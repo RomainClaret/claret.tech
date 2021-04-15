@@ -1,6 +1,6 @@
 {
-  "homepage": "https://romainclaret.github.io/claret.tech/",
-  "name": "romainclaret.github.io",
+  "homepage": "https://claret.tech/",
+  "name": "claret.tech",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
