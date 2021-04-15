@@ -59,8 +59,8 @@ export default class Main extends Component {
           <Talks />
           <Twitter />
           <Podcast />
-          <Profile />
           <Projects />
+          <Profile />
           <Footer />
           <Top />
         </StyleProvider>

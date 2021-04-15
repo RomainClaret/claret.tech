@@ -1,4 +1,4 @@
-﻿/* Change this file to get your personal Portfolio */
+/* Change this file to get your personal Portfolio */
 
 // Summary And Greeting Section
 
@@ -70,6 +70,10 @@ https://fontawesome.com/icons?d=gallery */
 
   softwareSkills: [
     {
+      skillName: "Python",
+      fontAwesomeClassname: "fab fa-python"
+    },
+    {
       skillName: "Machine Learning",
       fontAwesomeClassname: "fas fa-brain"
     },
@@ -101,10 +105,7 @@ https://fontawesome.com/icons?d=gallery */
       skillName: "Nonprofit",
       fontAwesomeClassname: "fas fa-users"
     },
-    {
-      skillName: "Python",
-      fontAwesomeClassname: "fab fa-python"
-    },
+    
     /*
     {
       skillName: "Docker",
@@ -267,7 +268,7 @@ To know how to get github key look at readme.md */
 
 const openSource = {
   display: true, // Set false to hide this section, defaults to true
-  showGithubProfile: 'true' // Set true or false to show Contact profile using Github, defaults to true
+  showGithubProfile: 'false' // Set true or false to show Contact profile using Github, defaults to true
 };
 
 // Some big projects you have worked on
