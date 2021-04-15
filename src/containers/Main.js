@@ -7,6 +7,7 @@ import WorkExperience from "./workExperience/WorkExperience";
 import Projects from "./projects/Projects";
 import StartupProject from "./StartupProjects/StartupProject";
 import Achievement from "./achievement/Achievement";
+import Papers from "./papers/Papers";
 import Blogs from "./blogs/Blogs";
 import Footer from "../components/footer/Footer";
 import Talks from "./talks/Talks";
@@ -51,14 +52,15 @@ export default class Main extends Component {
           <StackProgress />
           <Education />
           <WorkExperience />
-          <Projects />
           <StartupProject />
           <Achievement />
+          <Papers />
           <Blogs />
           <Talks />
           <Twitter />
           <Podcast />
           <Profile />
+          <Projects />
           <Footer />
           <Top />
         </StyleProvider>

@@ -8,7 +8,11 @@ export default function ExperienceCard({cardInfo, isDark}) {
 
   function getColorArrays() {
     const colorThief = new ColorThief();
-    setColorArrays(colorThief.getColor(imgRef.current));
+    cardInfo.header_color ? (
+      setColorArrays(cardInfo.header_color)
+    ): setColorArrays(colorThief.getColor(imgRef.current));
+    console.log('colorArrays', colorArrays)
+    
   }
 
   function rgb(values) {
@@ -48,6 +52,15 @@ export default function ExperienceCard({cardInfo, isDark}) {
         />
       </div>
       <div className="experience-text-details">
+        <p
+          className={
+            isDark
+              ? "subTitle experience-text-desc dark-mode-text"
+              : "subTitle experience-text-desc"
+          }
+        >
+          {cardInfo.company_desc}
+        </p>
         <h5
           className={
             isDark
@@ -57,7 +70,7 @@ export default function ExperienceCard({cardInfo, isDark}) {
         >
           {cardInfo.role}
         </h5>
-        <h5
+        <h6
           className={
             isDark
               ? "experience-text-date dark-mode-text"
@@ -65,7 +78,7 @@ export default function ExperienceCard({cardInfo, isDark}) {
           }
         >
           {cardInfo.date}
-        </h5>
+        </h6>
         <p
           className={
             isDark

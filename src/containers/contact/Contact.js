@@ -29,8 +29,8 @@ export default function Contact() {
                 isDark ? "dark-mode contact-text-div" : "contact-text-div"
               }
             >
-              <a className="contact-detail" href={"tel:" + contactInfo.number}>
-                {contactInfo.number}
+              <a className="contact-detail" href={contactInfo.twitter_url}  target={contactInfo.newTab && "_blank"}>
+                {contactInfo.twitter_desc}
               </a>
               <br />
               <br />
@@ -38,7 +38,7 @@ export default function Contact() {
                 className="contact-detail-email"
                 href={"mailto:" + contactInfo.email_address}
               >
-                {contactInfo.email_address}
+                {contactInfo.email_desc} {contactInfo.email_address}
               </a>
               <br />
               <br />

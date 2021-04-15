@@ -5,47 +5,64 @@
 import emoji from "react-easy-emoji";
 
 const illustration = {
-  animated: true // set to false to use static SVG
+  animated: false // set to false to use static SVG
 };
 
 const greeting = {
-  username: "Saad Pasta",
-  title: "Hi all, I'm Saad",
+  displayGreeting: true, // Set false to hide this section, defaults to true
+  username: "Claret.Tech",
+  title_greeting: "Greetings!",
+  title_greeting_newline: "I am Romain, ",
+  title_greeting_title_list: [
+    "a Software Enginneer.",1000,
+    "a PhD Student.",1000,
+    "a Lecturer.",1000,
+    "a Teaching Assistant.",1000,
+    "a Roleplayer.",1000,
+    "a Data Scientist.",1000,
+    "an AI Addict.",1000,
+    "a Technology Hacker.",1000,
+    "a Penguin Worshiper.",1000,
+    "an Open-source Contributor.",1000,
+    "a Sci-fi writer.",1000,
+    "an UNIX evangelist.",1000,
+  ],
   subTitle: emoji(
-    "A passionate Full Stack Software Developer 🚀 having an experience of building Web and Mobile applications with JavaScript / Reactjs / Nodejs / React Native and some other cool libraries and frameworks."
+    "Currently focusing my PhD research on Artificial General Intelligence. Self-diagnosed with an addiction to Autnomous Artificial Entities, passionated by any AI-driven technologies, and naively believing in decentalized censensuses."
   ),
-  resumeLink:
-    "https://drive.google.com/file/d/1ofFdKF_mqscH8WvXkSObnVvC9kK7Ldlu/view?usp=sharing",
-  displayGreeting: true // Set false to hide this section, defaults to true
+  resumeLink: "https://docs.google.com/gview?url=https://claret.tech/assets/documents/RomainClaret_CV.pdf"
 };
 
 // Social Media Links
 
 const socialMediaLinks = {
-  github: "https://github.com/saadpasta",
-  linkedin: "https://www.linkedin.com/in/saadpasta/",
-  gmail: "saadpasta70@gmail.com",
-  gitlab: "https://gitlab.com/saadpasta",
-  facebook: "https://www.facebook.com/saad.pasta7",
-  medium: "https://medium.com/@saadpasta",
-  stackoverflow: "https://stackoverflow.com/users/10422806/saad-pasta",
-  // Instagram and Twitter are also supported in the links!
-  display: true // Set true to display this section, defaults to false
+  display: true, // Set true to display this section, defaults to false
+  orcid: "https://orcid.org/0000-0002-5612-8471",
+  github: "https://github.com/RomainClaret",
+  linkedin: "https://www.linkedin.com/in/romainclaret/",
+  //gmail: "saadpasta70@gmail.com",
+  gitlab: "https://gitlab.com/RomainClaret",
+  //facebook: "https://www.facebook.com/saad.pasta7",
+  medium: "https://medium.com/@RomainClaret",
+  twitter: "https://twitter.com/RomainClaret",
+  stackoverflow: "https://stackoverflow.com/users/9648764/romain-claret",
+  instagram: "https://www.instagram.com/weak_intelligence/",
 };
 
 // Skills Section
 
 const skillsSection = {
+  display: true, // Set false to hide this section, defaults to true
   title: "What I do",
-  subTitle: "CRAZY FULL STACK DEVELOPER WHO WANTS TO EXPLORE EVERY TECH STACK",
+  subTitle: "PRETTY MUCH ANYTHING RELATED TO SOFTWARE ENGINEERING AND ARTIFICIAL INTELLIGENCE",
   skills: [
     emoji(
-      "⚡ Develop highly interactive Front end / User Interfaces for your web and mobile applications"
+      "⚡ Hack around anything that touchs to autnomous artificial entities and contibute to open-source projects."
     ),
-    emoji("⚡ Progressive Web Applications ( PWA ) in normal and SPA Stacks"),
     emoji(
-      "⚡ Integration of third party services such as Firebase/ AWS / Digital Ocean"
-    )
+      "🔗 Have a background in distributed-data and blockchain-protocols."
+    ),
+
   ],
 
   /* Make Sure to include correct Font Awesome Classname to view your icon
@@ -53,59 +70,52 @@ https://fontawesome.com/icons?d=gallery */
 
   softwareSkills: [
     {
-      skillName: "html-5",
-      fontAwesomeClassname: "fab fa-html5"
+      skillName: "Machine Learning",
+      fontAwesomeClassname: "fas fa-brain"
     },
     {
-      skillName: "css3",
-      fontAwesomeClassname: "fab fa-css3-alt"
+      skillName: "Algorithms",
+      fontAwesomeClassname: "fas fa-calculator"
     },
     {
-      skillName: "sass",
-      fontAwesomeClassname: "fab fa-sass"
+      skillName: "Research",
+      fontAwesomeClassname: "fas fa-flask"
     },
     {
-      skillName: "JavaScript",
-      fontAwesomeClassname: "fab fa-js"
+      skillName: "Teaching",
+      fontAwesomeClassname: "fas fa-graduation-cap"
     },
     {
-      skillName: "reactjs",
-      fontAwesomeClassname: "fab fa-react"
+      skillName: "Blockchain",
+      fontAwesomeClassname: "fas fa-link"
     },
     {
-      skillName: "nodejs",
-      fontAwesomeClassname: "fab fa-node"
+      skillName: "Consulting",
+      fontAwesomeClassname: "fas fa-puzzle-piece"
     },
     {
-      skillName: "swift",
-      fontAwesomeClassname: "fab fa-swift"
+      skillName: "Open-source",
+      fontAwesomeClassname: "fab fa-github"
     },
     {
-      skillName: "npm",
-      fontAwesomeClassname: "fab fa-npm"
+      skillName: "Nonprofit",
+      fontAwesomeClassname: "fas fa-users"
     },
     {
-      skillName: "sql-database",
-      fontAwesomeClassname: "fas fa-database"
-    },
-    {
-      skillName: "aws",
-      fontAwesomeClassname: "fab fa-aws"
-    },
-    {
-      skillName: "firebase",
-      fontAwesomeClassname: "fas fa-fire"
-    },
-    {
-      skillName: "python",
+      skillName: "Python",
       fontAwesomeClassname: "fab fa-python"
     },
+    /*
     {
-      skillName: "docker",
+      skillName: "Docker",
       fontAwesomeClassname: "fab fa-docker"
+    },
+    {
+      skillName: "Roleplay",
+      fontAwesomeClassname: "fas fa-dice-d20"
     }
-  ],
-  display: true // Set false to hide this section, defaults to true
+    */
+  ]
 };
 
 // Education Section
@@ -114,24 +124,37 @@ const educationInfo = {
   display: true, // Set false to hide this section, defaults to true
   schools: [
     {
-      schoolName: "Harvard University",
-      logo: require("./assets/images/harvardLogo.png"),
-      subHeader: "Master of Science in Computer Science",
-      duration: "September 2017 - April 2019",
-      desc: "Participated in the research of XXX and published 3 papers.",
+      schoolName: "University of Neuchâtel, Switzerland",
+      logo: require("./assets/images/unine_logo.jpg"),
+      subHeader: "PhD in Computer Science",
+      duration: "November 2020 - Present",
+      desc: "Thesis: [defining the subject]",
+      research: "",
       descBullets: [
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit"
+        "Research: Meta-Learning, Machine Reasoning, Graphs, Grounded Symbolics, Natural Language Processing, and Knowledge Representation.",
+        "Teaching Assistant (Bachelor in Economics): Analysis, Linear Algebra, and Databases",
+        "Lecturer (Bachelor in Healthcare): 'Demystifying Artificial Intelligence for Health Professionals'"
       ]
     },
     {
-      schoolName: "Stanford University",
-      logo: require("./assets/images/stanfordLogo.png"),
+      schoolName: "HES-SO University of Applied Sciences and Arts Western Switzerland, Lausanne, Switzerland",
+      logo: require("./assets/images/hes_so_logo_master.png"),
+      subHeader: "Master of Science in Engineering in Software Engineering",
+      duration: "September 2017 - April 2019",
+      desc: "Thesis: GraphQA - a Multi-hop Conversational Question-Answering Chatbot using Sub-Knowledge Graphs",
+      descBullets: ["Specialized in Machine Learning"]
+    },
+    {
+      schoolName: "HES-SO University of Applied Sciences and Arts Western Switzerland, Neuchâtel, Switzerland",
+      logo: require("./assets/images/he_arc_logo.png"),
       subHeader: "Bachelor of Science in Computer Science",
-      duration: "September 2013 - April 2017",
+      duration: "September 2013 - August 2016",
       desc:
-        "Ranked top 10% in the program. Took courses about Software Engineering, Web Security, Operating Systems, ...",
-      descBullets: ["Lorem ipsum dolor sit amet, consectetur adipiscing elit"]
+        "Thesis: Overclouds - an Anonymous and Decentralized Browser-based Data-sharing Service",
+      descBullets: [
+        "REH-SO: Head of Communication at the umbrella organization for HES-SO Students",
+        "My Arc: Founder of a social media and shortcut platform for HE-ARC Students"
+    ]
     }
   ]
 };
@@ -139,7 +162,7 @@ const educationInfo = {
 // Your top 3 proficient stacks/tech experience
 
 const techStack = {
-  viewSkillBars: true, //Set it to true to show Proficiency Section
+  viewSkillBars: false, //Set it to true to show Proficiency Section
   experience: [
     {
       Stack: "Frontend/Design", //Insert stack or technology you have experience in
@@ -163,33 +186,79 @@ const workExperiences = {
   display: true, //Set it to true to show workExperiences Section
   experience: [
     {
-      role: "Software Engineer",
-      company: "Facebook",
-      companylogo: require("./assets/images/facebookLogo.png"),
-      date: "June 2018 – Present",
-      desc:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      role: "IT Independent",
+      company: "Claret.Tech",
+      companylogo: require("./assets/images/clarettech_logo.jpg"),
+      company_desc: "Consulting for Blockchain and Autonomous Entities",
+      date: "Sep. 2018 – July 2017",
+      desc: "The tasks were to advise and suggest technologies, define project scopes, document, prototype, and prepare workshops. Active in the domains of Automation, Finance, Art, Video Games, and Non-Profit Organisation.",
       descBullets: [
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit"
+        "Geneva area, Lausanne area, and Versicherix AG, Switzerland",
+        "#Blockchain #SmartContracts #Python #MachineLearning #Tensorflow #NodeJS #IoT #HelpingStartups #ICO",
       ]
     },
     {
-      role: "Front-End Developer",
-      company: "Quora",
-      companylogo: require("./assets/images/quoraLogo.png"),
-      date: "May 2017 – May 2018",
-      desc:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+      role: "Co-Founder",
+      company: "Versicherix",
+      companylogo: require("./assets/images/versicherix_logo.png"),
+      company_desc: "Blockchain-based InsurTech Startup",
+      date: "June 2017 - Nov. 2016",
+      desc: "In charge of Blockchain & Innovation, the tasks were to make software architectures, do high-level schematics for company products, project management, conduct workshops, prototype & implement software, and write documentation. Also participating in Startup tasks such as administration, fundraising, exhibitions, partnerships, and market studies.",
+      descBullets: [
+        "Versicherix AG, Solothurn, Switzerland",
+        "#Ethereum #SmartContracts #ERC20 #TOGAF #NodeJS #CI/CD #Azure #Python #MicroServices #Agile #PHP"
+      ]
     },
     {
-      role: "Software Engineer Intern",
-      company: "Airbnb",
+      role: "Founder",
+      company: "Overclouds",
+      companylogo: require("./assets/images/overclouds_logo.png"),
+      company_desc: "Open-Source consensus-based distributed file-hosting service",
+      date: "Oct. 2016 - Dec, 2015",
+      desc: "Lead developer on an Open-Source project. The tasks were to make software architectures, prototype & implement software, write documentation, and do research.",
+      descBullets: [
+        "Overclouds project, Neuchâtel, Switzerland",
+        "#WebRTC #P2P #WebTorrents #NodeJS #Serverless #Distributed #Privacy #DistributedConsensus #Blockchain",
+      ]
+    },
+    {
+      role: "Founder",
+      company: "Libacy",
+      companylogo: require("./assets/images/libacy_logo.png"),
+      company_desc: "Streaming-based service for a multimedia library Startup",
+      date: "Oct. 2015 - Oct. 2010",
+      desc: "Lead developer and executive at a media-services provider Startup. The tasks were to do prototypes & implement software, make digital rights management & software architectures, write documentation, build the business model, do market studies, do fundraising, create partnerships with Film Studios, and comply with copyright laws.",
+      descBullets: [
+        "Libacy, Neuchâtel, Switzerland",
+        "#NodeJS #PHP #Python #Cryptography #MachineVision #FilmAuthentication #FamilySharing #WebRTC #AWS",
+      ]
+    },
+    /*
+    {
+      role: "Internship",
+      company: "Jenks Vestibular Lab",
       companylogo: require("./assets/images/airbnbLogo.png"),
-      date: "Jan 2015 – Sep 2015",
-      desc:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-    }
+      company_desc: "Streaming-based service for a multimedia library Startup.",
+      date: "May 2010 - August 2010 08/2010 05/2010",
+      desc: "Design an experiment to identify a link between vision and the vestibular system. The tasks were to build in 3D the setup, construct the setup by adapting a hydraulic flight simulator, run Matlab simulations, experiment on human subjects, and interpret the results.",
+      descBullets: [
+        "Massachusetts Eye & Ear Infirmary, Harvard Medical School, Boston, United States of America",
+        "See poster 11/2010",
+      ]
+    },
+    {
+      role: "Internship",
+      company: "Manufacture Claret",
+      companylogo: require("./assets/images/airbnbLogo.png"),
+      company_desc: "Streaming-based service for a multimedia library Startup.",
+      date: "Summers in 2004, 2005, 2006, 2012",
+      desc: "Internships @ Watchmaking Industry. ",
+      descBullets: [
+        "Overclouds project, Neuchâtel, Switzerland",
+        "#WebRTC #P2P #WebTorrents #NodeJS #Serverless #Distributed #Privacy #DistributedConsensus #Blockchain",
+      ]
+    },
+    */
   ]
 };
 
@@ -197,13 +266,14 @@ const workExperiences = {
 To know how to get github key look at readme.md */
 
 const openSource = {
-  showGithubProfile: "true", // Set true or false to show Contact profile using Github, defaults to true
-  display: true // Set false to hide this section, defaults to true
+  display: true, // Set false to hide this section, defaults to true
+  showGithubProfile: 'true' // Set true or false to show Contact profile using Github, defaults to true
 };
 
 // Some big projects you have worked on
 
 const bigProjects = {
+  display: false, // Set false to hide this section, defaults to true
   title: "Big Projects",
   subtitle: "SOME STARTUPS AND COMPANIES THAT I HELPED TO CREATE THEIR TECH",
   projects: [
@@ -230,75 +300,119 @@ const bigProjects = {
         }
       ]
     }
-  ],
-  display: true // Set false to hide this section, defaults to true
+  ]
 };
 
 // Achievement Section
 // Include certificates, talks etc
 
 const achievementSection = {
-  title: emoji("Achievements And Certifications 🏆 "),
+  display: false, // Set false to hide this section, defaults to true
+  title: emoji("Achievements And Certifications 🏆"),
   subtitle:
     "Achievements, Certifications, Award Letters and Some Cool Stuff that I have done !",
 
   achievementsCards: [
     {
-      title: "Google Code-In Finalist",
+      title: "asdasd",
       subtitle:
-        "First Pakistani to be selected as Google Code-in Finalist from 4000 students from 77 different countries.",
+        "sad",
       image: require("./assets/images/codeInLogo.webp"),
-      footerLink: [
-        {
-          name: "Certification",
-          url:
-            "https://drive.google.com/file/d/0B7kazrtMwm5dYkVvNjdNWjNybWJrbndFSHpNY2NFV1p4YmU0/view?usp=sharing"
-        },
-        {
-          name: "Award Letter",
-          url:
-            "https://drive.google.com/file/d/0B7kazrtMwm5dekxBTW5hQkg2WXUyR3QzQmR0VERiLXlGRVdF/view?usp=sharing"
-        },
-        {
-          name: "Google Code-in Blog",
-          url:
-            "https://opensource.googleblog.com/2019/01/google-code-in-2018-winners.html"
-        }
-      ]
+      footerLink: []
     },
     {
-      title: "Google Assistant Action",
+      title: "asdsad",
       subtitle:
-        "Developed a Google Assistant Action JavaScript Guru that is available on 2 Billion devices world wide.",
+        "asd",
       image: require("./assets/images/googleAssistantLogo.webp"),
+      footerLink: []
+    }
+  ]
+};
+
+// Papers Section
+
+const papersSection = {
+  display: true, // Set false to hide this section, defaults to true
+  title: emoji("Papers, Posters, and Theses"),
+  subtitle: "Stuff that I wrote or contibuted to",
+
+  papersCards: [
+    {
+      title: "Master's Thesis",
+      date: "03.2020",
+      subtitle: "We propose an innovative approach for question-answering chatbots to handle conversational contexts and generate natural language sentences as answers. In addition to the ability to answer open-domain questions, our zero-shot learning approach, which uses a pure algorithmic orchestration in a grounded learning manner, provides a modular architecture to swap statically or dynamically task-oriented models while preserving its independence to training.",
+      image: require("./assets/images/paper_graphqa_2020.png"),
       footerLink: [
         {
-          name: "View Google Assistant Action",
-          url:
-            "https://assistant.google.com/services/a/uid/000000100ee688ee?hl=en"
+          name: "Read Thesis",
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Msc_Thesis.pdf"
+        },
+        {
+          name: "Read Poster",
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Msc_Thesis_Poster.pdf"
+        },
+        {
+          name: "Code",
+          url: "https://github.com/RomainClaret/mse.thesis.code"
         }
       ]
     },
-
     {
-      title: "PWA Web App Developer",
-      subtitle: "Completed Certifcation from SMIT for PWA Web App Development",
-      image: require("./assets/images/pwaLogo.webp"),
+      title: "Blockchain, a techie overview",
+      date: "09.2016",
+      subtitle: "As of 2016, Blockchain is a buzzword associated with shady cryptocurrencies and not a distributed ledger framework. This technology is widely misunderstood, and false visions are propagated. As a result, Blockchain is categorized as some mystical technology that nobody understands. In this paper, we try to overview what Blockchain is and help the reader make an opinion about it from a technical perspective.",
+      image: require("./assets/images/paper_blockchain_2016.png"),
       footerLink: [
-        {name: "Certification", url: ""},
         {
-          name: "Final Project",
-          url: "https://pakistan-olx-1.firebaseapp.com/"
+          name: "Read Paper",
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/paper_blockchain_small_techie_overview_2016.pdf"
+        }
+      ]
+    },
+    {
+      title: "Bachelor Thesis",
+      date: "07.2016",
+      subtitle: "The initiative behind this project is to create a new generation of decentralized services to offer data sharing with a digital democracy over Internet. The services also want to be adapted to today’s paranoia about Internet privacy as well as the preservation of knowledge for the next human generations. The idea is to give the ability to the user to not rely on corporate servers, or farms of servers (cloud) anymore.",
+      image: require("./assets/images/overclouds_logo.png"),
+      footerLink: [
+        {
+          name: "Read Thesis",
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis"
+        },
+        {
+          name: "Read Poster",
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis_Poster"
+        },
+        {
+          name: "Code",
+          url: "https://github.com/RomainClaret/OverClouds"
+        }
+      ]
+    },
+    {
+      title: "Poster",
+      date: "11.2010",
+      subtitle: "Prior studies show that visual motion perception is more precise than vestibular motion perception, but it is unclear whether this is universal or the result of specific experimental conditions. We compared visual and vestibular motion precision over a broad range of temporal frequencies by measuring thresholds for vestibular (subject motion in the dark), visual (visual scene motion) or visual-vestibular (subject motion in the light) stimuli.",
+      image: require("./assets/images/paper_visual_vestibular_2013.png"),
+      footerLink: [
+        {
+          name: "Read Poster", 
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf"
+        },
+        {
+          name: "Read related Paper", 
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/paper_doi_10.1152_jn_00332_2013_2013.pdf"
         }
       ]
     }
-  ],
-  display: true // Set false to hide this section, defaults to true
+  ]
 };
 
 // Blogs Section
 
 const blogSection = {
+  display: false, // Set false to hide this section, defaults to true
   title: "Blogs",
   subtitle:
     "With Love for Developing cool stuff, I love to write and teach others what I have learnt.",
@@ -316,14 +430,20 @@ const blogSection = {
       title: "Why REACT is The Best?",
       description:
         "React is a JavaScript library for building User Interface. It is maintained by Facebook and a community of individual developers and companies."
-    }
-  ],
-  display: true // Set false to hide this section, defaults to true
+    },
+    {
+      url: "https://medium.com/@saadpasta/why-react-is-the-best-5a97563f423e",
+      title: "Why REACT is The Best?",
+      description:
+        "React is a JavaScript library for building User Interface. It is maintained by Facebook and a community of individual developers and companies."
+    },
+  ]
 };
 
 // Talks Sections
 
 const talkSection = {
+  display: false, // Set false to hide this section, defaults to true
   title: "TALKS",
   subtitle: emoji(
     "I LOVE TO SHARE MY LIMITED KNOWLEDGE AND GET A SPEAKER BADGE 😅"
@@ -335,37 +455,51 @@ const talkSection = {
       subtitle: "Codelab at GDG DevFest Karachi 2019",
       slides_url: "https://bit.ly/saadpasta-slides",
       event_url: "https://www.facebook.com/events/2339906106275053/"
+    },
+    {
+      title: "Build Actions For Google Assistant",
+      subtitle: "Codelab at GDG DevFest Karachi 2019",
+      slides_url: "https://bit.ly/saadpasta-slides",
+      event_url: "https://www.facebook.com/events/2339906106275053/"
+    },
+    {
+      title: "Build Actions For Google Assistant",
+      subtitle: "Codelab at GDG DevFest Karachi 2019",
+      slides_url: "https://bit.ly/saadpasta-slides",
+      event_url: "https://www.facebook.com/events/2339906106275053/"
     }
-  ],
-  display: true // Set false to hide this section, defaults to true
+  ]
 };
 
 // Podcast Section
 
 const podcastSection = {
+  display: false, // Set false to hide this section, defaults to true
   title: emoji("Podcast 🎙️"),
   subtitle: "I LOVE TO TALK ABOUT MYSELF AND TECHNOLOGY",
 
   // Please Provide with Your Podcast embeded Link
   podcast: [
     "https://anchor.fm/codevcast/embed/episodes/DevStory---Saad-Pasta-from-Karachi--Pakistan-e9givv/a-a15itvo"
-  ],
-  display: true // Set false to hide this section, defaults to true
+  ]
 };
 
 const contactInfo = {
-  title: emoji("Contact Me ☎️"),
+  title: emoji("Reach out to me"),
   subtitle:
-    "Discuss a project or just want to say hi? My Inbox is open for all.",
-  number: "+92-3243454077",
-  email_address: "saadpasta70@gmail.com"
+    "Just want to say hi? Talk AGI? Discuss a project?",
+  twitter_url: "https://twitter.com/RomainClaret",
+  twitter_desc: "Drop me a line on Twitter",
+  newTab: "true",
+  email_address: "romain.claret {at} unine.ch",
+  email_desc: "Or email:",
 };
 
 // Twitter Section
 
 const twitterDetails = {
-  userName: "twitter", //Replace "twitter" with your twitter username without @
-  display: true // Set true to display this section, defaults to false
+  display: false, // Set true to display this section, defaults to false
+  userName: "RomainClaret" //Replace "twitter" with your twitter username without @
 };
 
 export {
@@ -379,6 +513,7 @@ export {
   openSource,
   bigProjects,
   achievementSection,
+  papersSection,
   blogSection,
   talkSection,
   podcastSection,

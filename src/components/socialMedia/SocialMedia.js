@@ -8,6 +8,18 @@ export default function socialMedia() {
   }
   return (
     <div className="social-media-div">
+      {socialMediaLinks.orcid ? (
+        <a
+          href={socialMediaLinks.orcid}
+          className="icon-button orcid"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <i className="fab fa-orcid"></i>
+          <span></span>
+        </a>
+      ) : null}
+      
       {socialMediaLinks.github ? (
         <a
           href={socialMediaLinks.github}
@@ -99,7 +111,7 @@ export default function socialMedia() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <i className="fab fa-medium"></i>
+          <i className="fab fa-medium-m"></i>
           <span></span>
         </a>
       ) : null}

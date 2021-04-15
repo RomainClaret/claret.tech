@@ -62,6 +62,10 @@
   background-color: #c13584;
 }
 
+.orcid i {
+  background-color: #A6CE39;
+}
+
 /* Hover Transition */
 .twitter i:hover,
 .google i:hover,
@@ -71,9 +75,11 @@
 .facebook i:hover,
 .instagram i:hover,
 .stack-overflow i:hover,
+.orcid i:hover,
 .medium i:hover {
   background-color: black;
 }
+
 
 /* Media Query */
 @media (max-width: 768px) {
