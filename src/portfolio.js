@@ -28,9 +28,9 @@ const greeting = {
     "an UNIX evangelist.",1000,
   ],
   subTitle: emoji(
-    "Currently focusing my PhD research on Artificial General Intelligence. Self-diagnosed with an addiction to Autnomous Artificial Entities, passionated by any AI-driven technologies, and naively believing in decentalized censensuses."
+    "Currently focusing my Ph.D. research on Artificial General Intelligence. Self-diagnosed with an addiction to Autonomous Artificial Entities, passionated by any AI-driven technologies, and naively believing in decentralized consensuses."
   ),
-  resumeLink: "https://docs.google.com/gview?url=https://claret.tech/assets/documents/RomainClaret_CV.pdf"
+  resumeLink: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_CV.pdf"
 };
 
 // Social Media Links
@@ -57,10 +57,10 @@ const skillsSection = {
   subTitle: "PRETTY MUCH ANYTHING RELATED TO SOFTWARE ENGINEERING AND ARTIFICIAL INTELLIGENCE",
   skills: [
     emoji(
-      "⚡ Hack around anything that touchs to autnomous artificial entities and contibute to open-source projects."
+      "⚡ Hack around anything that touches autonomous artificial entities and contributes to open-source projects."
     ),
     emoji(
-      "🔗 Have a background in distributed-data and blockchain-protocols."
+      "🔗 Have a background in distributed-data and blockchain protocols."
     ),
 
   ],
@@ -379,11 +379,11 @@ const papersSection = {
       footerLink: [
         {
           name: "Read Thesis",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis"
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis.pdf"
         },
         {
           name: "Read Poster",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis_Poster"
+          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis_Poster.pdf"
         },
         {
           name: "Code",
