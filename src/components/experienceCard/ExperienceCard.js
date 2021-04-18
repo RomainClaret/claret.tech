@@ -49,6 +49,8 @@ export default function ExperienceCard({cardInfo, isDark}) {
           src={cardInfo.companylogo}
           alt={cardInfo.company}
           onLoad={() => getColorArrays()}
+          onClick={cardInfo.company_url ? () => window.open(cardInfo.company_url, "_blank") : undefined}
+          
         />
       </div>
       <div className="experience-text-details">

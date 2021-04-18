@@ -126,6 +126,7 @@ const educationInfo = {
   schools: [
     {
       schoolName: "University of Neuchâtel, Switzerland",
+      school_url: "https://www.unine.ch",
       logo: require("./assets/images/unine_logo.jpg"),
       subHeader: "PhD in Computer Science",
       duration: "November 2020 - Present",
@@ -139,6 +140,7 @@ const educationInfo = {
     },
     {
       schoolName: "HES-SO University of Applied Sciences and Arts Western Switzerland, Lausanne, Switzerland",
+      school_url: "https://master.hes-so.ch/master",
       logo: require("./assets/images/hes_so_logo_master.png"),
       subHeader: "Master of Science in Engineering in Software Engineering",
       duration: "September 2017 - April 2019",
@@ -147,6 +149,7 @@ const educationInfo = {
     },
     {
       schoolName: "HES-SO University of Applied Sciences and Arts Western Switzerland, Neuchâtel, Switzerland",
+      school_url: "https://www.he-arc.ch/",
       logo: require("./assets/images/he_arc_logo.png"),
       subHeader: "Bachelor of Science in Computer Science",
       duration: "September 2013 - August 2016",
@@ -187,38 +190,54 @@ const workExperiences = {
   display: true, //Set it to true to show workExperiences Section
   experience: [
     {
+      role: "Founder",
+      company: "Artificialkind",
+      company_url: "https://artificialkind.com/",
+      companylogo: require("./assets/images/artificialkind_logo.png"),
+      company_desc: "Supercharging the Humankind with Artificial Entities",
+      date: "Present – Jan. 2018",
+      desc: "We build autonomous artificial entities and a hybrid ecosystem for you and them. Reshaping standards and establishing new meaningful foundations for the humanity by closely working with our community. Not only providing cutting-edge technologies, products, and services, we are also training you to use them.",
+      descBullets: [
+        "Neuchâtel, Switzerland",
+        "#AGI #AutonomousAI #MachineLearning #Nonprofit #R&D #HighTechDriven",
+      ]
+    },
+    {
       role: "IT Independent",
       company: "Claret.Tech",
+      company_url: "https://claret.tech/",
       companylogo: require("./assets/images/clarettech_logo.jpg"),
-      company_desc: "Consulting for Blockchain and Autonomous Entities",
+      company_desc: "Providing consulting for Blockchain, Smart-Contracts and AI",
       date: "Sep. 2018 – July 2017",
       desc: "The tasks were to advise and suggest technologies, define project scopes, document, prototype, and prepare workshops. Active in the domains of Automation, Finance, Art, Video Games, and Non-Profit Organisation.",
       descBullets: [
-        "Geneva area, Lausanne area, and Versicherix AG, Switzerland",
+        "Geneva area, Lausanne area, and Solothurn, Switzerland",
         "#Blockchain #SmartContracts #Python #MachineLearning #Tensorflow #NodeJS #IoT #HelpingStartups #ICO",
       ]
     },
     {
       role: "Co-Founder",
       company: "Versicherix",
+      company_url: "https://versicherix.com/",
       companylogo: require("./assets/images/versicherix_logo.png"),
-      company_desc: "Blockchain-based InsurTech Startup",
+      company_desc: "InsurTech Startup providing blockchain-based services",
       date: "June 2017 - Nov. 2016",
       desc: "In charge of Blockchain & Innovation, the tasks were to make software architectures, do high-level schematics for company products, project management, conduct workshops, prototype & implement software, and write documentation. Also participating in Startup tasks such as administration, fundraising, exhibitions, partnerships, and market studies.",
       descBullets: [
-        "Versicherix AG, Solothurn, Switzerland",
+        "Solothurn, Switzerland",
         "#Ethereum #SmartContracts #ERC20 #TOGAF #NodeJS #CI/CD #Azure #Python #MicroServices #Agile #PHP"
       ]
     },
     {
       role: "Founder",
       company: "Overclouds",
+      company_url: "https://github.com/RomainClaret/OverClouds",
       companylogo: require("./assets/images/overclouds_logo.png"),
       company_desc: "Open-Source consensus-based distributed file-hosting service",
       date: "Oct. 2016 - Dec, 2015",
       desc: "Lead developer on an Open-Source project. The tasks were to make software architectures, prototype & implement software, write documentation, and do research.",
       descBullets: [
-        "Overclouds project, Neuchâtel, Switzerland",
+        "Neuchâtel, Switzerland",
         "#WebRTC #P2P #WebTorrents #NodeJS #Serverless #Distributed #Privacy #DistributedConsensus #Blockchain",
       ]
     },
@@ -230,36 +249,40 @@ const workExperiences = {
       date: "Oct. 2015 - Oct. 2010",
       desc: "Lead developer and executive at a media-services provider Startup. The tasks were to do prototypes & implement software, make digital rights management & software architectures, write documentation, build the business model, do market studies, do fundraising, create partnerships with Film Studios, and comply with copyright laws.",
       descBullets: [
-        "Libacy, Neuchâtel, Switzerland",
+        "Project name: MovieCircle",
+        "Neuchâtel, Switzerland",
         "#NodeJS #PHP #Python #Cryptography #MachineVision #FilmAuthentication #FamilySharing #WebRTC #AWS",
       ]
     },
-    /*
     {
       role: "Internship",
       company: "Jenks Vestibular Lab",
-      companylogo: require("./assets/images/airbnbLogo.png"),
-      company_desc: "Streaming-based service for a multimedia library Startup.",
-      date: "May 2010 - August 2010 08/2010 05/2010",
+      company_url: "https://www.masseyeandear.org/research/otolaryngology/vestibular",
+      companylogo: require("./assets/images/jvpl_logo.png"),
+      company_desc: "Development of balance aids for patients suffering imbalance, as well as vestibular implants for patients who have lost inner ear function.",
+      date: "Aug. 2010 - May 2010",
       desc: "Design an experiment to identify a link between vision and the vestibular system. The tasks were to build in 3D the setup, construct the setup by adapting a hydraulic flight simulator, run Matlab simulations, experiment on human subjects, and interpret the results.",
       descBullets: [
-        "Massachusetts Eye & Ear Infirmary, Harvard Medical School, Boston, United States of America",
         "See poster 11/2010",
+        "Massachusetts Eye & Ear Infirmary, Harvard Medical School, Boston, United States of America",
       ]
     },
     {
-      role: "Internship",
+      role: "Internships",
       company: "Manufacture Claret",
-      companylogo: require("./assets/images/airbnbLogo.png"),
-      company_desc: "Streaming-based service for a multimedia library Startup.",
-      date: "Summers in 2004, 2005, 2006, 2012",
-      desc: "Internships @ Watchmaking Industry. ",
+      company_url: "https://www.christopheclaret.com/",
+      companylogo: require("./assets/images/manufactureclaret_logo.jpg"),
+      company_desc: "Respect for watchmaking traditions and time-honoured savoir faire go hand in hand with a quest for innovation and excellence",
+      date: "Summers in 2012, 2006, 2005, 2004",
+      //desc: "Internships in watchmaking industry.",
       descBullets: [
-        "Overclouds project, Neuchâtel, Switzerland",
-        "#WebRTC #P2P #WebTorrents #NodeJS #Serverless #Distributed #Privacy #DistributedConsensus #Blockchain",
+        "Watchmaking research and development using 3D computer-aided design (CAD).",
+        "Manufacturing, chamfering, and technical control.",
+        "Disassembly, reassembly and customization of a mechanical pocket watch.",
+        "3D CAD construction and technical drawing of watch movements.",
+        "Le Locle, Switzerland",
       ]
     },
-    */
   ]
 };
 

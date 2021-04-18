@@ -5,6 +5,7 @@ import ToggleSwitch from "../ToggleSwitch/ToggleSwitch";
 import StyleContext from "../../contexts/StyleContext";
 import {
   greeting,
+  educationInfo,
   workExperiences,
   skillsSection,
   openSource,
@@ -31,7 +32,7 @@ function Header() {
   const viewExperience = workExperiences.display;
   const viewOpenSource = openSource.display;
   const viewSkills = skillsSection.display;
-  //const viewEducation = educationSection.display;
+  const viewEducation = educationInfo.display;
   const viewAchievement = achievementSection.display;
   const viewPapers = papersSection.display;
   const viewBlog = blogSection.display;
@@ -66,6 +67,21 @@ function Header() {
               <a href="#skills">Skills</a>
             </li>
           )}
+          {viewOpenSource && (
+            <li>
+              <a href="#opensource">Opensource</a>
+            </li>
+          )}
+          {viewEducation && (
+            <li>
+              <a href="#education">Education</a>
+            </li>
+          )}
+          {viewPapers && (
+            <li>
+              <a href="#papers">Papers</a>
+            </li>
+          )}
           {viewExperience && (
             <li>
               <a href="#experience">Work Experiences</a>
@@ -74,11 +90,6 @@ function Header() {
           {viewAchievement && (
             <li>
               <a href="#achievements">Achievements</a>
-            </li>
-          )}
-          {viewPapers && (
-            <li>
-              <a href="#papers">Papers</a>
             </li>
           )}
           {viewBlog && (
@@ -91,11 +102,7 @@ function Header() {
               <a href="#talks">Talks</a>
             </li>
           )}
-          {viewOpenSource && (
-            <li>
-              <a href="#opensource">Repositories</a>
-            </li>
-          )}
+          
           <li>
             <a href="#contact">Contact Me</a>
           </li>

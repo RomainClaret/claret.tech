@@ -27,6 +27,7 @@ export default function EducationCard({school}) {
               className="education-roundedimg"
               src={school.logo}
               alt={school.schoolName}
+              onClick={school.school_url ? () => window.open(school.school_url, "_blank") : undefined}
             />
           </div>
           <div className="education-card-right">
