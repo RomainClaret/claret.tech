@@ -1,43 +1,43 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "df24f8094f4afd0c2afa3967d591ea31",
+    "revision": "83b2d5d98d6b3c247776a9deb89ab85b",
     "url": "/index.html"
   },
   {
-    "revision": "9c5469207fbc327dd61d",
+    "revision": "f8220cf999dda7936d1b",
     "url": "/static/css/3.6a352120.chunk.css"
   },
   {
-    "revision": "4a9c7933a0642ece8ea9",
+    "revision": "f297e691285507c179c1",
     "url": "/static/css/4.6e14a8dd.chunk.css"
   },
   {
-    "revision": "a6fa5d3b510abe016d65",
+    "revision": "56a593e02b305e7145e0",
     "url": "/static/css/main.c1af0799.chunk.css"
   },
   {
-    "revision": "53e11f9fbaa48fa5249a",
-    "url": "/static/js/2.69459e8c.chunk.js"
+    "revision": "4b530d5cd72475fcd984",
+    "url": "/static/js/2.be2263e7.chunk.js"
   },
   {
     "revision": "6e1d2efc12a1ac972ff1f942df7eb0bd",
-    "url": "/static/js/2.69459e8c.chunk.js.LICENSE.txt"
+    "url": "/static/js/2.be2263e7.chunk.js.LICENSE.txt"
   },
   {
-    "revision": "9c5469207fbc327dd61d",
-    "url": "/static/js/3.c4b055a1.chunk.js"
+    "revision": "f8220cf999dda7936d1b",
+    "url": "/static/js/3.a4aa5c9c.chunk.js"
   },
   {
-    "revision": "4a9c7933a0642ece8ea9",
-    "url": "/static/js/4.58fde81a.chunk.js"
+    "revision": "f297e691285507c179c1",
+    "url": "/static/js/4.4606631d.chunk.js"
   },
   {
-    "revision": "a6fa5d3b510abe016d65",
-    "url": "/static/js/main.aa2c72ae.chunk.js"
+    "revision": "56a593e02b305e7145e0",
+    "url": "/static/js/main.9499e815.chunk.js"
   },
   {
-    "revision": "dbbce16766889bbb476d",
-    "url": "/static/js/runtime-main.f8109df1.js"
+    "revision": "7cb86cfba04990e72854",
+    "url": "/static/js/runtime-main.cad1bd2f.js"
   },
   {
     "revision": "21f233e19402cc4a66866a7f31191f0d",
@@ -46,6 +46,10 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
     "revision": "ee6539921d713482b8ccd4d0d23961bb",
     "url": "/static/media/Montserrat-Regular.ee653992.ttf"
+  },
+  {
+    "revision": "f0e8a6ed18b1f190231f67ec1a2fd52d",
+    "url": "/static/media/artificialkind_logo.f0e8a6ed.png"
   },
   {
     "revision": "629f7543f7a96e39f328a9bd5f793897",
@@ -72,12 +76,20 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/static/media/hes_so_logo_master.7afa6cf0.png"
   },
   {
+    "revision": "de6173e09c858bf4ce76fae266869821",
+    "url": "/static/media/jvpl_logo.de6173e0.png"
+  },
+  {
     "revision": "6581ad24e74bfe156c9b016794f4b682",
     "url": "/static/media/libacy_logo.6581ad24.png"
   },
   {
     "revision": "52be31441c8cf8a8a16bd7a228d428bf",
     "url": "/static/media/manOnTable.52be3144.svg"
+  },
+  {
+    "revision": "332eec31134a7f458254f5449b415431",
+    "url": "/static/media/manufactureclaret_logo.332eec31.jpg"
   },
   {
     "revision": "829ad0a1deef4d7295adfecdf12df2be",
