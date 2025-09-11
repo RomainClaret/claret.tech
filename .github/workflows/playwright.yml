@@ -1,0 +1,902 @@
+name: Playwright Tests
+on:
+  workflow_dispatch:  # Allow manual triggering to control quota usage
+    inputs:
+      force_all_tests:
+        description: 'Force run all tests (ignore change detection)'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'          # Skip documentation changes
+      - '.github/workflows/ci.yml'  # Skip CI-only changes
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'          # Skip documentation changes
+      - '.github/workflows/ci.yml'  # Skip CI-only changes
+      - 'LICENSE'
+      - '.gitignore'
+
+env:
+  # Skip external API calls in CI for stability
+  SKIP_EXTERNAL_APIS: true
+
+# QUOTA OPTIMIZATION FEATURES:
+# - workflow_dispatch: Manual triggering to control usage
+# - paths-ignore: Skip runs for documentation and non-code changes
+# - Playwright browser caching: Reduce browser download time and quota usage
+# - npm caching: Already enabled via actions/setup-node cache parameter
+
+jobs:
+  # Detect changed files to run only relevant tests
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.filter.outputs.tests }}
+      navigation: ${{ steps.filter.outputs.navigation }}
+      accessibility: ${{ steps.filter.outputs.accessibility }}
+      performance: ${{ steps.filter.outputs.performance }}
+      terminal: ${{ steps.filter.outputs.terminal }}
+      load: ${{ steps.filter.outputs.load }}
+      lighthouse: ${{ steps.filter.outputs.lighthouse }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      src: ${{ steps.filter.outputs.src }}
+      dependencies: ${{ steps.filter.outputs.dependencies }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Only need 2 commits for comparison
+          
+      - name: Get base commit
+        id: base_commit
+        run: |
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            echo "base=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
+            echo "Using HEAD~1 as base: $(git rev-parse HEAD~1)"
+          else
+            echo "base=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+            echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
+          fi
+          
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          base: ${{ steps.base_commit.outputs.base }}
+          filters: |
+            tests:
+              - 'tests/**'
+            navigation:
+              - 'tests/e2e/navigation.spec.ts'
+              - 'src/**/nav*.{ts,tsx}'
+              - 'src/**/header*.{ts,tsx}'
+              - 'src/**/menu*.{ts,tsx}'
+              - 'src/components/layout/**'
+            accessibility:
+              - 'tests/e2e/accessibility.spec.ts'
+              - 'src/**/*aria*.{ts,tsx}'
+              - 'src/**/*a11y*.{ts,tsx}'
+              - 'src/**/*accessibility*.{ts,tsx}'
+              - 'src/**/theme*.{ts,tsx}'
+            performance:
+              - 'tests/e2e/performance.spec.ts'
+              - 'src/**/*performance*.{ts,tsx}'
+              - 'src/**/*optimization*.{ts,tsx}'
+              - 'src/**/*lazy*.{ts,tsx}'
+            terminal:
+              - 'tests/e2e/terminal.spec.ts'
+              - 'src/**/terminal/**'
+              - 'src/**/*terminal*.{ts,tsx}'
+              - 'src/**/*command*.{ts,tsx}'
+            load:
+              - 'tests/e2e/load-testing.spec.ts'
+              - 'src/**/*load*.{ts,tsx}'
+              - 'src/**/*stress*.{ts,tsx}'
+            lighthouse:
+              - 'tests/e2e/lighthouse.spec.ts'
+              - 'next.config.js'
+              - 'src/app/**'
+              - 'src/**/optimization*.{ts,tsx}'
+            mobile:
+              - 'tests/e2e/mobile-navigation.spec.ts'
+              - 'tests/e2e/mobile-accessibility.spec.ts'
+              - 'src/**/*mobile*.{ts,tsx}'
+              - 'src/**/*responsive*.{ts,tsx}'
+              - 'src/**/*breakpoint*.{ts,tsx}'
+              - 'tailwind.config.js'
+            src:
+              - 'src/**'
+              - 'public/**'
+              - 'styles/**'
+              - '*.config.js'
+            dependencies:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
+            workflows:
+              - '.github/workflows/**'
+
+  # Navigation tests across browsers
+  navigation-tests:
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (github.ref == 'refs/heads/main' ||
+       needs.detect-changes.outputs.navigation == 'true' ||
+       needs.detect-changes.outputs.src == 'true' ||
+       needs.detect-changes.outputs.dependencies == 'true' ||
+       needs.detect-changes.outputs.workflows == 'true')
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache Playwright test results to avoid re-running unchanged tests
+      - name: Cache Navigation test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            playwright-report/
+            test-results/
+            .playwright-cache/
+          key: playwright-navigation-${{ matrix.browser }}-${{ hashFiles('tests/e2e/navigation.spec.ts', 'src/**/nav*.{ts,tsx}', 'src/**/header*.{ts,tsx}', 'src/**/menu*.{ts,tsx}', 'src/components/layout/**', 'package-lock.json') }}
+          restore-keys: |
+            playwright-navigation-${{ matrix.browser }}-${{ github.ref_name }}-
+            playwright-navigation-${{ matrix.browser }}-
+
+      - name: Install Playwright Browser
+        run: npx playwright install ${{ matrix.browser }}
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Navigation Tests
+        run: npx playwright test tests/e2e/navigation.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: navigation-tests-${{ matrix.browser }}-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Accessibility tests across browsers
+  accessibility-tests:
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (github.ref == 'refs/heads/main' ||
+       needs.detect-changes.outputs.accessibility == 'true' ||
+       needs.detect-changes.outputs.src == 'true' ||
+       needs.detect-changes.outputs.dependencies == 'true' ||
+       needs.detect-changes.outputs.workflows == 'true')
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]  # Skip firefox for accessibility due to timeouts
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browser
+        run: npx playwright install ${{ matrix.browser }}
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Accessibility Tests
+        run: npx playwright test tests/e2e/accessibility.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: accessibility-tests-${{ matrix.browser }}-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Performance tests (chromium only for efficiency)
+  performance-tests:
+    needs: detect-changes
+    if: |
+      github.event.inputs.force_all_tests == 'true' ||
+      needs.detect-changes.outputs.performance == 'true' ||
+      needs.detect-changes.outputs.src == 'true' ||
+      needs.detect-changes.outputs.dependencies == 'true' ||
+      needs.detect-changes.outputs.workflows == 'true'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browser
+        run: npx playwright install chromium
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Performance Tests
+        run: npx playwright test tests/e2e/performance.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: performance-tests-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Terminal tests (heavy - 38 tests) split into multiple shards
+  terminal-tests:
+    needs: detect-changes
+    # Only run if terminal-related files or core src changed
+    if: |
+      github.event.inputs.force_all_tests == 'true' ||
+      needs.detect-changes.outputs.terminal == 'true' ||
+      needs.detect-changes.outputs.src == 'true' ||
+      needs.detect-changes.outputs.dependencies == 'true' ||
+      needs.detect-changes.outputs.workflows == 'true'
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1-of-3, 2-of-3, 3-of-3]  # Split terminal tests across 3 shards
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache Terminal test results to avoid re-running unchanged tests
+      - name: Cache Terminal test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            playwright-report/
+            test-results/
+            .playwright-cache/
+          key: playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ hashFiles('tests/e2e/terminal.spec.ts', 'src/**/terminal/**', 'src/**/*terminal*.{ts,tsx}', 'src/**/*command*.{ts,tsx}', 'package-lock.json') }}
+          restore-keys: |
+            playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.ref_name }}-
+            playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-
+
+      - name: Install Playwright Browser
+        run: npx playwright install ${{ matrix.browser }}
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Terminal Tests
+        run: |
+          # Convert shard format for Playwright (e.g., 1-of-3 -> 1/3)
+          SHARD_PLAYWRIGHT=$(echo "${{ matrix.shard }}" | sed 's/-of-/\//g')
+          npx playwright test tests/e2e/terminal.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root  # Fix Firefox launch issue
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
+        with:
+          name: terminal-tests-${{ matrix.browser }}-${{ matrix.shard }}-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Load testing as separate job (heavy tests)
+  load-tests:
+    needs: detect-changes
+    # Only run if load-related files or core src changed
+    if: |
+      github.event.inputs.force_all_tests == 'true' ||
+      needs.detect-changes.outputs.load == 'true' ||
+      needs.detect-changes.outputs.performance == 'true' ||
+      needs.detect-changes.outputs.src == 'true' ||
+      needs.detect-changes.outputs.dependencies == 'true' ||
+      needs.detect-changes.outputs.workflows == 'true'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1-of-2, 2-of-2]  # Split load tests for better distribution
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Load Tests
+        run: |
+          # Convert shard format for Playwright (e.g., 1-of-2 -> 1/2)
+          SHARD_PLAYWRIGHT=$(echo "${{ matrix.shard }}" | sed 's/-of-/\//g')
+          npx playwright test tests/e2e/load-testing.spec.ts --project=chromium --shard="$SHARD_PLAYWRIGHT" --max-failures=2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root  # Fix potential browser launch issues
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
+        with:
+          name: load-tests-${{ matrix.shard }}-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Mobile testing
+  mobile-tests:
+    needs: detect-changes
+    # Only run if mobile-specific files or critical dependencies changed
+    if: |
+      github.event.inputs.force_all_tests == 'true' ||
+      needs.detect-changes.outputs.mobile == 'true' ||
+      needs.detect-changes.outputs.dependencies == 'true' ||
+      needs.detect-changes.outputs.navigation == 'true' ||
+      needs.detect-changes.outputs.workflows == 'true'
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium webkit
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
+          NEXT_PUBLIC_ENABLE_TERMINAL: true
+          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+          USE_GITHUB_DATA: false
+          MEDIUM_USERNAME: mock_username
+
+      - name: Start Next.js Application
+        run: |
+          npm start &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to be ready with retry logic
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ Server is ready (attempt $i/30)"
+              break
+            fi
+            echo "⏳ Waiting for server to start (attempt $i/30)..."
+            sleep 2
+          done
+          
+          # Final health check
+          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+            echo "❌ Server failed to start after 60 seconds"
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Mobile Tests
+        run: |
+          # Run dedicated mobile navigation and mobile accessibility tests
+          # Both test files have built-in timeout handling and optimized scope for mobile
+          npx playwright test tests/e2e/mobile-navigation.spec.ts tests/e2e/mobile-accessibility.spec.ts \
+            --project="Mobile Chrome" --project="Mobile Safari" \
+            --max-failures=2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_EXTERNAL_APIS: true
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          HOME: /root  # Fix potential browser launch issues
+
+      - name: Stop Next.js Server
+        if: always()
+        run: |
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID || true
+            echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
+        with:
+          name: mobile-tests-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Comprehensive Lighthouse performance testing (optional)
+  lighthouse-performance:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      options: --user root
+    needs: detect-changes  # Simplified dependencies to avoid cycles
+    if: |
+      (github.event.inputs.force_all_tests == 'true' ||
+       github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'performance')) &&
+      (github.event.inputs.force_all_tests == 'true' ||
+       needs.detect-changes.outputs.lighthouse == 'true' ||
+       needs.detect-changes.outputs.performance == 'true' ||
+       needs.detect-changes.outputs.src == 'true' ||
+       needs.detect-changes.outputs.dependencies == 'true' ||
+       needs.detect-changes.outputs.workflows == 'true')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install system dependencies for canvas
+        run: |
+          apt-get update
+          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium webkit
+
+      - name: Build application
+        run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start application
+        run: |
+          npm start &
+          sleep 30
+          # Fixed: Discard HTML output to avoid curl buffer overflow (23) error
+          curl --retry 10 --retry-delay 5 --retry-connrefused -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Lighthouse Tests
+        run: npx playwright test tests/e2e/lighthouse.spec.ts --project=chromium
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOME: /root  # Fix potential browser launch issues
+
+      # Safari-Specific Performance Tests removed - no matching tests exist
+      # Regular performance tests already run on webkit project
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true  # Don't fail job if artifact upload fails
+        with:
+          name: lighthouse-performance-reports
+          path: playwright-report/
+          retention-days: 90
+
+  # Summary job to validate test execution
+  playwright-summary:
+    name: Playwright Tests Summary
+    runs-on: ubuntu-latest
+    needs: [
+      detect-changes,
+      navigation-tests,
+      accessibility-tests,
+      performance-tests,
+      terminal-tests,
+      load-tests,
+      mobile-tests,
+      lighthouse-performance
+    ]
+    if: always()
+    steps:
+      - name: Check Test Execution
+        run: |
+          echo "=== Playwright Tests Summary ==="
+          echo ""
+          echo "Path Detection: ${{ needs.detect-changes.result }}"
+          echo "Navigation Tests: ${{ needs.navigation-tests.result }}"
+          echo "Accessibility Tests: ${{ needs.accessibility-tests.result }}"
+          echo "Performance Tests: ${{ needs.performance-tests.result }}"
+          echo "Terminal Tests: ${{ needs.terminal-tests.result }}"
+          echo "Load Tests: ${{ needs.load-tests.result }}"
+          echo "Mobile Tests: ${{ needs.mobile-tests.result }}"
+          echo "Lighthouse Tests: ${{ needs.lighthouse-performance.result }}"
+          echo ""
+          
+          # Validate that at least some tests ran
+          TESTS_RAN=false
+          if [[ "${{ needs.navigation-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.accessibility-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.performance-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.terminal-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.load-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.mobile-tests.result }}" != "skipped" ]] || \
+             [[ "${{ needs.lighthouse-performance.result }}" != "skipped" ]]; then
+            TESTS_RAN=true
+            echo "✅ Tests executed successfully"
+          fi
+          
+          # On main branch or workflow changes, ensure critical tests ran
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
+             [[ "${{ needs.detect-changes.outputs.workflows }}" == "true" ]]; then
+            if [[ "${{ needs.navigation-tests.result }}" == "skipped" ]] && \
+               [[ "${{ needs.accessibility-tests.result }}" == "skipped" ]]; then
+              echo "❌ Critical tests were skipped on main branch or workflow change!"
+              exit 1
+            fi
+          fi
+          
+          # If no tests ran when they should have
+          if [[ "$TESTS_RAN" == "false" ]]; then
+            echo "⚠️ Warning: All tests were skipped"
+            # Check if this is expected (no relevant changes)
+            if [[ "${{ needs.detect-changes.outputs.src }}" == "true" ]] || \
+               [[ "${{ needs.detect-changes.outputs.tests }}" == "true" ]] || \
+               [[ "${{ needs.detect-changes.outputs.workflows }}" == "true" ]]; then
+              echo "❌ Tests should have run but were all skipped!"
+              exit 1
+            else
+              echo "ℹ️ No relevant changes detected - skipping is expected"
+            fi
+          fi
+          
+          # Check for any failures
+          if [[ "${{ needs.navigation-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.accessibility-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.performance-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.terminal-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.load-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.mobile-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.lighthouse-performance.result }}" == "failure" ]]; then
+            echo "❌ Some tests failed!"
+            exit 1
+          fi
+          
+          echo "✅ Playwright test suite completed successfully!"

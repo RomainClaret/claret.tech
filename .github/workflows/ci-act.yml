@@ -1,0 +1,152 @@
+name: CI-ACT
+
+# This is a modified CI workflow for testing with ACT
+# Removes sudo commands that don't work in Docker containers
+
+on:
+  push:
+    branches: ['*']  # Run on all branches including main
+  pull_request:
+    branches: ['*']  # Run on all pull requests
+  workflow_call:  # Allow this workflow to be called by other workflows
+
+env:
+  NODE_VERSION: '20'
+  # CI environment detection variables
+  CI: true
+  CONTINUOUS_INTEGRATION: true
+  GITHUB_ACTIONS: true
+  # Node.js optimization for CI - 8GB for component tests
+  NODE_OPTIONS: '--max-old-space-size=8192'
+
+jobs:
+  # Test jobs - simplified without disk cleanup
+  test-api:
+    name: Test API Routes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:api
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-utils:
+    name: Test Utilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:utils
+
+  test-components:
+    name: Test Components
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:components
+
+  test-contexts:
+    name: Test Contexts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:contexts
+
+  test-hooks:
+    name: Test Hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:hooks
+
+  test-lib-dom:
+    name: Test Library DOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:lib-dom
+
+  test-unit:
+    name: Test Other Units
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:unit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Summary job
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [
+      test-api,
+      test-utils, 
+      test-components,
+      test-contexts,
+      test-hooks,
+      test-lib-dom,
+      test-unit
+    ]
+    if: always() && !cancelled()
+    steps:
+      - name: Check results
+        run: |
+          echo "=== CI Results Summary ==="
+          echo ""
+          echo "API Tests: ${{ needs.test-api.result }}"
+          echo "Utils Tests: ${{ needs.test-utils.result }}"
+          echo "Component Tests: ${{ needs.test-components.result }}"
+          echo "Context Tests: ${{ needs.test-contexts.result }}"
+          echo "Hooks Tests: ${{ needs.test-hooks.result }}"
+          echo "Library DOM Tests: ${{ needs.test-lib-dom.result }}"
+          echo "Unit Tests: ${{ needs.test-unit.result }}"
+          echo ""
+          
+          # Check if any job failed
+          if [[ "${{ needs.test-api.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-utils.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-components.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-contexts.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-hooks.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-lib-dom.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-unit.result }}" == "failure" ]]; then
+            echo "❌ Some CI checks failed!"
+            exit 1
+          else
+            echo "✅ All CI checks passed!"
+          fi

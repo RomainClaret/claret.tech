@@ -1,0 +1,674 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Performance optimizations */
+@import "../styles/performance.css";
+
+@layer base {
+  :root {
+    /* Light theme colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 35%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 85%;
+    --input: 214.3 31.8% 91.4%;
+    --primary: 217 91% 48%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+
+    /* Custom theme colors */
+    --primary-50: 239 246 255;
+    --primary-100: 219 234 254;
+    --primary-200: 191 219 254;
+    --primary-300: 147 197 253;
+    --primary-400: 96 165 250;
+    --primary-500: 59 130 246;
+    --primary-600: 37 99 235;
+    --primary-700: 29 78 216;
+    --primary-800: 30 64 175;
+    --primary-900: 30 58 138;
+
+    /* Grid background gradient colors */
+    --grid-gradient-start: #ffffff;
+    --grid-gradient-end: #eff6ff;
+  }
+
+  .dark {
+    /* Dark theme colors */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 75%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 25%;
+    --input: 217.2 32.6% 17.5%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 212.7 26.8% 83.9%;
+
+    /* Grid background gradient colors for dark mode */
+    --grid-gradient-start: #020617;
+    --grid-gradient-end: #0f172a;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Animation utilities */
+  .animate-in {
+    animation: animate-in 0.5s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Smooth scroll behavior */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Dual Brain Animation Styles */
+  .dual-brain-background {
+    @apply overflow-hidden;
+    position: relative;
+    mix-blend-mode: screen;
+  }
+
+  .dual-brain-primary {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Gradient radial background effect */
+  .bg-gradient-radial {
+    background: radial-gradient(
+      circle,
+      var(--tw-gradient-from),
+      var(--tw-gradient-via),
+      var(--tw-gradient-to)
+    );
+  }
+
+  /* Enhanced glow effects for dual brain */
+  @keyframes neural-pulse {
+    0%,
+    100% {
+      filter: brightness(1) drop-shadow(0 0 20px rgba(59, 130, 246, 0.4));
+    }
+    50% {
+      filter: brightness(1.1) drop-shadow(0 0 40px rgba(139, 92, 246, 0.6));
+    }
+  }
+
+  .dual-brain-primary.is-pulsing {
+    animation: neural-pulse 2s ease-in-out;
+  }
+
+  /* Dark mode enhancements for dual brain */
+  .dark .dual-brain-background {
+    mix-blend-mode: lighten;
+    filter: brightness(1.2) contrast(1.1);
+  }
+
+  .dark .dual-brain-primary {
+    filter: brightness(1.1) saturate(1.2);
+  }
+
+  /* Neural connection animation */
+  @keyframes neural-flow {
+    0% {
+      stroke-dashoffset: 0;
+    }
+    100% {
+      stroke-dashoffset: -100;
+    }
+  }
+
+  .neural-connection-path {
+    stroke-dasharray: 5 10;
+    animation: neural-flow 3s linear infinite;
+  }
+
+  /* Responsive adjustments for dual brain */
+  @media (max-width: 768px) {
+    .dual-brain-background {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dual-brain-background,
+    .dual-brain-primary {
+      animation: none !important;
+    }
+  }
+
+  /* Custom utilities */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent;
+  }
+
+  .animate-typewriter {
+    animation: typewriter 2s steps(40) 1s forwards;
+  }
+
+  @keyframes typewriter {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
+  /* Lightweight animation classes to replace framer-motion */
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.6s ease-out forwards;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  .animate-slide-in-down {
+    animation: slideInDown 0.6s ease-out forwards;
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.6s ease-out forwards;
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.6s ease-out forwards;
+    opacity: 0;
+    transform: translateX(50px);
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.4s ease-out forwards;
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  @keyframes fadeIn {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInDown {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInRight {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Animation delays */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+  .animation-delay-600 {
+    animation-delay: 600ms;
+  }
+
+  /* Shimmer animation for color headers */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(200%);
+    }
+  }
+
+  /* Education section animations */
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) translateX(0);
+    }
+    25% {
+      transform: translateY(-10px) translateX(5px);
+    }
+    50% {
+      transform: translateY(5px) translateX(-5px);
+    }
+    75% {
+      transform: translateY(-5px) translateX(10px);
+    }
+  }
+
+  .animate-float {
+    animation: float 15s ease-in-out infinite;
+  }
+
+  /* 3D rotate animation */
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+
+  /* Slide in from top animation */
+  .slide-in-from-top-2 {
+    animation: slideInFromTop 0.3s ease-out;
+  }
+
+  @keyframes slideInFromTop {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Animated gradient for mobile menu border */
+  @keyframes gradient-xy {
+    0%,
+    100% {
+      background-position: left top;
+    }
+    50% {
+      background-position: right bottom;
+    }
+  }
+
+  .animate-gradient-xy {
+    background-size: 200% 200%;
+    animation: gradient-xy 6s ease infinite;
+  }
+
+  /* Gradient shift animation for neural background */
+  @keyframes gradient-shift {
+    0%,
+    100% {
+      opacity: 0.5;
+      transform: translateX(-10%) translateY(-10%);
+    }
+    50% {
+      opacity: 0.8;
+      transform: translateX(10%) translateY(10%);
+    }
+  }
+
+  .animate-gradient-shift {
+    animation: gradient-shift 20s ease-in-out infinite;
+  }
+
+  /* Holographic animation for cards */
+  @keyframes holographic {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  /* Terminal specific styles */
+  .xterm .xterm-screen {
+    padding-top: 1rem;
+  }
+
+  /* Experience section improvements */
+  .experience-bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .experience-bullet::before {
+    content: "▸";
+    color: rgb(var(--primary));
+    font-weight: bold;
+    line-height: 1.5;
+    flex-shrink: 0;
+  }
+
+  /* Centralized gradient title styling */
+  .section-title-gradient {
+    @apply text-3xl sm:text-4xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent;
+  }
+
+  .section-subtitle-gradient {
+    @apply text-xl sm:text-2xl font-semibold mb-2 sm:mb-3 bg-gradient-to-r from-primary/80 to-purple-600/80 bg-clip-text text-transparent;
+  }
+
+  /* Experience card cascading layout */
+  @media (min-width: 1024px) {
+    /* Timeline connector lines */
+    .timeline-connector {
+      @apply absolute top-1/2 w-8 h-0.5 bg-border;
+    }
+
+    .timeline-connector-left {
+      @apply right-full mr-4;
+    }
+
+    .timeline-connector-right {
+      @apply left-full ml-4;
+    }
+
+    /* Skills card chaining layout */
+    .skills-card-chain {
+      margin-top: 2rem; /* Positive spacing between cards */
+    }
+
+    .skills-card-chain:first-child {
+      margin-top: 0;
+    }
+  }
+
+  /* In-view trigger */
+  /* Removed opacity: 0 from .animate-on-scroll to prevent elements being invisible */
+
+  /* When in-view class is applied, animations will run */
+
+  /* Ensure animations are visible when not using the animate-on-scroll wrapper */
+  .animate-fade-in:not(.animate-on-scroll),
+  .animate-slide-in-up:not(.animate-on-scroll),
+  .animate-slide-in-down:not(.animate-on-scroll),
+  .animate-slide-in-left:not(.animate-on-scroll),
+  .animate-slide-in-right:not(.animate-on-scroll),
+  .animate-scale-in:not(.animate-on-scroll) {
+    opacity: 1 !important;
+  }
+
+  /* Terminal resize and drag cursor styles */
+  .resize-none {
+    resize: none !important;
+  }
+
+  /* Ensure proper cursor styles during resize */
+  .cursor-ns-resize {
+    cursor: ns-resize !important;
+  }
+
+  .cursor-ew-resize {
+    cursor: ew-resize !important;
+  }
+
+  .cursor-nesw-resize {
+    cursor: nesw-resize !important;
+  }
+
+  .cursor-nwse-resize {
+    cursor: nwse-resize !important;
+  }
+
+  .cursor-move {
+    cursor: move !important;
+  }
+
+  /* Terminal header smooth dragging */
+  .terminal-header {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  /* Prevent text selection during drag/resize */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  /* Hide scrollbar for button containers */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+
+  /* Grid items stretch to fill container */
+  .grid-stretch > * {
+    @apply h-full;
+  }
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  /* Remove all animations */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Disable specific animations */
+  .animate-fade-in,
+  .animate-slide-in-up,
+  .animate-slide-in-down,
+  .animate-slide-in-left,
+  .animate-slide-in-right,
+  .animate-scale-in,
+  .animate-float,
+  .animate-gradient-xy,
+  .animate-gradient-shift,
+  .animate-typewriter,
+  .animate-pulse {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Disable hover effects that involve motion */
+  .hover\:scale-105:hover,
+  .hover\:scale-110:hover,
+  .hover\:-translate-y-1:hover,
+  .hover\:-translate-y-2:hover {
+    transform: none !important;
+  }
+
+  /* Disable transform transitions */
+  .transition-transform,
+  .transition-all,
+  .transition {
+    transition-property:
+      opacity, color, background-color, border-color !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Ensure content is visible */
+  .animate-on-scroll {
+    opacity: 1 !important;
+  }
+}
+
+/* Custom fonts */
+@font-face {
+  font-family: "Agustina";
+  src: url("/fonts/Agustina.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Justov font removed - CDN returning 404 */
+
+/* Import high contrast mode styles */
+@import "../styles/high-contrast.css";
+
+/* Cursor blink animation - pure CSS for better performance */
+@keyframes cursor-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-cursor-blink {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Safari-specific performance optimizations */
+/* Disable infinite animations that cause compositor saturation */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  /* This specifically targets Safari */
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce {
+    animation: none !important;
+  }
+
+  /* Disable infinite animations via CSS attribute selectors */
+  *[style*="infinite"] {
+    animation-iteration-count: 1 !important;
+  }
+
+  /* Reduce complex transform animations */
+  *[style*="translate3d"],
+  *[style*="translateZ"] {
+    transform: none !important;
+  }
+
+  /* Limit will-change usage - exclude fixed positioned elements */
+  *:not(.fixed):not(nav):not([class*="floating"]) {
+    will-change: auto !important;
+  }
+
+  /* Keep essential will-change only for direct user interactions */
+  :hover:not(.fixed),
+  :focus:not(.fixed),
+  :active:not(.fixed) {
+    will-change: transform !important;
+  }
+
+  /* Preserve fixed positioning */
+  .fixed,
+  nav,
+  [class*="floating"] {
+    will-change: unset !important;
+    position: fixed !important;
+  }
+}

@@ -1,0 +1,557 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']  # Run on all branches including main
+  pull_request:
+    branches: ['*']  # Run on all pull requests
+  workflow_call:  # Allow this workflow to be called by other workflows
+
+env:
+  NODE_VERSION: '20'
+  # CI environment detection variables
+  CI: true
+  CONTINUOUS_INTEGRATION: true
+  GITHUB_ACTIONS: true
+  # Node.js optimization for CI - 8GB for component tests
+  NODE_OPTIONS: '--max-old-space-size=8192'
+
+jobs:
+  # Phase 1: Detect what changed to run only necessary jobs
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      components: ${{ steps.filter.outputs.components }}
+      utils: ${{ steps.filter.outputs.utils }}
+      contexts: ${{ steps.filter.outputs.contexts }}
+      hooks: ${{ steps.filter.outputs.hooks }}
+      styles: ${{ steps.filter.outputs.styles }}
+      config: ${{ steps.filter.outputs.config }}
+      tests: ${{ steps.filter.outputs.tests }}
+      docs-only: ${{ steps.filter.outputs.docs-only }}
+      has-code-changes: ${{ steps.filter.outputs.has-code-changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for path filtering
+          
+      - name: Get base commit
+        id: base_commit
+        run: |
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            echo "base=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
+            echo "Using HEAD~1 as base: $(git rev-parse HEAD~1)"
+          else
+            echo "base=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+            echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
+          fi
+          
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          base: ${{ steps.base_commit.outputs.base }}
+          filters: |
+            api:
+              - 'src/app/api/**'
+              - 'src/lib/utils/api-cache.ts'
+              - 'src/lib/utils/markdown-server.ts'
+              - 'src/lib/utils/dev-logger.ts'
+              - 'package.json'
+            components:
+              - 'src/components/**'
+              - 'src/test/helpers/**'
+              - 'package.json'
+            utils:
+              - 'src/lib/utils/**'
+              - 'src/lib/validators/**'
+              - 'src/lib/constants/**'
+              - 'package.json'
+            contexts:
+              - 'src/contexts/**'
+              - 'package.json'
+            hooks:
+              - 'src/lib/hooks/**'
+              - 'package.json'
+            styles:
+              - 'src/styles/**'
+              - 'tailwind.config.js'
+              - 'src/**/*.module.css'
+            config:
+              - 'next.config.js'
+              - 'tsconfig.json'
+              - '.eslintrc.json'
+              - 'prettier.config.js'
+              - 'vitest.config.ts'
+              - '.github/workflows/**'
+            tests:
+              - '**/*.test.ts'
+              - '**/*.test.tsx'
+              - 'tests/**'
+            docs-only:
+              - '**.md'
+              - 'LICENSE'
+              - '.gitignore'
+            has-code-changes:
+              - 'src/**'
+              - 'public/**'
+              - '*.config.js'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/**'
+
+  # Phase 2: Quick validation jobs (run in parallel)
+  quick-checks:
+    name: Quick Checks
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      needs.detect-changes.outputs.has-code-changes == 'true'
+    strategy:
+      matrix:
+        check: [lint, format, type-check]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Run ${{ matrix.check }}
+        run: |
+          case "${{ matrix.check }}" in
+            lint)
+              npm run lint
+              ;;
+            format)
+              npm run format -- --check
+              ;;
+            type-check)
+              npm run type-check
+              ;;
+          esac
+
+  # Phase 3: Test jobs (run conditionally based on changes)
+  test-api:
+    name: Test API Routes
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.api == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache API test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: api-tests-${{ hashFiles('src/app/api/**', 'package-lock.json') }}
+          restore-keys: api-tests-
+      - run: npm run test:api
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-utils:
+    name: Test Utilities
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.utils == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Utils test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: utils-tests-${{ hashFiles('src/lib/utils/**', 'package-lock.json') }}
+          restore-keys: utils-tests-
+      - run: npm run test:utils
+
+  test-components-batch1:
+    name: Test Components - Batch 1 (UI Core)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.components == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Component test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: components-tests-batch1-${{ hashFiles('src/components/**', 'package-lock.json') }}
+          restore-keys: components-tests-batch1-
+      - run: npm run test:components:batch1
+        env:
+          NODE_OPTIONS: '--max-old-space-size=5120'
+
+  test-components-batch2:
+    name: Test Components - Batch 2 (UI Extended)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.components == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Component test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: components-tests-batch2-${{ hashFiles('src/components/**', 'package-lock.json') }}
+          restore-keys: components-tests-batch2-
+      - run: npm run test:components:batch2
+        env:
+          NODE_OPTIONS: '--max-old-space-size=5120'
+
+  test-components-batch3:
+    name: Test Components - Batch 3 (Sections)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.components == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Component test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: components-tests-batch3-${{ hashFiles('src/components/**', 'package-lock.json') }}
+          restore-keys: components-tests-batch3-
+      - run: npm run test:components:batch3
+        env:
+          NODE_OPTIONS: '--max-old-space-size=5120'
+
+  test-components-batch4:
+    name: Test Components - Batch 4 (Animations & Error)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.components == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Component test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: components-tests-batch4-${{ hashFiles('src/components/**', 'package-lock.json') }}
+          restore-keys: components-tests-batch4-
+      - run: npm run test:components:batch4
+        env:
+          NODE_OPTIONS: '--max-old-space-size=5120'
+
+
+  test-contexts:
+    name: Test Contexts
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.contexts == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Context test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: contexts-tests-${{ hashFiles('src/contexts/**', 'package-lock.json') }}
+          restore-keys: contexts-tests-
+      - run: npm run test:contexts
+
+  test-hooks:
+    name: Test Hooks
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.hooks == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Hooks test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: hooks-tests-${{ hashFiles('src/hooks/**', 'package-lock.json') }}
+          restore-keys: hooks-tests-
+      - run: npm run test:hooks
+
+  test-lib-dom:
+    name: Test Library DOM
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.utils == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Library DOM test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: lib-dom-tests-${{ hashFiles('src/lib/**', 'package-lock.json') }}
+          restore-keys: lib-dom-tests-
+      - run: npm run test:lib-dom
+
+  test-unit:
+    name: Test Non-DOM Units
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.has-code-changes == 'true' ||
+       github.event_name == 'pull_request')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - name: Cache Unit test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/vitest
+            .vitest-cache
+          key: unit-tests-${{ hashFiles('src/**', 'package-lock.json') }}
+          restore-keys: unit-tests-
+      - run: npm run test:unit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Phase 4: Build job
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      always() && !cancelled() &&
+      (needs.detect-changes.outputs.has-code-changes == 'true' ||
+       needs.detect-changes.outputs.config == 'true')
+    env:
+      NEXT_PUBLIC_SITE_URL: https://claret.tech
+      NEXT_PUBLIC_ENABLE_TERMINAL: true
+      NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
+      NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+      GITHUB_TOKEN: mock_token
+      GITHUB_USERNAME: mock_username
+      USE_GITHUB_DATA: false
+      MEDIUM_USERNAME: mock_username
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          df -h
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Check build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Build failed: .next directory not found"
+            exit 1
+          fi
+          echo "Build successful"
+      - name: Cache build output
+        uses: actions/cache@v3
+        with:
+          path: .next
+          key: build-${{ github.sha }}
+          restore-keys: build-
+
+  # Phase 5: Summary job
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [
+      detect-changes, 
+      quick-checks,
+      test-api,
+      test-utils, 
+      test-components-batch1,
+      test-components-batch2,
+      test-components-batch3,
+      test-components-batch4,
+      test-contexts,
+      test-hooks,
+      test-lib-dom,
+      test-unit, 
+      build
+    ]
+    if: always() && !cancelled()
+    steps:
+      - name: Check results
+        run: |
+          echo "=== CI Results Summary ==="
+          echo ""
+          echo "Quick Checks: ${{ needs.quick-checks.result }}"
+          echo "API Tests: ${{ needs.test-api.result }}"
+          echo "Utils Tests: ${{ needs.test-utils.result }}"
+          echo "Component Tests Batch 1: ${{ needs.test-components-batch1.result }}"
+          echo "Component Tests Batch 2: ${{ needs.test-components-batch2.result }}"
+          echo "Component Tests Batch 3: ${{ needs.test-components-batch3.result }}"
+          echo "Component Tests Batch 4: ${{ needs.test-components-batch4.result }}"
+          echo "Context Tests: ${{ needs.test-contexts.result }}"
+          echo "Hooks Tests: ${{ needs.test-hooks.result }}"
+          echo "Library DOM Tests: ${{ needs.test-lib-dom.result }}"
+          echo "Unit Tests: ${{ needs.test-unit.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo ""
+          
+          # Check if any job failed
+          if [[ "${{ needs.quick-checks.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-api.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-utils.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-components-batch1.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-components-batch2.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-components-batch3.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-components-batch4.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-contexts.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-hooks.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-lib-dom.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-unit.result }}" == "failure" ]] || \
+             [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "❌ Some CI checks failed!"
+            exit 1
+          else
+            echo "✅ All CI checks passed!"
+          fi

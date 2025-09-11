@@ -1,0 +1,257 @@
+config:
+  # Load testing configuration for cross-browser performance
+  target: 'http://localhost:3000'
+  
+  # Test phases - gradually increase load
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 1
+      name: "Warm-up"
+    
+    # Ramp-up phase
+    - duration: 60
+      arrivalRate: 1
+      rampTo: 10
+      name: "Ramp-up"
+    
+    # Sustained load
+    - duration: 120
+      arrivalRate: 10
+      name: "Sustained load"
+    
+    # Peak load test
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 25
+      name: "Peak load"
+    
+    # Cool-down
+    - duration: 30
+      arrivalRate: 25
+      rampTo: 1
+      name: "Cool-down"
+
+  # Playwright engine for browser automation
+  engines:
+    playwright:
+      # Test across multiple browsers
+      launchOptions:
+        headless: true
+        args:
+          - '--no-sandbox'
+          - '--disable-dev-shm-usage'
+          - '--disable-background-timer-throttling'
+      
+      # Browser configurations
+      browsers:
+        - name: 'chromium'
+          weight: 40
+        - name: 'firefox' 
+          weight: 30
+        - name: 'webkit'
+          weight: 30
+
+  # Performance monitoring
+  plugins:
+    metrics-by-endpoint:
+      # Track metrics per endpoint
+      useOnlyRequestNames: true
+    
+    # Ensure we can handle the load
+    ensure:
+      thresholds:
+        - http.response_time.p95: 3000    # 95% of requests under 3s
+        - http.response_time.p99: 5000    # 99% of requests under 5s
+        - http.response_time.median: 1500 # Median under 1.5s
+        - http.codes.200: 90              # 90% success rate minimum
+        - playwright.page.fcp.p95: 2500   # First Contentful Paint
+        - playwright.page.lcp.p95: 4000   # Largest Contentful Paint
+        - playwright.page.cls.p95: 0.25   # Cumulative Layout Shift
+
+# Test scenarios
+scenarios:
+  # Basic page load test
+  - name: "Homepage Load Test"
+    weight: 40
+    engine: playwright
+    flow:
+      - goto:
+          url: "/"
+      - waitForSelector:
+          selector: "h1"
+          timeout: 10000
+      - measure:
+          name: "homepage_load"
+          event: "load"
+      - screenshot:
+          path: "screenshots/homepage-{{ $randomNumber }}.png"
+
+  # Navigation and scrolling test
+  - name: "Navigation Performance"
+    weight: 30
+    engine: playwright
+    flow:
+      - goto:
+          url: "/"
+      - waitForLoadState:
+          state: "networkidle"
+      
+      # Test scrolling performance
+      - evaluate:
+          expression: |
+            () => {
+              return new Promise((resolve) => {
+                let frameCount = 0;
+                let lastTime = performance.now();
+                const targetFrames = 60; // Test for 1 second at 60fps
+                
+                const measureFrame = () => {
+                  const currentTime = performance.now();
+                  frameCount++;
+                  
+                  if (frameCount < targetFrames) {
+                    window.scrollBy(0, 10);
+                    requestAnimationFrame(measureFrame);
+                  } else {
+                    const totalTime = currentTime - lastTime;
+                    const fps = (frameCount / totalTime) * 1000;
+                    resolve({ fps, frameCount, totalTime });
+                  }
+                };
+                
+                requestAnimationFrame(measureFrame);
+              });
+            }
+      
+      # Navigate to different sections
+      - click:
+          selector: "nav a[href*='experience']"
+          timeout: 5000
+      - waitForLoadState:
+          state: "networkidle"
+      - measure:
+          name: "section_navigation"
+          event: "load"
+
+  # Heavy interaction test (animations, etc.)
+  - name: "Animation Performance"
+    weight: 20
+    engine: playwright
+    flow:
+      - goto:
+          url: "/"
+      - waitForLoadState:
+          state: "networkidle"
+      
+      # Enable animations if disabled
+      - evaluate:
+          expression: |
+            () => {
+              document.body.classList.add('enable-animations');
+              return true;
+            }
+      
+      # Trigger animations through interactions
+      - hover:
+          selector: ".holographic-card"
+      - wait: 1000
+      
+      # Measure FPS during heavy animations
+      - evaluate:
+          expression: |
+            () => {
+              return new Promise((resolve) => {
+                const frames = [];
+                let lastTime = performance.now();
+                let animationCount = 0;
+                const maxFrames = 120; // 2 seconds at 60fps
+                
+                const measureFrame = () => {
+                  const currentTime = performance.now();
+                  const delta = currentTime - lastTime;
+                  frames.push(1000 / delta);
+                  lastTime = currentTime;
+                  animationCount++;
+                  
+                  // Trigger more animations
+                  if (animationCount % 20 === 0) {
+                    window.scrollBy(0, 100);
+                  }
+                  
+                  if (animationCount < maxFrames) {
+                    requestAnimationFrame(measureFrame);
+                  } else {
+                    const avgFps = frames.reduce((a, b) => a + b) / frames.length;
+                    const minFps = Math.min(...frames);
+                    const droppedFrames = frames.filter(fps => fps < 50).length;
+                    
+                    resolve({
+                      avgFps: avgFps,
+                      minFps: minFps,
+                      droppedFrames: droppedFrames,
+                      totalFrames: frames.length
+                    });
+                  }
+                };
+                
+                requestAnimationFrame(measureFrame);
+              });
+            }
+
+  # Memory leak detection test
+  - name: "Memory Leak Detection"
+    weight: 10
+    engine: playwright  
+    flow:
+      - goto:
+          url: "/"
+      - waitForLoadState:
+          state: "networkidle"
+      
+      # Perform memory-intensive operations
+      - loop:
+          count: 10
+          flow:
+            # Navigate around the site
+            - evaluate:
+                expression: |
+                  () => {
+                    // Scroll to trigger image loading
+                    window.scrollTo(0, document.body.scrollHeight);
+                    window.scrollTo(0, 0);
+                    
+                    // Force garbage collection if available
+                    if (window.gc) window.gc();
+                    
+                    // Return memory usage if available
+                    return performance.memory ? {
+                      used: performance.memory.usedJSHeapSize,
+                      total: performance.memory.totalJSHeapSize,
+                      limit: performance.memory.jsHeapSizeLimit
+                    } : null;
+                  }
+            - wait: 1000
+
+# Additional configuration for different environments
+environments:
+  development:
+    target: 'http://localhost:3000'
+    phases:
+      - duration: 30
+        arrivalRate: 1
+        rampTo: 5
+  
+  staging:
+    target: 'https://staging.claret.tech'
+    phases:
+      - duration: 60
+        arrivalRate: 1
+        rampTo: 15
+  
+  production:
+    target: 'https://claret.tech'
+    phases:
+      - duration: 120
+        arrivalRate: 5
+        rampTo: 50

@@ -1,0 +1,141 @@
+/* High Contrast Mode Styles */
+
+/* Apply high contrast when user has system preference or manual toggle */
+@media (prefers-contrast: high) {
+  :root {
+    /* Increase contrast for light theme */
+    --background: 255 255 255;
+    --foreground: 0 0 0;
+    --card: 255 255 255;
+    --card-foreground: 0 0 0;
+    --primary: 0 0 0;
+    --primary-foreground: 255 255 255;
+    --secondary: 245 245 245;
+    --secondary-foreground: 0 0 0;
+    --muted: 230 230 230;
+    --muted-foreground: 0 0 0;
+    --accent: 220 220 220;
+    --accent-foreground: 0 0 0;
+    --border: 0 0 0;
+    --input: 0 0 0;
+    --ring: 0 0 0;
+  }
+
+  .dark {
+    /* Increase contrast for dark theme */
+    --background: 0 0 0;
+    --foreground: 255 255 255;
+    --card: 0 0 0;
+    --card-foreground: 255 255 255;
+    --primary: 255 255 255;
+    --primary-foreground: 0 0 0;
+    --secondary: 20 20 20;
+    --secondary-foreground: 255 255 255;
+    --muted: 40 40 40;
+    --muted-foreground: 255 255 255;
+    --accent: 60 60 60;
+    --accent-foreground: 255 255 255;
+    --border: 255 255 255;
+    --input: 255 255 255;
+    --ring: 255 255 255;
+  }
+}
+
+/* Manual high contrast mode toggle */
+.high-contrast {
+  /* Light theme high contrast */
+  --background: 255 255 255 !important;
+  --foreground: 0 0 0 !important;
+  --card: 255 255 255 !important;
+  --card-foreground: 0 0 0 !important;
+  --primary: 0 0 0 !important;
+  --primary-foreground: 255 255 255 !important;
+  --secondary: 245 245 245 !important;
+  --secondary-foreground: 0 0 0 !important;
+  --muted: 230 230 230 !important;
+  --muted-foreground: 0 0 0 !important;
+  --accent: 220 220 220 !important;
+  --accent-foreground: 0 0 0 !important;
+  --border: 0 0 0 !important;
+  --input: 0 0 0 !important;
+  --ring: 0 0 0 !important;
+}
+
+.high-contrast.dark {
+  /* Dark theme high contrast */
+  --background: 0 0 0 !important;
+  --foreground: 255 255 255 !important;
+  --card: 0 0 0 !important;
+  --card-foreground: 255 255 255 !important;
+  --primary: 255 255 255 !important;
+  --primary-foreground: 0 0 0 !important;
+  --secondary: 20 20 20 !important;
+  --secondary-foreground: 255 255 255 !important;
+  --muted: 40 40 40 !important;
+  --muted-foreground: 255 255 255 !important;
+  --accent: 60 60 60 !important;
+  --accent-foreground: 255 255 255 !important;
+  --border: 255 255 255 !important;
+  --input: 255 255 255 !important;
+  --ring: 255 255 255 !important;
+}
+
+/* Additional high contrast enhancements */
+.high-contrast {
+  /* Stronger borders */
+  * {
+    border-width: 2px !important;
+  }
+
+  /* Increase focus visibility */
+  *:focus {
+    outline: 3px solid currentColor !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Remove shadows and blur effects */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Ensure links are underlined */
+  a {
+    text-decoration: underline !important;
+  }
+
+  /* Stronger button borders */
+  button,
+  [role="button"] {
+    border: 2px solid currentColor !important;
+  }
+
+  /* High contrast for terminal */
+  .terminal {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border: 2px solid #ffffff !important;
+  }
+
+  .terminal .xterm-screen {
+    background-color: #000000 !important;
+  }
+
+  /* High contrast for code blocks */
+  pre,
+  code {
+    background: var(--background) !important;
+    color: var(--foreground) !important;
+    border: 1px solid var(--border) !important;
+  }
+}
+
+/* Respect user's motion preferences in high contrast mode */
+@media (prefers-reduced-motion: reduce) {
+  .high-contrast * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

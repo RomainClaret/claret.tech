@@ -1,0 +1,50 @@
+{
+  "lastUpdated": "2025-09-10T17:57:01.560Z",
+  "count": 2,
+  "totalCitations": 2,
+  "publications": [
+    {
+      "id": "a450d758796fdcc7b5964f751cfa6e796499a693",
+      "title": "Investigating Hyperparameter Optimization and Transferability for ES-HyperNEAT: A TPE Approach",
+      "authors": [
+        "Romain Claret",
+        "Michael O'Neill",
+        "Paul Cotofrei",
+        "K. Stoffel"
+      ],
+      "year": "2024",
+      "venue": "GECCO Companion",
+      "citations": 0,
+      "abstract": "Neuroevolution of Augmenting Topologies (NEAT) and its advanced version, Evolvable-Substrate HyperNEAT (ES-HyperNEAT), have shown great potential in developing neural networks. However, their effectiveness heavily depends on the selection of hyperparameters. This study investigates the optimization of ES-HyperNEAT hyperparameters using the Tree-structured Parzen Estimator (TPE) on the MNIST classification task, exploring a search space of over 3 billion potential combinations. TPE effectively navigates this vast space, significantly outperforming random search in terms of mean, median, and best accuracy. During the validation process, the best hyperparameter configuration found by TPE achieves an accuracy of 29.00% on MNIST, surpassing previous studies while using a smaller population size and fewer generations. The transferability of the optimized hyperparameters is explored in logic operations and Fashion-MNIST tasks, revealing successful transfer to the more complex Fashion-MNIST problem but limited to simpler logic operations. This study emphasizes a method to unlock the full potential of neuroevolutionary algorithms and provides insights into the hyperparameters' transferability across tasks of varying complexity.",
+      "shortDescription": "Achieved 29% MNIST accuracy with ES-HyperNEAT through systematic TPE optimization, beating previous 23.90% benchmark while proving transferability to Fashion-MNIST.",
+      "doi": "10.1145/3638530.3664144",
+      "pdfUrl": "",
+      "openAccessUrl": "",
+      "semanticScholarUrl": "https://www.semanticscholar.org/paper/a450d758796fdcc7b5964f751cfa6e796499a693",
+      "paperUrl": "https://dl.acm.org/doi/10.1145/3638530.3664144",
+      "source": "semantic-scholar"
+    },
+    {
+      "id": "karmali2010perceptual",
+      "title": "Perceptual roll tilt thresholds demonstrate visual-vestibular fusion",
+      "authors": [
+        "Faisal Karmali",
+        "Koeun Lim",
+        "Adil Adatia",
+        "Romain Claret",
+        "Keyvan Nicoucar",
+        "Daniel M Merfeld"
+      ],
+      "year": "2010",
+      "venue": "40th Annual meeting of Neuroscience, San Diego, CA, on November",
+      "citations": 2,
+      "abstract": "Prior studies show that visual motion perception is more precise than vestibular motion perception, but it is unclear whether this is universal or the result of specific experimental conditions. We compared visual and vestibular motion precision over a broad range of temporal frequencies by measuring thresholds for vestibular (subject motion in the dark), visual (visual scene motion) or visual-vestibular (subject motion in the light) stimuli.",
+      "shortDescription": "Investigating how the brain integrates visual and vestibular information for motion perception by comparing precision thresholds across sensory modalities.",
+      "pdfUrl": "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
+      "openAccessUrl": "https://journals.physiology.org/doi/abs/10.1152/jn.00332.2013",
+      "paperUrl": "https://journals.physiology.org/doi/full/10.1152/jn.00332.2013",
+      "googleScholarCitationId": "4650031951635731568",
+      "source": "static"
+    }
+  ]
+}

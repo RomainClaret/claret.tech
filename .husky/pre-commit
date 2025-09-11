@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run lint-staged for formatting and linting
+npx lint-staged
+
+# Run type checking on the whole project
+npm run type-check
+
+# Skip unit tests for now (no unit tests configured, only e2e tests)
+# TODO: Add unit tests and re-enable: npm test -- run

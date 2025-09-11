@@ -1,0 +1,29 @@
+# Test files - excluded from production build linting
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Test directories
+src/test/**
+tests/**
+__tests__/**
+
+# Coverage
+coverage/**
+.nyc_output/**
+
+# Build outputs
+.next/**
+out/**
+dist/**
+
+# Dependencies
+node_modules/**
+
+# Scripts
+scripts/**/*.js
+
+# Generated files
+src/lib/utils/precomputed-colors.json
+src/lib/utils/medium-colors-cache.json

@@ -1,0 +1,226 @@
+/* Performance optimizations for animations */
+/* Safari-aware GPU layer management to prevent compositor saturation */
+
+/* Base CSS containment without GPU acceleration hacks */
+.animation-container {
+  contain: layout style paint;
+}
+
+.grid-background-container {
+  contain: strict;
+}
+
+.neural-animation {
+  contain: layout style paint;
+  backface-visibility: hidden;
+}
+
+.shooting-star {
+  contain: layout style;
+  pointer-events: none;
+}
+
+.signal-animation {
+  contain: layout;
+  pointer-events: none;
+}
+
+/* Non-Safari browsers: Full GPU acceleration */
+@supports not (-webkit-backdrop-filter: blur(1px)) {
+  .animation-container {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+
+  .grid-background-container {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+
+  .neural-animation {
+    will-change: opacity, transform;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .shooting-star {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+  }
+
+  .signal-animation {
+    will-change: transform, opacity;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .animation-container,
+  .neural-animation,
+  .shooting-star,
+  .signal-animation {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Performance hints for hover effects */
+.hover-scale {
+  transition: transform 0.2s ease-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Optimize card animations */
+.card-animation {
+  contain: layout;
+}
+
+/* Optimize image loading containers */
+.image-container {
+  contain: layout style paint;
+  overflow: hidden;
+}
+
+/* Reduce paint areas for frequently updated elements */
+.frequent-update {
+  contain: strict;
+}
+
+/* Holographic card performance optimizations - Safari safe */
+.group\/card {
+  backface-visibility: hidden;
+}
+
+.group\/badge {
+  backface-visibility: hidden;
+}
+
+/* Non-Safari browsers: Add GPU acceleration for hover effects */
+@supports not (-webkit-backdrop-filter: blur(1px)) {
+  .hover-scale {
+    will-change: transform;
+  }
+
+  .card-animation {
+    will-change: transform, box-shadow;
+    transform: translateZ(0);
+  }
+
+  .frequent-update {
+    will-change: contents;
+  }
+
+  .group\/card {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+
+  .group\/badge {
+    will-change: transform;
+  }
+}
+
+/* Optimize shimmer and holographic animations */
+/* Safari-safe versions without GPU hacks */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes holographic {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+/* Non-Safari browsers: GPU-accelerated keyframes */
+@supports not (-webkit-backdrop-filter: blur(1px)) {
+  @keyframes shimmer-gpu {
+    0% {
+      transform: translateX(-100%) translateZ(0);
+    }
+    100% {
+      transform: translateX(100%) translateZ(0);
+    }
+  }
+}
+
+/* Skill card animations containment */
+.group\/tech {
+  contain: layout style;
+}
+
+.group\/interest {
+  contain: layout;
+}
+
+/* Reduce animation complexity on mobile */
+@media (max-width: 768px) {
+  .group\/badge:hover > div[style*="animation"] {
+    animation-duration: 3s !important;
+  }
+
+  /* Disable some hover effects on mobile for better performance */
+  @media (hover: none) {
+    .group\/badge:hover > div[style*="shimmer"] {
+      animation: none !important;
+    }
+
+    .group\/badge:hover > div[style*="holographic"] {
+      opacity: 0.1 !important;
+      animation: none !important;
+    }
+  }
+}
+
+/* Animation optimization */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Layer promotion for animations - Safari aware */
+/* Only promote to GPU layers on non-Safari browsers */
+@supports not (-webkit-backdrop-filter: blur(1px)) {
+  .animate-float,
+  .animate-pulse,
+  .animate-spin {
+    will-change: transform;
+  }
+}
+
+/* Safari performance optimizations - minimal approach */
+/* Let the quality context handle performance instead of aggressive CSS overrides */
+
+/* Disable SVG animations */
+body[data-safari="true"] svg animate,
+body[data-safari="true"] svg animateTransform {
+  display: none !important;
+}
+
+/* Remove GPU acceleration hints - exclude fixed positioned elements */
+body[data-safari="true"] .group\/card:not(.fixed),
+body[data-safari="true"] .group\/badge:not(.fixed),
+body[data-safari="true"] .neural-animation:not(.fixed),
+body[data-safari="true"] .shooting-star:not(.fixed),
+body[data-safari="true"] .signal-animation:not(.fixed),
+body[data-safari="true"] .grid-background-container:not(.fixed) {
+  transform: none !important;
+  backface-visibility: visible !important;
+  will-change: auto !important;
+}

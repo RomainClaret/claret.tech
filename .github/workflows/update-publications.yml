@@ -1,0 +1,64 @@
+name: Update Publications
+
+on:
+  schedule:
+    # Run every Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-publications:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch publications
+        env:
+          SEMANTIC_SCHOLAR_AUTHOR_ID: ${{ secrets.SEMANTIC_SCHOLAR_AUTHOR_ID }}
+          ORCID_ID: ${{ secrets.ORCID_ID }}
+          AUTHOR_NAME: ${{ secrets.AUTHOR_NAME || 'Romain Claret' }}
+        run: |
+          echo "🔍 Fetching publications..."
+          node scripts/fetch-publications.js
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          git diff --quiet public/publications.json || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update publications data'
+          title: 'Update Publications Data'
+          body: |
+            ## Automated Publications Update
+            
+            This PR updates the publications data from academic sources:
+            - Semantic Scholar
+            - ORCID
+            
+            The data was fetched on ${{ steps.date.outputs.date }}.
+            
+            Please review the changes and merge if everything looks correct.
+          branch: update-publications-${{ github.run_number }}
+          delete-branch: true

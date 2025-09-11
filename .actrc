@@ -1,0 +1,20 @@
+# ACT Configuration for local GitHub Actions testing
+# https://github.com/nektos/act
+
+# Use Node.js 20 image for consistency with production
+--platform ubuntu-latest=node:20-bullseye
+
+# Container architecture for Apple Silicon compatibility
+--container-architecture linux/amd64
+
+# Enable verbose output for debugging
+# --verbose
+
+# Reuse containers between runs for faster execution
+--reuse
+
+# Default secrets file location (create .env.act.local for testing)
+--secret-file .env.act.local
+
+# Custom event file location (optional)
+# --eventpath .github/workflows/events/
