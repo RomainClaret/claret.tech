@@ -128,6 +128,7 @@ export function BlogCardHolographic({
   author = "Romain Claret",
 }: BlogCardHolographicProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Determine color based on category or use provided color
   const category = detectBlogCategory(title, description);
@@ -246,13 +247,23 @@ export function BlogCardHolographic({
           {/* Image section */}
           {image && (
             <div className="relative w-full h-48 mb-4 overflow-hidden rounded-lg bg-muted/10">
-              <Image
-                src={image}
-                alt={title}
-                fill
-                className="object-contain object-center"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
+              {!imageError ? (
+                <Image
+                  src={image}
+                  alt={title}
+                  fill
+                  className="object-contain object-center"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, rgba(${nodeColor}, 0.3) 0%, rgba(${nodeColor}, 0.1) 50%, rgba(${nodeColor}, 0.2) 100%)`,
+                  }}
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-60" />
             </div>
           )}
