@@ -163,6 +163,16 @@ const nextConfig = {
     `.replace(/\s{2,}/g, ' ').trim();
 
     return [
+      // Prevent caching of HTML pages to ensure fresh JS chunk references after deploys
+      {
+        source: "/((?!_next|fonts|images|animations|api|favicon|robots|sitemap).*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, must-revalidate",
+          },
+        ],
+      },
       {
         source: "/:path*",
         headers: [

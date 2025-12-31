@@ -1,7 +1,6 @@
 // Service Worker for claret.tech
-const CACHE_NAME = "claret-tech-v1";
+const CACHE_NAME = "claret-tech-v2";
 const urlsToCache = [
-  "/",
   "/fonts/Agustina.woff",
   "/fonts/Montserrat-Regular.ttf",
   "/site.webmanifest",
@@ -32,8 +31,21 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Fetch event - serve from cache when possible
+// Fetch event - network-first for HTML, cache-first for assets
 self.addEventListener("fetch", (event) => {
+  // Network-first for navigation requests (HTML pages)
+  // This ensures users always get fresh HTML with correct JS chunk hashes
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // Only fall back to cache if network fails (offline)
+        return caches.match(event.request);
+      }),
+    );
+    return;
+  }
+
+  // Cache-first for static assets (fonts, images, animations)
   event.respondWith(
     caches.match(event.request).then((response) => {
       // Cache hit - return response
