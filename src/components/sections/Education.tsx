@@ -302,7 +302,7 @@ export function Education() {
           <span className="text-primary font-semibold">
             {educationInfo.subtitle.highlightedText}
           </span>
-          {""}
+          {" • "}
           {educationInfo.subtitle.normalText}
         </p>
 

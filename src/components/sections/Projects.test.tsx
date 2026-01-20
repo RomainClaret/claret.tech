@@ -168,10 +168,11 @@ vi.mock("@/lib/utils/language-colors", () => ({
 vi.mock("@/data/portfolio", () => ({
   projectsSection: {
     display: true,
-    title: "Projects",
+    title: "Software Engineering Playground",
     subtitle: {
-      highlightedText: "Featured",
-      normalText: " projects and repositories",
+      highlightedText: "Building tools that should exist but don't",
+      normalText:
+        "Need it? Build it. Broken? Fix it. Too slow? Optimize it. Each project here exists because I needed it and nobody else had done it right. From automating kernels to analyzing evolutionary data, from research pipelines to visualization tools, every problem has a solution waiting to be coded.",
     },
     featuredProject: "auto",
   },
@@ -286,10 +287,12 @@ describe("Projects Component", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole("heading", { name: "Projects" }),
+          screen.getByRole("heading", {
+            name: "Software Engineering Playground",
+          }),
         ).toBeInTheDocument();
         expect(
-          screen.getByText("projects and repositories"),
+          screen.getByText(/Need it\? Build it\. Broken\? Fix it\./),
         ).toBeInTheDocument();
         // Check for featured project section
         expect(screen.getByText("Featured Project")).toBeInTheDocument();
@@ -848,7 +851,9 @@ describe("Projects Component", () => {
       await waitFor(() => {
         // Component should still render the main structure (heading)
         expect(
-          screen.getByRole("heading", { name: /projects/i }),
+          screen.getByRole("heading", {
+            name: /Software Engineering Playground/i,
+          }),
         ).toBeInTheDocument();
         // Should show empty state message when no projects are loaded
         expect(

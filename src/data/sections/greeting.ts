@@ -52,7 +52,7 @@ export const greeting = {
     700,
   ],
   subTitle:
-    "Evolution spent billions of years creating intelligence. I'm compressing that into days—not training AI, evolving it. Self-organizing. Self-improving. Self-surprising. Networks that discover solutions we never could imagine. Behaviors that emerge without programming. This is intelligence—unchained. And I'm helping it build itself.",
+    "Evolution spent billions of years creating intelligence. I'm compressing that into days. Not training AI, evolving it. Self organizing. Self improving. Self surprising. Networks that discover solutions we never could imagine. Behaviors that emerge without programming. This is intelligence, unchained. And I'm helping it build itself.",
   resumeLink: "/pdfs/RomainClaret_CV.pdf",
   interests: [
     { interestName: "Open-Endedness", fontAwesomeClassname: "fas fa-infinity" },

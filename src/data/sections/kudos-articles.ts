@@ -24,7 +24,7 @@ export const kudosArticles: KudosArticle[] = [
   {
     id: "gecco-2024-tuning-evolution",
     title:
-      "Tuning Evolution: Optimizing Algorithms for Self-Adapting Neural Networks",
+      "Tuning Evolution: Optimizing Algorithms for Self Adapting Neural Networks",
     storyTitle:
       "Teaching AI to Evolve: A Journey Through 3 Billion Possibilities",
     authors: [
@@ -53,7 +53,7 @@ export const kudosArticles: KudosArticle[] = [
       "Autonomous vehicles that adapt to new environments",
       "Healthcare systems with personalized treatment adaptation",
       "Robotics with flexible behavioral patterns",
-      "Self-optimizing AI systems",
+      "Self optimizing AI systems",
     ],
     tags: [
       "Neuroevolution",

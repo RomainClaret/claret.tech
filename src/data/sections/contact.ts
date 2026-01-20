@@ -17,7 +17,7 @@ export const contactInfo: ContactInfo = {
   subtitle: {
     highlightedText: "Always collecting pieces of the puzzle",
     normalText:
-      "—especially the ones that don't fit. Research collaborations, wild theories, or proof I'm wrong all welcome.",
+      "Especially the ones that don't fit. Research collaborations, wild theories, or proof I'm wrong all welcome.",
   },
   twitterUrl: "https://twitter.com/RomainClaret",
   twitterDesc: "Message me on Twitter",

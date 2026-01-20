@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { logError } from "@/lib/utils/dev-logger";
 
 export function TermsContent() {
@@ -16,7 +17,11 @@ export function TermsContent() {
       .then((response) => response.json())
       .then((data) => {
         if (data.html) {
-          setTermsHtml(data.html);
+          // Sanitize HTML to prevent XSS attacks (defense-in-depth)
+          const sanitizedHtml = DOMPurify.sanitize(data.html, {
+            ADD_ATTR: ["target", "rel"],
+          });
+          setTermsHtml(sanitizedHtml);
         } else {
           throw new Error("No terms of service HTML received");
         }

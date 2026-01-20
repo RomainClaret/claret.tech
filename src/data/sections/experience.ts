@@ -17,7 +17,7 @@ export const workExperiences = {
   subtitle: {
     highlightedText: "From engineering precision to evolving intelligence",
     normalText:
-      "—I once thought I had answers; now I realize I only have questions. Each pivot stripping away what I thought I knew, teaching me that growth happens at the edge of understanding. The pattern matches evolution: survival isn't about being right, it's about adapting. Now I let each experience prove that everything is possible when you embrace mutation over optimization.",
+      "I once thought I had answers; now I realize I only have questions. Each pivot stripping away what I thought I knew, teaching me that growth happens at the edge of understanding. The pattern matches evolution: survival isn't about being right, it's about adapting. Now I let each experience prove that everything is possible when you embrace mutation over optimization.",
   },
   experience: [
     {
@@ -63,7 +63,7 @@ export const workExperiences = {
       companyLogo: "/images/artificialkind_logo.webp",
       companyDesc: "Supercharging the Humankind with Artificial Entities",
       date: "Jan. 2018 - Present",
-      desc: "We build autonomous artificial entities and a hybrid ecosystem for you and them. Reshaping standards and establishing new meaningful foundations for the humanity by closely working with our community. Not only providing cutting-edge technologies, products, and services, we are also training you to use them.",
+      desc: "We build autonomous artificial entities and a hybrid ecosystem for you and them. Reshaping standards and establishing new meaningful foundations for the humanity by closely working with our community. Not only providing advanced technologies, products, and services, we are also training you to use them.",
       location: "Neuchâtel, Switzerland",
       descBullets: [
         "#AGI #AutonomousAI #MachineLearning #Nonprofit #R&D #HighTechDriven",

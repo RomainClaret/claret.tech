@@ -17,7 +17,7 @@ export const papersSection = {
   subtitle: {
     highlightedText: "Leaving breadcrumbs of a longer journey",
     normalText:
-      "—documenting discoveries that captured what I knew at the time. Looking back, they were all converging.",
+      "Documenting discoveries that captured what I knew at the time. Looking back, they were all converging.",
   },
   papersCards: [
     {

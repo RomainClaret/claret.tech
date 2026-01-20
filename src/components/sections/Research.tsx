@@ -337,7 +337,7 @@ export function Research() {
             <span className="text-primary font-semibold">
               {researchSection.subtitle.highlightedText}
             </span>
-            {""}
+            {" • "}
             {researchSection.subtitle.normalText}
           </p>
         </FadeIn>

@@ -23,12 +23,12 @@ export const educationInfo = {
     highlightedText:
       "Every degree was a detour that turned out to be the destination",
     normalText:
-      "—spent a decade in universities learning how to engineer. Had to master building before I could discover growing.",
+      "Spent a decade in universities learning how to engineer. Had to master building before I could discover growing.",
   },
   certificationSection: {
     title: "Professional Certifications & Training",
     subtitle:
-      "Side Quests That Mattered—Formal certifications and training programs that taught me a different way to approach problems.",
+      "Side Quests That Mattered. Formal certifications and training programs that taught me a different way to approach problems.",
   },
   schools: [
     {

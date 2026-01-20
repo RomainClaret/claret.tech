@@ -27,7 +27,7 @@ export function Contact() {
             <span className="text-primary font-semibold">
               {contactInfo.subtitle.highlightedText}
             </span>
-            {""}
+            {" • "}
             {contactInfo.subtitle.normalText}
           </p>
         </FadeIn>

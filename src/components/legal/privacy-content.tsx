@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { logError } from "@/lib/utils/dev-logger";
 
 export function PrivacyContent() {
@@ -16,7 +17,11 @@ export function PrivacyContent() {
       .then((response) => response.json())
       .then((data) => {
         if (data.html) {
-          setPrivacyHtml(data.html);
+          // Sanitize HTML to prevent XSS attacks (defense-in-depth)
+          const sanitizedHtml = DOMPurify.sanitize(data.html, {
+            ADD_ATTR: ["target", "rel"],
+          });
+          setPrivacyHtml(sanitizedHtml);
         } else {
           throw new Error("No privacy policy HTML received");
         }

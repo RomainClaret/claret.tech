@@ -721,7 +721,7 @@ export function Papers() {
               <span className="text-primary font-semibold">
                 {papersSection.subtitle.highlightedText}
               </span>
-              {""}
+              {" • "}
               {papersSection.subtitle.normalText}
             </p>
             <div className="flex items-center justify-center gap-6 mt-4 text-sm text-muted-foreground">

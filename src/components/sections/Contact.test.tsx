@@ -156,10 +156,11 @@ vi.mock("framer-motion", () => ({
 // Mock portfolio data
 vi.mock("@/data/portfolio", () => ({
   contactInfo: {
-    title: "Get in Touch",
+    title: "Contact",
     subtitle: {
-      highlightedText: "Let's collaborate",
-      normalText: " on exciting projects",
+      highlightedText: "Always collecting pieces of the puzzle",
+      normalText:
+        "Especially the ones that don't fit. Research collaborations, wild theories, or proof I'm wrong all welcome.",
     },
     emailAddress: "contact@example.com",
     emailDesc: "Send me an email",
@@ -189,9 +190,13 @@ describe("Contact Component", () => {
     it("renders contact section with title and subtitle", () => {
       render(<Contact />);
 
-      expect(screen.getByText("Get in Touch")).toBeInTheDocument();
-      expect(screen.getByText("Let's collaborate")).toBeInTheDocument();
-      expect(screen.getByText("on exciting projects")).toBeInTheDocument();
+      expect(screen.getByText("Contact")).toBeInTheDocument();
+      expect(
+        screen.getByText("Always collecting pieces of the puzzle"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Especially the ones that don't fit/),
+      ).toBeInTheDocument();
     });
 
     it("renders all contact method cards", () => {
@@ -385,7 +390,7 @@ describe("Contact Component", () => {
       render(<Contact />);
 
       // Check for proper heading
-      const heading = screen.getByRole("heading", { name: "Get in Touch" });
+      const heading = screen.getByRole("heading", { name: "Contact" });
       expect(heading).toBeInTheDocument();
     });
 

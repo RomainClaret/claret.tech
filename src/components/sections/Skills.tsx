@@ -78,7 +78,7 @@ export function Skills() {
             <span className="text-primary font-semibold">
               {skillsSection.subtitle.highlightedText}
             </span>
-            {""}
+            {" • "}
             {skillsSection.subtitle.normalText}
           </p>
         </FadeIn>

@@ -371,7 +371,7 @@ export function ExperienceTimeline() {
           <span className="text-primary font-semibold">
             {workExperiences.subtitle.highlightedText}
           </span>
-          {""}
+          {" • "}
           {workExperiences.subtitle.normalText}
         </p>
       </FadeIn>

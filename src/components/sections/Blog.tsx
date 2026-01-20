@@ -110,7 +110,7 @@ export function Blog() {
     }
   };
 
-  // Extract text content from HTML
+  // Extract text content from HTML safely using DOMParser
   const extractTextContent = (html: string): string => {
     if (typeof html !== "string") return "";
 
@@ -119,10 +119,10 @@ export function Blog() {
       .replace(/<img[^>]*medium\.com\/_\/stat[^>]*>/gi, "") // Remove Medium tracking pixels
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ""); // Remove scripts
 
-    // Remove HTML tags and get text content
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = cleanedHtml;
-    let textContent = tempDiv.textContent || tempDiv.innerText || "";
+    // Use DOMParser for safe HTML parsing (doesn't execute scripts)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleanedHtml, "text/html");
+    let textContent = doc.body.textContent || "";
 
     // Remove "Photo by" credits and everything after
     const photoByIndex = textContent.indexOf("Photo by");
@@ -165,7 +165,7 @@ export function Blog() {
             <span className="text-primary font-semibold">
               {blogSection.subtitle.highlightedText}
             </span>
-            {""}
+            {" • "}
             {blogSection.subtitle.normalText}
           </p>
         </FadeIn>

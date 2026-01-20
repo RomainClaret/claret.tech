@@ -519,7 +519,7 @@ export function Experience() {
           <span className="text-primary font-semibold">
             {workExperiences.subtitle.highlightedText}
           </span>
-          {""}
+          {" • "}
           {workExperiences.subtitle.normalText}
         </p>
       </SlideInUp>

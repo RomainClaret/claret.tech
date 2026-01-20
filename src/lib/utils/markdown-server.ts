@@ -160,11 +160,11 @@ function processInlineElements(content: string): string {
     .replace(/\*\*([^*]*(?:\*(?!\*)[^*]*)*)\*\*/g, "<strong>$1</strong>")
     // Italic text after bold (single asterisks)
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    // Links (process escaped markdown syntax)
-    .replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-    );
+    // Links (process escaped markdown syntax) - sanitize URLs to prevent XSS
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+      const safeUrl = sanitizeUrl(url);
+      return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    });
 
   return result.trim();
 }
@@ -176,4 +176,27 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// Sanitize URLs to prevent javascript: and data: protocol XSS attacks
+function sanitizeUrl(url: string): string {
+  const allowedProtocols = ["http:", "https:", "mailto:"];
+  try {
+    // Use URL constructor to parse and validate the URL
+    const parsed = new URL(url, "https://example.com");
+    if (!allowedProtocols.includes(parsed.protocol)) {
+      return "#";
+    }
+  } catch {
+    // If URL parsing fails for relative URLs, check for dangerous protocols
+    const trimmedUrl = url.trim().toLowerCase();
+    if (
+      trimmedUrl.startsWith("javascript:") ||
+      trimmedUrl.startsWith("data:") ||
+      trimmedUrl.startsWith("vbscript:")
+    ) {
+      return "#";
+    }
+  }
+  return url;
 }

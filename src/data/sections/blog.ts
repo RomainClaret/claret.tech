@@ -5,7 +5,7 @@ export const blogSection = {
   subtitle: {
     highlightedText: "The noise that doesn't fit in a paper",
     normalText:
-      "—research insights, creative fiction, technical rants, philosophical spirals. Some polished, most not.",
+      "Research insights, creative fiction, technical rants, philosophical spirals. Some polished, most not.",
   },
   displayMediumBlogs: true,
   displayKudosArticles: true, // Enable Kudos research stories

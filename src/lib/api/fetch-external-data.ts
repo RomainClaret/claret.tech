@@ -60,13 +60,22 @@ const ERROR_MESSAGES = {
     "The request to Medium didn't succeed. Check if Medium username in your .env file is correct.",
 };
 
-// Helper function to make HTTPS requests
+// Default timeout for external API requests (8 seconds)
+const REQUEST_TIMEOUT_MS = 8000;
+
+// Helper function to make HTTPS requests with timeout
 function httpsRequest(
   options: https.RequestOptions,
   postData?: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const req = https.request(options, (res) => {
+    // Add timeout to request options
+    const optionsWithTimeout = {
+      ...options,
+      timeout: REQUEST_TIMEOUT_MS,
+    };
+
+    const req = https.request(optionsWithTimeout, (res) => {
       let data = "";
 
       if (res.statusCode !== 200) {
@@ -81,6 +90,12 @@ function httpsRequest(
       res.on("end", () => {
         resolve(data);
       });
+    });
+
+    // Handle timeout event
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`));
     });
 
     req.on("error", (error) => {

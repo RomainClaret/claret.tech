@@ -16,7 +16,7 @@ export const projectsSection: ProjectsSection = {
   subtitle: {
     highlightedText: "Building tools that should exist but don't",
     normalText:
-      "—Need it? Build it. Broken? Fix it. Too slow? Optimize it. Each project here exists because I needed it and nobody else had done it right. From automating kernels to analyzing evolutionary data, from research pipelines to visualization tools—every problem has a solution waiting to be coded.",
+      "Need it? Build it. Broken? Fix it. Too slow? Optimize it. Each project here exists because I needed it and nobody else had done it right. From automating kernels to analyzing evolutionary data, from research pipelines to visualization tools, every problem has a solution waiting to be coded.",
   },
   // Featured project selection:
   // - "auto" or null: Automatically select the project with the most stars

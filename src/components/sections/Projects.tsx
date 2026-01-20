@@ -315,7 +315,7 @@ export function Projects() {
             <span className="text-primary font-semibold">
               {projectsSection.subtitle.highlightedText}
             </span>
-            {""}
+            {" • "}
             {projectsSection.subtitle.normalText}
           </p>
         </FadeIn>
