@@ -104,8 +104,8 @@ This project is open source under the [MIT License](LICENSE). See the [LICENSE](
 
 <div align="center">
 
-**[🌐 View Live](https://claret.tech)** • **[📧 Contact](mailto:claret.tech.website.pessimist917@simplelogin.com)** • **[🐦 Twitter](https://twitter.com/RomainClaret)**
+**[🌐 Live](https://claret.tech)** • **[📧 Contact](mailto:claret.tech.website.pessimist917@simplelogin.com)**
 
-_"Intelligence isn't trained—it evolves."_
+_"Intelligence isn't trained—it evolves. 🐧"_
 
 </div>

@@ -19,7 +19,23 @@ export function PrivacyContent() {
         if (data.html) {
           // Sanitize HTML to prevent XSS attacks (defense-in-depth)
           const sanitizedHtml = DOMPurify.sanitize(data.html, {
-            ADD_ATTR: ["target", "rel"],
+            ALLOWED_TAGS: [
+              "p",
+              "a",
+              "strong",
+              "em",
+              "ul",
+              "ol",
+              "li",
+              "h1",
+              "h2",
+              "h3",
+              "br",
+              "code",
+              "pre",
+              "blockquote",
+            ],
+            ALLOWED_ATTR: ["href", "target", "rel", "title"],
           });
           setPrivacyHtml(sanitizedHtml);
         } else {
