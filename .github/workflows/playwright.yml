@@ -135,7 +135,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -247,7 +247,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -345,7 +345,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
 
     steps:
@@ -440,7 +440,7 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -558,7 +558,7 @@ jobs:
     timeout-minutes: 20
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -661,7 +661,7 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
 
     steps:
@@ -754,7 +754,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.40.0-focal
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
       options: --user root
     needs: detect-changes  # Simplified dependencies to avoid cycles
     if: |
