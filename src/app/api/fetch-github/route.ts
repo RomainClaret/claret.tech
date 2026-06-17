@@ -22,7 +22,6 @@ async function handler(_request: NextRequest) {
           config: {
             username: process.env.GH_USERNAME,
             useGithubData: process.env.USE_GITHUB_DATA,
-            tokenSet: !!process.env.GITHUB_TOKEN,
           },
         },
         {
@@ -58,7 +57,6 @@ async function handler(_request: NextRequest) {
         config: {
           username: config.githubUsername,
           useGithubData: config.useGithubData,
-          tokenSet: !!config.githubToken,
         },
       },
       {

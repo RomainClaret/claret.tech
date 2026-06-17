@@ -59,6 +59,19 @@ describe("License API Route", () => {
     vi.restoreAllMocks();
   });
 
+  describe("Rate limiting", () => {
+    it("wraps the handler with withRateLimit (attaches X-RateLimit headers)", async () => {
+      mockApiCache.get.mockReturnValue("cached LICENSE content");
+      const request = { headers: new Headers() } as unknown as Parameters<
+        typeof GET
+      >[0];
+
+      const response = await GET(request);
+
+      expect(response.headers.get("X-RateLimit-Limit")).toBe("100");
+    });
+  });
+
   describe("Successful Response", () => {
     it("returns license content as plain text", async () => {
       const mockLicenseText = `MIT License

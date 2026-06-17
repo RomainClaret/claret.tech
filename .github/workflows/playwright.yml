@@ -49,7 +49,7 @@ jobs:
       dependencies: ${{ steps.filter.outputs.dependencies }}
       workflows: ${{ steps.filter.outputs.workflows }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2  # Only need 2 commits for comparison
           
@@ -64,7 +64,7 @@ jobs:
             echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
           fi
           
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           base: ${{ steps.base_commit.outputs.base }}
@@ -143,7 +143,7 @@ jobs:
         browser: [chromium, firefox, webkit]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -152,7 +152,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -162,7 +162,7 @@ jobs:
 
       # Cache Playwright test results to avoid re-running unchanged tests
       - name: Cache Navigation test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             playwright-report/
@@ -227,7 +227,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: navigation-tests-${{ matrix.browser }}-report
@@ -255,7 +255,7 @@ jobs:
         browser: [chromium, webkit]  # Skip firefox for accessibility due to timeouts
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -264,7 +264,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -326,7 +326,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: accessibility-tests-${{ matrix.browser }}-report
@@ -349,7 +349,7 @@ jobs:
       options: --user root
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -358,7 +358,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -420,7 +420,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: performance-tests-report
@@ -449,7 +449,7 @@ jobs:
         shard: [1-of-3, 2-of-3, 3-of-3]  # Split terminal tests across 3 shards
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -458,7 +458,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -468,7 +468,7 @@ jobs:
 
       # Cache Terminal test results to avoid re-running unchanged tests
       - name: Cache Terminal test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             playwright-report/
@@ -536,7 +536,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -566,7 +566,7 @@ jobs:
         shard: [1-of-2, 2-of-2]  # Split load tests for better distribution
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -575,7 +575,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -640,7 +640,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -665,7 +665,7 @@ jobs:
       options: --user root
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -674,7 +674,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -741,7 +741,7 @@ jobs:
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -768,7 +768,7 @@ jobs:
        needs.detect-changes.outputs.workflows == 'true')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -777,7 +777,7 @@ jobs:
           apt-get update
           apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -812,7 +812,7 @@ jobs:
       # Safari-Specific Performance Tests removed - no matching tests exist
       # Regular performance tests already run on webkit project
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:

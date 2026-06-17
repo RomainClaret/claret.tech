@@ -100,7 +100,6 @@ describe("GitHub API Route", () => {
       expect(result.data).toEqual(mockGitHubData);
       expect(result.cached).toBe(false);
       expect(result.config.username).toBe("testuser");
-      expect(result.config.tokenSet).toBe(true);
     });
 
     it("returns cached data when cache is valid", async () => {
@@ -217,8 +216,9 @@ describe("GitHub API Route", () => {
       expect(result.config).toEqual({
         username: "testuser",
         useGithubData: "true",
-        tokenSet: true,
       });
+      // tokenSet was intentionally removed (info-disclosure hardening)
+      expect(result.config).not.toHaveProperty("tokenSet");
     });
 
     it("handles missing environment variables", async () => {
@@ -233,7 +233,6 @@ describe("GitHub API Route", () => {
       expect(result.config).toEqual({
         username: undefined,
         useGithubData: "true",
-        tokenSet: false,
       });
 
       expect(mockFetchGitHubData).toHaveBeenCalledWith(

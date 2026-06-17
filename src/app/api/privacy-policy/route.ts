@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { devError } from "@/lib/utils/dev-logger";
 import { renderMarkdownToHtml } from "@/lib/utils/markdown-server";
 import { ApiCache } from "@/lib/utils/api-cache";
+import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 const CACHE_KEY = "privacy-policy-content";
 
-export async function GET() {
+async function handler() {
   try {
     // Check if we have cached data that's still valid
     const cachedData = ApiCache.get<{ content: string; html: string }>(
@@ -96,4 +97,8 @@ If you have any questions about this privacy policy, please contact:
       { status: 200 },
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  return withRateLimit(handler)(request);
 }

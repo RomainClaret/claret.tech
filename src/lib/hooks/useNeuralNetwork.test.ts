@@ -434,20 +434,39 @@ describe("useNeuralNetwork", () => {
   });
 
   describe("Keyboard Shortcuts", () => {
+    // Invoke this hook instance's own keydown handler directly. Using
+    // window.dispatchEvent would also fire keydown listeners leaked by sibling
+    // renderHook calls in this file; the fullscreen/view-mode toggles then
+    // double-fire and cancel out under batch load — the source of the flake.
+    // Grabbing the latest registered handler each call keeps its captured
+    // closure (isFullscreen/viewMode) current after toggles re-run the effect.
+    const pressKey = (
+      addSpy: ReturnType<typeof vi.spyOn>,
+      init: KeyboardEventInit,
+    ) => {
+      const keydownHandlers = addSpy.mock.calls.filter(
+        ([type]) => type === "keydown",
+      );
+      const handler = keydownHandlers[keydownHandlers.length - 1]?.[1] as
+        | ((e: KeyboardEvent) => void)
+        | undefined;
+      if (!handler) throw new Error("hook did not register a keydown handler");
+      const event = {
+        preventDefault: vi.fn(),
+        ...init,
+      } as unknown as KeyboardEvent;
+      act(() => {
+        handler(event);
+      });
+    };
+
     it("clears selection on Escape key", () => {
+      const addSpy = vi.spyOn(window, "addEventListener");
       const { result, unmount } = renderHook(() =>
         useNeuralNetwork(defaultProps),
       );
 
       const node = result.current.graph.nodes.get("pub1") as ResearchNodeData;
-
-      // Ensure clean initial state (in case of batch mode contamination)
-      act(() => {
-        result.current.setSelectedNode(null);
-        result.current.setHighlightedNode(null);
-        result.current.setFullscreen(false);
-        result.current.setViewMode("grid");
-      });
 
       act(() => {
         result.current.setSelectedNode(node);
@@ -457,128 +476,60 @@ describe("useNeuralNetwork", () => {
       expect(result.current.selectedNode).toBe(node);
       expect(result.current.highlightedNode).toBe(node);
 
-      act(() => {
-        const event = new KeyboardEvent("keydown", { key: "Escape" });
-        window.dispatchEvent(event);
-      });
+      pressKey(addSpy, { key: "Escape" });
 
       expect(result.current.selectedNode).toBe(null);
       expect(result.current.highlightedNode).toBe(null);
 
-      // Clean up to prevent test contamination
       unmount();
     });
 
     it("toggles fullscreen on Ctrl+F", () => {
+      const addSpy = vi.spyOn(window, "addEventListener");
       const { result, unmount } = renderHook(() =>
         useNeuralNetwork(defaultProps),
       );
 
-      // Ensure clean initial state (in case of batch mode contamination)
-      act(() => {
-        result.current.setSelectedNode(null);
-        result.current.setHighlightedNode(null);
-        result.current.setFullscreen(false);
-        result.current.setViewMode("grid");
-      });
-
       expect(result.current.isFullscreen).toBe(false);
 
-      act(() => {
-        const event = new KeyboardEvent("keydown", {
-          key: "f",
-          ctrlKey: true,
-        });
-        Object.defineProperty(event, "preventDefault", {
-          value: vi.fn(),
-          writable: true,
-        });
-        window.dispatchEvent(event);
-      });
+      pressKey(addSpy, { key: "f", ctrlKey: true });
 
       expect(result.current.isFullscreen).toBe(true);
 
-      // Clean up to prevent test contamination
       unmount();
     });
 
     it("toggles fullscreen on Cmd+F (Mac)", () => {
+      const addSpy = vi.spyOn(window, "addEventListener");
       const { result, unmount } = renderHook(() =>
         useNeuralNetwork(defaultProps),
       );
 
-      // Ensure clean initial state (in case of batch mode contamination)
-      act(() => {
-        result.current.setSelectedNode(null);
-        result.current.setHighlightedNode(null);
-        result.current.setFullscreen(false);
-        result.current.setViewMode("grid");
-      });
-
       expect(result.current.isFullscreen).toBe(false);
 
-      act(() => {
-        const event = new KeyboardEvent("keydown", {
-          key: "f",
-          metaKey: true,
-        });
-        Object.defineProperty(event, "preventDefault", {
-          value: vi.fn(),
-          writable: true,
-        });
-        window.dispatchEvent(event);
-      });
+      pressKey(addSpy, { key: "f", metaKey: true });
 
       expect(result.current.isFullscreen).toBe(true);
 
-      // Clean up to prevent test contamination
       unmount();
     });
 
     it("toggles view mode on Ctrl+V", () => {
+      const addSpy = vi.spyOn(window, "addEventListener");
       const { result, unmount } = renderHook(() =>
         useNeuralNetwork(defaultProps),
       );
 
-      // Ensure clean initial state (in case of batch mode contamination)
-      act(() => {
-        result.current.setSelectedNode(null);
-        result.current.setHighlightedNode(null);
-        result.current.setFullscreen(false);
-        result.current.setViewMode("grid");
-      });
-
       expect(result.current.viewMode).toBe("grid");
 
-      act(() => {
-        const event = new KeyboardEvent("keydown", {
-          key: "v",
-          ctrlKey: true,
-        });
-        Object.defineProperty(event, "preventDefault", {
-          value: vi.fn(),
-          writable: true,
-        });
-        window.dispatchEvent(event);
-      });
+      pressKey(addSpy, { key: "v", ctrlKey: true });
 
       expect(result.current.viewMode).toBe("network");
 
-      act(() => {
-        const event = new KeyboardEvent("keydown", {
-          key: "v",
-          ctrlKey: true,
-        });
-        Object.defineProperty(event, "preventDefault", {
-          value: vi.fn(),
-          writable: true,
-        });
-        window.dispatchEvent(event);
-      });
+      pressKey(addSpy, { key: "v", ctrlKey: true });
 
       expect(result.current.viewMode).toBe("grid");
 
-      // Clean up to prevent test contamination
       unmount();
     });
   });

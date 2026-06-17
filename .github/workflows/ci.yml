@@ -33,7 +33,7 @@ jobs:
       docs-only: ${{ steps.filter.outputs.docs-only }}
       has-code-changes: ${{ steps.filter.outputs.has-code-changes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch full history for path filtering
           
@@ -48,7 +48,7 @@ jobs:
             echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
           fi
           
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           base: ${{ steps.base_commit.outputs.base }}
@@ -114,13 +114,13 @@ jobs:
         check: [lint, format, type-check]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -149,19 +149,19 @@ jobs:
       (needs.detect-changes.outputs.api == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache API test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -181,19 +181,19 @@ jobs:
       (needs.detect-changes.outputs.utils == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Utils test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -211,19 +211,19 @@ jobs:
       (needs.detect-changes.outputs.components == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Component test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -243,19 +243,19 @@ jobs:
       (needs.detect-changes.outputs.components == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Component test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -275,19 +275,19 @@ jobs:
       (needs.detect-changes.outputs.components == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Component test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -307,19 +307,19 @@ jobs:
       (needs.detect-changes.outputs.components == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Component test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -340,19 +340,19 @@ jobs:
       (needs.detect-changes.outputs.contexts == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Context test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -370,19 +370,19 @@ jobs:
       (needs.detect-changes.outputs.hooks == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Hooks test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -400,19 +400,19 @@ jobs:
       (needs.detect-changes.outputs.utils == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Library DOM test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -430,19 +430,19 @@ jobs:
       (needs.detect-changes.outputs.has-code-changes == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - name: Cache Unit test results
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/vitest
@@ -472,13 +472,13 @@ jobs:
       USE_GITHUB_DATA: false
       MEDIUM_USERNAME: mock_username
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /usr/share/dotnet
           df -h
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -492,7 +492,7 @@ jobs:
           fi
           echo "Build successful"
       - name: Cache build output
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: .next
           key: build-${{ github.sha }}

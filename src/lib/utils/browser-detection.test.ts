@@ -112,6 +112,19 @@ const mockPerformance: MockPerformance = {
 };
 
 describe("Browser and Hardware Detection", () => {
+  // Capture the real globals so afterEach can restore them. Without this, the
+  // Object.defineProperty mocks below leak into other files sharing the vitest
+  // worker — notably the mock `document`, whose createElement impl gets wiped by
+  // mockReset, which intermittently broke animation-manager.test.ts.
+  const realGlobals = {
+    window: global.window,
+    screen: global.screen,
+    document: global.document,
+    localStorage: global.localStorage,
+    performance: global.performance,
+    navigator: global.navigator,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -163,6 +176,15 @@ describe("Browser and Hardware Detection", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Restore real globals so this suite's mocks don't leak into sibling test
+    // files sharing the worker.
+    for (const [key, value] of Object.entries(realGlobals)) {
+      Object.defineProperty(global, key, {
+        value,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 
   describe("detectBrowser", () => {

@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { devError } from "@/lib/utils/dev-logger";
 import { ApiCache } from "@/lib/utils/api-cache";
+import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 const CACHE_KEY = "license-content";
 
-export async function GET() {
+async function handler() {
   try {
     // Check if we have cached data that's still valid
     const cachedContent = ApiCache.get<string>(CACHE_KEY);
@@ -84,4 +85,8 @@ SOFTWARE.`;
       { status: 200 },
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  return withRateLimit(handler)(request);
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
 // Set up global navigator mock BEFORE importing commands module
 if (typeof global !== "undefined" && !global.navigator) {
@@ -149,6 +149,15 @@ const mockDocument = {
   body: mockElement,
 };
 
+// Capture real globals so afterAll can restore them; otherwise these mocks leak
+// into other files in the shared vitest worker (they previously made
+// animation-opacity.test.tsx flaky in batch4b).
+const realGlobals = {
+  window: global.window,
+  navigator: global.navigator,
+  document: global.document,
+};
+
 Object.defineProperty(global, "window", { value: mockWindow, writable: true });
 Object.defineProperty(global, "navigator", {
   value: mockNavigator,
@@ -162,6 +171,17 @@ Object.defineProperty(global, "document", {
 describe("Terminal Commands", () => {
   let mockContext: CommandContext;
   let commands: CommandsObject;
+
+  afterAll(() => {
+    // Restore real globals so this file's mocks don't leak into sibling files.
+    for (const [key, value] of Object.entries(realGlobals)) {
+      Object.defineProperty(global, key, {
+        value,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
 
   beforeEach(async () => {
     mockContext = {

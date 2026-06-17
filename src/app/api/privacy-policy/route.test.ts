@@ -64,6 +64,22 @@ describe("Privacy Policy API Route", () => {
     vi.restoreAllMocks();
   });
 
+  describe("Rate limiting", () => {
+    it("wraps the handler with withRateLimit (attaches X-RateLimit headers)", async () => {
+      mockApiCache.get.mockReturnValue({
+        content: "cached",
+        html: "<p>cached</p>",
+      });
+      const request = { headers: new Headers() } as unknown as Parameters<
+        typeof GET
+      >[0];
+
+      const response = await GET(request);
+
+      expect(response.headers.get("X-RateLimit-Limit")).toBe("100");
+    });
+  });
+
   describe("Successful Response", () => {
     it("returns privacy policy content with HTML rendering", async () => {
       const mockMarkdown = "# Privacy Policy\\n\\nContent here.";

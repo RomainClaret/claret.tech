@@ -64,6 +64,22 @@ describe("Terms of Service API Route", () => {
     vi.restoreAllMocks();
   });
 
+  describe("Rate limiting", () => {
+    it("wraps the handler with withRateLimit (attaches X-RateLimit headers)", async () => {
+      mockApiCache.get.mockReturnValue({
+        content: "cached",
+        html: "<p>cached</p>",
+      });
+      const request = { headers: new Headers() } as unknown as Parameters<
+        typeof GET
+      >[0];
+
+      const response = await GET(request);
+
+      expect(response.headers.get("X-RateLimit-Limit")).toBe("100");
+    });
+  });
+
   describe("Successful Response", () => {
     it("returns terms of service content with HTML rendering", async () => {
       const mockMarkdown = "# Terms of Service\\n\\nTerms content here.";

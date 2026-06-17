@@ -195,41 +195,31 @@ describe("useReducedMotion", () => {
   });
 
   describe("Performance", () => {
-    it("does not cause unnecessary re-renders", () => {
-      // Use fake timers to control timing precisely
-      vi.useFakeTimers();
-
-      const renderSpy = vi.fn();
-
-      const { rerender } = renderHook(() => {
-        renderSpy();
-        return useReducedMotion();
+    it("runs its effect once and does not re-subscribe on re-render", () => {
+      // The empty-deps mount effect must run exactly once regardless of how many
+      // times the component re-renders. Asserting on the effect's side-effects
+      // (matchMedia query + change listener) is deterministic, unlike counting
+      // React render cycles, which is sensitive to batch-mode timing.
+      const addEventListener = vi.fn();
+      const removeEventListener = vi.fn();
+      mockMatchMedia.mockReturnValue({
+        matches: false,
+        media: "(prefers-reduced-motion: reduce)",
+        addEventListener,
+        removeEventListener,
       });
 
-      // Wait for any useEffect to complete to avoid timing issues
-      act(() => {
-        // Force any pending effects to flush
-        vi.runAllTimers();
-      });
+      const { rerender } = renderHook(() => useReducedMotion());
 
-      // Get initial render count after effects complete
-      const initialRenders = renderSpy.mock.calls.length;
+      // Re-render several times with no preference change.
+      rerender();
+      rerender();
+      rerender();
 
-      // Ensure rerender is also wrapped in act for consistent timing
-      act(() => {
-        rerender();
-      });
-
-      // Should only have one additional render from rerender()
-      // In isolation: 1 initial + 1 rerender = 2
-      // In batch mode with contamination: may be 2 initial + 1 rerender = 3
-      // Allow for batch mode variance
-      const finalRenderCount = renderSpy.mock.calls.length;
-      const additionalRenders = finalRenderCount - initialRenders;
-      expect(additionalRenders).toBe(1);
-
-      // Clean up timers
-      vi.useRealTimers();
+      // No repeated matchMedia queries and no duplicate change listeners:
+      // this is the deterministic guarantee behind "no unnecessary re-renders".
+      expect(mockMatchMedia).toHaveBeenCalledTimes(1);
+      expect(addEventListener).toHaveBeenCalledTimes(1);
     });
 
     it("only creates one matchMedia query", () => {
