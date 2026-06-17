@@ -160,6 +160,21 @@ async function fetchPublicationsSimple() {
     console.log(`- Author Name: ${config.authorName}`);
     console.log("");
 
+    // Read the previously-saved file so we can MERGE (never drop papers when a
+    // source is temporarily unavailable) and avoid rewriting an unchanged file.
+    const outputPath = path.join(
+      __dirname,
+      "..",
+      "public",
+      "publications.json",
+    );
+    let existing = null;
+    try {
+      existing = JSON.parse(await fs.readFile(outputPath, "utf-8"));
+    } catch {
+      // First run / no existing file — nothing to merge.
+    }
+
     const publications = [];
 
     // Add static publications first
@@ -275,6 +290,31 @@ async function fetchPublicationsSimple() {
       console.log("⚠️  No Semantic Scholar ID configured");
     }
 
+    // Merge: preserve previously-saved publications that this run did not return.
+    // Semantic Scholar (unauthenticated) frequently rate-limits CI runners and
+    // returns nothing; without this the file would be overwritten with only the
+    // static entries, silently dropping fetched papers (e.g. the GECCO 2024 paper).
+    if (existing && Array.isArray(existing.publications)) {
+      const idKey = (p) =>
+        (p.id || p.title || "").toString().toLowerCase().trim();
+      const titleKey = (p) => (p.title || "").toString().toLowerCase().trim();
+      const haveIds = new Set(publications.map(idKey));
+      const haveTitles = new Set(publications.map(titleKey));
+      let preserved = 0;
+      for (const old of existing.publications) {
+        if (haveIds.has(idKey(old)) || haveTitles.has(titleKey(old))) continue;
+        publications.push(old);
+        haveIds.add(idKey(old));
+        haveTitles.add(titleKey(old));
+        preserved++;
+      }
+      if (preserved > 0) {
+        console.log(
+          `↻ Preserved ${preserved} existing publication(s) not returned this run (merge).`,
+        );
+      }
+    }
+
     // Sort by year and citations
     publications.sort((a, b) => {
       const yearDiff = parseInt(b.year) - parseInt(a.year);
@@ -282,17 +322,24 @@ async function fetchPublicationsSimple() {
       return (b.citations || 0) - (a.citations || 0);
     });
 
-    // Save results
-    const outputPath = path.join(
-      __dirname,
-      "..",
-      "public",
-      "publications.json",
-    );
+    // Save results. Only bump lastUpdated when the publication set actually
+    // changed (id + citation-count signature), so a no-op weekly run does not
+    // open a PR just to change a timestamp.
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
+    const signature = (pubs) =>
+      (pubs || [])
+        .map((p) => `${p.id || p.title}:${p.citations || 0}`)
+        .sort()
+        .join("|");
+    const unchanged =
+      existing && signature(existing.publications) === signature(publications);
+
     const output = {
-      lastUpdated: new Date().toISOString(),
+      lastUpdated:
+        unchanged && existing.lastUpdated
+          ? existing.lastUpdated
+          : new Date().toISOString(),
       count: publications.length,
       totalCitations: publications.reduce(
         (sum, pub) => sum + (pub.citations || 0),
@@ -301,9 +348,12 @@ async function fetchPublicationsSimple() {
       publications,
     };
 
-    await fs.writeFile(outputPath, JSON.stringify(output, null, 2));
+    // Trailing newline so the output matches the prettier-formatted committed
+    // file (otherwise every run shows a spurious newline-only diff -> noise PR).
+    await fs.writeFile(outputPath, JSON.stringify(output, null, 2) + "\n");
     console.log(
-      `\n✅ Saved ${publications.length} publications to ${outputPath}`,
+      `\n✅ Saved ${publications.length} publications to ${outputPath}` +
+        (unchanged ? " (no substantive change — timestamp preserved)" : ""),
     );
   } catch (error) {
     console.error("❌ Error:", error);
