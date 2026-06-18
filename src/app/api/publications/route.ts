@@ -57,7 +57,7 @@ async function updateCache(): Promise<CachedData> {
   // Save to cache
   try {
     await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(data, null, 2));
+    await fs.writeFile(CACHE_FILE, JSON.stringify(data, null, 2) + "\n");
   } catch (error) {
     logError(error, "Failed to write cache");
   }

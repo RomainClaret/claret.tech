@@ -190,6 +190,27 @@ describe("Publications API Route", () => {
       expect(mockFs.writeFile).toHaveBeenCalled();
     });
 
+    it("writes the cache file with a trailing newline", async () => {
+      // Expired cache forces a re-fetch + write via updateCache().
+      mockFs.readFile.mockResolvedValueOnce(
+        JSON.stringify({
+          ...mockCachedData,
+          lastUpdated: "2024-08-10T12:00:00.000Z",
+        }),
+      );
+      mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
+
+      const request = new NextRequest("http://localhost:3000/api/publications");
+      await GET(request);
+
+      const calls = mockFs.writeFile.mock.calls;
+      const written = calls[calls.length - 1][1] as string;
+      // Generated JSON must end with "\n" to match the prettier convention and
+      // avoid a spurious diff against the committed publications.json.
+      expect(written.endsWith("\n")).toBe(true);
+      expect(JSON.parse(written)).toMatchObject({ count: 2 });
+    });
+
     it("returns stale cache when fetch fails", async () => {
       // No valid cache available
       mockFs.readFile.mockRejectedValueOnce(new Error("No cache file"));

@@ -199,7 +199,7 @@ async function extractMediumColors() {
     }
 
     // Save to file
-    await fs.writeFile(OUTPUT_FILE, JSON.stringify(colorMap, null, 2));
+    await fs.writeFile(OUTPUT_FILE, JSON.stringify(colorMap, null, 2) + "\n");
 
     console.log(
       `\n✅ Extracted colors for ${Object.keys(colorMap).length} posts`,
@@ -210,7 +210,10 @@ async function extractMediumColors() {
 
     // Create a default file if extraction fails
     const defaultColors = {};
-    await fs.writeFile(OUTPUT_FILE, JSON.stringify(defaultColors, null, 2));
+    await fs.writeFile(
+      OUTPUT_FILE,
+      JSON.stringify(defaultColors, null, 2) + "\n",
+    );
   }
 }
 

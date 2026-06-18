@@ -213,7 +213,7 @@ async function openMobileMenuRobust(page: Page): Promise<void> {
           `Mobile menu failed attempt ${retry + 1}, reloading page and retrying...`,
         );
         await page.reload();
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
         await page.waitForTimeout(1000); // Let page settle
       } else if (menuOpened) {
         return; // Success
@@ -269,7 +269,6 @@ test.describe("Navigation", () => {
 
     // Wait for the page to be ready
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
   });
 
   test("should display all navigation items", async ({ page, isMobile }) => {
@@ -810,7 +809,7 @@ test.describe("Navigation", () => {
     browserName,
   }) => {
     // Page already loaded in beforeEach with playwright parameter
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Ensure playwright parameter for test mode (should be no-op now)
     await ensurePlaywrightParam(page);
@@ -1774,7 +1773,7 @@ test.describe("Navigation", () => {
     // Deep linking should work on all devices
     // Navigate directly to a section via URL
     await page.goto("/#projects");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
     await page.waitForSelector("#projects", { timeout: 10000 });
 
     // Give extra time for auto-scroll to complete

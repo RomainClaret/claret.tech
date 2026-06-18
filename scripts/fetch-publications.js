@@ -10,8 +10,9 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
 
 // Configurable map of abbreviated author names (as returned by academic APIs)
-// to canonical full names. Edit scripts/author-name-fixes.json to extend.
-const AUTHOR_NAME_FIXES = require("./author-name-fixes.json");
+// to canonical full names. Shared with the runtime API route; edit
+// src/lib/api/author-name-fixes.json to extend.
+const AUTHOR_NAME_FIXES = require("../src/lib/api/author-name-fixes.json");
 
 // Import the fetch function (we'll compile TypeScript first)
 async function fetchPublications() {
@@ -346,7 +347,7 @@ async function fetchPublicationsSimple() {
     }
 
     // Normalize author names (academic APIs abbreviate; map -> canonical full
-    // names, configured in scripts/author-name-fixes.json). Runs after the merge
+    // names, configured in src/lib/api/author-name-fixes.json). Runs after the merge
     // so it covers static, fetched, and preserved entries.
     for (const pub of publications) {
       if (Array.isArray(pub.authors)) {

@@ -2,6 +2,12 @@
 // No API keys required for basic usage
 
 import { logError } from "@/lib/utils/dev-logger";
+import authorNameFixes from "./author-name-fixes.json";
+
+// Configurable map of abbreviated author names (as returned by academic APIs)
+// to canonical full names. Shared with scripts/fetch-publications.js; edit
+// src/lib/api/author-name-fixes.json to extend.
+const AUTHOR_NAME_FIXES: Record<string, string> = authorNameFixes;
 
 // Static publications that may not be available through APIs
 const STATIC_PUBLICATIONS: Publication[] = [
@@ -170,7 +176,9 @@ export async function fetchFromSemanticScholar(
         doi: doi,
         arxivId: paper.externalIds?.ArXiv,
         pdfUrl: paper.openAccessPdf?.url,
-        openAccessUrl: paper.openAccessPdf?.url,
+        // Curated field (manually set per-paper in publications.json), not derived
+        // from the API; default empty so existing curated values are preserved.
+        openAccessUrl: "",
         semanticScholarUrl: paper.url,
         paperUrl: paperUrl,
         source: "semantic-scholar" as const,
@@ -323,6 +331,12 @@ export async function fetchAllPublications(config: {
         }
       }
     }
+  }
+
+  // Normalize abbreviated author names (e.g. "K. Stoffel" -> "Kilian Stoffel")
+  // using the shared config, so the live API matches the curated publications.
+  for (const pub of allPublications) {
+    pub.authors = pub.authors.map((name) => AUTHOR_NAME_FIXES[name] || name);
   }
 
   // Sort by year (newest first) and then by citations

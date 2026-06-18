@@ -124,7 +124,11 @@ async function processImages() {
     await fs.mkdir(outputDir, { recursive: true });
 
     // Write the color map to file
-    await fs.writeFile(OUTPUT_FILE, JSON.stringify(colorMap, null, 2), "utf8");
+    await fs.writeFile(
+      OUTPUT_FILE,
+      JSON.stringify(colorMap, null, 2) + "\n",
+      "utf8",
+    );
 
     console.log(`\n✅ Color mapping complete!`);
     console.log(`   - Known colors: ${knownCount} images`);
