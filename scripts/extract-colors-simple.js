@@ -59,6 +59,20 @@ const KNOWN_COLORS = {
   "40th_annual_meeting_of_neuroscience_2010_logo.jpg": "rgb(147, 51, 234)", // Purple (neuroscience)
   "40th_annual_meeting_of_neuroscience_2010_logo.png": "rgb(147, 51, 234)",
 
+  // Upcoming 2026 conference logos
+  "icpr_2026_logo.png": "rgb(8, 56, 56)", // ICPR 2026 dark teal
+  "icpr_2026_logo.webp": "rgb(8, 56, 56)",
+  "wcci_2026_logo.png": "rgb(8, 40, 88)", // IEEE WCCI 2026 navy
+  "wcci_2026_logo.webp": "rgb(8, 40, 88)",
+  "alife_2026_logo.png": "rgb(168, 40, 24)", // ALIFE 2026 maple red
+  "alife_2026_logo.webp": "rgb(168, 40, 24)",
+  "ppsn_2026_logo.png": "rgb(17, 17, 17)", // PPSN 2026 black
+  "ppsn_2026_logo.webp": "rgb(17, 17, 17)",
+  "ppsn_2026_logo_white.png": "rgb(245, 245, 245)", // PPSN 2026 white variant
+  "ppsn_2026_logo_white.webp": "rgb(245, 245, 245)",
+  "gecco_2026_logo.png": "rgb(8, 40, 120)", // GECCO 2026 blue
+  "gecco_2026_logo.webp": "rgb(8, 40, 120)",
+
   // Other assets
   "contactMail.webp": "rgb(107, 114, 128)", // Gray
   "contactMailDark.svg": "rgb(107, 114, 128)", // Gray

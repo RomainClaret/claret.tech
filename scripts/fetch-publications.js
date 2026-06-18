@@ -9,6 +9,10 @@ const path = require("path");
 // Load environment variables
 require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
 
+// Configurable map of abbreviated author names (as returned by academic APIs)
+// to canonical full names. Edit scripts/author-name-fixes.json to extend.
+const AUTHOR_NAME_FIXES = require("./author-name-fixes.json");
+
 // Import the fetch function (we'll compile TypeScript first)
 async function fetchPublications() {
   try {
@@ -261,6 +265,7 @@ async function fetchPublicationsSimple() {
                 doi: paper.externalIds?.DOI || null,
                 arxivId: paper.externalIds?.ArXiv || null,
                 pdfUrl: paper.openAccessPdf?.url,
+                openAccessUrl: "", // API doesn't provide this; manual/curated field
                 paperUrl: paperUrl,
                 semanticScholarUrl: paper.url,
                 source: "semantic-scholar",
@@ -290,14 +295,39 @@ async function fetchPublicationsSimple() {
       console.log("⚠️  No Semantic Scholar ID configured");
     }
 
-    // Merge: preserve previously-saved publications that this run did not return.
-    // Semantic Scholar (unauthenticated) frequently rate-limits CI runners and
-    // returns nothing; without this the file would be overwritten with only the
-    // static entries, silently dropping fetched papers (e.g. the GECCO 2024 paper).
+    // Merge with the previously-saved file:
+    //  - field level: for a paper the fetch returned that already existed, start
+    //    from the existing entry and overlay only the fresh, non-empty fetched
+    //    values. This keeps manually-curated fields the API omits or returns
+    //    empty (e.g. openAccessUrl) while still refreshing citations, etc., and
+    //    preserves the existing key order (so an unchanged run stays a no-op).
+    //  - paper level: re-add any existing paper this run did not return at all
+    //    (Semantic Scholar unauthenticated frequently rate-limits CI runners).
     if (existing && Array.isArray(existing.publications)) {
       const idKey = (p) =>
         (p.id || p.title || "").toString().toLowerCase().trim();
       const titleKey = (p) => (p.title || "").toString().toLowerCase().trim();
+
+      const existingByKey = new Map();
+      for (const old of existing.publications) {
+        existingByKey.set(idKey(old), old);
+        existingByKey.set(titleKey(old), old);
+      }
+
+      // Field-level merge onto matched papers.
+      for (let i = 0; i < publications.length; i++) {
+        const pub = publications[i];
+        const old =
+          existingByKey.get(idKey(pub)) || existingByKey.get(titleKey(pub));
+        if (!old) continue;
+        const merged = { ...old };
+        for (const [k, v] of Object.entries(pub)) {
+          if (v !== undefined && v !== null && v !== "") merged[k] = v;
+        }
+        publications[i] = merged;
+      }
+
+      // Paper-level: preserve existing papers not returned this run.
       const haveIds = new Set(publications.map(idKey));
       const haveTitles = new Set(publications.map(titleKey));
       let preserved = 0;
@@ -312,6 +342,15 @@ async function fetchPublicationsSimple() {
         console.log(
           `↻ Preserved ${preserved} existing publication(s) not returned this run (merge).`,
         );
+      }
+    }
+
+    // Normalize author names (academic APIs abbreviate; map -> canonical full
+    // names, configured in scripts/author-name-fixes.json). Runs after the merge
+    // so it covers static, fetched, and preserved entries.
+    for (const pub of publications) {
+      if (Array.isArray(pub.authors)) {
+        pub.authors = pub.authors.map((a) => AUTHOR_NAME_FIXES[a] || a);
       }
     }
 

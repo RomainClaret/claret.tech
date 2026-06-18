@@ -123,4 +123,16 @@ export const AVAILABLE_CONFERENCE_LOGOS = new Set([
   "40th_annual_meeting_of_neuroscience_2010_logo.webp",
   "40th_annual_meeting_of_neuroscience_2010_logo.png",
   "40th_annual_meeting_of_neuroscience_2010_logo.jpg",
+  // Upcoming 2026 venues (match venue strings like "ICPR • 2026", "WCCI • 2026",
+  // "ALIFE • 2026", "PPSN • 2026", "GECCO • 2026")
+  "icpr_2026_logo.webp",
+  "icpr_2026_logo.png",
+  "wcci_2026_logo.webp",
+  "wcci_2026_logo.png",
+  "alife_2026_logo.webp",
+  "alife_2026_logo.png",
+  "ppsn_2026_logo.webp",
+  "ppsn_2026_logo.png",
+  "gecco_2026_logo.webp",
+  "gecco_2026_logo.png",
 ]);
