@@ -154,9 +154,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -266,9 +271,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -360,9 +370,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -460,9 +475,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -577,9 +597,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -676,9 +701,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -779,9 +809,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install system dependencies for canvas
+        # --no-install-recommends drops the optional extras (was pulling ~100
+        # packages); Acquire::Retries survives archive.ubuntu.com throttling
+        # that timed out terminal-test shards on 2026-07-22.
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+            build-essential pkg-config libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
