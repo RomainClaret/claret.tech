@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FadeIn } from "@/components/ui/animated";
 import { BlogCardHolographic } from "@/components/ui/blog-card-holographic";
 import { blogSection } from "@/data/portfolio";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/utils/extract-medium-image";
 import mediumColors from "@/lib/utils/medium-colors.json";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
+import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { cn } from "@/lib/utils";
 import { logError } from "@/lib/utils/dev-logger";
 
@@ -36,6 +37,7 @@ interface MediumPost {
 }
 
 interface KudosArticle {
+  id?: string; // stable deep-link anchor (absent in older cached responses)
   title: string;
   description: string;
   url: string;
@@ -50,6 +52,39 @@ interface KudosArticle {
   highlights?: string[];
   applications?: string[];
   perspectives?: string;
+}
+
+// Deep-link anchor for a Medium post: the URL slug (title slug plus Medium's
+// permanent post hash), stable across title edits. Exported for tests.
+export function mediumAnchorId(link: string): string | undefined {
+  try {
+    return new URL(link).pathname.split("/").filter(Boolean).pop() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Extract text content from HTML safely using DOMParser
+function extractTextContent(html: string): string {
+  if (typeof html !== "string") return "";
+
+  // Strip out tracking pixels and scripts before processing
+  const cleanedHtml = html
+    .replace(/<img[^>]*medium\.com\/_\/stat[^>]*>/gi, "") // Remove Medium tracking pixels
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ""); // Remove scripts
+
+  // Use DOMParser for safe HTML parsing (doesn't execute scripts)
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(cleanedHtml, "text/html");
+  let textContent = doc.body.textContent || "";
+
+  // Remove "Photo by" credits and everything after
+  const photoByIndex = textContent.indexOf("Photo by");
+  if (photoByIndex !== -1) {
+    textContent = textContent.substring(0, photoByIndex).trim();
+  }
+
+  return textContent;
 }
 
 export function Blog() {
@@ -110,46 +145,68 @@ export function Blog() {
     }
   };
 
-  // Extract text content from HTML safely using DOMParser
-  const extractTextContent = (html: string): string => {
-    if (typeof html !== "string") return "";
+  // Combine all blog sources (computed before the display early-return so the
+  // deep-link hook below runs unconditionally, per the rules of hooks)
+  const allArticles = useMemo(
+    () =>
+      [
+        ...kudosArticles.map((article) => ({
+          ...article,
+          source: "kudos" as const,
+          sortDate: new Date(article.date).getTime(),
+        })),
+        ...mediumPosts.map((post) => ({
+          ...post,
+          source: "medium" as const,
+          sortDate: new Date(post.pubDate).getTime(),
+        })),
+      ].sort((a, b) => b.sortDate - a.sortDate), // Sort by date, newest first
+    [kudosArticles, mediumPosts],
+  );
 
-    // Strip out tracking pixels and scripts before processing
-    const cleanedHtml = html
-      .replace(/<img[^>]*medium\.com\/_\/stat[^>]*>/gi, "") // Remove Medium tracking pixels
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ""); // Remove scripts
-
-    // Use DOMParser for safe HTML parsing (doesn't execute scripts)
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(cleanedHtml, "text/html");
-    let textContent = doc.body.textContent || "";
-
-    // Remove "Photo by" credits and everything after
-    const photoByIndex = textContent.indexOf("Photo by");
-    if (photoByIndex !== -1) {
-      textContent = textContent.substring(0, photoByIndex).trim();
+  // Parse each Medium post's snippet once per fetch instead of on every
+  // render: extractTextContent spins up a DOMParser per call.
+  const mediumTextByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const post of mediumPosts) {
+      map.set(
+        post.guid || post.link,
+        extractTextContent(post.contentSnippet || post.content),
+      );
     }
+    return map;
+  }, [mediumPosts]);
 
-    return textContent;
-  };
+  // Deep-link anchors: Kudos stories use their curated id; Medium posts use
+  // the permanent slug from their URL.
+  const articleAnchorId = (
+    article: (typeof allArticles)[number],
+  ): string | undefined =>
+    article.source === "kudos" ? article.id : mediumAnchorId(article.link);
+
+  // Deep links: a #<article anchor> hash scrolls to that card, pulses a
+  // highlight, and holds its hover glow until the user interacts.
+  const { deepLinkedId, highlightedId } = useCardDeepLink(
+    allArticles.flatMap((article) => {
+      const id = articleAnchorId(article);
+      return id ? [id] : [];
+    }),
+  );
 
   if (!blogSection.display) {
     return null;
   }
 
-  // Combine all blog sources
-  const allArticles = [
-    ...kudosArticles.map((article) => ({
-      ...article,
-      source: "kudos" as const,
-      sortDate: new Date(article.date).getTime(),
-    })),
-    ...mediumPosts.map((post) => ({
-      ...post,
-      source: "medium" as const,
-      sortDate: new Date(post.pubDate).getTime(),
-    })),
-  ].sort((a, b) => b.sortDate - a.sortDate); // Sort by date, newest first
+  // Newest six, plus the deep-linked article when it is older than the cut
+  // (otherwise its anchor would not exist in the DOM).
+  const visibleArticles = allArticles.slice(0, 6);
+  if (
+    deepLinkedId &&
+    !visibleArticles.some((a) => articleAnchorId(a) === deepLinkedId)
+  ) {
+    const target = allArticles.find((a) => articleAnchorId(a) === deepLinkedId);
+    if (target) visibleArticles.push(target);
+  }
 
   const displayStaticBlogs =
     (!blogSection.displayMediumBlogs && !blogSection.displayKudosArticles) ||
@@ -212,7 +269,9 @@ export function Blog() {
                       )}
                     />
                   ))
-                : allArticles.slice(0, 6).map((article, index) => {
+                : visibleArticles.map((article, index) => {
+                    const anchorId = articleAnchorId(article);
+
                     // Handle Kudos articles
                     if (article.source === "kudos") {
                       const kudosArticle = article as KudosArticle & {
@@ -220,19 +279,33 @@ export function Blog() {
                         sortDate: number;
                       };
                       return (
-                        <BlogCardHolographic
+                        <div
                           key={`kudos-${kudosArticle.url}`}
-                          title={kudosArticle.title}
-                          description={kudosArticle.description}
-                          url={kudosArticle.url}
-                          date={kudosArticle.date}
-                          author={kudosArticle.author}
-                          image={kudosArticle.image}
-                          index={index}
-                          readingTime={Math.ceil(
-                            kudosArticle.description.split(" ").length / 200,
+                          id={anchorId}
+                          className={cn(
+                            "h-full",
+                            anchorId &&
+                              highlightedId === anchorId &&
+                              "deep-link-highlight",
                           )}
-                        />
+                        >
+                          <BlogCardHolographic
+                            title={kudosArticle.title}
+                            description={kudosArticle.description}
+                            url={kudosArticle.url}
+                            date={kudosArticle.date}
+                            author={kudosArticle.author}
+                            image={kudosArticle.image}
+                            index={index}
+                            readingTime={Math.ceil(
+                              kudosArticle.description.split(" ").length / 200,
+                            )}
+                            anchorId={anchorId}
+                            isDeepLinked={
+                              !!anchorId && deepLinkedId === anchorId
+                            }
+                          />
+                        </div>
                       );
                     }
 
@@ -241,9 +314,8 @@ export function Blog() {
                       source: string;
                       sortDate: number;
                     };
-                    const content = extractTextContent(
-                      post.contentSnippet || post.content,
-                    );
+                    const content =
+                      mediumTextByKey.get(post.guid || post.link) ?? "";
 
                     // Use enriched image from scraper, fallback to RSS extraction
                     const imageUrl =
@@ -262,17 +334,31 @@ export function Blog() {
                       linkColor?.color;
 
                     return (
-                      <BlogCardHolographic
+                      <div
                         key={post.guid}
-                        title={post.title}
-                        description={content}
-                        url={post.link}
-                        date={post.pubDate}
-                        image={imageUrl || undefined}
-                        color={postColor}
-                        index={index}
-                        readingTime={Math.ceil(content.split(" ").length / 200)}
-                      />
+                        id={anchorId}
+                        className={cn(
+                          "h-full",
+                          anchorId &&
+                            highlightedId === anchorId &&
+                            "deep-link-highlight",
+                        )}
+                      >
+                        <BlogCardHolographic
+                          title={post.title}
+                          description={content}
+                          url={post.link}
+                          date={post.pubDate}
+                          image={imageUrl || undefined}
+                          color={postColor}
+                          index={index}
+                          readingTime={Math.ceil(
+                            content.split(" ").length / 200,
+                          )}
+                          anchorId={anchorId}
+                          isDeepLinked={!!anchorId && deepLinkedId === anchorId}
+                        />
+                      </div>
                     );
                   })}
             </div>

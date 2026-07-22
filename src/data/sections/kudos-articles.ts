@@ -84,6 +84,7 @@ export function getKudosWidgetUrls(doi: string) {
 // Helper function to format Kudos article for blog display
 export function formatKudosArticleForBlog(article: KudosArticle) {
   return {
+    id: article.id, // stable deep-link anchor (e.g. #gecco-2024-tuning-evolution)
     title: article.storyTitle || article.title,
     description: article.storyDescription || article.description,
     url: article.kudosUrl,

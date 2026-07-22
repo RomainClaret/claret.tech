@@ -12,6 +12,199 @@ const AUTHOR_NAME_FIXES: Record<string, string> = authorNameFixes;
 // Static publications that may not be available through APIs
 const STATIC_PUBLICATIONS: Publication[] = [
   {
+    id: "claret2026activations",
+    title:
+      "Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity",
+    authors: [
+      "Romain Claret",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Kilian Stoffel",
+    ],
+    year: "2026",
+    month: 8,
+    venue: "Artificial Life Conference (ALIFE)",
+    citations: 2,
+    abstract:
+      "Biological neurons achieve computational diversity through specialized types: tonic, bursting, adapting, and fast-spiking cells coexist within the same circuit. Artificial neural networks, by contrast, apply a single activation function uniformly to all nodes, which limits what they can represent. We show that this uniformity creates hard limits for evolutionary search: across sparse evolved substrates, monotonic functions fail to solve parity beyond its smallest instance, XOR, while a single oscillatory unit suffices at all tested scales. The gap is one of search and sparsity, not representation: monotonic networks can represent parity with a modest number of hidden units, and gradient descent recovers that solution. We evolve, to our knowledge for the first time in indirect encoding, per-node activation function assignments from an 18-function palette across more than 4,500 experimental runs spanning Boolean logic, regression, and spatial classification. Testing each of the 18 functions individually on Parity-4 reveals a three-tier solvability structure: oscillatory functions achieve 100%, intermediate functions 6.7--80%, and all 9 monotonic functions 0%. This divide is not universal. Recurrence collapses it, and gradient descent inverts it entirely, showing that the barrier is specific to evolutionary search in sparse substrates. What activation functions a network can use, beyond its topology and weights, determines what evolutionary search can solve. Indirect encoding discovers heterogeneous per-node activation assignments unlikely to be chosen by hand.",
+    shortDescription:
+      "Evolving per-node activation functions reveals a Parity-4 divide (oscillatory 100%, monotonic 0%) specific to evolutionary search in sparse substrates.",
+    status: "to-appear",
+    paperPdf: "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
+    bibtex:
+      "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}",
+    codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
+    source: "static" as const,
+  },
+  {
+    id: "claret2026emr",
+    title:
+      "Tensor-Accelerated Eager Multi-Resolution Grids for Evolving Large-Scale Substrates",
+    authors: [
+      "Romain Claret",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Kilian Stoffel",
+    ],
+    year: "2026",
+    month: 7,
+    starred: true,
+    venue: "Genetic and Evolutionary Computation Conference (GECCO)",
+    citations: 3,
+    doi: "10.1145/3795101.3805361",
+    abstract:
+      "Evolvable-Substrate HyperNEAT (ES-HyperNEAT) discovers neural network topology by querying a Compositional Pattern-Producing Network (CPPN) at spatial positions and placing nodes where output variance is high. Its sequential quadtree cannot be tensorized directly: each network produces a different tree with dynamic shapes. We present Eager Multi-Resolution HyperNEAT (EMR-HyperNEAT), which reformulates adaptive substrate discovery as a batch tensor operation: shared position grids are precomputed for all depths, every position is evaluated in one vectorized CPPN call, then the same variance criterion filters the output. This tensor formulation supports population-level batching, one-time JIT compilation, chunked memory streaming, and six substrate configurations (feedforward through full recurrent) that sequential traversal could not support at scale. On the CRSP/Compustat financial dataset (94K samples), EMR-HyperNEAT achieves 5.5x speedup at depth~6; on XOR (pop 1000), 12--34x per-generation GPU speedup at depths 5--7 (~100x over 30 generations). The reformulation also discovers a superset of ES-HyperNEAT's positions, yielding higher empirical solve rates. We validate substrate evolution up to depth~13 (358M positions, streamed from disk).",
+    shortDescription:
+      "EMR-HyperNEAT recasts substrate discovery as one batched tensor pass, reaching 12 to 34x per-generation GPU speedups on XOR and validating evolution up to depth 13.",
+    paperPdf: "/pdfs/paper_GECCO_2026_claret2026emr.pdf",
+    posterPdf: "/pdfs/poster_GECCO_2026_claret2026emr.pdf",
+    videoUrl: "https://youtu.be/l3RuJW4uDL0",
+    bibtex:
+      "@inproceedings{claret2026emr,\n  title     = {Tensor-Accelerated Eager Multi-Resolution Grids for Evolving Large-Scale Substrates},\n  author    = {Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle = {Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO Companion '26)},\n  year      = {2026},\n  address   = {San Jose, Costa Rica},\n  publisher = {ACM},\n  doi       = {10.1145/3795101.3805361}\n}",
+    openAccessUrl: "https://dl.acm.org/doi/10.1145/3795101.3805361",
+    paperUrl: "https://dl.acm.org/doi/10.1145/3795101.3805361",
+    codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
+    source: "static" as const,
+  },
+  {
+    id: "claret2026bio",
+    title:
+      "Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery",
+    authors: [
+      "Romain Claret",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Kilian Stoffel",
+    ],
+    year: "2026",
+    month: 9,
+    venue: "Parallel Problem Solving from Nature (PPSN)",
+    citations: 0,
+    abstract:
+      "Indirectly encoded neural networks can assign different activation functions to individual nodes, but the right functions are rarely known in advance. When the available set contains only standard monotonic functions, problems like parity become unsolvable, yet an all-inclusive palette underperforms a curated one. How should evolution discover which functions to use? We address this as a meta-learning problem, designing 13 strategies (11 inspired by biological adaptation mechanisms, plus baseline and oracle controls) that modify the set of available activation functions during evolution. Each strategy translates a biological principle into an evolutionary operator: for example, circadian-inspired oscillatory gating cycles functions in and out of the palette on a fixed schedule, while immune-inspired Clonal Selection permanently protects functions that consistently correlate with fitness. We evaluate all strategies across more than 3,000 runs on parity and non-parity problems, first evolving the activation palette alone, then co-evolving a per-node aggregation palette on harder problems; an independent replication with new seeds confirms a stable high-reliability tier, with Circadian holding its top rank. Bio-inspired strategies match the solve rate of a tuned baseline but converge up to twice as fast, with Circadian halving total compute. Strategy rankings reverse across problem types, with no single strategy dominating all domains. Strategy success is largely shaped by timescale compatibility: strategies whose characteristic operating timescale matches the evolutionary evaluation window consistently outperform those that operate too slowly. This gives a practical guideline: match the mechanism's timescale to the evaluation budget. Rescaling the slowest strategy bypasses the oscillatory barrier entirely: all nine solutions solve parity with non-oscillatory activations paired with min or max aggregation.",
+    shortDescription:
+      "Eleven bio-inspired strategies for evolving activation palettes converge up to twice as fast as a tuned baseline, with success shaped by timescale compatibility.",
+    status: "to-appear",
+    paperPdf: "/pdfs/paper_PPSN_2026_claret2026bio.pdf",
+    posterPdf: "/pdfs/poster_PPSN_2026_claret2026bio.pdf",
+    bibtex:
+      "@inproceedings{claret2026bio,\n  title={Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={International Conference on Parallel Problem Solving from Nature},\n  year={2026},\n  publisher={Springer}\n}",
+    codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
+    source: "static" as const,
+  },
+  {
+    id: "claret2026neuromodulation",
+    title:
+      "Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection",
+    authors: [
+      "Romain Claret",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Kilian Stoffel",
+    ],
+    year: "2026",
+    month: 8,
+    starred: true,
+    venue: "Artificial Life Conference (ALIFE)",
+    citations: 0,
+    abstract:
+      "Open-ended artificial life systems must acquire diverse competencies from a single evolving genotype. Biological brains combine neuromodulation, which reconfigures circuits without changing connections, with diverse neuron types matched to specific computational roles. Can artificial evolution achieve something analogous in indirectly encoded substrates? Using indirectly encoded substrates evolved via CPPNs, we show through more than 10,000 experiments that neuromodulation alone is insufficient: under evolutionary search, monotonic activation functions impose a 75% ceiling on parity tasks that persists regardless of capacity, topology, or population size. This is an evolutionary search barrier, not a representational limit, since Adam gradient descent achieves 100% on the identical architecture. We combine neuromodulation with per-task activation function selection, matching oscillatory primitives to parity tasks and monotonic to threshold tasks, producing multi-behavioral evolved substrates. The result: 100% simultaneous 5-task success across all 30 seeds (median 14 generations). This generalizes across the oscillatory activation class: all four functions reach 100% (30 seeds each). Neither mechanism suffices alone. The barrier extends to higher-arity and asymmetric tasks, while multi-layer depth provides an alternative path. For open-ended evolution, the computational primitive should itself be an evolvable trait. At inference, one evolved genotype expresses many behaviors.",
+    shortDescription:
+      "Neuromodulation alone stalls at a 75% parity ceiling; adding per-task activation selection lets one evolved genotype solve all five tasks at once, on every seed.",
+    status: "to-appear",
+    paperPdf: "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
+    bibtex:
+      "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}",
+    codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
+    source: "static" as const,
+  },
+  {
+    id: "claret2026pruner",
+    title:
+      "Early-Stopping Thresholds for ES-HyperNEAT: A Data-Driven Approach from Fitness Dynamics",
+    authors: [
+      "Romain Claret",
+      "Arthur Gygax",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Pascal Felber",
+    ],
+    year: "2026",
+    month: 6,
+    venue: "IEEE World Congress on Computational Intelligence (WCCI)",
+    citations: 0,
+    abstract:
+      "Most hyperparameter configurations for Evolvable-Substrate HyperNEAT (ES-HyperNEAT) produce networks that stagnate at random-guessing performance, wasting computational resources. We frame early stopping as binary classification on early fitness trajectories: for each trial, we compute the cumulative median of best-per-generation fitness and test it against a threshold derived by maximizing the F_1 score on an initial 90-trial dataset. The resulting rule (generation G^*=3, threshold T^*=0.140) achieves F_1=0.872 on 180 independent validation trials, retaining over 90% of successful trials while cutting computational cost by 41.6%. Compared to Hyperband, our domain-specific rule is 64% more efficient with higher mean fitness, though Hyperband occasionally discovers higher peak solutions. On a converged search population the rule becomes too aggressive (recall 31.1%), motivating adaptive thresholds. The specific thresholds are ES-HyperNEAT-specific, but the methodology, deriving stopping criteria from fitness dynamics classification, is applicable to other evolutionary algorithms with stagnation-prone hyperparameter spaces.",
+    shortDescription:
+      "A data-driven early-stopping rule keeps over 90% of successful ES-HyperNEAT runs on MNIST, cuts compute by 41.6%, and is 64% more efficient than Hyperband.",
+    status: "to-appear",
+    paperPdf: "/pdfs/paper_WCCI_2026_claret2026pruner.pdf",
+    presentationPdf: "/pdfs/presentation_WCCI_2026_claret2026pruner.pdf",
+    bibtex:
+      "@inproceedings{claret2026pruner,\n  title={Early-Stopping Thresholds for {ES-HyperNEAT}: A Data-Driven Approach from Fitness Dynamics},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Felber, Pascal},\n  booktitle={Proceedings of the IEEE Congress on Evolutionary Computation},\n  year={2026},\n  publisher={IEEE}\n}",
+    codeUrl:
+      "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
+    source: "static" as const,
+  },
+  {
+    id: "claret2026partitioned",
+    title:
+      "Breaking the Central Bias: Spatially Partitioned Experts for Coordinate-Based Neuroevolution",
+    authors: [
+      "Romain Claret",
+      "Arthur Gygax",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Michael Palma Mendes",
+      "Pascal Felber",
+    ],
+    year: "2026",
+    month: 8,
+    venue: "International Conference on Pattern Recognition (ICPR)",
+    citations: 0,
+    abstract:
+      "Evolvable-Substrate HyperNEAT (ES-HyperNEAT), a bio-inspired indirect encoding that determines neuron placement and connection weights from spatial coordinates, exhibits a failure mode on MNIST as a diagnostic benchmark. Because input pixels map to a coordinate space centered at the origin, evolved networks converge on a small central cluster of input pixels, a spatial-concentration bias; prior work observed only 21% mean accuracy in this regime. Is this bias an optimization artifact or an architectural ceiling? Inspired by Mixture-of-Experts (MoE) principles, we partition the input into non-overlapping spatial segments, each assigned to a separately evolved specialist network. With 13 such experts, this design reaches 43% mean accuracy, a 106% relative improvement over the baseline. The architectural gain does not depend on data-driven aggregation: equal-weighted averaging, which uses no validation data, already yields a 70% improvement; the gain comes from partitioning, not the weighting. Receptive-field analysis shows the mechanism: partitioning forces evolution to discover features across the entire image, expanding active pixel coverage from 4% to 79%. Absolute accuracy stays below gradient-trained baselines, but the relative gain points to central bias, not the evolutionary search. Two tools are designed to generalize beyond MNIST: a receptive-field diagnostic for silent input-coverage collapse, and a spatial-partitioning remedy that restores coverage.",
+    shortDescription:
+      "Splitting MNIST across 13 evolved spatial experts breaks ES-HyperNEAT's central-pixel bias: pixel coverage jumps from 4% to 79% and mean accuracy more than doubles to 43%.",
+    status: "to-appear",
+    paperPdf: "/pdfs/paper_ICPR_2026_claret2026partitioned.pdf",
+    bibtex:
+      "@inproceedings{claret2026partitioned,\n  title={Breaking the Central Bias: Spatially Partitioned Experts for Coordinate-Based Neuroevolution},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Palma Mendes, Michael and Felber, Pascal},\n  booktitle={International conference on pattern recognition},\n  year={2026},\n  publisher={Springer}\n}",
+    codeUrl:
+      "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
+    source: "static" as const,
+  },
+  {
+    id: "claret2024tpe",
+    title:
+      "Investigating Hyperparameter Optimization and Transferability for ES-HyperNEAT: A TPE Approach",
+    authors: [
+      "Romain Claret",
+      "Michael O'Neill",
+      "Paul Cotofrei",
+      "Kilian Stoffel",
+    ],
+    year: "2024",
+    venue: "Genetic and Evolutionary Computation Conference (GECCO)",
+    citations: 5,
+    doi: "10.1145/3638530.3664144",
+    abstract:
+      "Neuroevolution of Augmenting Topologies (NEAT) and its advanced version, Evolvable-Substrate HyperNEAT (ES-HyperNEAT), have shown great potential in developing neural networks. However, their effectiveness heavily depends on the selection of hyperparameters. This study investigates the optimization of ES-HyperNEAT hyperparameters using the Tree-structured Parzen Estimator (TPE) on the MNIST classification task, exploring a search space of over 3 billion potential combinations. TPE effectively navigates this vast space, significantly outperforming random search in terms of mean, median, and best accuracy. During the validation process, the best hyperparameter configuration found by TPE achieves an accuracy of 29.00% on MNIST, surpassing previous studies while using a smaller population size and fewer generations. The transferability of the optimized hyperparameters is explored in logic operations and Fashion-MNIST tasks, revealing successful transfer to the more complex Fashion-MNIST problem but limited to simpler logic operations. This study emphasizes a method to unlock the full potential of neuroevolutionary algorithms and provides insights into the hyperparameters' transferability across tasks of varying complexity.",
+    shortDescription:
+      "Achieved 29% MNIST accuracy with ES-HyperNEAT through systematic TPE optimization, beating the previous 23.90% benchmark and transferring successfully to Fashion-MNIST.",
+    paperPdf: "/pdfs/paper_GECCO_2024_claret2024tpe.pdf",
+    presentationPdf: "/pdfs/presentation_GECCO_2024_claret2024tpe.pdf",
+    bibtex:
+      "@inproceedings{claret2024tpe,\n  title={Investigating Hyperparameter Optimization and Transferability for {ES-HyperNEAT}: A {TPE} Approach},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '24 Companion)},\n  year={2024},\n  publisher={ACM},\n  pages={1879--1887},\n  doi={10.1145/3638530.3664144}\n}",
+    openAccessUrl: "https://dl.acm.org/doi/10.1145/3638530.3664144",
+    semanticScholarUrl:
+      "https://www.semanticscholar.org/paper/a450d758796fdcc7b5964f751cfa6e796499a693",
+    paperUrl: "https://dl.acm.org/doi/10.1145/3638530.3664144",
+    codeUrl:
+      "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
+    source: "static" as const,
+  },
+  {
     id: "karmali2010perceptual",
     title:
       "Perceptual roll tilt thresholds demonstrate visual-vestibular fusion",
@@ -24,17 +217,18 @@ const STATIC_PUBLICATIONS: Publication[] = [
       "Daniel M Merfeld",
     ],
     year: "2010",
-    venue: "40th Annual meeting of Neuroscience, San Diego, CA, on November",
+    venue: "40th Annual meeting of Neuroscience",
     citations: 2,
     abstract:
       "Prior studies show that visual motion perception is more precise than vestibular motion perception, but it is unclear whether this is universal or the result of specific experimental conditions. We compared visual and vestibular motion precision over a broad range of temporal frequencies by measuring thresholds for vestibular (subject motion in the dark), visual (visual scene motion) or visual-vestibular (subject motion in the light) stimuli.",
     shortDescription:
       "Investigating how the brain integrates visual and vestibular information for motion perception by comparing precision thresholds across sensory modalities.",
-    pdfUrl:
+    posterPdf:
       "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
+    bibtex:
+      "@inproceedings{karmali2010perceptual,\n  title={Perceptual roll-tilt thresholds demonstrate visual-vestibular fusion},\n  author={Karmali, Faisal and Lim, Koeun and Adatia, Adil and Claret, Romain and Nicoucar, Keyvan and Merfeld, Daniel M},\n  booktitle={40th Annual meeting of Neuroscience, San Diego, CA, on November},\n  pages={13--17},\n  year={2010}\n}",
     openAccessUrl:
       "https://journals.physiology.org/doi/abs/10.1152/jn.00332.2013",
-    paperUrl: "https://journals.physiology.org/doi/full/10.1152/jn.00332.2013",
     googleScholarCitationId: "4650031951635731568",
     source: "static" as const,
   },
@@ -45,18 +239,42 @@ export interface Publication {
   title: string;
   authors: string[];
   year: string;
+  month?: number; // 1-12; orders within a year (newest first); not displayed
+  starred?: boolean; // manually featured; sorts first with a star
   venue?: string;
   citations?: number;
   abstract?: string;
   shortDescription?: string; // Optional: Shows in collapsed state, expands to full abstract
+  status?: "to-appear" | "presented" | "preprint"; // Optional: explicit status badge (defaults to Published)
   doi?: string;
   arxivId?: string;
   pdfUrl?: string;
+  paperPdf?: string; // local /pdfs/ paper PDF (renders a Read Paper chip)
+  posterPdf?: string; // local /pdfs/ poster PDF (renders a Read Poster chip)
+  presentationPdf?: string; // local /pdfs/ slides PDF (renders a Read Presentation chip)
+  videoUrl?: string; // video presentation link, e.g. YouTube (renders a Watch Video button)
+  bibtex?: string; // verbatim curated BibTeX entry (copied by the BibTeX button)
   openAccessUrl?: string;
   semanticScholarUrl?: string;
   paperUrl?: string;
+  codeUrl?: string; // link to the paper's code repository
   googleScholarCitationId?: string;
   source: "semantic-scholar" | "orcid" | "crossref" | "static";
+}
+
+/**
+ * Ordering for the publication list: manually starred papers first, then newest
+ * by year and month, then by citation count. Shared by the server-side rebuild
+ * and the client render so the displayed order is consistent.
+ */
+export function comparePublications(a: Publication, b: Publication): number {
+  const starDiff = (b.starred ? 1 : 0) - (a.starred ? 1 : 0);
+  if (starDiff !== 0) return starDiff;
+  const yearDiff = parseInt(b.year) - parseInt(a.year);
+  if (yearDiff !== 0) return yearDiff;
+  const monthDiff = (b.month || 0) - (a.month || 0);
+  if (monthDiff !== 0) return monthDiff;
+  return (b.citations || 0) - (a.citations || 0);
 }
 
 interface SemanticScholarAuthor {
@@ -150,20 +368,9 @@ export async function fetchFromSemanticScholar(
 
     return papers.map((paper) => {
       const doi = paper.externalIds?.DOI;
-      let paperUrl: string | undefined;
-
-      // Add specific paper URLs based on DOI
-      if (doi === "10.1145/3638530.3664144") {
-        paperUrl = "https://dl.acm.org/doi/10.1145/3638530.3664144";
-      }
-
-      // Add shortDescription for GECCO paper
-      let shortDescription: string | undefined;
-      if (paper.paperId === "a450d758796fdcc7b5964f751cfa6e796499a693") {
-        shortDescription =
-          "Achieved 29% MNIST accuracy with ES-HyperNEAT through systematic TPE optimization, beating previous 23.90% benchmark while proving transferability to Fashion-MNIST.";
-      }
-
+      // Per-paper curation (descriptions, links, code repos) lives in
+      // STATIC_PUBLICATIONS; manually curated papers are deduped by title, so
+      // their fetched copies are dropped.
       return {
         id: paper.paperId,
         title: paper.title,
@@ -172,7 +379,6 @@ export async function fetchFromSemanticScholar(
         venue: paper.venue,
         citations: paper.citationCount,
         abstract: paper.abstract,
-        shortDescription: shortDescription,
         doi: doi,
         arxivId: paper.externalIds?.ArXiv,
         pdfUrl: paper.openAccessPdf?.url,
@@ -180,7 +386,6 @@ export async function fetchFromSemanticScholar(
         // from the API; default empty so existing curated values are preserved.
         openAccessUrl: "",
         semanticScholarUrl: paper.url,
-        paperUrl: paperUrl,
         source: "semantic-scholar" as const,
       };
     });
@@ -339,12 +544,8 @@ export async function fetchAllPublications(config: {
     pub.authors = pub.authors.map((name) => AUTHOR_NAME_FIXES[name] || name);
   }
 
-  // Sort by year (newest first) and then by citations
-  allPublications.sort((a, b) => {
-    const yearDiff = parseInt(b.year) - parseInt(a.year);
-    if (yearDiff !== 0) return yearDiff;
-    return (b.citations || 0) - (a.citations || 0);
-  });
+  // Starred first, then newest by year and month, then citations.
+  allPublications.sort(comparePublications);
 
   return allPublications;
 }
@@ -352,31 +553,26 @@ export async function fetchAllPublications(config: {
 /**
  * Export publications to BibTeX format
  */
+/**
+ * A single publication as a BibTeX entry, keyed by its id (the site's
+ * BibTeX-style keys, e.g. claret2024tpe). Anything with a venue is a
+ * conference paper here, so it becomes @inproceedings; venue-less entries
+ * fall back to @misc.
+ */
+export function publicationToBibTeX(pub: Publication): string {
+  const type = pub.venue ? "@inproceedings" : "@misc";
+  const fields = [
+    `  title = {${pub.title}}`,
+    `  author = {${pub.authors.join(" and ")}}`,
+  ];
+  if (pub.venue) fields.push(`  booktitle = {${pub.venue}}`);
+  fields.push(`  year = {${pub.year}}`);
+  if (pub.doi) fields.push(`  doi = {${pub.doi}}`);
+  return `${type}{${pub.id},\n${fields.join(",\n")},\n}`;
+}
+
 export function exportToBibTeX(publications: Publication[]): string {
   return publications
-    .map((pub) => {
-      const type = pub.venue?.toLowerCase().includes("arxiv")
-        ? "@misc"
-        : "@article";
-      const key =
-        pub.title
-          .split(" ")
-          .slice(0, 2)
-          .join("")
-          .replace(/[^a-zA-Z0-9]/g, "") + pub.year;
-
-      const fields = [
-        `  title = {${pub.title}}`,
-        `  author = {${pub.authors.join(" and ")}}`,
-        `  year = {${pub.year}}`,
-      ];
-
-      if (pub.venue) fields.push(`  journal = {${pub.venue}}`);
-      if (pub.doi) fields.push(`  doi = {${pub.doi}}`);
-      if (pub.abstract) fields.push(`  abstract = {${pub.abstract}}`);
-      if (pub.pdfUrl) fields.push(`  url = {${pub.pdfUrl}}`);
-
-      return `${type}{${key},\n${fields.join(",\n")}\n}`;
-    })
+    .map((pub) => pub.bibtex ?? publicationToBibTeX(pub))
     .join("\n\n");
 }

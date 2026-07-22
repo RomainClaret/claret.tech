@@ -164,6 +164,11 @@ export function useFpsAutoDisable(
     setState((prevState) => {
       // If already auto-disabled or in cooldown, don't process further
       if (prevState.isAutoDisabled || cooldownActive) {
+        if (prevState.cooldownActive === cooldownActive) {
+          // Nothing changed: bail out with the same reference so React
+          // skips the re-render this per-second tick would otherwise cause.
+          return prevState;
+        }
         return {
           ...prevState,
           cooldownActive,
@@ -210,20 +215,22 @@ export function useFpsAutoDisable(
         return newState;
       }
 
-      // Normal state update
+      // Normal path: bail out with the same reference when nothing changed
+      // so the per-second FPS ticks stop re-rendering the provider.
+      if (
+        newConsecutiveCount === prevState.consecutiveLowFpsCount &&
+        cooldownActive === prevState.cooldownActive
+      ) {
+        return prevState;
+      }
+
       const newState: AutoDisableState = {
         ...prevState,
         consecutiveLowFpsCount: newConsecutiveCount,
         cooldownActive,
       };
 
-      // Only persist if something meaningful changed
-      if (
-        newState.consecutiveLowFpsCount !== prevState.consecutiveLowFpsCount ||
-        newState.cooldownActive !== prevState.cooldownActive
-      ) {
-        persistState(newState);
-      }
+      persistState(newState);
 
       return newState;
     });

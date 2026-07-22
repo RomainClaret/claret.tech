@@ -9,7 +9,7 @@ export const openSource = {
 export const terminalConfig = {
   enabled: true,
   welcomeMessages: [
-    "Welcome to the terminal! You've discovered the interactive CLI.",
-    "Type 'help' to see available commands.",
+    "You found the terminal. Of course you did.",
+    "Type 'help' to see what it can do.",
   ],
 };

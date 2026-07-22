@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // rate-limiter calls devLog() on the 429 path. Mock the logger so this file is
-// hermetic — other suites in the same batch mock "./dev-logger" with a partial
+// hermetic; other suites in the same batch mock "./dev-logger" with a partial
 // surface, which would otherwise leak in singleFork mode and drop devLog.
 vi.mock("./dev-logger", () => ({
   devLog: vi.fn(),
@@ -122,6 +122,24 @@ describe("rate-limiter", () => {
       const fresh = makeRequest({ "x-real-ip": "10.0.0.5" });
       const res = await rateLimit(fresh, okHandler);
       expect(res.status).toBe(200);
+    });
+
+    it("ignores cf-connecting-ip so a spoofed value cannot mint a fresh bucket", async () => {
+      // Exhaust the quota for a client keyed by its (Vercel-set) x-real-ip.
+      const client = makeRequest({ "x-real-ip": "10.0.0.7" });
+      for (let i = 0; i < RATE_LIMIT_CONFIG.maxRequests; i++) {
+        await rateLimit(client, okHandler);
+      }
+      expect((await rateLimit(client, okHandler)).status).toBe(429);
+
+      // Same x-real-ip but an attacker-supplied, distinct cf-connecting-ip must
+      // NOT reset the bucket: the site is not behind Cloudflare, so that header
+      // is untrusted and no longer part of the client key.
+      const spoofed = makeRequest({
+        "x-real-ip": "10.0.0.7",
+        "cf-connecting-ip": "1.2.3.4",
+      });
+      expect((await rateLimit(spoofed, okHandler)).status).toBe(429);
     });
 
     it("tolerates an undefined request without throwing", async () => {

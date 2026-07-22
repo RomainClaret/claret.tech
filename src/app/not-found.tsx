@@ -24,8 +24,7 @@ export default function NotFound() {
         {/* Error message */}
         <h2 className="text-3xl font-semibold mb-4">Page Not Found</h2>
         <p className="text-lg text-muted-foreground mb-8">
-          Oops! Looks like you&apos;ve ventured into uncharted territory. The
-          page you&apos;re looking for doesn&apos;t exist or has been moved.
+          This page did not survive selection. Happens to the best of them.
         </p>
 
         {/* Terminal-style message */}
@@ -37,6 +36,12 @@ export default function NotFound() {
           <p className="text-muted-foreground mt-2">
             <span className="text-primary">$</span> Try navigating back to
             safety...
+          </p>
+          <p className="text-muted-foreground mt-2">
+            <span className="text-primary">$</span> locate page
+          </p>
+          <p className="text-muted-foreground">
+            🐧 a lost penguin waddled off with this one
           </p>
         </div>
 

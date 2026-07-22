@@ -111,7 +111,7 @@ describe("Experience", () => {
 
       // Use getAllByText for elements that appear multiple times due to responsive design
       expect(screen.getAllByText("Visiting Researcher")).toHaveLength(2); // Desktop + mobile versions
-      expect(screen.getByText("University College Dublin")).toBeInTheDocument();
+      expect(screen.getAllByText("University College Dublin")).toHaveLength(2);
       expect(screen.getByText("University of Neuchâtel")).toBeInTheDocument();
     });
 
@@ -157,11 +157,13 @@ describe("Experience", () => {
       render(<Experience />);
 
       // Check actual company and location info from real data
-      expect(screen.getByText("University College Dublin")).toBeInTheDocument();
+      expect(screen.getAllByText("University College Dublin")).toHaveLength(2);
       // Location appears twice due to responsive design
-      expect(screen.getAllByText("Dublin, Ireland")).toHaveLength(2);
+      expect(screen.getAllByText("Dublin, Ireland")).toHaveLength(4);
       // Date also appears twice due to responsive design
-      expect(screen.getAllByText("Sep. 2023 - Present")).toHaveLength(2);
+      expect(
+        screen.getAllByText("Sep. 2023 - Feb. 2024 & Sep. 2024 - Dec. 2024"),
+      ).toHaveLength(2);
     });
 
     it("displays company logos", () => {

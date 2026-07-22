@@ -1,4 +1,4 @@
-import { expect, afterEach, vi, beforeAll } from "vitest";
+import { expect, afterEach, beforeEach, vi, beforeAll } from "vitest";
 import { cleanup } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { createElement } from "react";
@@ -226,6 +226,28 @@ function suppressExpectedErrors() {
     }
   };
 }
+
+// Re-establish matchMedia BEFORE each test. Vitest's `mockReset: true` clears
+// every vi.fn implementation (including window.matchMedia) before each test, so
+// the afterEach/beforeAll installs below do not survive into the next test body.
+// Without a fresh mock here, framer-motion's initPrefersReducedMotion() calls
+// window.matchMedia("(prefers-reduced-motion)").addEventListener on `undefined`
+// and throws (e.g. src/lib/animation-opacity.test.tsx, which uses real
+// framer-motion). Keeping it a vi.fn preserves the existing mock semantics.
+beforeEach(() => {
+  if (typeof window !== "undefined") {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof matchMedia;
+  }
+});
 
 // Cleanup after each test
 afterEach(() => {

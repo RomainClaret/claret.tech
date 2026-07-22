@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import {
   GitHubIcon,
   LinkedInIcon,
-  TwitterIcon,
   MediumIcon,
   StackOverflowIcon,
   InstagramIcon,
@@ -74,17 +73,6 @@ export function Footer() {
                   <LinkedInIcon size={28} />
                 </a>
               )}
-              {socialMediaLinks.twitter && (
-                <a
-                  href={socialMediaLinks.twitter}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#1DA1F2]"
-                  aria-label="Twitter"
-                >
-                  <TwitterIcon size={28} />
-                </a>
-              )}
               {socialMediaLinks.medium && (
                 <a
                   href={socialMediaLinks.medium}
@@ -146,8 +134,7 @@ export function Footer() {
           {/* Footer Text */}
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">
-              Ultrathinking with AI • 50% human creativity - 50% machine
-              precision
+              Built by one stubborn human and a very patient machine
             </p>
             <p className="text-sm text-muted-foreground">
               <span>
@@ -155,12 +142,12 @@ export function Footer() {
                 <button
                   type="button"
                   role="button"
-                  aria-label="View MIT License"
+                  aria-label="View the GNU GPLv3 or later license"
                   onClick={openLicenseModal}
                   className="text-primary hover:underline"
                   suppressHydrationWarning
                 >
-                  MIT License
+                  GNU GPLv3 or later
                 </button>{" "}
                 • Updated{" "}
                 <span

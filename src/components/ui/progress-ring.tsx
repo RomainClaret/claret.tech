@@ -241,9 +241,9 @@ export function ProgressRing({
 // Preset configurations for education progress
 export const educationProgress = {
   phd: {
-    current: 85, // Ongoing
-    label: "In Progress",
-    color: "rgb(34, 197, 94)", // Green for active
+    current: 100, // Completed
+    label: "Completed",
+    color: "rgb(59, 130, 246)", // Blue for completed
   },
   master: {
     current: 100, // Completed

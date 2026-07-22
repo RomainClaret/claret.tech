@@ -50,7 +50,7 @@ export default function CookieNotice() {
               <span className="font-semibold text-white">
                 🧬 Cookie Selection:
               </span>{" "}
-              Only the essential survive—theme genes and performance
+              Only the essential survive: theme genes and performance
               adaptations. We use privacy-focused analytics (Vercel) to
               understand site performance. No invasive tracking, no third-party
               advertising. View our{" "}

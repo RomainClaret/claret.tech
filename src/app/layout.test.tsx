@@ -15,9 +15,9 @@ import { describe, it, expect } from "vitest";
 const mockMetadata = {
   title: "Romain Claret - Evolving Artificial Intelligence",
   description:
-    "PhD researcher breeding neural networks that think in components, not patterns. Making evolution computationally viable. Because intelligence emerges, it isn't engineered.",
+    "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
   keywords:
-    "Romain Claret, Evolving AI, Neuroevolution, Compositional Intelligence, ES-HyperNEAT, GECCO, Evolutionary Computation, Artificial Life, Emergent Intelligence, PhD University Neuchâtel",
+    "Romain Claret, Evolving AI, Neuroevolution, Compositional Intelligence, ES-HyperNEAT, GECCO, Evolutionary Computation, Artificial Life, Emergent Intelligence, Lecturer, University College Dublin, University of Neuchâtel",
   authors: [{ name: "Romain Claret" }],
   metadataBase: { toString: () => "https://claret.tech/" } as {
     toString: () => string;
@@ -31,7 +31,7 @@ const mockMetadata = {
   openGraph: {
     title: "Romain Claret - Evolving Artificial Intelligence",
     description:
-      "PhD researcher breeding neural networks that think in components, not patterns. Making evolution computationally viable. Because intelligence emerges, it isn't engineered.",
+      "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
     type: "website",
     url: "https://claret.tech",
     images: [
@@ -42,13 +42,6 @@ const mockMetadata = {
         alt: "Romain Claret - Evolving Artificial Intelligence",
       },
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Romain Claret - Evolution > Engineering",
-    description: "Breeding neural networks that think compositionally.",
-    creator: "@romainclaret",
-    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -159,7 +152,7 @@ describe("RootLayout", () => {
         "Romain Claret - Evolving Artificial Intelligence",
       );
       expect(mockMetadata.description).toContain(
-        "PhD researcher breeding neural networks",
+        "studying emergent behaviors in bio-inspired artificial life",
       );
       expect(mockMetadata.keywords).toContain("Romain Claret");
       expect(mockMetadata.keywords).toContain("Neuroevolution");
@@ -181,7 +174,7 @@ describe("RootLayout", () => {
         "Romain Claret - Evolving Artificial Intelligence",
       );
       expect(mockMetadata.openGraph.description).toContain(
-        "PhD researcher breeding neural networks",
+        "studying emergent behaviors in bio-inspired artificial life",
       );
       expect(mockMetadata.openGraph.type).toBe("website");
       expect(mockMetadata.openGraph.url).toBe("https://claret.tech");
@@ -194,18 +187,6 @@ describe("RootLayout", () => {
       expect(ogImage.alt).toBe(
         "Romain Claret - Evolving Artificial Intelligence",
       );
-    });
-
-    it("includes Twitter Card metadata", () => {
-      expect(mockMetadata.twitter.card).toBe("summary_large_image");
-      expect(mockMetadata.twitter.title).toBe(
-        "Romain Claret - Evolution > Engineering",
-      );
-      expect(mockMetadata.twitter.description).toBe(
-        "Breeding neural networks that think compositionally.",
-      );
-      expect(mockMetadata.twitter.creator).toBe("@romainclaret");
-      expect(mockMetadata.twitter.images).toEqual(["/og-image.png"]);
     });
 
     it("has comprehensive favicon configuration", () => {

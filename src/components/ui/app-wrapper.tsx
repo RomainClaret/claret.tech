@@ -18,6 +18,9 @@ import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { logError } from "@/lib/utils/error-logger";
 // Import performance logger to initialize it
 import "@/lib/utils/performance-logger";
+import { PenguinConsole } from "./penguin-console";
+import { useKonamiCode } from "@/lib/hooks/useKonamiCode";
+import { showToast } from "@/components/ui/toast";
 
 const SplashScreen = dynamic(
   () => import("./splash-screen").then((mod) => mod.SplashScreen),
@@ -116,6 +119,12 @@ export function AppWrapper({ children }: AppWrapperProps) {
     setSplashScreenComplete(true);
   }, []);
 
+  // Easter egg: Konami code waddles a penguin toast.
+  const handleKonami = useCallback(() => {
+    showToast("🐧 Waddle mode unlocked: adaptation over accuracy.", "info");
+  }, []);
+  useKonamiCode(handleKonami);
+
   return (
     <ErrorBoundary>
       <BackgroundProvider>
@@ -123,6 +132,7 @@ export function AppWrapper({ children }: AppWrapperProps) {
           <PerformanceMonitorProvider>
             <ProjectsProvider>
               <ServiceWorkerRegister />
+              <PenguinConsole />
               {/* Site-wide grid background with very low opacity - Disabled on Safari for performance */}
               {!shouldReduceAnimations && (
                 <GridBackground className="fixed inset-0 z-0 opacity-30" />

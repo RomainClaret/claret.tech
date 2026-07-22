@@ -408,13 +408,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                   <div>
                     <div className="text-gray-400">CPU</div>
                     <div className={getUsageColor(cpuUsage)}>
-                      {cpuUsage !== null ? `${cpuUsage}%` : "—"}
+                      {cpuUsage !== null ? `${cpuUsage}%` : "N/A"}
                     </div>
                   </div>
                   <div>
                     <div className="text-gray-400">GPU</div>
                     <div className={getUsageColor(gpuUsage)}>
-                      {gpuUsage !== null ? `${gpuUsage}%` : "—"}
+                      {gpuUsage !== null ? `${gpuUsage}%` : "N/A"}
                     </div>
                   </div>
                   <div>
@@ -606,7 +606,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                         </div>
                         <div className="text-right">
                           <div className={getWebVitalColor(grade)}>
-                            {value !== null ? format(value) : "—"}
+                            {value !== null ? format(value) : "N/A"}
                           </div>
                           <div
                             className={cn(
@@ -667,13 +667,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                         <div>
                           <div className="text-gray-400">Used</div>
                           <div className="text-gray-300">
-                            {memoryUsed ? formatBytes(memoryUsed) : "—"}
+                            {memoryUsed ? formatBytes(memoryUsed) : "N/A"}
                           </div>
                         </div>
                         <div>
                           <div className="text-gray-400">Limit</div>
                           <div className="text-gray-300">
-                            {memoryLimit ? formatBytes(memoryLimit) : "—"}
+                            {memoryLimit ? formatBytes(memoryLimit) : "N/A"}
                           </div>
                         </div>
                       </div>
@@ -725,14 +725,16 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                   <div className="p-2 bg-gray-900 rounded">
                     <div className="text-gray-400">Bandwidth</div>
                     <div className="text-gray-300">
-                      {effectiveBandwidth ? `${effectiveBandwidth} Mbps` : "—"}
+                      {effectiveBandwidth
+                        ? `${effectiveBandwidth} Mbps`
+                        : "N/A"}
                     </div>
                   </div>
 
                   <div className="p-2 bg-gray-900 rounded">
                     <div className="text-gray-400">RTT</div>
                     <div className="text-gray-300">
-                      {rtt ? `${rtt}ms` : "—"}
+                      {rtt ? `${rtt}ms` : "N/A"}
                     </div>
                   </div>
 
@@ -970,13 +972,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     <div>
                       <div className="text-gray-400">Usage</div>
                       <div className={getUsageColor(cpuUsage)}>
-                        {cpuUsage !== null ? `${cpuUsage}%` : "—"}
+                        {cpuUsage !== null ? `${cpuUsage}%` : "N/A"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-400">Score</div>
                       <div className="text-gray-300">
-                        {cpuScore !== null ? cpuScore : "—"}
+                        {cpuScore !== null ? cpuScore : "N/A"}
                       </div>
                     </div>
                     <div>
@@ -1047,13 +1049,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     <div>
                       <div className="text-gray-400">Usage</div>
                       <div className={getUsageColor(gpuUsage)}>
-                        {gpuUsage !== null ? `${gpuUsage}%` : "—"}
+                        {gpuUsage !== null ? `${gpuUsage}%` : "N/A"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-400">Score</div>
                       <div className="text-gray-300">
-                        {gpuScore !== null ? gpuScore : "—"}
+                        {gpuScore !== null ? gpuScore : "N/A"}
                       </div>
                     </div>
                   </div>

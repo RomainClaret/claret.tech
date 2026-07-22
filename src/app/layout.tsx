@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import "./globals.css";
@@ -22,11 +21,7 @@ import { ToastContainer } from "@/components/ui/toast";
 import CookieNotice from "@/components/ui/cookie-notice";
 import { TestModeProvider } from "@/components/providers/test-mode-provider";
 import { LegalModalsProvider } from "@/components/ui/legal-modals-provider";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+import { PenguinSource } from "@/components/ui/penguin-source";
 
 const montserrat = localFont({
   src: "../../public/fonts/Montserrat-Regular.ttf",
@@ -43,9 +38,9 @@ const agustina = localFont({
 export const metadata: Metadata = {
   title: "Romain Claret - Evolving Artificial Intelligence",
   description:
-    "PhD researcher breeding neural networks that think in components, not patterns. Making evolution computationally viable. Because intelligence emerges, it isn't engineered.",
+    "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
   keywords:
-    "Romain Claret, Evolving AI, Neuroevolution, Compositional Intelligence, ES-HyperNEAT, GECCO, Evolutionary Computation, Artificial Life, Emergent Intelligence, PhD University Neuchâtel",
+    "Romain Claret, Evolving AI, Neuroevolution, Compositional Intelligence, ES-HyperNEAT, GECCO, Evolutionary Computation, Artificial Life, Emergent Intelligence, Lecturer, University College Dublin, University of Neuchâtel",
   authors: [{ name: "Romain Claret" }],
   metadataBase: new URL("https://claret.tech"),
   alternates: {
@@ -57,7 +52,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Romain Claret - Evolving Artificial Intelligence",
     description:
-      "PhD researcher breeding neural networks that think in components, not patterns. Making evolution computationally viable. Because intelligence emerges, it isn't engineered.",
+      "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
     type: "website",
     url: "https://claret.tech",
     images: [
@@ -68,13 +63,6 @@ export const metadata: Metadata = {
         alt: "Romain Claret - Evolving Artificial Intelligence",
       },
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Romain Claret - Evolution > Engineering",
-    description: "Breeding neural networks that think compositionally.",
-    creator: "@romainclaret",
-    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -273,21 +261,6 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href="https://medium.com" />
         <link rel="dns-prefetch" href="https://api.github.com" />
         <link rel="dns-prefetch" href="https://cdn-images-1.medium.com" />
-        {/* Preload critical fonts */}
-        <link
-          rel="preload"
-          href="/fonts/Montserrat-Regular.ttf"
-          as="font"
-          type="font/ttf"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preload"
-          href="/fonts/Agustina.woff"
-          as="font"
-          type="font/woff"
-          crossOrigin="anonymous"
-        />
         {/* Additional SEO meta tags */}
         <meta name="author" content="Romain Claret" />
         <meta name="generator" content="Next.js 15" />
@@ -321,9 +294,11 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${montserrat.variable} ${agustina.variable} font-sans`}
+        className={`${montserrat.variable} ${agustina.variable} font-sans`}
         suppressHydrationWarning
       >
+        {/* Easter egg: a penguin hidden in the HTML source (View Page Source) */}
+        <PenguinSource />
         {/* Skip Navigation Links */}
         <a
           href="#main-content"

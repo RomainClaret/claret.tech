@@ -9,7 +9,6 @@ import { logError } from "@/lib/utils/dev-logger";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 const CACHE_FILE = path.join(process.cwd(), "public", "publications.json");
-const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 interface CachedData {
   lastUpdated: string;
@@ -18,21 +17,17 @@ interface CachedData {
   publications: Publication[];
 }
 
+// Publications are manually curated: the committed publications.json is
+// authoritative regardless of age. A rebuild from the academic APIs happens
+// only on an explicit ?refresh=true (or when the cache file is missing).
 async function getCachedPublications(): Promise<CachedData | null> {
   try {
     const data = await fs.readFile(CACHE_FILE, "utf-8");
-    const cached: CachedData = JSON.parse(data);
-
-    // Check if cache is still valid
-    const cacheAge = Date.now() - new Date(cached.lastUpdated).getTime();
-    if (cacheAge < CACHE_DURATION_MS) {
-      return cached;
-    }
+    return JSON.parse(data) as CachedData;
   } catch {
     // Cache doesn't exist or is invalid
+    return null;
   }
-
-  return null;
 }
 
 async function updateCache(): Promise<CachedData> {

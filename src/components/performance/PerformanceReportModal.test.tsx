@@ -38,11 +38,14 @@ vi.mock("framer-motion", () => ({
   ),
 }));
 
-vi.mock("lucide-react", () => ({
-  X: ({ className }: { className?: string }) => (
+// Mock the deep per-icon imports used by the modal (see PerformanceReportModal.tsx)
+vi.mock("lucide-react/dist/esm/icons/x", () => ({
+  default: ({ className }: { className?: string }) => (
     <div data-testid="x-icon" className={className} />
   ),
-  FileText: ({ className }: { className?: string }) => (
+}));
+vi.mock("lucide-react/dist/esm/icons/file-text", () => ({
+  default: ({ className }: { className?: string }) => (
     <div data-testid="filetext-icon" className={className} />
   ),
 }));
@@ -246,8 +249,7 @@ describe("PerformanceReportModal", () => {
       removeEventListenerSpy.mockRestore();
     });
 
-    it.skip("handles terminal report generation event", () => {
-      // FIXME: This test passes in isolation but fails in batch mode due to mock isolation issues
+    it("handles terminal report generation event", () => {
       render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
 
       // Auto-generation should have been called once on mount

@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Minimize2, Maximize2 } from "lucide-react";
+// Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
+import X from "lucide-react/dist/esm/icons/x";
+import Minimize2 from "lucide-react/dist/esm/icons/minimize-2";
+import Maximize2 from "lucide-react/dist/esm/icons/maximize-2";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { cn } from "@/lib/utils";
 

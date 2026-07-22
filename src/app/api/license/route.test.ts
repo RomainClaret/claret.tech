@@ -2,7 +2,7 @@
  * License API Route Tests
  *
  * Tests the license API endpoint that reads, caches, and
- * serves MIT license content as plain text.
+ * serves the license content as plain text.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -74,11 +74,12 @@ describe("License API Route", () => {
 
   describe("Successful Response", () => {
     it("returns license content as plain text", async () => {
-      const mockLicenseText = `MIT License
+      const mockLicenseText = `GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
 
-Copyright (c) 2025 Romain Claret
+Copyright (C) 2025 Romain Claret
 
-Permission is hereby granted...`;
+This program is free software...`;
 
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
@@ -105,7 +106,7 @@ Permission is hereby granted...`;
 
     it("includes proper cache headers", async () => {
       mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue("MIT License Content");
+      mockFs.readFileSync.mockReturnValue("GPL-3.0-or-later License Content");
 
       await GET();
 
@@ -123,7 +124,7 @@ Permission is hereby granted...`;
 
   describe("Caching Behavior", () => {
     it("returns cached data when cache is valid", async () => {
-      const mockLicenseText = "MIT License - Cached Version";
+      const mockLicenseText = "GPL-3.0-or-later License - Cached Version";
 
       // Mock cache hit
       mockApiCache.get.mockReturnValue(mockLicenseText);
@@ -145,7 +146,7 @@ Permission is hereby granted...`;
     });
 
     it("refreshes cache after expiration", async () => {
-      const newLicense = "New MIT License";
+      const newLicense = "New GPL-3.0-or-later License";
 
       // Mock cache miss (expired or not found)
       mockApiCache.get.mockReturnValue(null);
@@ -186,7 +187,7 @@ Permission is hereby granted...`;
         {
           error: "LICENSE file not found",
           content:
-            "MIT License\n\nCopyright (c) 2025 Romain Claret\n\n[License file not found - please check repository]",
+            "GPL-3.0-or-later\n\nCopyright (C) 2025 Romain Claret\n\n[LICENSE file not found - see https://www.gnu.org/licenses/gpl-3.0.txt]",
         },
         { status: 404 },
       );
@@ -198,9 +199,9 @@ Permission is hereby granted...`;
       await GET();
 
       const notFoundCall = (NextResponse.json as any).mock.calls[0][0];
-      expect(notFoundCall.content).toContain("MIT License");
+      expect(notFoundCall.content).toContain("GPL-3.0-or-later");
       expect(notFoundCall.content).toContain(
-        "Copyright (c) 2025 Romain Claret",
+        "Copyright (C) 2025 Romain Claret",
       );
       expect(notFoundCall.error).toBe("LICENSE file not found");
     });
@@ -221,14 +222,14 @@ Permission is hereby granted...`;
       );
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          content: expect.stringContaining("MIT License"),
+          content: expect.stringContaining("GNU GENERAL PUBLIC LICENSE"),
           warning: "Using fallback license content due to read error",
         }),
         { status: 200 },
       );
     });
 
-    it("includes comprehensive fallback MIT license", async () => {
+    it("includes comprehensive fallback GPL license", async () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockImplementation(() => {
         throw new Error("Read error");
@@ -237,16 +238,14 @@ Permission is hereby granted...`;
       await GET();
 
       const fallbackCall = (NextResponse.json as any).mock.calls[0][0];
-      expect(fallbackCall.content).toContain("MIT License");
+      expect(fallbackCall.content).toContain("GNU GENERAL PUBLIC LICENSE");
       expect(fallbackCall.content).toContain(
-        "Copyright (c) 2025 Romain Claret",
+        "Copyright (C) 2025 Romain Claret",
       );
-      expect(fallbackCall.content).toContain("Permission is hereby granted");
-      expect(fallbackCall.content).toContain("without restriction");
-      expect(fallbackCall.content).toContain(
-        'THE SOFTWARE IS PROVIDED "AS IS"',
-      );
-      expect(fallbackCall.content).toContain("WITHOUT WARRANTY OF ANY KIND");
+      expect(fallbackCall.content).toContain("free software");
+      expect(fallbackCall.content).toContain("any later");
+      expect(fallbackCall.content).toContain("GNU General Public License");
+      expect(fallbackCall.content).toContain("https://www.gnu.org/licenses/");
       expect(fallbackCall.warning).toBe(
         "Using fallback license content due to read error",
       );
@@ -269,7 +268,7 @@ Permission is hereby granted...`;
   describe("Path Resolution", () => {
     it("uses correct LICENSE file path", async () => {
       mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue("MIT License Content");
+      mockFs.readFileSync.mockReturnValue("GPL-3.0-or-later License Content");
 
       await GET();
 
@@ -297,7 +296,7 @@ Permission is hereby granted...`;
 
   describe("Response Format", () => {
     it("returns content field only (no HTML rendering)", async () => {
-      const mockLicenseText = "MIT License\\nContent here";
+      const mockLicenseText = "GPL License\\nContent here";
 
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
@@ -311,7 +310,7 @@ Permission is hereby granted...`;
     });
 
     it("stores content in cache correctly", async () => {
-      const mockLicenseText = "Test MIT License";
+      const mockLicenseText = "Test GPL License";
 
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
@@ -330,45 +329,35 @@ Permission is hereby granted...`;
     });
   });
 
-  describe("MIT License Format", () => {
-    it("handles standard MIT license format", async () => {
-      const standardMIT = `MIT License
+  describe("License Format", () => {
+    it("handles standard GPL license format", async () => {
+      const standardGPL = `GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
 
-Copyright (c) 2025 Romain Claret
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+                            Preamble
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.`;
+  The GNU General Public License is a free, copyleft license for
+software and other kinds of works.`;
 
       mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(standardMIT);
+      mockFs.readFileSync.mockReturnValue(standardGPL);
 
       await GET();
 
       expect(NextResponse.json).toHaveBeenCalledWith(
-        { content: standardMIT },
+        { content: standardGPL },
         expect.any(Object),
       );
     });
 
     it("preserves license text formatting", async () => {
-      const formattedLicense = `MIT License
+      const formattedLicense = `GNU GENERAL PUBLIC LICENSE
 
-Copyright (c) 2025 Romain Claret
+Copyright (C) 2025 Romain Claret
 
    Indented text here
    More indented content

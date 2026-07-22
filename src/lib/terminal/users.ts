@@ -27,7 +27,13 @@ const createUserFileSystem = (
       type: "file",
       name: ".secrets",
       hidden: true,
-      content: `🔐 ${username}'s secret vault\n\nNothing to see here... yet.\n`,
+      content: `🔐 ${username}'s secret vault\n\n🐧 The colony sees everything.\n\nTry 'penguin' in the terminal, or 'cat .colony'.\n`,
+    },
+    ".colony": {
+      type: "file",
+      name: ".colony",
+      hidden: true,
+      content: `🐧🐧🐧🐧🐧🐧🐧\n🐧 the colony 🐧\n🐧🐧🐧🐧🐧🐧🐧\n\nAdaptation over accuracy. No flight, all survival.\n`,
     },
     "README.md": {
       type: "file",

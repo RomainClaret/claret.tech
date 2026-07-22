@@ -18,7 +18,7 @@ export interface Certification {
 
 export const educationInfo = {
   display: true,
-  title: "Academic Journey",
+  title: "Degrees",
   subtitle: {
     highlightedText:
       "Every degree was a detour that turned out to be the destination",
@@ -36,12 +36,12 @@ export const educationInfo = {
       schoolUrl: "https://www.unine.ch",
       logo: "/images/unine_logo.webp",
       subHeader: "PhD in Computer Science",
-      duration: "November 2020 - Present",
-      desc: "Thesis: Evolving Neural Networks toward Humanity-inspired Artificial Collective Intelligence",
+      duration: "November 2020 - August 2026",
+      desc: "Thesis: Scaling Adaptive Substrate Neuroevolution",
       research:
-        "Supervisors: Prof. Dr. Kilian Stoffel and Prof. Dr. Paul Cotofrei",
+        "Supervisors: Prof. Dr. Kilian Stoffel and Adjunct Prof. Dr. Paul Cotofrei",
       descBullets: [
-        "Research: Evolving Neural Networks, Neuromodulation, Spiking, Sparsity, Meta-Learning, Graph Representation, Consensus-based predictions",
+        "Research: Bio-inspired, Neuroevolution, Evolving Artificial Neural Networks, Adaptive Substrates, Neuromodulation, Sparsity, Meta-Learning, Tensor Acceleration",
         "Teaching Assistant: Applied Mathematics (Analysis and Linear Algebra) for Bachelor in Economic Science and Data Science",
         "Teaching Assistant: Databases (Modelization, SQL, NoSQL, Visualization) for Bachelor in Economic Science and Data Science",
       ],
@@ -88,29 +88,24 @@ export const educationInfo = {
       year: "2013",
     },
     {
-      name: "Writing to Be Published: English Academic Writing",
+      name: "Academic Writing",
       issuer: "Dr. Paul Skandera",
       year: "2022",
     },
     {
-      name: "Writing to Be Published: English Academic Writing Conventions and Style",
-      issuer: "Venturelab, Switzerland",
-      year: "2022",
-    },
-    {
       name: "Summer/Winter Schools",
-      issuer: "GEECO, CUSO, BENEFRI",
+      issuer: "GECCO, CUSO, BENEFRI",
       year: "2022,2023,2024,2024,2025",
     },
     {
-      name: "Training Students to Think Different",
+      name: "Teaching Students to Think",
       issuer: "Former Students",
       year: "2023-present",
     },
     {
       name: "Surviving a Ph.D.",
       issuer: "Sheer Stubbornness",
-      year: "2020-present",
+      year: "2020-2026",
     },
   ] as Certification[],
 };

@@ -4,8 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { DisplayLottie } from "./display-lottie";
 import { splashScreen } from "@/data/portfolio";
 import { useTheme } from "./theme-provider";
-import graphNetworkWhiteAnimation from "../../../public/animations/graphNetworkWhiteAnimation.json";
-import graphNetworkBlueAnimation from "../../../public/animations/graphNetworkBlueAnimation.json";
 import { cn } from "@/lib/utils";
 import { useProjects } from "@/contexts/projects-context";
 import { useBackground } from "@/contexts/background-context";
@@ -29,6 +27,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   const [isExiting, setIsExiting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+  const [animationData, setAnimationData] = useState<object | null>(null);
   const { theme } = useTheme();
   const animationFrameRef = useRef<number | null>(null);
   const { setAllProjects, setIsLoading } = useProjects();
@@ -77,6 +76,31 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       generateBackgroundData(width, height, 64); // 64px grid size
     }
   }, [generateBackgroundData]);
+
+  // Fetch the themed splash Lottie at runtime instead of bundling both
+  // multi-MB JSONs into the splash chunk; /animations/* is immutable-cached
+  // so repeat visits read it from disk cache.
+  useEffect(() => {
+    const file =
+      theme === "light"
+        ? "graphNetworkBlueAnimation"
+        : "graphNetworkWhiteAnimation";
+    let cancelled = false;
+    fetch(`/animations/${file}.json`)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        if (!cancelled) setAnimationData(data);
+      })
+      .catch((error) => {
+        logError(error, "SplashScreen.lottieFetch");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [theme]);
 
   // Fetch all projects during splash screen
   useEffect(() => {
@@ -200,15 +224,20 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           !shouldReduceAnimations ? { willChange: "transform, opacity" } : {}
         }
       >
-        <DisplayLottie
-          animationData={
-            theme === "light"
-              ? graphNetworkBlueAnimation
-              : graphNetworkWhiteAnimation
-          }
-          loop={false}
-          className="w-full max-w-lg mx-auto"
-        />
+        {animationData ? (
+          <DisplayLottie
+            animationData={animationData}
+            loop={false}
+            className="w-full max-w-lg mx-auto"
+          />
+        ) : (
+          // Same footprint as DisplayLottie's own dynamic-import placeholder
+          // so the loading text below does not jump when the JSON arrives.
+          <div
+            className="w-full max-w-lg mx-auto"
+            style={{ height: "200px" }}
+          />
+        )}
 
         {/* Loading text and progress */}
         <div className="text-center mt-8 space-y-4">
@@ -222,7 +251,8 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               Romain Claret
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              PhD Researcher • Evolving Artificial Intelligence
+              Neuroevolution Researcher & Lecturer • Evolving Artificial
+              Intelligence
             </p>
           </div>
 

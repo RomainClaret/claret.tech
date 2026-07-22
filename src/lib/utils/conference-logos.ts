@@ -69,9 +69,11 @@ export function generateLogoFileNames(venue: string): string[] {
     fileNames.push(`${baseName}_logo`);
   }
 
-  // Try acronym-based names (e.g., GECCO)
-  const acronymMatch = venue.match(/\b[A-Z]{3,}\b/);
-  if (acronymMatch) {
+  // Try acronym-based names (e.g., GECCO). Check every acronym in the venue, not
+  // just the first, so a later one still resolves when the venue leads with a
+  // different acronym (e.g. "IEEE World Congress ... (WCCI)" -> the wcci logo).
+  // getConferenceLogo returns the first candidate that has a real file.
+  for (const acronymMatch of venue.matchAll(/\b[A-Z]{3,}\b/g)) {
     const acronym = acronymMatch[0].toLowerCase();
     if (year) {
       fileNames.push(`${acronym}_${year}_logo`);
@@ -92,11 +94,19 @@ export function generateLogoFileNames(venue: string): string[] {
 export function getConferenceLogo(
   venue: string,
   availableLogos: Set<string>,
+  options?: { theme?: "light" | "dark" },
 ): string | null {
   const potentialNames = generateLogoFileNames(venue);
 
+  // In dark theme, prefer a dedicated `<name>_white` variant when one is
+  // registered (e.g. ppsn_2026_logo_white); fall back to the normal logo.
+  const candidates =
+    options?.theme === "dark"
+      ? potentialNames.flatMap((name) => [`${name}_white`, name])
+      : potentialNames;
+
   // Check each potential name with WebP first, then fallback to original formats
-  for (const name of potentialNames) {
+  for (const name of candidates) {
     // Check WebP first
     if (availableLogos.has(`${name}.webp`)) {
       return `/images/${name}.webp`;
@@ -133,6 +143,9 @@ export const AVAILABLE_CONFERENCE_LOGOS = new Set([
   "alife_2026_logo.png",
   "ppsn_2026_logo.webp",
   "ppsn_2026_logo.png",
+  // `_white` variants are picked automatically in dark theme
+  "ppsn_2026_logo_white.webp",
+  "ppsn_2026_logo_white.png",
   "gecco_2026_logo.webp",
   "gecco_2026_logo.png",
 ]);

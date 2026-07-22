@@ -130,7 +130,7 @@ export const skillPresets = {
     { name: "Teaching" },
     { name: "JAX/TensorFlow" },
     { name: "Scientific Writing" },
-    { name: "Python" },
+    { name: "Scaling AI" },
   ],
   master: [
     { name: "Machine Learning" },
@@ -139,13 +139,17 @@ export const skillPresets = {
     { name: "Software Engineering" },
     { name: "Cloud Computing" },
     { name: "Data Science" },
+    { name: "Knowledge Graphs" },
+    { name: "Question Answering" },
   ],
   bachelor: [
     { name: "Algorithms" },
     { name: "Databases" },
     { name: "Web Development" },
     { name: "Distributed Systems" },
-    { name: "Java/C++" },
     { name: "Networks" },
+    { name: "Cryptography" },
+    { name: "P2P Networks" },
+    { name: "Blockchain" },
   ],
 };

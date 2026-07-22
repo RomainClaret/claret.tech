@@ -1,10 +1,9 @@
 // Service Worker for claret.tech
-const CACHE_NAME = "claret-tech-v2";
-const urlsToCache = [
-  "/fonts/Agustina.woff",
-  "/fonts/Montserrat-Regular.ttf",
-  "/site.webmanifest",
-];
+const CACHE_NAME = "claret-tech-v4";
+// The raw /fonts/ files are no longer referenced by any CSS (next/font
+// serves hashed copies from /_next/static/media), so precaching them was
+// 335KB of dead weight on first install.
+const urlsToCache = ["/site.webmanifest"];
 
 // Install event - cache resources
 self.addEventListener("install", (event) => {
@@ -33,6 +32,12 @@ self.addEventListener("install", (event) => {
 
 // Fetch event - network-first for HTML, cache-first for assets
 self.addEventListener("fetch", (event) => {
+  // Never intercept API requests: their data (publications, blog feeds) must
+  // always come from the network so content updates are visible immediately.
+  if (new URL(event.request.url).pathname.startsWith("/api/")) {
+    return;
+  }
+
   // Network-first for navigation requests (HTML pages)
   // This ensures users always get fresh HTML with correct JS chunk hashes
   if (event.request.mode === "navigate") {

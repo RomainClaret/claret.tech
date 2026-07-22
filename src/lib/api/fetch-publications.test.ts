@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchAllPublications } from "./fetch-publications";
+import {
+  fetchAllPublications,
+  comparePublications,
+  publicationToBibTeX,
+  type Publication,
+} from "./fetch-publications";
 
 // A Semantic Scholar paper with abbreviated author names (as the real API returns
 // them) and an open-access PDF, used to exercise the runtime normalization path.
@@ -68,10 +73,96 @@ describe("fetchAllPublications - author normalization & curated fields", () => {
 
   it("leaves static publications' author names untouched", async () => {
     const pubs = await run();
-    const staticPub = pubs.find((p) => p.source === "static");
+    const staticPub = pubs.find((p) => p.id === "karmali2010perceptual");
 
     expect(staticPub).toBeDefined();
     expect(staticPub!.authors).toContain("Romain Claret");
     expect(staticPub!.authors).toContain("Faisal Karmali");
+  });
+});
+
+describe("comparePublications", () => {
+  const make = (over: Partial<Publication>): Publication => ({
+    id: "x",
+    title: "t",
+    authors: [],
+    year: "2026",
+    source: "static",
+    ...over,
+  });
+
+  it("sorts starred papers first, even when older", () => {
+    const order = [
+      make({ id: "plain", year: "2026" }),
+      make({ id: "star", year: "2020", starred: true }),
+    ]
+      .sort(comparePublications)
+      .map((p) => p.id);
+    expect(order).toEqual(["star", "plain"]);
+  });
+
+  it("sorts by year, newest first", () => {
+    const order = [
+      make({ id: "old", year: "2024" }),
+      make({ id: "new", year: "2026" }),
+    ]
+      .sort(comparePublications)
+      .map((p) => p.id);
+    expect(order).toEqual(["new", "old"]);
+  });
+
+  it("breaks a year tie by month, newest first", () => {
+    const order = [
+      make({ id: "jun", year: "2026", month: 6 }),
+      make({ id: "sep", year: "2026", month: 9 }),
+    ]
+      .sort(comparePublications)
+      .map((p) => p.id);
+    expect(order).toEqual(["sep", "jun"]);
+  });
+
+  it("breaks a year and month tie by citations", () => {
+    const order = [
+      make({ id: "lo", year: "2026", month: 6, citations: 1 }),
+      make({ id: "hi", year: "2026", month: 6, citations: 9 }),
+    ]
+      .sort(comparePublications)
+      .map((p) => p.id);
+    expect(order).toEqual(["hi", "lo"]);
+  });
+});
+
+describe("publicationToBibTeX", () => {
+  const base: Publication = {
+    id: "claret2026emr",
+    title: "Tensor-Accelerated Grids",
+    authors: ["Romain Claret", "Michael O'Neill"],
+    year: "2026",
+    venue: "Genetic and Evolutionary Computation Conference (GECCO)",
+    doi: "10.1145/3795101.3805361",
+    source: "static",
+  };
+
+  it("keys the entry by the publication id and joins authors with 'and'", () => {
+    const bib = publicationToBibTeX(base);
+    expect(bib.startsWith("@inproceedings{claret2026emr,")).toBe(true);
+    expect(bib).toContain("author = {Romain Claret and Michael O'Neill}");
+    expect(bib).toContain(
+      "booktitle = {Genetic and Evolutionary Computation Conference (GECCO)}",
+    );
+    expect(bib).toContain("doi = {10.1145/3795101.3805361}");
+  });
+
+  it("omits the doi field when absent and falls back to @misc without a venue", () => {
+    const noDoi = publicationToBibTeX({ ...base, doi: undefined });
+    expect(noDoi).not.toContain("doi =");
+
+    const noVenue = publicationToBibTeX({
+      ...base,
+      venue: undefined,
+      doi: undefined,
+    });
+    expect(noVenue.startsWith("@misc{claret2026emr,")).toBe(true);
+    expect(noVenue).not.toContain("booktitle =");
   });
 });

@@ -10,11 +10,13 @@ import {
   Share2,
   Eye,
   ChevronDown,
+  Link2,
+  Check,
 } from "lucide-react";
 import Image from "next/image";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 
@@ -29,6 +31,8 @@ interface BlogCardHolographicProps {
   readingTime?: number;
   views?: number;
   author?: string;
+  anchorId?: string; // deep-link hash for this post (enables the copy button)
+  isDeepLinked?: boolean; // arrived via a deep link: hold the glow + expand
 }
 
 // Blog category colors - optimized for better contrast
@@ -126,9 +130,26 @@ export function BlogCardHolographic({
   readingTime = 5,
   views,
   author = "Romain Claret",
+  anchorId,
+  isDeepLinked = false,
 }: BlogCardHolographicProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Arriving via a deep link opens the full description.
+  useEffect(() => {
+    if (isDeepLinked) setIsExpanded(true);
+  }, [isDeepLinked]);
+
+  const handleCopyLink = async () => {
+    if (!anchorId) return;
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/#${anchorId}`,
+    );
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   // Determine color based on category or use provided color
   const category = detectBlogCategory(title, description);
@@ -159,6 +180,7 @@ export function BlogCardHolographic({
       <HolographicCard
         glowColor={nodeColor}
         className="h-full transition-all duration-300 blog-card-enhanced"
+        forceHover={isDeepLinked}
       >
         <div className="p-6 h-full flex flex-col">
           {/* Header with type badge */}
@@ -242,6 +264,20 @@ export function BlogCardHolographic({
                 </p>
               </div>
             </div>
+            {anchorId && (
+              <button
+                onClick={handleCopyLink}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+                title="Copy link to this post"
+                aria-label="Copy link to this post"
+              >
+                {linkCopied ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Link2 className="w-4 h-4" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Image section */}

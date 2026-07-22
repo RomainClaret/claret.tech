@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { usePDFViewer } from "./usePDFViewer";
+import { usePDFViewer, isSafePdfUrl } from "./usePDFViewer";
 
 describe("usePDFViewer", () => {
   describe("Initial State", () => {
@@ -116,7 +116,7 @@ describe("usePDFViewer", () => {
       expect(result.current.pdfUrl).toBe("/documents/file.pdf");
     });
 
-    it("handles data URLs", () => {
+    it("rejects data: URLs (scheme allowlist)", () => {
       const { result } = renderHook(() => usePDFViewer());
 
       const dataUrl = "data:application/pdf;base64,JVBERi0xLjQK...";
@@ -125,7 +125,35 @@ describe("usePDFViewer", () => {
         result.current.openPDF(dataUrl);
       });
 
-      expect(result.current.pdfUrl).toBe(dataUrl);
+      // pdfUrl can originate from external APIs; only same-origin paths and
+      // https URLs may reach the viewer and its raw-DOM download anchor.
+      expect(result.current.isOpen).toBe(false);
+      expect(result.current.pdfUrl).toBe("");
+    });
+  });
+
+  describe("URL scheme allowlist", () => {
+    it.each([
+      ["/pdfs/paper.pdf", true],
+      ["https://example.com/paper.pdf", true],
+      ["http://example.com/paper.pdf", false],
+      ["javascript:alert(1)", false],
+      ["data:application/pdf;base64,AAAA", false],
+      ["//evil.example/paper.pdf", false],
+      ["", false],
+    ])("isSafePdfUrl(%j) -> %s", (url, expected) => {
+      expect(isSafePdfUrl(url as string)).toBe(expected);
+    });
+
+    it("keeps javascript: URLs out of the viewer state", () => {
+      const { result } = renderHook(() => usePDFViewer());
+
+      act(() => {
+        result.current.openPDF("javascript:alert(1)");
+      });
+
+      expect(result.current.isOpen).toBe(false);
+      expect(result.current.pdfUrl).toBe("");
     });
   });
 
@@ -258,14 +286,15 @@ describe("usePDFViewer", () => {
   });
 
   describe("Edge Cases", () => {
-    it("handles empty string URL", () => {
+    it("rejects an empty string URL", () => {
       const { result } = renderHook(() => usePDFViewer());
 
       act(() => {
         result.current.openPDF("");
       });
 
-      expect(result.current.isOpen).toBe(true);
+      // Nothing to show and not an allowlisted URL: stay closed.
+      expect(result.current.isOpen).toBe(false);
       expect(result.current.pdfUrl).toBe("");
     });
 

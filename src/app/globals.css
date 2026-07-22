@@ -585,24 +585,9 @@
   }
 }
 
-/* Custom fonts */
-@font-face {
-  font-family: "Agustina";
-  src: url("/fonts/Agustina.woff") format("woff");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Montserrat";
-  src: url("/fonts/Montserrat-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* Justov font removed - CDN returning 404 */
+/* Fonts are loaded via next/font in layout.tsx (its hashed @font-face rules
+   and CSS variables); the old manual @font-face duplicates were never applied
+   because Tailwind only references the next/font variables. */
 
 /* Import high contrast mode styles */
 @import "../styles/high-contrast.css";
@@ -671,4 +656,37 @@
     will-change: unset !important;
     position: fixed !important;
   }
+}
+
+/* Deep-link highlight: one-shot ring pulse on the paper card targeted by a
+   #<paper-id> hash (see the deep-link effect in Papers.tsx). */
+@keyframes deep-link-pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55);
+  }
+  60% {
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+}
+
+.deep-link-highlight {
+  animation: deep-link-pulse 2.4s ease-out;
+  border-radius: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deep-link-highlight {
+    animation: none;
+  }
+}
+
+/* PDF reader safety net: never let a rendered page overflow the viewer width,
+   even before the JS auto-fit has run (wide 16:9 presentation slides render
+   at native size otherwise). height auto preserves the aspect ratio. */
+.react-pdf__Page__canvas {
+  max-width: 100%;
+  height: auto !important;
 }

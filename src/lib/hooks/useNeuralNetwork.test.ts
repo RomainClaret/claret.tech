@@ -437,7 +437,7 @@ describe("useNeuralNetwork", () => {
     // Invoke this hook instance's own keydown handler directly. Using
     // window.dispatchEvent would also fire keydown listeners leaked by sibling
     // renderHook calls in this file; the fullscreen/view-mode toggles then
-    // double-fire and cancel out under batch load — the source of the flake.
+    // double-fire and cancel out under batch load, the source of the flake.
     // Grabbing the latest registered handler each call keeps its captured
     // closure (isFullscreen/viewMode) current after toggles re-run the effect.
     const pressKey = (

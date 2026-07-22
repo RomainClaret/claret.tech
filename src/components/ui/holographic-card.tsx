@@ -2,8 +2,10 @@
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { ReactNode, useRef } from "react";
+import { ReactNode, RefObject, useState } from "react";
 import { useShouldReduceAnimations, useIsSafari } from "@/lib/hooks/useSafari";
+import { useInViewAnimation } from "@/lib/hooks/useInViewAnimation";
+import { useAnimationStateOptional } from "@/contexts/animation-state-context";
 
 interface HolographicCardProps {
   children: ReactNode;
@@ -14,6 +16,9 @@ interface HolographicCardProps {
   onMouseLeave?: () => void;
   isActive?: boolean;
   isConnected?: boolean;
+  /** Hold the hover color shift on, as if the pointer were over the card
+   *  (used by paper deep links until the user interacts). */
+  forceHover?: boolean;
   delay?: number;
   transitionDuration?: number;
 }
@@ -27,25 +32,42 @@ export function HolographicCard({
   onMouseLeave,
   isActive = false,
   isConnected = false,
+  forceHover = false,
   delay = 0,
   transitionDuration = 300,
 }: HolographicCardProps) {
-  const ref = useRef<HTMLDivElement>(null);
   const shouldReduceAnimations = useShouldReduceAnimations();
   const isSafari = useIsSafari();
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Only run the infinite glow/shimmer loops while the card can actually be
+  // seen and the site-wide animation switch is on: with ~50 cards mounted,
+  // ungated `repeat: Infinity` animations kept every off-screen card busy.
+  const { ref, isInView } = useInViewAnimation({ triggerOnce: false });
+  // Optional so the card still renders outside the provider (tests, tools).
+  const animationState = useAnimationStateOptional();
+  const areAnimationsPlaying = animationState?.areAnimationsPlaying ?? true;
+  const glowAnimated =
+    !shouldReduceAnimations && isInView && areAnimationsPlaying;
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    onMouseEnter?.();
+  };
 
   const handleMouseLeave = () => {
+    setIsHovered(false);
     onMouseLeave?.();
   };
 
   return (
     <motion.div
-      ref={ref}
+      ref={ref as RefObject<HTMLDivElement>}
       className={cn("relative group/card h-full", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Neural glow effect - simplified for Safari */}
@@ -60,13 +82,11 @@ export function HolographicCard({
         }}
         initial={{ opacity: 0 }}
         animate={
-          shouldReduceAnimations
-            ? { opacity: 0.15 }
-            : { opacity: [0.1, 0.25, 0.1] }
+          glowAnimated ? { opacity: [0.1, 0.25, 0.1] } : { opacity: 0.15 }
         }
         transition={{
-          duration: shouldReduceAnimations ? 0.3 : 3,
-          repeat: shouldReduceAnimations ? 0 : Infinity,
+          duration: glowAnimated ? 3 : 0.3,
+          repeat: glowAnimated ? Infinity : 0,
           delay: delay + 0.5,
           ease: "easeInOut",
         }}
@@ -93,7 +113,12 @@ export function HolographicCard({
       {/* Holographic background effect - simplified for Safari */}
       {!shouldReduceAnimations && (
         <motion.div
-          className="absolute inset-0 rounded-lg opacity-0 group-hover/card:opacity-100 transition-opacity"
+          className={cn(
+            "absolute inset-0 rounded-lg transition-opacity",
+            forceHover
+              ? "opacity-100"
+              : "opacity-0 group-hover/card:opacity-100",
+          )}
           style={{ transitionDuration: `${transitionDuration}ms` }}
         >
           {/* Base glow - reduced blur on Safari */}
@@ -111,7 +136,10 @@ export function HolographicCard({
       {/* Safari-optimized hover effect */}
       {shouldReduceAnimations && (
         <div
-          className="absolute inset-0 rounded-lg opacity-0 group-hover/card:opacity-20 transition-opacity"
+          className={cn(
+            "absolute inset-0 rounded-lg transition-opacity",
+            forceHover ? "opacity-20" : "opacity-0 group-hover/card:opacity-20",
+          )}
           style={{
             transitionDuration: `${transitionDuration}ms`,
             background: `rgba(${glowColor}, 0.1)`,
@@ -122,29 +150,39 @@ export function HolographicCard({
       {/* Holographic shimmer - disabled on Safari */}
       {!shouldReduceAnimations && (
         <motion.div
-          className="absolute inset-0 rounded-lg opacity-0 group-hover/card:opacity-100 transition-opacity overflow-hidden"
+          className={cn(
+            "absolute inset-0 rounded-lg transition-opacity overflow-hidden",
+            forceHover
+              ? "opacity-100"
+              : "opacity-0 group-hover/card:opacity-100",
+          )}
           style={{ transitionDuration: `${transitionDuration}ms` }}
         >
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(115deg,
-                transparent 20%,
-                rgba(255, 255, 255, 0.1) 40%,
-                rgba(255, 255, 255, 0.2) 50%,
-                rgba(255, 255, 255, 0.1) 60%,
-                transparent 80%
-              )`,
-            }}
-            animate={{
-              x: ["-100%", "100%"],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
+          {/* Mount the sweep only while it can be seen: the wrapper above
+              is invisible until hover/deep-link, yet this loop used to run
+              on every card all the time. */}
+          {(isHovered || forceHover) && areAnimationsPlaying ? (
+            <motion.div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(115deg,
+                  transparent 20%,
+                  rgba(255, 255, 255, 0.1) 40%,
+                  rgba(255, 255, 255, 0.2) 50%,
+                  rgba(255, 255, 255, 0.1) 60%,
+                  transparent 80%
+                )`,
+              }}
+              animate={{
+                x: ["-100%", "100%"],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            />
+          ) : null}
         </motion.div>
       )}
 
@@ -162,6 +200,7 @@ export function HolographicCard({
           "hover:before:opacity-100",
           "h-full",
           isActive && "before:opacity-100",
+          forceHover && "before:opacity-100",
           className?.includes("blog-card-enhanced") &&
             "bg-card/95 dark:bg-card/90",
         )}
@@ -172,7 +211,12 @@ export function HolographicCard({
       >
         {/* Animated holographic border */}
         <motion.div
-          className="absolute inset-0 rounded-lg p-[1px] -z-20 opacity-0 group-hover/card:opacity-100 transition-opacity"
+          className={cn(
+            "absolute inset-0 rounded-lg p-[1px] -z-20 transition-opacity",
+            forceHover
+              ? "opacity-100"
+              : "opacity-0 group-hover/card:opacity-100",
+          )}
           style={{
             transitionDuration: `${transitionDuration}ms`,
             backgroundImage: `linear-gradient(135deg,
@@ -203,7 +247,7 @@ export function HolographicCard({
                 left: "-2px",
               }}
               animate={
-                shouldReduceAnimations
+                shouldReduceAnimations || !areAnimationsPlaying
                   ? {}
                   : {
                       scale: [1, 1.5, 1],
@@ -212,7 +256,10 @@ export function HolographicCard({
               }
               transition={{
                 duration: 2,
-                repeat: shouldReduceAnimations ? 0 : Infinity,
+                repeat:
+                  shouldReduceAnimations || !areAnimationsPlaying
+                    ? 0
+                    : Infinity,
                 ease: "easeInOut",
               }}
             />
@@ -226,7 +273,7 @@ export function HolographicCard({
                   : `0 0 10px rgba(${glowColor}, 0.8)`,
               }}
               animate={
-                shouldReduceAnimations
+                shouldReduceAnimations || !areAnimationsPlaying
                   ? {}
                   : {
                       scale: [1, 1.2, 1],
@@ -234,7 +281,10 @@ export function HolographicCard({
               }
               transition={{
                 duration: 1,
-                repeat: shouldReduceAnimations ? 0 : Infinity,
+                repeat:
+                  shouldReduceAnimations || !areAnimationsPlaying
+                    ? 0
+                    : Infinity,
                 ease: "easeInOut",
               }}
             />
@@ -243,7 +293,10 @@ export function HolographicCard({
 
         {/* Light reflection effect */}
         <div
-          className="absolute top-0 left-0 w-full h-full opacity-0 group-hover/card:opacity-10 transition-opacity pointer-events-none"
+          className={cn(
+            "absolute top-0 left-0 w-full h-full transition-opacity pointer-events-none",
+            forceHover ? "opacity-10" : "opacity-0 group-hover/card:opacity-10",
+          )}
           style={{
             transitionDuration: `${transitionDuration * 1.5}ms`,
             background: `radial-gradient(

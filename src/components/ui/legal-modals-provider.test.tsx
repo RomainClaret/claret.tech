@@ -2,7 +2,7 @@
  * Legal Modals Provider Tests
  *
  * Tests the context provider that manages legal modal state
- * (Privacy Policy, Terms of Service, MIT License) across components.
+ * (Privacy Policy, Terms of Service, GPL-3.0-or-later License) across components.
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -45,7 +45,7 @@ vi.mock("@/components/legal/terms-content", () => ({
 
 vi.mock("@/components/legal/license-content", () => ({
   LicenseContent: () => (
-    <div data-testid="license-content">MIT License Content</div>
+    <div data-testid="license-content">GPL-3.0-or-later License Content</div>
   ),
 }));
 
@@ -63,7 +63,7 @@ function TestComponent() {
         Open Terms of Service
       </button>
       <button onClick={openLicenseModal} data-testid="open-license">
-        Open MIT License
+        Open License
       </button>
     </div>
   );
@@ -190,7 +190,7 @@ describe("LegalModalsProvider", () => {
     });
   });
 
-  describe("MIT License Modal", () => {
+  describe("GNU GPLv3 or later Modal", () => {
     it("opens license modal when openLicenseModal is called", () => {
       render(
         <LegalModalsProvider>
@@ -200,15 +200,17 @@ describe("LegalModalsProvider", () => {
 
       // Modal should not be visible initially
       expect(
-        screen.queryByTestId("legal-modal-mit-license"),
+        screen.queryByTestId("legal-modal-gnu-gplv3-or-later"),
       ).not.toBeInTheDocument();
 
       // Click to open license modal
       fireEvent.click(screen.getByTestId("open-license"));
 
       // Modal should now be visible
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
-      expect(screen.getByText("MIT License")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("GNU GPLv3 or later")).toBeInTheDocument();
       expect(screen.getByTestId("license-content")).toBeInTheDocument();
     });
 
@@ -221,12 +223,14 @@ describe("LegalModalsProvider", () => {
 
       // Open the modal
       fireEvent.click(screen.getByTestId("open-license"));
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
 
       // Close the modal
-      fireEvent.click(screen.getByTestId("close-mit-license"));
+      fireEvent.click(screen.getByTestId("close-gnu-gplv3-or-later"));
       expect(
-        screen.queryByTestId("legal-modal-mit-license"),
+        screen.queryByTestId("legal-modal-gnu-gplv3-or-later"),
       ).not.toBeInTheDocument();
     });
   });
@@ -275,13 +279,17 @@ describe("LegalModalsProvider", () => {
 
       // Open license modal
       fireEvent.click(screen.getByTestId("open-license"));
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
 
       // Both should be open
       expect(
         screen.getByTestId("legal-modal-privacy-policy"),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
     });
 
     it("closes individual modals independently", () => {
@@ -303,7 +311,9 @@ describe("LegalModalsProvider", () => {
       expect(
         screen.getByTestId("legal-modal-terms-of-service"),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
 
       // Close only privacy modal
       fireEvent.click(screen.getByTestId("close-privacy-policy"));
@@ -315,7 +325,9 @@ describe("LegalModalsProvider", () => {
       expect(
         screen.getByTestId("legal-modal-terms-of-service"),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("legal-modal-mit-license")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -384,7 +396,9 @@ describe("LegalModalsProvider", () => {
       // Open license modal and check content
       fireEvent.click(screen.getByTestId("open-license"));
       expect(screen.getByTestId("license-content")).toBeInTheDocument();
-      expect(screen.getByText("MIT License Content")).toBeInTheDocument();
+      expect(
+        screen.getByText("GPL-3.0-or-later License Content"),
+      ).toBeInTheDocument();
     });
 
     it("passes correct titles to modal components", () => {
@@ -402,7 +416,7 @@ describe("LegalModalsProvider", () => {
       expect(screen.getByText("Terms of Service")).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("open-license"));
-      expect(screen.getByText("MIT License")).toBeInTheDocument();
+      expect(screen.getByText("GNU GPLv3 or later")).toBeInTheDocument();
     });
   });
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTheme } from "./theme-provider";
 import { useQuality } from "@/contexts/quality-context";
+import { useAnimationStateOptional } from "@/contexts/animation-state-context";
 import { logError } from "@/lib/utils/dev-logger";
 
 interface FaviconRenderer {
@@ -56,6 +57,13 @@ export function AnimatedFavicon() {
   const { theme } = useTheme();
   const { quality } = useQuality();
   const isLowQuality = quality === "battery" || quality === "low";
+  // Honor the site-wide animation switch. Read through a ref so toggling
+  // pauses the loop in place instead of tearing down and reloading the
+  // favicon scripts (optional hook: tests may render without the provider).
+  const animationState = useAnimationStateOptional();
+  const areAnimationsPlaying = animationState?.areAnimationsPlaying ?? true;
+  const areAnimationsPlayingRef = useRef(areAnimationsPlaying);
+  areAnimationsPlayingRef.current = areAnimationsPlaying;
 
   useEffect(() => {
     let animationId: number | null = null;
@@ -146,7 +154,6 @@ export function AnimatedFavicon() {
         const frameInterval = 1000 / fps;
         const pauseDuration = 3000; // 3 second pause between loops
         const totalFrames = pattern.length; // 12 frames for current pattern
-        let lastFrameTime = 0; // Track when we last updated the frame
         let isGeneratingNewPattern = false; // Prevent concurrent pattern generation
 
         // Check for reduced motion preference
@@ -183,14 +190,6 @@ export function AnimatedFavicon() {
           if (isPaused || !renderer || !canvas) {
             return;
           }
-
-          // Check if enough time has passed for the next frame
-          const now = performance.now();
-          if (now - lastFrameTime < frameInterval) {
-            // Not time for next frame yet
-            return;
-          }
-          lastFrameTime = now;
 
           // Render the current frame directly
           renderer.drawFrame(currentFrame);
@@ -263,19 +262,19 @@ export function AnimatedFavicon() {
             pauseTimeout = setTimeout(() => {
               isPaused = false;
               pauseTimeout = null;
-              lastFrameTime = 0; // Reset timing for next loop
             }, pauseDuration);
           }
         };
 
-        // Optimized animation loop using requestAnimationFrame
+        // Tick at the favicon's real frame rate (1-3fps) with setTimeout:
+        // the previous requestAnimationFrame loop woke 60 times per second
+        // only to skip ~95% of those on a frame-interval check.
         const animate = () => {
-          if (!document.hidden) {
+          if (!document.hidden && areAnimationsPlayingRef.current) {
             updateFavicon();
           }
 
-          // Use requestAnimationFrame for better performance and battery life
-          animationId = window.requestAnimationFrame(animate);
+          animationId = window.setTimeout(animate, frameInterval);
         };
 
         // Handle visibility change - animation continues but skips updates when hidden
@@ -292,7 +291,7 @@ export function AnimatedFavicon() {
         // Store cleanup function
         cleanup = () => {
           if (animationId !== null) {
-            window.cancelAnimationFrame(animationId);
+            window.clearTimeout(animationId);
             animationId = null;
           }
           if (pauseTimeout !== null) {

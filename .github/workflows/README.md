@@ -6,15 +6,25 @@ This directory contains the CI/CD workflows for the claret.tech v2 project.
 
 ### 1. CI Workflow (`ci.yml`)
 
-Runs on all pushes and pull requests to ensure code quality.
+Runs on all pushes and pull requests (all branches, including slash-named
+ones like `feature/foo`). Superseded runs on the same ref are cancelled
+automatically (concurrency group).
 
 **Jobs:**
 
-- **Lint**: Checks code style with ESLint
-- **Type Check**: Validates TypeScript types
-- **Format**: Ensures consistent code formatting with Prettier
-- **Test**: Runs unit tests with Vitest
-- **Build**: Verifies the Next.js build succeeds
+- **Detect Changes**: path filters decide which test jobs a push needs
+  (pull requests always run everything)
+- **Quick Checks**: lint / format / type-check matrix
+- **Test jobs**: Vitest split into parallel jobs - API routes, utilities,
+  components (4 batches, file lists in `package.json`
+  `test:components:batch1..4`), contexts, hooks, library DOM, non-DOM units
+- **Build**: verifies the Next.js production build
+- **CI Summary**: aggregates all results
+
+**Known exclusion**: `src/components/sections/Introduction.test.tsx` runs in
+NO CI path on purpose - it heap-OOMs even alone with a 16GB limit (it is
+also excluded from the local `test:ci` batches). Refactoring that test file
+is the only way to bring it back.
 
 ### 2. Deploy Workflow (`deploy.yml`) - MANUAL ONLY
 
@@ -88,9 +98,9 @@ Add these secrets to your GitHub repository (Settings > Secrets > Actions):
 4. Test workflows locally:
 
    ```bash
-   # Test CI workflow
-   act push -j lint
-   act push -j test
+   # Test individual CI jobs
+   act push -j quick-checks
+   act push -j test-unit
    act push -j build
 
    # Test all CI jobs
@@ -105,9 +115,10 @@ Add these secrets to your GitHub repository (Settings > Secrets > Actions):
 
 ## Workflow Triggers
 
-- **CI**: Runs on all pushes and pull requests
+- **CI**: Runs on all pushes and pull requests (superseded runs cancelled)
 - **Deploy**: Manual trigger only from GitHub Actions tab (workflow_dispatch)
-- **Playwright**: Runs on all pushes and pull requests
+- **Playwright**: workflow_dispatch, plus pushes/PRs targeting main/master
+  (docs-only changes skipped); superseded runs cancelled
 
 ## Environment URLs
 

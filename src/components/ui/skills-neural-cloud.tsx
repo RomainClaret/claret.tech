@@ -8,7 +8,57 @@ import {
   DEFAULT_SPIKING_CONFIG,
   getRandomInterval,
 } from "@/lib/utils/neural-animations";
-import * as LucideIcons from "lucide-react";
+import {
+  Activity,
+  ArrowLeftRight,
+  Atom,
+  Beaker,
+  Blocks,
+  Book,
+  Bot,
+  Brain,
+  Bug,
+  Clock,
+  Code2,
+  Cog,
+  Coins,
+  Compass,
+  Cpu,
+  Dices,
+  Dna,
+  Ear,
+  FileCode,
+  Flame,
+  Github,
+  GraduationCap,
+  Hand,
+  Handshake,
+  Heart,
+  Hourglass,
+  Infinity as InfinityIcon,
+  Layers,
+  Leaf,
+  Lightbulb,
+  Map as MapIcon,
+  MemoryStick,
+  Microscope,
+  Network,
+  Puzzle,
+  Rocket,
+  Route,
+  Server,
+  Shield,
+  Shuffle,
+  Sparkles,
+  Sprout,
+  Telescope,
+  TreePine,
+  TrendingUp,
+  Users,
+  Wind,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { validateRadius } from "@/lib/utils/svg-validation";
 import { useAnimationState } from "@/contexts/animation-state-context";
@@ -73,11 +123,65 @@ const getCategoryColor = (category?: string): string => {
   }
 };
 
+// Explicit icon map instead of `import * as LucideIcons`: the namespace
+// import defeated tree-shaking and pulled the whole lucide barrel into the
+// bundle. Names missing here (e.g. concept ids like "Evolving") fall back
+// to Code2, exactly as the dynamic lookup did.
+const ICON_MAP: Record<string, LucideIcon> = {
+  Activity,
+  ArrowLeftRight,
+  Atom,
+  Beaker,
+  Blocks,
+  Book,
+  Bot,
+  Brain,
+  Bug,
+  Clock,
+  Code2,
+  Cog,
+  Coins,
+  Compass,
+  Cpu,
+  Dices,
+  Dna,
+  Ear,
+  FileCode,
+  Flame,
+  Github,
+  GraduationCap,
+  Hand,
+  Handshake,
+  Heart,
+  Hourglass,
+  Infinity: InfinityIcon,
+  Layers,
+  Leaf,
+  Lightbulb,
+  Map: MapIcon,
+  MemoryStick,
+  Microscope,
+  Network,
+  Puzzle,
+  Rocket,
+  Route,
+  Server,
+  Shield,
+  Shuffle,
+  Sparkles,
+  Sprout,
+  Telescope,
+  TreePine,
+  TrendingUp,
+  Users,
+  Wind,
+  Wrench,
+  Zap,
+};
+
 // Get Lucide icon component by name
 const getIconComponent = (iconName: string): LucideIcon => {
-  // Type assertion to access icons dynamically
-  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
-  return icons[iconName] || LucideIcons.Code2;
+  return ICON_MAP[iconName] || Code2;
 };
 
 // Calculate text width approximation

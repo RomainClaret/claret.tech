@@ -573,7 +573,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               if (currentCommandAbortControllerRef.current) {
                 currentCommandAbortControllerRef.current.abort();
                 term.write("^C\r\n");
-                term.writeln("Command cancelled by user");
+                term.writeln("Command canceled by user");
                 term.writeln("");
                 writePrompt();
                 isCommandRunningRef.current = false;

@@ -2,22 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Activity,
-  Zap,
-  Monitor,
-  Smartphone,
-  AlertTriangle,
-  CheckCircle,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  BarChart3,
-  Globe,
-  Timer,
-  Eye,
-  Cpu,
-} from "lucide-react";
+// Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
+import Activity from "lucide-react/dist/esm/icons/activity";
+import Zap from "lucide-react/dist/esm/icons/zap";
+import Monitor from "lucide-react/dist/esm/icons/monitor";
+import Smartphone from "lucide-react/dist/esm/icons/smartphone";
+import AlertTriangle from "lucide-react/dist/esm/icons/triangle-alert";
+import CheckCircle from "lucide-react/dist/esm/icons/circle-check";
+import TrendingUp from "lucide-react/dist/esm/icons/trending-up";
+import TrendingDown from "lucide-react/dist/esm/icons/trending-down";
+import Minus from "lucide-react/dist/esm/icons/minus";
+import BarChart3 from "lucide-react/dist/esm/icons/bar-chart-3";
+import Globe from "lucide-react/dist/esm/icons/globe";
+import Timer from "lucide-react/dist/esm/icons/timer";
+import Eye from "lucide-react/dist/esm/icons/eye";
+import Cpu from "lucide-react/dist/esm/icons/cpu";
 import { cn } from "@/lib/utils";
 import { usePerformanceMonitor } from "@/lib/hooks/usePerformanceMonitor";
 

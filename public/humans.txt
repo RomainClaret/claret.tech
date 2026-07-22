@@ -1,20 +1,19 @@
 /* TEAM */
-Developer & Designer: Romain Claret
+Built & maintained by: Romain Claret (researcher, lecturer, recovering engineer)
 Site: https://claret.tech
-Twitter: @romainclaret
-Location: Switzerland
+Location: Dublin, Ireland
 
 /* THANKS */
-University of Neuchâtel for supporting my PhD research
+University of Neuchâtel for supporting my research
 Open source community for amazing tools and libraries
 
 /* SITE */
-Last update: 2025-07-09
+Last update: 2026-07-07
 Language: English
 Standards: HTML5, CSS3, JavaScript ES6+
 Components: Next.js 15, React 18, TypeScript, Tailwind CSS
 Software: VS Code, Git, Node.js
 
 /* RESEARCH */
-Current Focus: GEENNS - Grid-based Emergent Evolution of Neocortical Network Substrates
-Field: Neuroevolution, Lifelong Learning, AI/ML
+Current Focus: Growing artificial minds by evolution and studying the behaviors that emerge on their own (a project called GEENNS)
+Field: Neuroevolution, Artificial Life, Lifelong Learning, AI/ML

@@ -1,11 +1,11 @@
-# 🧬 Claret.tech — Evolving Artificial Intelligence
+# 🧬 Claret.tech: Evolving Artificial Intelligence
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.4-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org)
 [![Tests](https://img.shields.io/badge/Tests-100%25-brightgreen)](https://github.com/RomainClaret/claret.tech)
 [![Deploy](https://img.shields.io/badge/Deploy-Vercel-green?logo=vercel)](https://claret.tech)
 
-> **PhD researcher breeding neural networks that think in components, not patterns.**  
+> **Neuroevolution researcher and lecturer breeding neural networks that assemble solutions from evolved components.**  
 > Evolution spent billions of years creating intelligence. I'm compressing that into days.
 
 ## ✨ Features
@@ -98,7 +98,7 @@ vercel --prod
 
 ## 📄 License
 
-This project is open source under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for details.
+This project is open source under the [GPL-3.0-or-later](LICENSE) license. See the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -106,6 +106,6 @@ This project is open source under the [MIT License](LICENSE). See the [LICENSE](
 
 **[🌐 Live](https://claret.tech)** • **[📧 Contact](mailto:claret.tech.website.pessimist917@simplelogin.com)**
 
-_"Intelligence isn't trained—it evolves. 🐧"_
+_"Trained networks memorize. Evolved networks adapt. 🐧"_
 
 </div>

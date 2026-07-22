@@ -22,6 +22,12 @@ on:
       - 'LICENSE'
       - '.gitignore'
 
+# Cancel superseded runs of the same ref: each run fans out to sharded
+# browser matrices, so stacked runs are expensive.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Skip external API calls in CI for stability
   SKIP_EXTERNAL_APIS: true

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import ColorThief from "colorthief";
+import type ColorThief from "colorthief";
 import precomputedColors from "@/lib/utils/precomputed-colors.json";
 import { logError, logWarning } from "@/lib/utils/dev-logger";
 
@@ -32,11 +32,6 @@ export function useColorExtraction(
       return;
     }
 
-    // Initialize ColorThief only on client side
-    if (typeof window !== "undefined" && !colorThiefRef.current) {
-      colorThiefRef.current = new ColorThief();
-    }
-
     const extractColor = async () => {
       try {
         // Validate image source
@@ -47,6 +42,13 @@ export function useColorExtraction(
         }
 
         setIsLoading(true);
+
+        // Load ColorThief on demand: the precomputed/cache lookups above
+        // cover most images, so the library stays out of the initial bundle.
+        if (!colorThiefRef.current) {
+          const { default: ColorThiefLib } = await import("colorthief");
+          colorThiefRef.current = new ColorThiefLib();
+        }
 
         // Create a new image element
         const img = new Image();
@@ -194,13 +196,15 @@ export function useColorPalette(
   const colorThiefRef = useRef<ColorThief | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !colorThiefRef.current) {
-      colorThiefRef.current = new ColorThief();
-    }
-
     const extractPalette = async () => {
       try {
         setIsLoading(true);
+
+        // Same on-demand load as useColorExtraction above.
+        if (!colorThiefRef.current) {
+          const { default: ColorThiefLib } = await import("colorthief");
+          colorThiefRef.current = new ColorThiefLib();
+        }
 
         const img = new Image();
         img.crossOrigin = "anonymous";

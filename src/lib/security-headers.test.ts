@@ -24,7 +24,13 @@ describe("security headers (next.config)", () => {
 
     expect(headers.get("X-Frame-Options")).toBe("DENY");
     expect(headers.get("X-Content-Type-Options")).toBe("nosniff");
-    expect(headers.get("Referrer-Policy")).toBe("origin-when-cross-origin");
+    expect(headers.get("Referrer-Policy")).toBe(
+      "strict-origin-when-cross-origin",
+    );
+    // Legacy XSS auditor disabled per OWASP guidance; CSP is the real control.
+    expect(headers.get("X-XSS-Protection")).toBe("0");
+    // Isolate our browsing-context group from cross-origin popups.
+    expect(headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
     expect(headers.get("Permissions-Policy")).toContain("geolocation=()");
 
     const hsts = headers.get("Strict-Transport-Security") ?? "";
@@ -42,5 +48,10 @@ describe("security headers (next.config)", () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("upgrade-insecure-requests");
+
+    // connect-src must not fall back to a bare `https:` wildcard, which would
+    // nullify the allowlist. Every https source must be a concrete origin
+    // (https://...), so no `https:` may appear that isn't followed by `//`.
+    expect(csp).not.toMatch(/\bhttps:(?!\/\/)/);
   });
 });

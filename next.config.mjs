@@ -65,6 +65,11 @@ const nextConfig = {
   // Enable experimental features for better performance
   experimental: {
     // optimizeCss: true, // Disabled due to critters dependency issue
+    // optimizePackageImports(lucide-react/framer-motion) was tried 2026-07-19
+    // and REVERTED: its __barrel_optimize__ proxy modules broke lazy chunks
+    // in webpack dev (pdf-modal crashed the page with "Cannot read
+    // properties of undefined (reading 'call')"). The real lucide win is the
+    // explicit icon map in skills-neural-cloud instead of a namespace import.
   },
 
   // Custom webpack config for WebLLM support and optimizations
@@ -151,7 +156,7 @@ const nextConfig = {
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com https://avatars.githubusercontent.com https://cdn-images-1.medium.com https://cdn-images-2.medium.com https://miro.medium.com https://images.unsplash.com;
       font-src 'self' data: https://cdn.scite.ai moz-extension: chrome-extension:;
-      connect-src 'self' https://api.github.com https://pub.orcid.org https://api.semanticscholar.org https://www.growkudos.com https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://s3.amazonaws.com https://raw.githubusercontent.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com https:;
+      connect-src 'self' https://api.github.com https://pub.orcid.org https://api.semanticscholar.org https://www.growkudos.com https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://s3.amazonaws.com https://raw.githubusercontent.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com;
       media-src 'self';
       object-src 'none';
       frame-src 'none';
@@ -165,7 +170,7 @@ const nextConfig = {
     return [
       // Prevent caching of HTML pages to ensure fresh JS chunk references after deploys
       {
-        source: "/((?!_next|fonts|images|animations|api|favicon|robots|sitemap).*)",
+        source: "/((?!_next|fonts|images|animations|pdfs|api|favicon|robots|sitemap).*)",
         headers: [
           {
             key: "Cache-Control",
@@ -181,8 +186,11 @@ const nextConfig = {
             value: "on",
           },
           {
+            // Deprecated header; OWASP recommends disabling the legacy XSS
+            // auditor (it introduced its own vulnerabilities). CSP is the real
+            // XSS control here.
             key: "X-XSS-Protection",
-            value: "1; mode=block",
+            value: "0",
           },
           {
             key: "X-Frame-Options",
@@ -194,7 +202,7 @@ const nextConfig = {
           },
           {
             key: "Referrer-Policy",
-            value: "origin-when-cross-origin",
+            value: "strict-origin-when-cross-origin",
           },
           {
             key: "Content-Security-Policy",
@@ -207,6 +215,15 @@ const nextConfig = {
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            // Isolate our browsing context group from cross-origin popups so a
+            // window we open (or one that opens us) cannot reach back through
+            // window.opener. Our only window.open() calls are external social
+            // links that need no opener. COEP is intentionally NOT set: it would
+            // break cross-origin images (GitHub/Medium) and WebLLM.
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
           },
         ],
       },
@@ -238,14 +255,24 @@ const nextConfig = {
         ],
       },
       {
-        source: "/_next/static/:path*",
+        // Papers/posters are large and mostly static, but files DO get
+        // replaced under the same name (e.g. an updated presentation), so
+        // no `immutable`: fresh for a day, then revalidate in background.
+        source: "/pdfs/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
+            value: "public, max-age=86400, stale-while-revalidate=2592000",
           },
         ],
       },
+      // Do NOT add a Cache-Control rule for /_next/static here. Next applies
+      // custom headers() BEFORE its own static-asset defaults, so a rule here
+      // suppresses the dev-only "no-store, must-revalidate" and dev chunks
+      // (whose filenames have no content hash) get cached immutable for a
+      // year, freezing stale/mixed compiles in the browser (2026-07-19
+      // pdf-modal crash). In production Next already serves /_next/static
+      // with "public, max-age=31536000, immutable" on its own.
       {
         source: "/api/:path*",
         headers: [

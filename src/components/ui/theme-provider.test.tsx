@@ -117,7 +117,8 @@ describe("ThemeProvider", () => {
         writable: true,
         configurable: true,
       });
-      mockDocumentElement = document.documentElement as unknown as typeof mockDocumentElement;
+      mockDocumentElement =
+        document.documentElement as unknown as typeof mockDocumentElement;
     }
 
     // Clear all mocks

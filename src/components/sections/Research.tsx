@@ -21,6 +21,7 @@ import {
   Ear,
   ChevronDown,
   Rocket,
+  Scaling,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -77,6 +78,7 @@ const iconMap = {
   Beaker: Beaker,
   Zap: Zap,
   Sparkles: Sparkles,
+  Scaling: Scaling,
 };
 
 function ResearchCard({
@@ -621,8 +623,9 @@ export function Research() {
                   </div>
                 </div>
 
-                {/* Visual Representation */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8 relative">
+                {/* Visual Representation. auto-rows-fr + h-full equalize the
+                    highlight boxes to the tallest one across all rows. */}
+                <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-fr gap-3 sm:gap-4 mb-6 sm:mb-8 relative">
                   {researchSection.projects[0].highlights?.map(
                     (highlight, i) => {
                       const iconName =
@@ -634,9 +637,13 @@ export function Research() {
                           .expandedHighlightDescriptions || [];
 
                       return (
-                        <ScaleIn key={i} delay={300 + i * 50}>
+                        <ScaleIn
+                          key={i}
+                          delay={300 + i * 50}
+                          className="h-full"
+                        >
                           <motion.div
-                            className="group relative bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
+                            className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
                             whileHover={{ scale: 1.05 }}
                             transition={{
                               type: "spring",

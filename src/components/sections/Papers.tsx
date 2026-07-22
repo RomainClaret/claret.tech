@@ -17,13 +17,22 @@ import {
   Users,
   FileText,
   Sparkles,
+  Star,
+  Link2,
+  Presentation,
+  Play,
 } from "lucide-react";
 import { OrcidIcon } from "@/components/icons";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import type { Publication } from "@/lib/api/fetch-publications";
+import {
+  comparePublications,
+  publicationToBibTeX,
+  type Publication,
+} from "@/lib/api/fetch-publications";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
+import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { useConferenceLogo } from "@/lib/hooks/useConferenceLogo";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { HolographicCard } from "@/components/ui/holographic-card";
@@ -100,12 +109,33 @@ function detectResearchArea(
 function detectPublicationStatus(
   pub: Publication | (typeof papersSection.papersCards)[0],
 ): {
-  status: "published" | "under_review" | "open_review" | "preprint";
+  status:
+    | "published"
+    | "under_review"
+    | "open_review"
+    | "preprint"
+    | "to_appear"
+    | "presented";
   label: string;
   color: string;
 } {
   const title = pub.title.toLowerCase();
   const venue = "venue" in pub ? pub.venue?.toLowerCase() || "" : "";
+
+  // Explicitly marked as forthcoming (accepted / to appear)
+  if (pub.status === "to-appear") {
+    return { status: "to_appear", label: "To Appear", color: "59, 130, 246" }; // Blue
+  }
+
+  // Explicitly marked as presented (talks and posters that are not publications)
+  if (pub.status === "presented") {
+    return { status: "presented", label: "Presented", color: "20, 184, 166" }; // Teal
+  }
+
+  // Explicitly marked as a preprint (never formally published)
+  if (pub.status === "preprint") {
+    return { status: "preprint", label: "Preprint", color: "139, 92, 246" }; // Purple
+  }
 
   // Check for arXiv/preprint
   if (venue.includes("arxiv") || title.includes("preprint")) {
@@ -138,11 +168,71 @@ function detectPublicationStatus(
   return { status: "published", label: "Published", color: "34, 197, 94" }; // Green
 }
 
+// Unified styling for the Read Paper / Read Poster buttons: solid, saturated,
+// and identical across all cards so they read as actions, not tags.
+const READ_PDF_VARIANTS = {
+  paper: { color: "37, 99, 235", Icon: BookOpen, label: "Read Paper" }, // Blue
+  poster: { color: "234, 88, 12", Icon: FileText, label: "Read Poster" }, // Orange
+  presentation: {
+    color: "5, 150, 105", // Emerald
+    Icon: Presentation,
+    label: "Read Presentation",
+  },
+} as const;
+
+// Solid button that opens a locally hosted PDF in the in-app reader.
+function ReadPdfButton({
+  variant,
+  pdf,
+  title,
+  onOpenPDF,
+}: {
+  variant: keyof typeof READ_PDF_VARIANTS;
+  pdf: string;
+  title: string;
+  onOpenPDF: (url: string, title: string, fileName: string) => void;
+}) {
+  const { color, Icon, label } = READ_PDF_VARIANTS[variant];
+  return (
+    <button
+      onClick={() =>
+        onOpenPDF(pdf, title, pdf.split("/").pop() || "document.pdf")
+      }
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white shadow-md transition-all hover:shadow-lg hover:brightness-110 active:scale-95"
+      style={{ backgroundColor: `rgb(${color})` }}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  );
+}
+
+// Same look as ReadPdfButton, but an external link: opens the paper's video
+// (e.g. a YouTube talk) in a new tab instead of the in-app PDF reader.
+function WatchVideoButton({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white shadow-md transition-all hover:shadow-lg hover:brightness-110 active:scale-95"
+      style={{ backgroundColor: "rgb(220, 38, 38)" }} // Red
+    >
+      <Play className="w-3.5 h-3.5" />
+      Watch Video
+    </a>
+  );
+}
+
+// Highlighted in author lists so it is obvious where Romain sits.
+const HIGHLIGHTED_AUTHOR = "Romain Claret";
+
 interface PaperCardProps {
   paper: (typeof papersSection.papersCards)[0];
   index: number;
   onOpenPDF: (url: string, title: string, fileName: string) => void;
   shouldReduceAnimations: boolean;
+  isDeepLinked?: boolean;
 }
 
 // Static paper card with neural design
@@ -151,8 +241,32 @@ function PaperCard({
   index,
   onOpenPDF,
   shouldReduceAnimations,
+  isDeepLinked = false,
 }: PaperCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [bibtexCopied, setBibtexCopied] = useState(false);
+
+  // Arriving via a deep link opens the full description.
+  useEffect(() => {
+    if (isDeepLinked) setIsExpanded(true);
+  }, [isDeepLinked]);
+
+  const handleBibTeXClick = async () => {
+    if (!paper.bibtex) return;
+    await navigator.clipboard.writeText(paper.bibtex);
+    setBibtexCopied(true);
+    setTimeout(() => setBibtexCopied(false), 2000);
+  };
+
+  const handleCopyLink = async () => {
+    if (!paper.anchorId) return;
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/#${paper.anchorId}`,
+    );
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
   const researchArea = detectResearchArea(paper);
   const fallbackColor = RESEARCH_COLORS[researchArea];
   const publicationStatus = detectPublicationStatus(paper);
@@ -175,10 +289,13 @@ function PaperCard({
     }
   };
 
-  // Determine paper type
+  // Determine paper type. A card with a poster PDF or a link named "Poster"
+  // is a poster even when its title does not say so.
   const paperType = paper.title.toLowerCase().includes("thesis")
     ? "thesis"
-    : paper.title.toLowerCase().includes("poster")
+    : paper.title.toLowerCase().includes("poster") ||
+        !!paper.posterPdf ||
+        paper.footerLink.some((l) => l.name.toLowerCase() === "poster")
       ? "poster"
       : "paper";
 
@@ -193,6 +310,7 @@ function PaperCard({
           glowColor={nodeColor}
           insideBackgroundColor={nodeColor}
           className="h-full"
+          forceHover={isDeepLinked}
         >
           <div className="p-6 h-full flex flex-col">
             {/* Header with type badge */}
@@ -239,7 +357,7 @@ function PaperCard({
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className="text-xs text-muted-foreground">
                       {paperType === "thesis"
                         ? "Thesis"
@@ -265,12 +383,57 @@ function PaperCard({
                   </p>
                 </div>
               </div>
+              {paper.anchorId && (
+                <button
+                  onClick={handleCopyLink}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+                  title="Copy link to this paper"
+                  aria-label="Copy link to this paper"
+                >
+                  {linkCopied ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Link2 className="w-4 h-4" />
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-semibold mb-3 line-clamp-2 min-h-[56px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
               {paper.title}
             </h3>
+
+            {/* Read the locally hosted PDFs in the in-app reader + video link */}
+            {(paper.paperPdf || paper.posterPdf || paper.videoUrl) && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {paper.paperPdf && (
+                  <ReadPdfButton
+                    variant="paper"
+                    pdf={paper.paperPdf}
+                    title={paper.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {paper.posterPdf && (
+                  <ReadPdfButton
+                    variant="poster"
+                    pdf={paper.posterPdf}
+                    title={paper.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {paper.presentationPdf && (
+                  <ReadPdfButton
+                    variant="presentation"
+                    pdf={paper.presentationPdf}
+                    title={paper.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {paper.videoUrl && <WatchVideoButton url={paper.videoUrl} />}
+              </div>
+            )}
 
             {/* Preview image */}
             {paper.image && (
@@ -348,6 +511,20 @@ function PaperCard({
                   </Link>
                 );
               })}
+              {paper.bibtex && (
+                <button
+                  onClick={handleBibTeXClick}
+                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
+                  title="Copy BibTeX"
+                >
+                  <span>BibTeX</span>
+                  {bibtexCopied ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </HolographicCard>
@@ -370,14 +547,22 @@ function DynamicPaperCard({
   index,
   onOpenPDF,
   shouldReduceAnimations,
+  isDeepLinked = false,
 }: {
   publication: Publication;
   index: number;
   onOpenPDF: (url: string, title: string, fileName: string) => void;
   shouldReduceAnimations: boolean;
+  isDeepLinked?: boolean;
 }) {
-  const [doiCopied, setDoiCopied] = useState(false);
+  const [bibtexCopied, setBibtexCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Arriving via a deep link opens the full abstract.
+  useEffect(() => {
+    if (isDeepLinked) setIsExpanded(true);
+  }, [isDeepLinked]);
   const { logoUrl } = useConferenceLogo(
     publication.venue
       ? `${publication.venue} • ${publication.year}`
@@ -403,12 +588,21 @@ function DynamicPaperCard({
     }
   };
 
-  const handleDOIClick = async () => {
-    if (publication.doi) {
-      await navigator.clipboard.writeText(publication.doi);
-      setDoiCopied(true);
-      setTimeout(() => setDoiCopied(false), 2000);
-    }
+  const handleBibTeXClick = async () => {
+    // Prefer the curated verbatim entry; generate one only as a fallback.
+    await navigator.clipboard.writeText(
+      publication.bibtex ?? publicationToBibTeX(publication),
+    );
+    setBibtexCopied(true);
+    setTimeout(() => setBibtexCopied(false), 2000);
+  };
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/#${publication.id}`,
+    );
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   return (
@@ -422,6 +616,7 @@ function DynamicPaperCard({
           glowColor={nodeColor}
           insideBackgroundColor={nodeColor}
           className="h-full"
+          forceHover={isDeepLinked}
         >
           <div className="p-6 h-full flex flex-col">
             {/* Header with type badge */}
@@ -468,7 +663,13 @@ function DynamicPaperCard({
                   />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    {publication.starred && (
+                      <Star
+                        className="w-4 h-4 flex-shrink-0 fill-amber-400 text-amber-400"
+                        aria-label="Featured paper"
+                      />
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {publication.venue?.toLowerCase().includes("journal")
                         ? "Journal"
@@ -529,25 +730,72 @@ function DynamicPaperCard({
                   </p>
                 </div>
               </div>
+              <button
+                onClick={handleCopyLink}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+                title="Copy link to this paper"
+                aria-label="Copy link to this paper"
+              >
+                {linkCopied ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Link2 className="w-4 h-4" />
+                )}
+              </button>
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-semibold mb-3 line-clamp-2 min-h-[56px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
               {publication.title}
             </h3>
 
-            {/* Conference/Journal Logo as preview image */}
+            {/* Read the locally hosted PDFs in the in-app reader + video link */}
+            {(publication.paperPdf ||
+              publication.posterPdf ||
+              publication.videoUrl) && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {publication.paperPdf && (
+                  <ReadPdfButton
+                    variant="paper"
+                    pdf={publication.paperPdf}
+                    title={publication.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {publication.posterPdf && (
+                  <ReadPdfButton
+                    variant="poster"
+                    pdf={publication.posterPdf}
+                    title={publication.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {publication.presentationPdf && (
+                  <ReadPdfButton
+                    variant="presentation"
+                    pdf={publication.presentationPdf}
+                    title={publication.title}
+                    onOpenPDF={onOpenPDF}
+                  />
+                )}
+                {publication.videoUrl && (
+                  <WatchVideoButton url={publication.videoUrl} />
+                )}
+              </div>
+            )}
+
+            {/* Conference/Journal logo. Height-driven (h-full w-auto) so wide
+                logos like ICPR and WCCI scale to the full card height instead of
+                being letterboxed by object-contain; the box centers and clips any
+                horizontal overflow. */}
             {logoUrl && (
-              <div className="relative h-24 mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-muted/50 to-muted/30">
-                <OptimizedImage
+              <div className="relative h-32 mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={logoUrl}
                   alt={`${publication.venue} logo`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  className="object-contain p-2"
-                  placeholder="blur"
-                  blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                   loading="lazy"
+                  className="h-full w-auto object-contain"
                 />
               </div>
             )}
@@ -557,7 +805,18 @@ function DynamicPaperCard({
               <div className="text-sm text-muted-foreground flex items-start gap-1 min-h-[48px]">
                 <Users className="w-3 h-3 flex-shrink-0 mt-0.5" />
                 <p className="line-clamp-2">
-                  {publication.authors.join(", ")}
+                  {publication.authors.map((author, i) => (
+                    <span key={i}>
+                      {i > 0 && ", "}
+                      {author === HIGHLIGHTED_AUTHOR ? (
+                        <span className="font-semibold text-foreground">
+                          {author}
+                        </span>
+                      ) : (
+                        author
+                      )}
+                    </span>
+                  ))}
                   {/* The line-clamp-2 will automatically handle overflow */}
                 </p>
               </div>
@@ -638,21 +897,33 @@ function DynamicPaperCard({
                   />
                 </button>
               )}
-              {publication.doi && (
+              {publication.bibtex && (
                 <button
-                  onClick={handleDOIClick}
+                  onClick={handleBibTeXClick}
                   className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
-                  title="Copy DOI"
+                  title="Copy BibTeX"
                 >
-                  <span>DOI</span>
-                  {doiCopied ? (
+                  <span>BibTeX</span>
+                  {bibtexCopied ? (
                     <Check className="w-3 h-3" />
                   ) : (
                     <Copy className="w-3 h-3" />
                   )}
                 </button>
               )}
-              {publication.semanticScholarUrl && (
+              {publication.codeUrl && (
+                <Link
+                  href={publication.codeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                >
+                  <span>Code</span>
+                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </Link>
+              )}
+              {/* Details gives way to Code when a repo link exists */}
+              {publication.semanticScholarUrl && !publication.codeUrl && (
                 <Link
                   href={publication.semanticScholarUrl}
                   target="_blank"
@@ -683,7 +954,10 @@ export function Papers() {
 
   useEffect(() => {
     // Fetch dynamic publications
-    fetch("/api/publications")
+    // no-store: the publications are manually curated; without it the
+    // stale-while-revalidate response header leaves the browser one reload
+    // behind every data update.
+    fetch("/api/publications", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.publications) {
@@ -699,6 +973,20 @@ export function Papers() {
       });
   }, []);
 
+  // Deep links: a #<publication id | paper anchorId> hash (the BibTeX-style
+  // keys, e.g. #claret2026emr) scrolls to that card, pulses a highlight, and
+  // holds its hover glow until the user interacts (see useCardDeepLink). The
+  // target may be hidden by the filter pills, so onMatch shows everything.
+  const { deepLinkedId, highlightedId } = useCardDeepLink(
+    [
+      ...dynamicPapers.map((p) => p.id),
+      ...papersSection.papersCards.flatMap((p) =>
+        p.anchorId ? [p.anchorId] : [],
+      ),
+    ],
+    { onMatch: () => setFilterType("all") },
+  );
+
   if (!papersSection.display) {
     return null;
   }
@@ -707,7 +995,8 @@ export function Papers() {
   const totalPapers = dynamicPapers.length + papersSection.papersCards.length;
 
   // Filter papers based on type
-  const filteredDynamicPapers = filterType === "theses" ? [] : dynamicPapers;
+  const filteredDynamicPapers =
+    filterType === "theses" ? [] : [...dynamicPapers].sort(comparePublications);
   const filteredStaticPapers =
     filterType === "papers" ? [] : papersSection.papersCards;
 
@@ -789,13 +1078,23 @@ export function Papers() {
               <div className="flex justify-center">
                 <div className="grid gap-6 md:grid-cols-2 grid-rows-auto grid-stretch max-w-[1000px]">
                   {filteredDynamicPapers.map((publication, index) => (
-                    <DynamicPaperCard
+                    <div
                       key={publication.id}
-                      publication={publication}
-                      index={index}
-                      onOpenPDF={openPDF}
-                      shouldReduceAnimations={shouldReduceAnimations}
-                    />
+                      id={publication.id}
+                      className={cn(
+                        "h-full",
+                        highlightedId === publication.id &&
+                          "deep-link-highlight",
+                      )}
+                    >
+                      <DynamicPaperCard
+                        publication={publication}
+                        index={index}
+                        onOpenPDF={openPDF}
+                        shouldReduceAnimations={shouldReduceAnimations}
+                        isDeepLinked={deepLinkedId === publication.id}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -821,13 +1120,21 @@ export function Papers() {
                   {filteredStaticPapers.map((paper, index) => (
                     <div
                       key={`static-${index}`}
-                      className="w-full sm:w-auto sm:min-w-[350px] sm:max-w-[450px] md:min-w-[400px] md:max-w-[500px]"
+                      id={paper.anchorId}
+                      className={cn(
+                        "w-full sm:w-auto sm:min-w-[350px] sm:max-w-[450px] md:min-w-[400px] md:max-w-[500px]",
+                        highlightedId === paper.anchorId &&
+                          "deep-link-highlight",
+                      )}
                     >
                       <PaperCard
                         paper={paper}
                         index={index + filteredDynamicPapers.length}
                         onOpenPDF={openPDF}
                         shouldReduceAnimations={shouldReduceAnimations}
+                        isDeepLinked={
+                          !!paper.anchorId && deepLinkedId === paper.anchorId
+                        }
                       />
                     </div>
                   ))}

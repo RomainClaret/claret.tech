@@ -9,7 +9,7 @@
 import { pdfjs } from "react-pdf";
 
 // Set absolute path for Next.js
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.mjs";
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 // Re-export react-pdf components with pre-configured worker
 export { Document, Page, pdfjs } from "react-pdf";

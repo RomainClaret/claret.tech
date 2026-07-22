@@ -1,18 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ZoomIn,
-  ZoomOut,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+// Deep per-icon imports, NOT the "lucide-react" barrel: in LAZILY loaded
+// components, Next's default lucide barrel optimization emits requires of
+// __barrel_optimize__ proxy modules that no chunk defines, crashing the
+// page in webpack dev (2026-07-20). Entry-graph files can keep the barrel.
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Download from "lucide-react/dist/esm/icons/download";
+import ZoomIn from "lucide-react/dist/esm/icons/zoom-in";
+import ZoomOut from "lucide-react/dist/esm/icons/zoom-out";
+import Loader2 from "lucide-react/dist/esm/icons/loader-circle";
+import AlertCircle from "lucide-react/dist/esm/icons/circle-alert";
 
 // Import from our PDF configuration module (worker pre-configured)
 import { Document, Page } from "@/lib/pdf-config";
+import { isSafePdfUrl } from "@/lib/utils/safe-pdf-url";
 import { logError } from "@/lib/utils/dev-logger";
 import { setupPDFConsoleFilter } from "@/lib/utils/pdf-console-filter";
 
@@ -49,6 +52,45 @@ export function PDFViewer({
     setLoading(false);
     setError(null);
   };
+
+  // Auto-fit oversized documents by measuring what is actually on screen:
+  // scale 1.0 is the PDF's native point size, which fits A4 papers but
+  // overflows the viewer for wide pages such as 16:9 presentation slides.
+  // Poll for the first page's canvas once the document has loaded (react-pdf
+  // render callbacks proved unreliable here); the moment it exists, compare
+  // its real width with the viewer and zoom out to fit, exactly like
+  // pressing the zoom buttons. One-shot; manual zoom stays available.
+  const didAutoFit = useRef(false);
+  useEffect(() => {
+    if (loading || !numPages || didAutoFit.current) return;
+
+    let tries = 0;
+    const interval = setInterval(() => {
+      tries += 1;
+      const container = scrollContainerRef.current;
+      const canvas = pageRefs.current[1]?.querySelector("canvas");
+      const rendered = canvas?.getBoundingClientRect().width ?? 0;
+
+      if (container && rendered > 0) {
+        clearInterval(interval);
+        didAutoFit.current = true;
+        const available = container.clientWidth - 32; // p-4 padding
+        if (rendered > available) {
+          setScale((prev) =>
+            Math.max(
+              0.25,
+              Math.floor((available / rendered) * prev * 100) / 100,
+            ),
+          );
+        }
+      } else if (tries > 40) {
+        // Give up after ~10s (e.g. render failure); default scale stays.
+        clearInterval(interval);
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [loading, numPages]);
 
   // Monitor for font warnings
   useEffect(() => {
@@ -94,7 +136,8 @@ export function PDFViewer({
   };
 
   const zoomIn = () => setScale((prevScale) => Math.min(prevScale + 0.2, 2.0));
-  const zoomOut = () => setScale((prevScale) => Math.max(prevScale - 0.2, 0.5));
+  const zoomOut = () =>
+    setScale((prevScale) => Math.max(prevScale - 0.2, 0.25));
 
   // Handle page navigation
   const scrollToPage = (page: number) => {
@@ -178,6 +221,9 @@ export function PDFViewer({
           </h2>
           <button
             onClick={() => {
+              // Defense in depth: never navigate a raw-DOM anchor to a
+              // non-https, non-local URL (pdfUrl can come from external APIs).
+              if (!isSafePdfUrl(url)) return;
               // Create a temporary anchor element to trigger download
               const link = document.createElement("a");
               link.href = url;
@@ -226,7 +272,7 @@ export function PDFViewer({
 
           <button
             onClick={zoomOut}
-            disabled={scale <= 0.5}
+            disabled={scale <= 0.25}
             className="p-2 rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Zoom out"
           >

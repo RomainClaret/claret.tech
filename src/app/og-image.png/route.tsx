@@ -70,7 +70,7 @@ export async function GET() {
                 fontFamily: "Inter, sans-serif",
               }}
             >
-              PhD Researcher & AI Engineer
+              Evolving intelligence rather than training it
             </p>
 
             {/* Divider */}
@@ -94,10 +94,10 @@ export async function GET() {
               }}
             >
               {[
-                "Neuroevolution",
-                "Machine Learning",
-                "Full-Stack Dev",
-                "Research",
+                "Artificial Life",
+                "Emergent Behavior",
+                "Grown, Not Trained",
+                "Researcher & Lecturer",
               ].map((skill) => (
                 <div
                   key={skill}

@@ -17,21 +17,19 @@ export const workExperiences = {
   subtitle: {
     highlightedText: "From engineering precision to evolving intelligence",
     normalText:
-      "I once thought I had answers; now I realize I only have questions. Each pivot stripping away what I thought I knew, teaching me that growth happens at the edge of understanding. The pattern matches evolution: survival isn't about being right, it's about adapting. Now I let each experience prove that everything is possible when you embrace mutation over optimization.",
+      "I once thought I had answers; now I realize I only have questions. Each pivot stripping away what I thought I knew, teaching me that growth happens at the edge of understanding. The pattern matches evolution: survival goes to whatever adapts, right or wrong. Now I let each experience prove that everything is possible when you embrace mutation over optimization.",
   },
   experience: [
     {
-      role: "Visiting Researcher",
+      role: "University Teaching Specialist",
       company: "University College Dublin",
-      companyUrl: "https://ncra.ucd.ie/",
+      companyUrl: "https://www.smurfitschool.ie/",
       companyLogo: "/images/ucd_logo.webp",
-      companyDesc: "Natural Computing Research & Applications Group",
-      date: "Sep. 2023 - Present",
-      desc: "Research collaboration on neuroevolution and evolutionary computation under the supervision of Prof. Michael O'Neill.",
+      companyDesc: "Smurfit School of Business",
+      date: "Aug. 2026 - Present",
+      desc: "Delivering Programming for Analytics (Trimester 1) in the UCD Smurfit School of Business. Conducting research at the NCRA lab with Prof. O'Neill alongside teaching duties.",
       location: "Dublin, Ireland",
-      descBullets: [
-        "#Neuroevolution #EvolutionaryComputation #Research #Collaboration",
-      ],
+      descBullets: ["#Lecturing #Programming #DataAnalytics #Python #Teaching"],
     },
     {
       role: "Doctoral Assistant",
@@ -40,10 +38,23 @@ export const workExperiences = {
       companyLogo: "/images/unine_logo.webp",
       companyDesc:
         "Information Management Institute at the Faculty of Economic Sciences",
-      date: "Nov. 2020 - Present",
+      date: "Nov. 2020 - June 2026",
       desc: "Teaching Assistant for Applied Mathematics (Analysis and Linear Algebra) and Databases (Modelization, SQL, NoSQL, Visualization) for Bachelor students in Economic Science and Data Science.",
       location: "Neuchâtel, Switzerland",
       descBullets: ["#Teaching #TA #Mathematics #Database"],
+    },
+    {
+      role: "Visiting Researcher",
+      company: "University College Dublin",
+      companyUrl: "https://ncra.ucd.ie/",
+      companyLogo: "/images/ucd_logo.webp",
+      companyDesc: "Natural Computing Research & Applications Group",
+      date: "Sep. 2023 - Feb. 2024 & Sep. 2024 - Dec. 2024",
+      desc: "Research collaboration on neuroevolution and evolutionary computation under the supervision of Prof. Michael O'Neill.",
+      location: "Dublin, Ireland",
+      descBullets: [
+        "#Neuroevolution #EvolutionaryComputation #Research #Collaboration",
+      ],
     },
     {
       role: "Guest Lecturer",
@@ -61,13 +72,12 @@ export const workExperiences = {
       company: "Artificialkind",
       companyUrl: "https://artificialkind.com/",
       companyLogo: "/images/artificialkind_logo.webp",
-      companyDesc: "Supercharging the Humankind with Artificial Entities",
+      companyDesc:
+        "A nonprofit building autonomous artificial agents, out in the open",
       date: "Jan. 2018 - Present",
-      desc: "We build autonomous artificial entities and a hybrid ecosystem for you and them. Reshaping standards and establishing new meaningful foundations for the humanity by closely working with our community. Not only providing advanced technologies, products, and services, we are also training you to use them.",
+      desc: "A nonprofit I started to build autonomous artificial agents in the open, and to help people actually understand them. Started long before this was fashionable, with more ambition than budget. Part research lab, part community, part stubbornness.",
       location: "Neuchâtel, Switzerland",
-      descBullets: [
-        "#AGI #AutonomousAI #MachineLearning #Nonprofit #R&D #HighTechDriven",
-      ],
+      descBullets: ["#AutonomousAI #ArtificialLife #Nonprofit #OpenResearch"],
     },
     {
       role: "IT Independent",
@@ -77,7 +87,7 @@ export const workExperiences = {
       companyDesc:
         "Providing consulting for Blockchain, Smart-Contracts and AI",
       date: "July 2017 - Sep. 2018",
-      desc: "The tasks were to advise and suggest technologies, define project scopes, document, prototype, and prepare workshops. Active in the domains of Automation, Finance, Art, Video Games, and Non-Profit Organisation.",
+      desc: "The tasks were to advise and suggest technologies, define project scopes, document, prototype, and prepare workshops. Active in the domains of Automation, Finance, Art, Video Games, and Non-Profit Organization.",
       location: "Geneva, Lausanne, and Solothurn, Switzerland",
       descBullets: [
         "#Blockchain #SmartContracts #Python #MachineLearning #Tensorflow #NodeJS #IoT #HelpingStartups #ICO",
@@ -143,8 +153,8 @@ export const workExperiences = {
       companyUrl: "https://www.christopheclaret.com/",
       companyLogo: "/images/manufactureclaret_logo.webp",
       companyDesc:
-        "Respect for watchmaking traditions and time-honoured savoir faire go hand in hand with a quest for innovation and excellence",
-      date: "2004, 2005, 2006, 2012",
+        "Respect for watchmaking traditions and time-honored savoir faire go hand in hand with a quest for innovation and excellence",
+      date: "Summers 2004, 2005, 2006, 2012",
       desc: "Watchmaking research and development using 3D computer-aided design (CAD). Manufacturing, chamfering, and technical control. Disassembly, reassembly and customization of a mechanical pocket watch. 3D CAD construction and technical drawing of watch movements.",
       location: "Le Locle, Switzerland",
       descBullets: [],

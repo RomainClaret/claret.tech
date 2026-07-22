@@ -7,6 +7,8 @@ import {
   useEffect,
   ReactNode,
   useCallback,
+  useMemo,
+  useRef,
 } from "react";
 import { useFpsOnly } from "@/lib/hooks/useFpsOnly";
 import { showToast } from "@/components/ui/toast";
@@ -130,6 +132,11 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // FPS monitoring for auto-adjustment
   const fpsData = useFpsOnly(typeof window !== "undefined");
   const [lastAdjustment, setLastAdjustment] = useState(0);
+  // Latest fps for the polling interval below WITHOUT being an effect
+  // dependency: keying the effect on fps tore down and recreated the 5s
+  // interval every second, so the adjustment poll could starve.
+  const latestFpsRef = useRef(60);
+  latestFpsRef.current = fpsData.fps || 60;
 
   // Auto-adjust quality based on performance
   useEffect(() => {
@@ -141,7 +148,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       if (now - lastAdjustment < ADJUSTMENT_COOLDOWN) return;
 
-      const fps = fpsData.fps || 60;
+      const fps = latestFpsRef.current;
 
       // Downgrade if struggling
       if (fps < 20 && quality !== QualityMode.BATTERY_SAVER) {
@@ -219,7 +226,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     // Check every 5 seconds, not every frame
     const interval = setInterval(adjustQuality, 5000);
     return () => clearInterval(interval);
-  }, [quality, isAuto, fpsData.fps, lastAdjustment, isTestMode]);
+  }, [quality, isAuto, lastAdjustment, isTestMode]);
 
   // Save preferences to localStorage
   useEffect(() => {
@@ -321,20 +328,27 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     [quality],
   );
 
+  // Memoize the context value so per-second FPS state updates in this
+  // provider stop re-rendering every quality consumer.
+  const value = useMemo<QualityContextType>(
+    () => ({
+      quality,
+      setQuality,
+      isAuto,
+      setIsAuto,
+      getConfig,
+      // Deliberately not reactive (excluded from the deps below): no
+      // consumer reads live fps from this context, and a 1Hz dependency
+      // would re-render every consumer each second.
+      currentFps: fpsData.fps || 60,
+      qualityMetrics: QUALITY_METRICS[quality],
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [quality, setQuality, isAuto, setIsAuto, getConfig],
+  );
+
   return (
-    <QualityContext.Provider
-      value={{
-        quality,
-        setQuality,
-        isAuto,
-        setIsAuto,
-        getConfig,
-        currentFps: fpsData.fps || 60,
-        qualityMetrics: QUALITY_METRICS[quality],
-      }}
-    >
-      {children}
-    </QualityContext.Provider>
+    <QualityContext.Provider value={value}>{children}</QualityContext.Provider>
   );
 }
 

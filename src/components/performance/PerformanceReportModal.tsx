@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, FileText } from "lucide-react";
+// Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
+import X from "lucide-react/dist/esm/icons/x";
+import FileText from "lucide-react/dist/esm/icons/file-text";
 import { cn } from "@/lib/utils";
 import { PerformanceReportGenerator } from "./PerformanceReportGenerator";
 import { logError } from "@/lib/utils/dev-logger";

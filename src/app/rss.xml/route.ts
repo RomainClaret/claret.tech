@@ -17,7 +17,7 @@ export async function GET() {
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Romain Claret - Blog</title>
-    <description>AI, engineering, and research insights.</description>
+    <description>Notes on evolving intelligence, growing artificial minds, and the occasional detour.</description>
     <link>${siteUrl}</link>
     <language>en-us</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
@@ -97,7 +97,7 @@ export async function GET() {
 <rss version="2.0">
   <channel>
     <title>Romain Claret - Blog</title>
-    <description>AI, engineering, and research insights.</description>
+    <description>Notes on evolving intelligence, growing artificial minds, and the occasional detour.</description>
     <link>${siteUrl}</link>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
   </channel>

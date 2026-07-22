@@ -143,7 +143,7 @@ describe("CookieNotice", () => {
       expect(screen.getByText(/🧬 Cookie Selection:/)).toBeInTheDocument();
       expect(
         screen.getByText(
-          /Only the essential survive—theme genes and performance adaptations/,
+          /Only the essential survive: theme genes and performance adaptations/,
         ),
       ).toBeInTheDocument();
       expect(

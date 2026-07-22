@@ -85,6 +85,12 @@ describe("Navigation", () => {
     typeof window.removeEventListener
   >;
 
+  // Capture the real jsdom window event methods so afterEach can restore them.
+  // beforeEach replaces them via Object.defineProperty, which vi.restoreAllMocks()
+  // cannot undo, so without this the stubs leak into later test files.
+  const realAddEventListener = window.addEventListener;
+  const realRemoveEventListener = window.removeEventListener;
+
   beforeEach(() => {
     // Mock window.scrollTo
     mockScrollTo = vi.fn();
@@ -137,6 +143,20 @@ describe("Navigation", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // vi.restoreAllMocks() does NOT undo the Object.defineProperty replacements
+    // in beforeEach. Restore the real window event methods so the stubbed (no-op)
+    // addEventListener/removeEventListener don't leak into later test files and
+    // break tests that rely on real window events (e.g. PerformanceReportModal).
+    Object.defineProperty(window, "addEventListener", {
+      value: realAddEventListener,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "removeEventListener", {
+      value: realRemoveEventListener,
+      writable: true,
+      configurable: true,
+    });
   });
 
   describe("Component Rendering", () => {

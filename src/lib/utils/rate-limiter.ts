@@ -52,13 +52,16 @@ function getClientId(request: NextRequest): string {
     }
   };
 
-  // Try to get real IP from various headers (for proxied requests)
+  // Try to get real IP from various headers (for proxied requests).
+  // cf-connecting-ip is intentionally NOT trusted: this site is deployed on
+  // Vercel (not behind Cloudflare), so that header would be entirely
+  // client-supplied and would let a caller mint a fresh rate-limit bucket at
+  // will. x-real-ip / x-forwarded-for are set by the Vercel edge.
   const forwarded = getHeader("x-forwarded-for");
   const realIp = getHeader("x-real-ip");
-  const cfConnectingIp = getHeader("cf-connecting-ip");
 
   // Use the first available IP
-  const ip = cfConnectingIp || realIp || forwarded?.split(",")[0] || "unknown";
+  const ip = realIp || forwarded?.split(",")[0] || "unknown";
 
   // Combine IP with User-Agent for better fingerprinting
   const userAgent = getHeader("user-agent") || "unknown";

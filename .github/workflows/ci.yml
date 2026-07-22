@@ -2,10 +2,17 @@ name: CI
 
 on:
   push:
-    branches: ['*']  # Run on all branches including main
+    branches: ['**']  # All branches; '*' does not match slash names like feature/foo
   pull_request:
-    branches: ['*']  # Run on all pull requests
+    branches: ['**']  # All pull requests
   workflow_call:  # Allow this workflow to be called by other workflows
+
+# Cancel superseded runs of the same ref (rapid pushes stack ~13 jobs each).
+# Group includes the workflow name so a deploy-invoked run never collides
+# with a push-triggered one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
@@ -21,6 +28,7 @@ jobs:
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       api: ${{ steps.filter.outputs.api }}
       components: ${{ steps.filter.outputs.components }}
@@ -105,6 +113,7 @@ jobs:
   quick-checks:
     name: Quick Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -143,6 +152,7 @@ jobs:
   test-api:
     name: Test API Routes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -175,6 +185,7 @@ jobs:
   test-utils:
     name: Test Utilities
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -205,6 +216,7 @@ jobs:
   test-components-batch1:
     name: Test Components - Batch 1 (UI Core)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -237,6 +249,7 @@ jobs:
   test-components-batch2:
     name: Test Components - Batch 2 (UI Extended)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -269,6 +282,7 @@ jobs:
   test-components-batch3:
     name: Test Components - Batch 3 (Sections)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -301,6 +315,7 @@ jobs:
   test-components-batch4:
     name: Test Components - Batch 4 (Animations & Error)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -334,6 +349,7 @@ jobs:
   test-contexts:
     name: Test Contexts
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -364,6 +380,7 @@ jobs:
   test-hooks:
     name: Test Hooks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -394,6 +411,7 @@ jobs:
   test-lib-dom:
     name: Test Library DOM
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -424,6 +442,7 @@ jobs:
   test-unit:
     name: Test Non-DOM Units
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -457,6 +476,7 @@ jobs:
   build:
     name: Build Application
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: detect-changes
     if: |
       always() && !cancelled() &&
@@ -502,6 +522,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [
       detect-changes, 
       quick-checks,

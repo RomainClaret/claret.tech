@@ -64,7 +64,7 @@ export function LegalModalsProvider({ children }: LegalModalsProviderProps) {
       <LegalModal
         isOpen={isLicenseModalOpen}
         onClose={() => setIsLicenseModalOpen(false)}
-        title="MIT License"
+        title="GNU GPLv3 or later"
       >
         <LicenseContent />
       </LegalModal>

@@ -2,7 +2,7 @@
 
 import { contactInfo, socialMediaLinks } from "@/data/portfolio";
 import { FadeIn } from "@/components/ui/animated";
-import { Mail, Twitter } from "lucide-react";
+import { Mail } from "lucide-react";
 import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import Link from "next/link";
 import Image from "next/image";
@@ -13,7 +13,6 @@ import { motion } from "framer-motion";
 // Contact method colors
 const CONTACT_COLORS = {
   email: "59, 130, 246", // Blue
-  twitter: "56, 189, 248", // Sky Blue
   github: "139, 92, 246", // Purple
 };
 
@@ -101,87 +100,6 @@ export function Contact() {
                           </h3>
                           <p className="text-muted-foreground break-all">
                             {contactInfo.emailAddress}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </EducationStyleCard>
-                </motion.div>
-              </Link>
-            </motion.div>
-
-            {/* Twitter Card */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-            >
-              <Link
-                href={contactInfo.twitterUrl}
-                target={contactInfo.newTab ? "_blank" : undefined}
-                rel={contactInfo.newTab ? "noopener noreferrer" : undefined}
-                className="block"
-              >
-                <motion.div
-                  className="relative"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                >
-                  {/* Neural glow effect */}
-                  <motion.div
-                    className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
-                    style={{
-                      backgroundColor: `rgb(${CONTACT_COLORS.twitter})`,
-                    }}
-                    initial={{ opacity: 0.2 }}
-                    animate={{ opacity: [0.2, 0.4, 0.2] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  />
-                  <EducationStyleCard
-                    glowColor={CONTACT_COLORS.twitter}
-                    insideBackgroundColor={CONTACT_COLORS.twitter}
-                  >
-                    <div className="p-6">
-                      <div className="flex items-start gap-4">
-                        <div className="relative">
-                          <motion.div
-                            className="w-14 h-14 rounded-full flex items-center justify-center"
-                            style={{
-                              backgroundColor: `rgba(${CONTACT_COLORS.twitter}, 0.1)`,
-                            }}
-                            whileHover={{ scale: 1.1 }}
-                          >
-                            <ProtectedLucideIcon
-                              Icon={Twitter}
-                              className="w-7 h-7"
-                              style={{
-                                color: `rgb(${CONTACT_COLORS.twitter})`,
-                              }}
-                            />
-                          </motion.div>
-                          {/* Gentle breathing effect */}
-                          <motion.div
-                            className="absolute inset-0 rounded-full pointer-events-none"
-                            style={{
-                              backgroundColor: `rgb(${CONTACT_COLORS.twitter})`,
-                              opacity: 0.1,
-                            }}
-                            animate={{
-                              scale: [1, 1.15, 1],
-                            }}
-                            transition={{
-                              duration: 3,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-1 bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
-                            {contactInfo.twitterDesc}
-                          </h3>
-                          <p className="text-muted-foreground">
-                            @{contactInfo.twitterUrl.split("/").pop()}
                           </p>
                         </div>
                       </div>
@@ -292,27 +210,36 @@ export function Contact() {
                 animate={{ opacity: [0.2, 0.4, 0.2] }}
                 transition={{ duration: 3, repeat: Infinity }}
               />
-              <EducationStyleCard
-                glowColor={CONTACT_COLORS.github}
-                insideBackgroundColor={CONTACT_COLORS.github}
-                className="rounded-full"
+              <Link
+                href={
+                  socialMediaLinks.github || "https://github.com/RomainClaret"
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
               >
-                <div className="p-1 rounded-full">
-                  <div className="relative overflow-hidden rounded-full">
-                    <Image
-                      src={`https://github.com/${process.env.NEXT_PUBLIC_GH_USERNAME || "RomainClaret"}.png`}
-                      alt="GitHub Profile"
-                      width={300}
-                      height={300}
-                      className="rounded-full"
-                      priority
-                      placeholder="blur"
-                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAKAAoDASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAAQFB//EACYQAAIBAwMEAQUAAAAAAAAAAAECAwAEEQUSITFBUWEGExQiMoH/xAAVAQEBAAAAAAAAAAAAAAAAAAABAv/EABcRAQEBAQAAAAAAAAAAAAAAAAECEQD/2gAMAwEAAhEDEQA/ANLviNwkhABCkgHxU2N2VgysVI6EGrN2zSXEkhGCx61EuI8EkAYNZsYV//Z"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                <EducationStyleCard
+                  glowColor={CONTACT_COLORS.github}
+                  insideBackgroundColor={CONTACT_COLORS.github}
+                  className="rounded-full"
+                >
+                  <div className="p-1 rounded-full">
+                    <div className="relative overflow-hidden rounded-full">
+                      <Image
+                        src={`https://github.com/${process.env.NEXT_PUBLIC_GH_USERNAME || "RomainClaret"}.png`}
+                        alt="GitHub Profile"
+                        width={300}
+                        height={300}
+                        className="rounded-full"
+                        priority
+                        placeholder="blur"
+                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAKAAoDASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAAQFB//EACYQAAIBAwMEAQUAAAAAAAAAAAECAwAEEQUSITFBUWEGExQiMoH/xAAVAQEBAAAAAAAAAAAAAAAAAAABAv/EABcRAQEBAQAAAAAAAAAAAAAAAAECEQD/2gAMAwEAAhEDEQA/ANLviNwkhABCkgHxU2N2VgysVI6EGrN2zSXEkhGCx61EuI8EkAYNZsYV//Z"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                    </div>
                   </div>
-                </div>
-              </EducationStyleCard>
+                </EducationStyleCard>
+              </Link>
 
               {/* Floating GitHub icon - clickable */}
               <Link

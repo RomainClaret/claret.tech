@@ -155,13 +155,13 @@ export const aiCommands: Record<string, CommandFunction> = {
         try {
           // Check if already aborted before starting
           if (context.abortController?.signal.aborted) {
-            throw new Error("Command cancelled by user");
+            throw new Error("Command canceled by user");
           }
 
           await client.initialize(modelId, (progress: WebLLMProgress) => {
             // Check for abort signal during progress updates
             if (context.abortController?.signal.aborted) {
-              throw new Error("Command cancelled by user");
+              throw new Error("Command canceled by user");
             }
 
             // Normalize progress to 0-100 range (WebLLM might use 0-1 range)
@@ -259,7 +259,7 @@ export const aiCommands: Record<string, CommandFunction> = {
           const errorMessage =
             error instanceof Error ? error.message : "Unknown error";
           const isCancelled =
-            errorMessage.includes("cancelled") ||
+            errorMessage.includes("cancel") ||
             errorMessage.includes("abort") ||
             context.abortController?.signal.aborted;
 
@@ -279,7 +279,7 @@ export const aiCommands: Record<string, CommandFunction> = {
               context.writer("\r\n");
             }
             if (isCancelled) {
-              context.writer("✗ AI model initialization cancelled");
+              context.writer("✗ AI model initialization canceled");
             } else {
               context.writer(`✗ Error loading model: ${errorMessage}`);
             }
@@ -295,7 +295,7 @@ export const aiCommands: Record<string, CommandFunction> = {
                 progressSteps.slice(-3).join("\n") + "\n\n";
             }
             if (isCancelled) {
-              fallbackErrorOutput += "✗ AI model initialization cancelled";
+              fallbackErrorOutput += "✗ AI model initialization canceled";
             } else {
               fallbackErrorOutput += `✗ Error loading model: ${errorMessage}`;
             }
@@ -498,21 +498,21 @@ export const aiCommands: Record<string, CommandFunction> = {
 
 Child me wanted thinking robots. Adult me breeds artificial minds that surprise me.
 
-A life journey through physics, neuroscience, mechanics, and AI, all converging on one truth: minds don't work, they evolve.
+A life journey through physics, neuroscience, mechanics, and AI, all converging on one lesson: you grow minds, you cannot assemble them.
 
 Current Focus:
-- Compositional AI through evolution (not training networks, breeding them)
-- Scaling up and Accelerating Neuroevolution
-- Making evolution computationally viable
-- Building tools that should exist but don't
+- Emergent behaviors from bio-inspired artificial life, grown by evolution and judged on what they do, not on how well they copy us or a dataset
+- Genuine emergence: specialists that claim their own roles, coordination that transfers to problems it never saw, wholes that outdo their parts
+- Composition as reasoning, and getting the composition itself to emerge rather than be designed
+- Lifelong learning without forgetting: knowledge as reusable, evolvable components instead of overwritten weights
+- Building the tools this needs, because most of them do not exist yet
 
 Research Philosophy:
-Intelligence isn't about accuracy — it's about adaptation. My networks achieve 29% on MNIST and transfer without retraining. Yours achieve 99.9% and die on pixel 785.
+Adaptation matters more than accuracy. I grow minds instead of training them, then judge what emerges by what it is, not by how closely it imitates a human or a test set. Evolution keeps finding behaviors I never programmed.
 
 Current Positions:
-- PhD Researcher, University of Neuchâtel (2020-Present)
-- Visiting Researcher, University College Dublin (2023-Present)
-- Teaching Assistant, Applied Mathematics & Databases
+- University Teaching Specialist, University College Dublin (2026-Present)
+- Researcher, NCRA Lab, University College Dublin
 
 Feel free to explore or challenge my approach. I'm here to explain why accuracy is a lie.
 Use 'ai init' to start the conversation.`,

@@ -437,7 +437,7 @@ async function postHandler(request: NextRequest) {
         browserSpecificIssues.push("Frame rate below Safari target (55 FPS)");
       }
     } else if (data.browser.name === "Chrome") {
-      browserOptimizations.push("Leverage Chrome's GPU acceleration");
+      browserOptimizations.push("Use Chrome's GPU acceleration");
       browserOptimizations.push(
         "Use Chrome DevTools for performance profiling",
       );

@@ -6,6 +6,8 @@ import {
   useState,
   ReactNode,
   useEffect,
+  useMemo,
+  useCallback,
 } from "react";
 import { useSafariContext } from "@/contexts/safari-context";
 import {
@@ -162,62 +164,89 @@ export function AnimationStateProvider({ children }: { children: ReactNode }) {
     };
   }, [autoDisableState, isSafari]);
 
-  const playAnimations = () => {
+  const playAnimations = useCallback(() => {
     setUserAnimationPreference(true);
     // Mark as user preference when explicitly changed
     if (typeof window !== "undefined") {
       storeAnimationPreference(true, isSafari, true);
     }
-  };
+  }, [isSafari]);
 
-  const stopAnimations = () => {
+  const stopAnimations = useCallback(() => {
     setUserAnimationPreference(false);
     // Mark as user preference when explicitly changed
     if (typeof window !== "undefined") {
       storeAnimationPreference(false, isSafari, true);
     }
-  };
+  }, [isSafari]);
 
-  const toggleAnimations = () => {
+  const toggleAnimations = useCallback(() => {
     const newValue = !userAnimationPreference;
     setUserAnimationPreference(newValue);
     // Mark as user preference when explicitly changed
     if (typeof window !== "undefined") {
       storeAnimationPreference(newValue, isSafari, true);
     }
-  };
+  }, [userAnimationPreference, isSafari]);
 
-  const forceEnableAnimations = () => {
+  // Stable function from the hook (wrapped in useCallback there), pulled out
+  // so the dependency below is a plain identifier.
+  const clearAutoDisable = autoDisableState.forceEnableAnimations;
+
+  const forceEnableAnimations = useCallback(() => {
     // Clear auto-disable state and enable animations
-    autoDisableState.forceEnableAnimations();
+    clearAutoDisable();
     setUserAnimationPreference(true);
     if (typeof window !== "undefined") {
       storeAnimationPreference(true, isSafari, true);
     }
-  };
+  }, [clearAutoDisable, isSafari]);
+
+  // Memoize the context value: the FPS hook updates its state every second,
+  // so without this every provider render handed all ~12 consumers a fresh
+  // object and re-rendered the whole consumer tree at 1Hz forever.
+  const value = useMemo<AnimationStateContextType>(
+    () => ({
+      // Basic animation state
+      areAnimationsPlaying,
+      playAnimations,
+      stopAnimations,
+      toggleAnimations,
+
+      // Auto-disable related properties
+      isAutoDisabled: autoDisableState.isAutoDisabled,
+      cooldownActive: autoDisableState.cooldownActive,
+      remainingCooldownMinutes: autoDisableState.remainingCooldownMinutes,
+      fpsThreshold: autoDisableState.threshold,
+      // Deliberately not reactive (excluded from the deps below): fps
+      // jitters every second and no consumer reads live fps from this
+      // context, so a dependency here would recreate the exact 1Hz
+      // re-render storm this memo exists to stop.
+      currentFps: fpsData.fps || 60,
+      consecutiveLowFpsCount: autoDisableState.consecutiveLowFpsCount,
+      progressToAutoDisable: autoDisableState.progressToAutoDisable,
+
+      // Force enable method
+      forceEnableAnimations,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      areAnimationsPlaying,
+      playAnimations,
+      stopAnimations,
+      toggleAnimations,
+      forceEnableAnimations,
+      autoDisableState.isAutoDisabled,
+      autoDisableState.cooldownActive,
+      autoDisableState.remainingCooldownMinutes,
+      autoDisableState.threshold,
+      autoDisableState.consecutiveLowFpsCount,
+      autoDisableState.progressToAutoDisable,
+    ],
+  );
 
   return (
-    <AnimationStateContext.Provider
-      value={{
-        // Basic animation state
-        areAnimationsPlaying,
-        playAnimations,
-        stopAnimations,
-        toggleAnimations,
-
-        // Auto-disable related properties
-        isAutoDisabled: autoDisableState.isAutoDisabled,
-        cooldownActive: autoDisableState.cooldownActive,
-        remainingCooldownMinutes: autoDisableState.remainingCooldownMinutes,
-        fpsThreshold: autoDisableState.threshold,
-        currentFps: fpsData.fps || 60,
-        consecutiveLowFpsCount: autoDisableState.consecutiveLowFpsCount,
-        progressToAutoDisable: autoDisableState.progressToAutoDisable,
-
-        // Force enable method
-        forceEnableAnimations,
-      }}
-    >
+    <AnimationStateContext.Provider value={value}>
       {children}
     </AnimationStateContext.Provider>
   );
@@ -231,4 +260,13 @@ export function useAnimationState() {
     );
   }
   return context;
+}
+
+// Non-throwing variant for shared UI (e.g. HolographicCard) that must also
+// render without the provider (tests, isolated tools). Callers treat an
+// undefined context as "animations playing".
+export function useAnimationStateOptional():
+  | AnimationStateContextType
+  | undefined {
+  return useContext(AnimationStateContext);
 }

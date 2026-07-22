@@ -17,6 +17,14 @@ import {
   MockHookFunction,
 } from "@/test/mock-types";
 
+// ResizeObserver that survives vitest's mockReset (the config resets vi.fn
+// mocks before every test; useCardDeepLink observes document.body).
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
@@ -36,16 +44,18 @@ vi.mock("@/data/portfolio", () => ({
     subtitle: {
       highlightedText: "Leaving breadcrumbs of a longer journey",
       normalText:
-        "—documenting discoveries that captured what I knew at the time. Looking back, they were all converging.",
+        ", documenting discoveries that captured what I knew at the time. Looking back, they were all converging.",
     },
     papersCards: [
       {
         title: "Blockchain, a techie overview",
         date: "2016",
+        status: "preprint",
+        anchorId: "claret2016blockchain",
         shortDescription:
           "Demystifying blockchain when everyone thought it would change everything. Technical reality vs. religious fervor.",
         subtitle:
-          "Written at peak blockchain hysteria. While everyone proclaimed revolution, I documented reality: consensus mechanisms with serious trade-offs. Explored three evolutionary paths for crypto (spoiler: none are utopian), dissected verification protocols (PoW wastes energy, PoS enables plutocracy), catalogued attack vectors everyone ignored. Key insight: blockchain is A digital consensus, not THE digital consensus. MaidSafe was already doing distributed consensus differently. The paper that said what techies were thinking but investors didn't want to hear.",
+          "Written at peak blockchain hysteria. While everyone proclaimed revolution, I documented reality: consensus mechanisms with serious trade-offs. Explored three evolutionary paths for crypto (spoiler: none are utopian), dissected verification protocols (PoW wastes energy, PoS enables plutocracy), cataloged attack vectors everyone ignored. The takeaway: blockchain is A digital consensus, not THE digital consensus. MaidSafe was already doing distributed consensus differently. The paper that said what techies were thinking but investors didn't want to hear.",
         image: "/images/paper_blockchain_2016.webp",
         footerLink: [
           {
@@ -55,8 +65,21 @@ vi.mock("@/data/portfolio", () => ({
         ],
       },
       {
+        title: "Forthcoming Paper On Substrates",
+        date: "2026",
+        status: "to-appear",
+        shortDescription: "A forthcoming paper.",
+        subtitle: "A forthcoming paper, to appear.",
+        image: "/images/paper_geenns_2024.webp",
+        footerLink: [
+          { name: "arXiv", url: "https://arxiv.org/abs/0000.00000" },
+        ],
+      },
+      {
         title: "Master's Thesis: Deep Learning Applications",
         date: "2018",
+        status: "presented",
+        posterPdf: "/pdfs/poster_static_mock.pdf",
         shortDescription: "Research on neural network architectures",
         subtitle: "Exploring neural network architectures for vision tasks.",
         image: "/images/thesis_2018.webp",
@@ -83,13 +106,15 @@ vi.mock("@/lib/hooks/useSafari", () => ({
   useShouldReduceAnimations: vi.fn(() => false),
 }));
 
+// Hoisted spy so tests can assert the in-app PDF reader was opened.
+const { mockOpenPDF } = vi.hoisted(() => ({ mockOpenPDF: vi.fn() }));
 vi.mock("@/lib/hooks/usePDFViewer", () => ({
   usePDFViewer: vi.fn(() => ({
     isOpen: false,
     pdfUrl: "",
     title: "",
     downloadFileName: "",
-    openPDF: vi.fn(),
+    openPDF: mockOpenPDF,
     closePDF: vi.fn(),
   })),
 }));
@@ -123,10 +148,18 @@ vi.mock("@/components/ui/animated", () => ({
   ),
 }));
 
-// Mock HolographicCard
+// Mock HolographicCard (exposes forceHover so deep-link tests can assert it)
 vi.mock("@/components/ui/holographic-card", () => ({
-  HolographicCard: ({ children, className }: BaseMockProps) => (
-    <div data-testid="holographic-card" className={className}>
+  HolographicCard: ({
+    children,
+    className,
+    forceHover,
+  }: BaseMockProps & { forceHover?: boolean }) => (
+    <div
+      data-testid="holographic-card"
+      data-force-hover={forceHover ? "true" : undefined}
+      className={className}
+    >
       {children}
     </div>
   ),
@@ -196,6 +229,10 @@ vi.mock("lucide-react", () => ({
   MessageCircle: () => (
     <div data-testid="message-circle-icon">MessageCircle</div>
   ),
+  Star: () => <div data-testid="star-icon">Star</div>,
+  Link2: () => <div data-testid="link2-icon">Link2</div>,
+  Presentation: () => <div data-testid="presentation-icon">Presentation</div>,
+  Play: () => <div data-testid="play-icon">Play</div>,
 }));
 
 // Mock ORCID icon
@@ -267,6 +304,8 @@ const mockPublications: Publication[] = [
 describe("Papers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.ResizeObserver =
+      MockResizeObserver as unknown as typeof ResizeObserver;
 
     // Mock successful API response
     global.fetch = vi.fn(() =>
@@ -323,7 +362,7 @@ describe("Papers", () => {
       render(<Papers />);
 
       await waitFor(() => {
-        expect(screen.getByText("4 publications")).toBeInTheDocument(); // 2 static + 2 dynamic
+        expect(screen.getByText("5 publications")).toBeInTheDocument(); // 3 static + 2 dynamic
         expect(screen.getByText("23 citations")).toBeInTheDocument();
       });
     });
@@ -340,7 +379,7 @@ describe("Papers", () => {
 
       // Should show static paper count only
       await waitFor(() => {
-        expect(screen.getByText("2 publications")).toBeInTheDocument();
+        expect(screen.getByText("3 publications")).toBeInTheDocument();
       });
     });
 
@@ -472,6 +511,63 @@ describe("Papers", () => {
       });
     });
 
+    it("opens the in-app reader from the Read Paper and Read Poster chips", async () => {
+      const mockPubsWithPdfs: Publication[] = [
+        {
+          id: "pdf-1",
+          title: "Paper with PDFs",
+          authors: ["Author A"],
+          venue: "Conference 2026",
+          year: "2026",
+          paperPdf: "/pdfs/paper_test.pdf",
+          posterPdf: "/pdfs/poster_test.pdf",
+          presentationPdf: "/pdfs/presentation_test.pdf",
+          source: "static" as const,
+        },
+      ];
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockPubsWithPdfs,
+              totalCitations: 0,
+              count: 1,
+            }),
+        } as Response),
+      );
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Paper with PDFs")).toBeInTheDocument();
+      });
+
+      // Dynamic card chips open the internal reader with the local file
+      fireEvent.click(screen.getByText("Read Paper"));
+      expect(mockOpenPDF).toHaveBeenCalledWith(
+        "/pdfs/paper_test.pdf",
+        "Paper with PDFs",
+        "paper_test.pdf",
+      );
+
+      const posterChips = screen.getAllByText("Read Poster");
+      // Dynamic pub + the static mock card with posterPdf
+      expect(posterChips.length).toBe(2);
+      fireEvent.click(posterChips[0]);
+      expect(mockOpenPDF).toHaveBeenCalledWith(
+        "/pdfs/poster_test.pdf",
+        "Paper with PDFs",
+        "poster_test.pdf",
+      );
+
+      fireEvent.click(screen.getByText("Read Presentation"));
+      expect(mockOpenPDF).toHaveBeenCalledWith(
+        "/pdfs/presentation_test.pdf",
+        "Paper with PDFs",
+        "presentation_test.pdf",
+      );
+    });
+
     it("renders PDF modal when isOpen is true", async () => {
       const { usePDFViewer } = await import("@/lib/hooks/usePDFViewer");
 
@@ -534,6 +630,11 @@ describe("Papers", () => {
       await waitFor(() => {
         // Published papers should have status indicators
         expect(screen.getAllByText("Published").length).toBeGreaterThan(0);
+        // Forthcoming papers show a "To Appear" badge
+        expect(screen.getAllByText("To Appear").length).toBeGreaterThan(0);
+        // Explicitly marked statuses render their own badges
+        expect(screen.getAllByText("Presented").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Preprint").length).toBeGreaterThan(0);
       });
     });
   });
@@ -558,7 +659,7 @@ describe("Papers", () => {
       }
     });
 
-    it("copies DOI to clipboard for dynamic papers", async () => {
+    it("copies the BibTeX entry to clipboard for dynamic papers", async () => {
       // Mock clipboard API
       const mockWriteText = vi.fn(() => Promise.resolve());
       Object.assign(navigator, {
@@ -579,6 +680,8 @@ describe("Papers", () => {
           paperUrl: "https://example.com/paper",
           abstract: "Abstract",
           doi: "10.1234/example.doi",
+          bibtex:
+            "@inproceedings{test-doi-1,\n  title={Paper with DOI},\n  doi={10.1234/example.doi},\n}",
           source: "static" as const,
         },
       ];
@@ -601,14 +704,199 @@ describe("Papers", () => {
         expect(screen.getByText("Paper with DOI")).toBeInTheDocument();
       });
 
-      // Find DOI button (it contains "DOI" text)
-      const doiButtons = screen.getAllByText("DOI");
-      expect(doiButtons.length).toBeGreaterThan(0);
+      // Find BibTeX button (it contains "BibTeX" text)
+      const bibtexButtons = screen.getAllByText("BibTeX");
+      expect(bibtexButtons.length).toBeGreaterThan(0);
 
-      fireEvent.click(doiButtons[0]);
+      fireEvent.click(bibtexButtons[0]);
 
       await waitFor(() => {
-        expect(mockWriteText).toHaveBeenCalledWith("10.1234/example.doi");
+        expect(mockWriteText).toHaveBeenCalled();
+      });
+      // The curated verbatim entry is copied as-is
+      const copied = mockWriteText.mock.calls[0][0] as unknown as string;
+      expect(copied).toBe(
+        "@inproceedings{test-doi-1,\n  title={Paper with DOI},\n  doi={10.1234/example.doi},\n}",
+      );
+    });
+
+    it("shows Code instead of Details when a publication has a code repository", async () => {
+      const mockPubsWithCode: Publication[] = [
+        {
+          id: "test-code-1",
+          title: "Paper with Code",
+          authors: ["Author A"],
+          venue: "Conference 2026",
+          year: "2026",
+          semanticScholarUrl: "https://semanticscholar.org/paper/test-code-1",
+          codeUrl: "https://github.com/example/repo",
+          source: "static" as const,
+        },
+        {
+          id: "test-details-1",
+          title: "Paper with Details only",
+          authors: ["Author B"],
+          venue: "Conference 2025",
+          year: "2025",
+          semanticScholarUrl:
+            "https://semanticscholar.org/paper/test-details-1",
+          source: "static" as const,
+        },
+      ];
+
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockPubsWithCode,
+              totalCitations: 0,
+              count: 2,
+            }),
+        } as Response),
+      );
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Paper with Code")).toBeInTheDocument();
+      });
+
+      // The paper with a repo shows a Code button linking to it
+      const codeButton = screen.getByText("Code").closest("a");
+      expect(codeButton).toHaveAttribute(
+        "href",
+        "https://github.com/example/repo",
+      );
+      // Details is suppressed for that paper but still shown for the other
+      expect(screen.getAllByText("Details")).toHaveLength(1);
+    });
+  });
+
+  describe("Deep Links", () => {
+    afterEach(() => {
+      window.location.hash = "";
+    });
+
+    it("scrolls to and expands the publication targeted by the URL hash", async () => {
+      window.scrollTo = vi.fn();
+      const mockDeepPubs: Publication[] = [
+        {
+          id: "deep-1",
+          title: "Deep Linked Paper",
+          authors: ["Author A"],
+          venue: "Conference 2026",
+          year: "2026",
+          abstract:
+            "A very long abstract that goes well past the two hundred character truncation threshold so that the collapsed and expanded states are clearly distinguishable in this test. It keeps going with enough filler words to comfortably exceed the limit and finally includes the marker END-OF-ABSTRACT.",
+          shortDescription: "The short teaser.",
+          source: "static" as const,
+        },
+      ];
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockDeepPubs,
+              totalCitations: 0,
+              count: 1,
+            }),
+        } as Response),
+      );
+      window.location.hash = "#deep-1";
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Deep Linked Paper")).toBeInTheDocument();
+      });
+      // The card wrapper carries the anchor id
+      expect(document.getElementById("deep-1")).toBeInTheDocument();
+      // The offset scroll fired
+      await waitFor(() => {
+        expect(window.scrollTo).toHaveBeenCalled();
+      });
+      // The abstract auto-expanded (full abstract replaces the teaser)
+      await waitFor(() => {
+        expect(screen.getByText(/END-OF-ABSTRACT/)).toBeInTheDocument();
+      });
+    });
+
+    it("holds the hover glow on the deep-linked card until the user interacts", async () => {
+      window.scrollTo = vi.fn();
+      const mockDeepPubs: Publication[] = [
+        {
+          id: "deep-2",
+          title: "Glowing Paper",
+          authors: ["Author A"],
+          venue: "Conference 2026",
+          year: "2026",
+          abstract: "Abstract",
+          source: "static" as const,
+        },
+      ];
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockDeepPubs,
+              totalCitations: 0,
+              count: 1,
+            }),
+        } as Response),
+      );
+      window.location.hash = "#deep-2";
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Glowing Paper")).toBeInTheDocument();
+      });
+      const wrapper = document.getElementById("deep-2")!;
+      // The linked card holds the forced hover glow
+      await waitFor(() => {
+        expect(wrapper.querySelector('[data-force-hover="true"]')).toBeTruthy();
+      });
+
+      // A click inside the linked card keeps the glow
+      fireEvent.pointerDown(
+        wrapper.querySelector('[data-testid="holographic-card"]')!,
+      );
+      expect(wrapper.querySelector('[data-force-hover="true"]')).toBeTruthy();
+
+      // Scrolling (wheel) releases it back to normal hover behavior
+      fireEvent.wheel(window);
+      await waitFor(() => {
+        expect(wrapper.querySelector('[data-force-hover="true"]')).toBeFalsy();
+      });
+    });
+
+    it("renders anchor ids for Other Work cards", () => {
+      render(<Papers />);
+
+      expect(
+        document.getElementById("claret2016blockchain"),
+      ).toBeInTheDocument();
+    });
+
+    it("copies a paper deep link from the card's copy button", async () => {
+      const mockWriteText = vi.fn(() => Promise.resolve());
+      Object.assign(navigator, { clipboard: { writeText: mockWriteText } });
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Neuroevolution Research Paper"),
+        ).toBeInTheDocument();
+      });
+
+      const copyButtons = screen.getAllByLabelText("Copy link to this paper");
+      fireEvent.click(copyButtons[0]);
+
+      await waitFor(() => {
+        expect(mockWriteText).toHaveBeenCalledWith(
+          expect.stringMatching(/\/#(test-pub-1|test-pub-2)$/),
+        );
       });
     });
   });
@@ -764,7 +1052,7 @@ describe("Papers", () => {
       ).toBeInTheDocument();
 
       await waitFor(() => {
-        expect(screen.getByText("2 publications")).toBeInTheDocument();
+        expect(screen.getByText("3 publications")).toBeInTheDocument();
       });
     });
   });

@@ -1,4 +1,10 @@
 import { useState, useCallback } from "react";
+import { isSafePdfUrl } from "@/lib/utils/safe-pdf-url";
+
+// Re-exported so existing consumers/tests keep their import path; the
+// implementation lives in utils so the lazy pdf-viewer chunk can import it
+// without depending on this page-bundled hook module.
+export { isSafePdfUrl };
 
 interface PDFViewerState {
   isOpen: boolean;
@@ -21,6 +27,10 @@ export function usePDFViewer() {
       const cleanUrl = url.includes("docs.google.com/gview")
         ? new URL(url).searchParams.get("url") || url
         : url;
+
+      if (!isSafePdfUrl(cleanUrl)) {
+        return;
+      }
 
       setState({
         isOpen: true,

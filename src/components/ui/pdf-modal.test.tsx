@@ -17,9 +17,9 @@ vi.mock("./pdf-viewer", () => ({
   )),
 }));
 
-// Mock lucide icons
-vi.mock("lucide-react", () => ({
-  X: vi.fn((props) => <div {...props}>X</div>),
+// Mock the deep per-icon import used by pdf-modal (see pdf-modal.tsx)
+vi.mock("lucide-react/dist/esm/icons/x", () => ({
+  default: vi.fn((props) => <div {...props}>X</div>),
 }));
 
 describe("PDFModal", () => {
@@ -244,10 +244,11 @@ describe("PDFModal", () => {
         <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      expect(document.body.style.overflow).toBe("auto");
+      // Cleared inline style hands scrolling back to the stylesheet default.
+      expect(document.body.style.overflow).toBe("");
     });
 
-    it("restores original overflow value", () => {
+    it("clears the inline overflow override on close", () => {
       document.body.style.overflow = "scroll";
 
       const { rerender } = render(
@@ -258,7 +259,7 @@ describe("PDFModal", () => {
         <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      expect(document.body.style.overflow).toBe("auto");
+      expect(document.body.style.overflow).toBe("");
     });
   });
 

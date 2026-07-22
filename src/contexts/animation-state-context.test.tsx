@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { ReactNode } from "react";
+import type { AnimationPreference } from "@/lib/utils/safari-detection";
 import {
   setupContextTesting,
   renderHookWithErrorBoundary,
@@ -61,15 +62,34 @@ describe("AnimationStateContext", () => {
     });
 
     const safariDetection = await import("@/lib/utils/safari-detection");
-    vi.mocked(safariDetection.getAnimationPreference).mockReturnValue(null);
+    // Stateful preference mock: storeAnimationPreference records the choice and
+    // getAnimationPreference returns it. The provider's post-hydration sync effect
+    // resets userAnimationPreference to the browser default whenever
+    // getAnimationPreference() reports no *user* preference, so a null-returning
+    // stub would immediately undo play/stop/toggle. Mirroring real storage keeps an
+    // explicit user choice sticky, exactly as it behaves in the browser. Tests that
+    // need a specific starting preference still override getAnimationPreference.
+    let storedPreference: AnimationPreference | null = null;
+    vi.mocked(safariDetection.getAnimationPreference).mockImplementation(
+      () => storedPreference,
+    );
     vi.mocked(safariDetection.storeAnimationPreference).mockImplementation(
-      () => {},
+      (value, isSafari, isUserPreference = false) => {
+        storedPreference = {
+          value,
+          browser: isSafari ? "safari" : "other",
+          isUserPreference,
+          timestamp: 0,
+        };
+      },
     );
     vi.mocked(safariDetection.shouldResetAnimationPreference).mockReturnValue(
       false,
     );
     vi.mocked(safariDetection.clearAnimationPreference).mockImplementation(
-      () => {},
+      () => {
+        storedPreference = null;
+      },
     );
 
     const { useFpsOnly } = await import("@/lib/hooks/useFpsOnly");
@@ -211,8 +231,7 @@ describe("AnimationStateContext", () => {
   });
 
   describe("Animation Controls", () => {
-    it.skip("plays animations correctly", async () => {
-      // FIXME: This test passes in isolation but fails in batch mode due to state update issues
+    it("plays animations correctly", async () => {
       const { storeAnimationPreference } = await import(
         "@/lib/utils/safari-detection"
       );
@@ -242,8 +261,7 @@ describe("AnimationStateContext", () => {
       );
     });
 
-    it.skip("stops animations correctly", async () => {
-      // FIXME: This test passes in isolation but fails in batch mode due to state update issues
+    it("stops animations correctly", async () => {
       const { storeAnimationPreference } = await import(
         "@/lib/utils/safari-detection"
       );
@@ -267,8 +285,7 @@ describe("AnimationStateContext", () => {
       );
     });
 
-    it.skip("toggles animations correctly", async () => {
-      // FIXME: This test passes in isolation but fails in batch mode due to state update issues
+    it("toggles animations correctly", async () => {
       const { storeAnimationPreference } = await import(
         "@/lib/utils/safari-detection"
       );

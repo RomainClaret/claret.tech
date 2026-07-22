@@ -31,6 +31,17 @@ export type CommandFunction = (
   context: CommandContext,
 ) => CommandResult | Promise<CommandResult>;
 
+// Shared ASCII art for the penguin easter eggs (penguin / penguinsay / waddle)
+const PENGUIN_ART = [
+  "     .--.",
+  "    |o_o |",
+  "    |:_/ |",
+  "   //   \\ \\",
+  "  (|     | )",
+  " /'\\_   _/'\\",
+  " \\___)=(___/",
+];
+
 export const commands: Record<string, CommandFunction> = {
   help: () => {
     const systemCommands = [
@@ -465,6 +476,44 @@ ${formatCommands(aiCommands)}
     };
   },
 
+  penguin: (args) => {
+    const waddling = args[0]?.toLowerCase() === "waddle";
+    const flavor = waddling
+      ? [
+          "",
+          "\x1b[36mWADDLE MODE ENGAGED.\x1b[0m",
+          "Adaptation over accuracy, one step at a time.",
+          "",
+        ]
+      : [
+          "",
+          "\x1b[36mPENGUIN PROTOCOL ACTIVE.\x1b[0m",
+          "Evolution favored me: no flight, all adaptation. The colony endures.",
+          "",
+          "Try 'penguin waddle', 'penguinsay <text>', or 'man penguin'.",
+          "",
+        ];
+    return { output: [...PENGUIN_ART, ...flavor].join("\n"), success: true };
+  },
+
+  waddle: (_args, context) => commands.penguin(["waddle"], context),
+
+  penguinsay: (args) => {
+    const text = args.length > 0 ? args.join(" ") : "adaptation over accuracy";
+    const border = "-".repeat(text.length + 2);
+    return {
+      output: [
+        ` ${border}`,
+        `< ${text} >`,
+        ` ${border}`,
+        "   \\",
+        "    \\",
+        ...PENGUIN_ART,
+      ].join("\n"),
+      success: true,
+    };
+  },
+
   exit: (args, context) => {
     context.closeTerminal();
     return { output: "Goodbye!", success: true };
@@ -484,8 +533,8 @@ ${formatCommands(aiCommands)}
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
       "📄 Full resume available on the portfolio website",
-      "🎓 PhD Researcher in Neuroevolution & Compositional Thinking",
-      "🏛️ University of Neuchâtel, Switzerland",
+      "🎓 Neuroevolution Researcher & Lecturer",
+      "🏛️ University College Dublin, Ireland",
       "",
       "To view my complete resume, navigate to the",
       "Experience and Education sections on this website.",
@@ -504,7 +553,6 @@ ${formatCommands(aiCommands)}
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
       `📧 Email: ${contactInfo.emailAddress}`,
-      `🐦 Twitter: ${contactInfo.twitterUrl}`,
       "",
       contactInfo.subtitle.highlightedText,
       contactInfo.subtitle.normalText,
@@ -649,9 +697,9 @@ ${formatCommands(aiCommands)}
       "\x1b[1m\x1b[36mRomain Claret\x1b[0m",
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
-      "PhD Researcher. Evolving Artificial Intelligence. Switzerland.",
+      "I grow artificial minds instead of programming them, and study the behaviors nobody designed.",
       "",
-      "romclaret@gmail.com",
+      `${contactInfo.emailAddress}`,
       "github.com/RomainClaret",
       "",
     ];
@@ -681,7 +729,8 @@ ${formatCommands(aiCommands)}
       "\x1b[1m\x1b[36mExperience\x1b[0m",
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
-      "PhD Researcher - University of Neuchâtel (2022-Present)",
+      "University Teaching Specialist - University College Dublin (2026-Present)",
+      "Doctoral Assistant - University of Neuchâtel (2020-2026)",
       "Software Engineer - Various (2015-Present)",
       "",
     ];
@@ -695,7 +744,7 @@ ${formatCommands(aiCommands)}
       "\x1b[1m\x1b[36mProjects\x1b[0m",
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
-      "A little bit of everything",
+      "A little bit of everything, mostly tools that should exist but didn't",
       "",
       "github.com/RomainClaret",
       "",
@@ -710,7 +759,7 @@ ${formatCommands(aiCommands)}
       "\x1b[1m\x1b[36mEducation\x1b[0m",
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       "",
-      "PhD Computer Science - University of Neuchâtel (2022-2025)",
+      "PhD Computer Science - University of Neuchâtel (2020-2026)",
       "MSc Software Engineering - HES-SO (2018-2020)",
       "BSc Computer Science - HES-SO (2015-2018)",
       "",
@@ -791,6 +840,25 @@ ${formatCommands(aiCommands)}
         "",
         "\x1b[1mEXAMPLE\x1b[0m",
         "    help",
+      ],
+
+      penguin: [
+        "\x1b[1mNAME\x1b[0m",
+        "    penguin - summon the colony",
+        "",
+        "\x1b[1mSYNOPSIS\x1b[0m",
+        "    penguin [waddle]",
+        "    penguinsay [text]",
+        "    waddle",
+        "",
+        "\x1b[1mDESCRIPTION\x1b[0m",
+        "    Prints a penguin. 'penguin waddle' waddles. 'penguinsay' makes the",
+        "    penguin speak your text. Adaptation over accuracy, always.",
+        "",
+        "\x1b[1mEXAMPLES\x1b[0m",
+        "    penguin",
+        "    penguin waddle",
+        "    penguinsay evolution favors the adaptable",
       ],
 
       ls: [

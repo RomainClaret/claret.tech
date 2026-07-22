@@ -23,6 +23,7 @@ describe("Terminal User System", () => {
 
       expect(children[".profile"]).toBeDefined();
       expect(children[".secrets"]).toBeDefined();
+      expect(children[".colony"]).toBeDefined();
       expect(children["README.md"]).toBeDefined();
     });
 
@@ -40,7 +41,16 @@ describe("Terminal User System", () => {
       expect(secretsFile.type).toBe("file");
       expect(secretsFile.hidden).toBe(true);
       expect(secretsFile.content).toContain("🔐 guest's secret vault");
-      expect(secretsFile.content).toContain("Nothing to see here... yet.");
+      expect(secretsFile.content).toContain("The colony sees everything");
+      expect(secretsFile.content).toContain("cat .colony");
+    });
+
+    it("guest colony easter-egg file has correct content", () => {
+      const colonyFile = users.guest.homeDirectory.children![".colony"];
+      expect(colonyFile.type).toBe("file");
+      expect(colonyFile.hidden).toBe(true);
+      expect(colonyFile.content).toContain("the colony");
+      expect(colonyFile.content).toContain("Adaptation over accuracy");
     });
 
     it("guest README has correct content", () => {
@@ -130,6 +140,7 @@ describe("Terminal User System", () => {
       const children = users.guest.homeDirectory.children!;
       expect(children[".profile"].hidden).toBe(true);
       expect(children[".secrets"].hidden).toBe(true);
+      expect(children[".colony"].hidden).toBe(true);
       expect(children["README.md"].hidden).toBeUndefined();
     });
 
@@ -151,7 +162,7 @@ describe("Terminal User System", () => {
 
     it("files have content", () => {
       const children = users.guest.homeDirectory.children!;
-      [".profile", ".secrets", "README.md"].forEach((fileName) => {
+      [".profile", ".secrets", ".colony", "README.md"].forEach((fileName) => {
         const file = children[fileName];
         expect(file.content).toBeDefined();
         expect(typeof file.content).toBe("string");

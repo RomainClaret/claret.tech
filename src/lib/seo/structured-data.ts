@@ -16,16 +16,15 @@ export function generateStructuredData() {
       "https://github.com/RomainClaret",
       "https://www.linkedin.com/in/RomainClaret",
       "https://medium.com/@romainclaret",
-      "https://twitter.com/romainclaret",
       "https://orcid.org/0000-0002-6872-7815",
       "https://stackoverflow.com/users/4023950/romain-claret",
       "https://gitlab.com/romainclaret",
     ],
-    jobTitle: "AI Software Engineer & PhD Researcher",
+    jobTitle: "Neuroevolution Researcher & Lecturer",
     worksFor: {
       "@type": "Organization",
-      name: "University of Neuchâtel",
-      url: "https://www.unine.ch",
+      name: "University College Dublin",
+      url: "https://www.ucd.ie",
     },
     alumniOf: [
       {
@@ -52,7 +51,7 @@ export function generateStructuredData() {
       "Next.js",
     ],
     description:
-      "PhD Researcher focusing on neuroevolution and compositional AI. Creator of GEENNS (Grid-based Emergent Evolution of Neocortical Network Substrates).",
+      "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life. Creator of GEENNS, an approach that grows artificial minds instead of programming them.",
   };
 
   // WebSite Schema with SearchAction
@@ -63,7 +62,7 @@ export function generateStructuredData() {
     url: baseUrl,
     name: "Romain Claret - Evolving Artificial Intelligence",
     description:
-      "Researcher breeding compositional AI through evolution. Making intelligence emerge, not engineering it.",
+      "Breeding artificial minds through evolution and studying the behaviors that emerge. Research in artificial life and emergent systems.",
     publisher: {
       "@id": `${baseUrl}/#person`,
     },

@@ -79,7 +79,6 @@ vi.mock("./ai-commands", () => ({
 vi.mock("@/data/sections/contact", () => ({
   contactInfo: {
     emailAddress: "test {at} example.com",
-    twitterUrl: "https://twitter.com/test",
     subtitle: {
       highlightedText: "Test highlighted text",
       normalText: "Test normal text",
@@ -869,6 +868,54 @@ describe("Terminal Commands", () => {
     });
   });
 
+  describe("penguin easter eggs", () => {
+    it("penguin prints a penguin", () => {
+      const result = commands.penguin([], mockContext) as CommandResult;
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("PENGUIN PROTOCOL");
+      expect(result.output).toContain(".--.");
+    });
+
+    it("penguin waddle waddles", () => {
+      const result = commands.penguin(["waddle"], mockContext) as CommandResult;
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("WADDLE MODE");
+    });
+
+    it("waddle aliases penguin waddle", () => {
+      const result = commands.waddle([], mockContext) as CommandResult;
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("WADDLE MODE");
+    });
+
+    it("penguinsay speaks the given text", () => {
+      const result = commands.penguinsay(
+        ["hello", "colony"],
+        mockContext,
+      ) as CommandResult;
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("hello colony");
+    });
+
+    it("man lists and documents penguin", () => {
+      const list = commands.man([], mockContext) as CommandResult;
+      expect(list.output).toContain("penguin");
+
+      const page = commands.man(["penguin"], mockContext) as CommandResult;
+      expect(page.success).toBe(true);
+      expect(page.output).toContain("summon the colony");
+    });
+
+    it("keeps penguin commands out of help", () => {
+      const help = commands.help([], mockContext) as CommandResult;
+      expect(help.output).not.toContain("penguin");
+    });
+  });
+
   describe("reload command", () => {
     it("reloads page", () => {
       vi.useFakeTimers();
@@ -892,7 +939,6 @@ describe("Terminal Commands", () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain("Contact Information");
       expect(result.output).toContain("test {at} example.com");
-      expect(result.output).toContain("https://twitter.com/test");
       expect(result.output).toContain("Use 'email' to copy email");
     });
   });

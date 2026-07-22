@@ -27,7 +27,7 @@ You may NOT:
 
 Unless otherwise stated:
 
-- **Website Code:** The source code of this website is open source and available under the MIT License on GitHub
+- **Website Code:** The source code of this website is open source and available under the GPL-3.0-or-later license on GitHub
 - **Research Content:** Academic publications, research papers, and related materials remain under their respective publication licenses
 - **Blog Posts:** Original blog content is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)
 - **Third-Party Content:** Content from external sources (GitHub, Medium, etc.) remains under their original licenses

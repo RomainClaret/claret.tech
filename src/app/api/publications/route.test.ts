@@ -157,24 +157,21 @@ describe("Publications API Route", () => {
       expect(result).toEqual(mockCachedData);
     });
 
-    it("fetches new data when cache is expired", async () => {
-      // Mock expired cache (8 days old)
-      const expiredData = {
+    it("serves an old cache without refetching (manual refresh only)", async () => {
+      // Cache is 8 days old; auto-refresh is disabled, so it is served as-is.
+      const oldData = {
         ...mockCachedData,
         lastUpdated: "2024-08-10T12:00:00.000Z",
       };
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(expiredData));
-      mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(oldData));
 
       const request = new NextRequest("http://localhost:3000/api/publications");
-      await GET(request);
+      const response = await GET(request);
 
-      expect(mockFetchAllPublications).toHaveBeenCalledWith({
-        semanticScholarId: "test-semantic-id",
-        orcidId: "test-orcid-id",
-        authorName: "Test Author",
-      });
-      expect(mockFs.writeFile).toHaveBeenCalled();
+      expect(mockFetchAllPublications).not.toHaveBeenCalled();
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+      const result = await response.json();
+      expect(result).toEqual(oldData);
     });
 
     it("fetches new data when force refresh is requested", async () => {
@@ -191,16 +188,12 @@ describe("Publications API Route", () => {
     });
 
     it("writes the cache file with a trailing newline", async () => {
-      // Expired cache forces a re-fetch + write via updateCache().
-      mockFs.readFile.mockResolvedValueOnce(
-        JSON.stringify({
-          ...mockCachedData,
-          lastUpdated: "2024-08-10T12:00:00.000Z",
-        }),
-      );
+      // A forced refresh re-fetches + writes via updateCache().
       mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
 
-      const request = new NextRequest("http://localhost:3000/api/publications");
+      const request = new NextRequest(
+        "http://localhost:3000/api/publications?refresh=true",
+      );
       await GET(request);
 
       const calls = mockFs.writeFile.mock.calls;

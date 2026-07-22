@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+// Deep per-icon import; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
+import X from "lucide-react/dist/esm/icons/x";
 import { PDFViewer } from "./pdf-viewer";
 
 interface PDFModalProps {
@@ -51,9 +52,14 @@ export function PDFModal({
       }
     };
 
+    // Scroll position at open time; null when this effect run never opened
+    // the modal (so its cleanup must not touch scroll or focus).
+    let scrollY: number | null = null;
+
     if (isOpen) {
-      // Store the currently focused element
+      // Store the currently focused element and where the page was scrolled.
       previousActiveElement.current = document.activeElement as HTMLElement;
+      scrollY = window.scrollY;
 
       document.addEventListener("keydown", handleEscape);
       document.addEventListener("keydown", handleFocusTrap);
@@ -69,12 +75,19 @@ export function PDFModal({
     return () => {
       document.removeEventListener("keydown", handleEscape);
       document.removeEventListener("keydown", handleFocusTrap);
-      document.body.style.overflow = "auto";
+      if (scrollY === null) return;
 
-      // Restore focus to the previously focused element
-      if (previousActiveElement.current) {
-        previousActiveElement.current.focus();
-      }
+      // Back to the stylesheet default rather than forcing "auto".
+      document.body.style.overflow = "";
+
+      // Restore focus WITHOUT letting the browser scroll the focused element
+      // into view: clicks do not reliably set focus (Safari never focuses
+      // clicked buttons), so this element can be far from where the user was.
+      previousActiveElement.current?.focus({ preventScroll: true });
+
+      // Pin the page back exactly where it was when the reader opened;
+      // instant so the global smooth scroll-behavior cannot animate it.
+      window.scrollTo({ top: scrollY, behavior: "auto" });
     };
   }, [isOpen, onClose]);
 
