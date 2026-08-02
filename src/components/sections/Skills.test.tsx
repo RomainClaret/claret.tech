@@ -167,26 +167,42 @@ vi.mock("@/data/portfolio", () => ({
       subtitle: "My approach to advancing artificial intelligence",
     },
     researchInterests: {
-      "Current Focus": [
-        "Neuroevolution algorithms",
-        "Lifelong learning systems",
-        "Embodied AI research",
-      ],
-      "Why Evolution": [
-        "Natural optimization principles",
-        "Adaptive system design",
-        "Emergent intelligence",
-      ],
-      "My Approach": [
-        "Open-source development",
-        "Reproducible research",
-        "Practical applications",
-      ],
-      Seeking: [
-        "Industry collaborations",
-        "Research partnerships",
-        "PhD opportunities",
-      ],
+      "Current Focus": {
+        description: "Short framing for current focus.",
+        expandedDescription: "Longer framing for current focus.",
+        bullets: [
+          "Neuroevolution algorithms",
+          "Lifelong learning systems",
+          "Embodied AI research",
+        ],
+      },
+      "Why Evolution": {
+        description: "Short framing for why evolution.",
+        expandedDescription: "Longer framing for why evolution.",
+        bullets: [
+          "Natural optimization principles",
+          "Adaptive system design",
+          "Emergent intelligence",
+        ],
+      },
+      "My Approach": {
+        description: "Short framing for my approach.",
+        expandedDescription: "Longer framing for my approach.",
+        bullets: [
+          "Open-source development",
+          "Reproducible research",
+          "Practical applications",
+        ],
+      },
+      Seeking: {
+        description: "Short framing for seeking.",
+        expandedDescription: "Longer framing for seeking.",
+        bullets: [
+          "Industry collaborations",
+          "Research partnerships",
+          "PhD opportunities",
+        ],
+      },
     },
     languages: [
       { name: "English", proficiency: 95 },
@@ -336,7 +352,8 @@ describe("Skills Component", () => {
       render(<Skills />);
 
       const readMoreButtons = screen.getAllByText("Read more");
-      expect(readMoreButtons).toHaveLength(3);
+      // 3 core activities + 4 research philosophy panels.
+      expect(readMoreButtons).toHaveLength(7);
     });
 
     it("expands activity description when read more is clicked", () => {
@@ -369,7 +386,8 @@ describe("Skills Component", () => {
           /This includes genetic algorithms, evolution strategies/,
         ),
       ).not.toBeInTheDocument();
-      expect(screen.getAllByText("Read more")).toHaveLength(3);
+      // Back to all 7 collapsed: 3 core activities + 4 philosophy panels.
+      expect(screen.getAllByText("Read more")).toHaveLength(7);
     });
 
     it("only expands one activity at a time", () => {
@@ -396,7 +414,8 @@ describe("Skills Component", () => {
       render(<Skills />);
 
       const chevronIcons = screen.getAllByTestId("chevron-down-icon");
-      expect(chevronIcons).toHaveLength(3);
+      // One per toggle: 3 core activities + 4 research philosophy panels.
+      expect(chevronIcons).toHaveLength(7);
 
       // Click to expand and check for rotation class
       const firstReadMore = screen.getAllByText("Read more")[0];
@@ -415,6 +434,62 @@ describe("Skills Component", () => {
       expect(screen.getByText("Why Evolution")).toBeInTheDocument();
       expect(screen.getByText("My Approach")).toBeInTheDocument();
       expect(screen.getByText("Seeking")).toBeInTheDocument();
+    });
+
+    it("frames each category with a description above its bullets", () => {
+      render(<Skills />);
+
+      // The bullets are fragments without this: "Measuring it honestly" under
+      // a bare "Current Focus" heading leaves the reader no referent for "it".
+      expect(
+        screen.getByText("Short framing for current focus."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Short framing for why evolution."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Short framing for my approach."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Short framing for seeking."),
+      ).toBeInTheDocument();
+    });
+
+    it("expands a category description without hiding its bullets", () => {
+      render(<Skills />);
+
+      // The philosophy toggles follow the 3 core activity ones in the DOM.
+      fireEvent.click(screen.getAllByText("Read more")[3]);
+
+      expect(
+        screen.getByText("Longer framing for current focus."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Short framing for current focus."),
+      ).not.toBeInTheDocument();
+      // Bullets stay put; only the paragraph swaps.
+      expect(screen.getByText("Neuroevolution algorithms")).toBeInTheDocument();
+    });
+
+    it("keeps category panels independent from the core activity cards", () => {
+      render(<Skills />);
+
+      fireEvent.click(screen.getAllByText("Read more")[0]); // a core activity
+      // The list re-indexes once the first toggle flips to "Show less", so
+      // this lands on the first philosophy panel. The assertions below pin
+      // down which element was actually hit.
+      fireEvent.click(screen.getAllByText("Read more")[2]);
+
+      // Expanding a panel must not collapse the activity: they are separate
+      // pieces of state, so both stay open.
+      expect(
+        screen.getByText(
+          /This includes genetic algorithms, evolution strategies/,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Longer framing for current focus."),
+      ).toBeInTheDocument();
     });
 
     it("renders research interest items for each category", () => {

@@ -48,6 +48,11 @@ export function useScrollSection() {
     return Math.min(100, Math.max(0, progress));
   }, []);
 
+  // Which of SECTIONS are actually in the document. The static list is the
+  // homepage's layout; on a route like /pdf/<slug> none of them exist, and
+  // consumers that render section controls need to be able to tell.
+  const [presentSections, setPresentSections] = useState<string[]>([]);
+
   const detectCurrentSection = useCallback(() => {
     const scrollPosition = window.scrollY + 64; // Offset for header (h-16 = 64px)
     const windowHeight = window.innerHeight;
@@ -77,6 +82,10 @@ export function useScrollSection() {
 
     // Calculate scroll progress
     const scrollProgress = calculateScrollProgress();
+
+    setPresentSections(
+      SECTIONS.filter((id) => document.getElementById(id) !== null),
+    );
 
     setState({
       currentSection: currentSectionId,
@@ -152,6 +161,6 @@ export function useScrollSection() {
     scrollToNext,
     scrollToTop,
     scrollToLatest,
-    sections: SECTIONS,
+    sections: presentSections,
   };
 }

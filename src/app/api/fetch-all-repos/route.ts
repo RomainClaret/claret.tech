@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { logError } from "@/lib/utils/dev-logger";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
+import { mayForceRefresh } from "@/lib/utils/refresh-key";
 
 // Simple in-memory cache
 let cache: {
@@ -165,9 +166,13 @@ async function fetchAllRepositories(
 
 async function handler(request: NextRequest) {
   try {
-    // Extract query parameters
-    const searchParams = request.nextUrl.searchParams;
-    const forceFresh = searchParams.get("fresh") === "true";
+    // ?fresh alone is not enough. Every forced refresh costs one authenticated
+    // GitHub GraphQL call per 100 repositories against the owner's token, and
+    // it bypasses both this cache and the CDN, so an anonymous caller could
+    // drain the quota by repeating the request.
+    const forceFresh =
+      request.nextUrl.searchParams.get("fresh") === "true" &&
+      mayForceRefresh(request);
 
     // Check cache first
     if (!forceFresh && cache && Date.now() - cache.timestamp < CACHE_TTL) {

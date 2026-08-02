@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { isSafePdfUrl } from "@/lib/utils/safe-pdf-url";
+import { findPdfRouteByUrl } from "@/lib/pdf-registry";
 
 // Re-exported so existing consumers/tests keep their import path; the
 // implementation lives in utils so the lazy pdf-viewer chunk can import it
@@ -11,6 +12,14 @@ interface PDFViewerState {
   pdfUrl: string;
   title?: string;
   downloadFileName?: string;
+  /**
+   * The document's own /pdf/<slug> page, when it has one. Resolved here rather
+   * than at each call site: this hook already receives the URL, and it is page
+   * bundled, so it can reach the registry that the lazily loaded reader
+   * deliberately cannot. Undefined for a PDF with no route, e.g. one fetched
+   * from an external API, and the reader hides its share control then.
+   */
+  shareSlug?: string;
 }
 
 export function usePDFViewer() {
@@ -37,6 +46,7 @@ export function usePDFViewer() {
         pdfUrl: cleanUrl,
         title,
         downloadFileName,
+        shareSlug: findPdfRouteByUrl(cleanUrl)?.slug,
       });
     },
     [],

@@ -10,11 +10,10 @@ import {
   Share2,
   Eye,
   ChevronDown,
-  Link2,
-  Check,
 } from "lucide-react";
 import Image from "next/image";
 import { HolographicCard } from "@/components/ui/holographic-card";
+import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -135,21 +134,11 @@ export function BlogCardHolographic({
 }: BlogCardHolographicProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
 
   // Arriving via a deep link opens the full description.
   useEffect(() => {
     if (isDeepLinked) setIsExpanded(true);
   }, [isDeepLinked]);
-
-  const handleCopyLink = async () => {
-    if (!anchorId) return;
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/#${anchorId}`,
-    );
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
 
   // Determine color based on category or use provided color
   const category = detectBlogCategory(title, description);
@@ -265,18 +254,10 @@ export function BlogCardHolographic({
               </div>
             </div>
             {anchorId && (
-              <button
-                onClick={handleCopyLink}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
-                title="Copy link to this post"
-                aria-label="Copy link to this post"
-              >
-                {linkCopied ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Link2 className="w-4 h-4" />
-                )}
-              </button>
+              <CopyLinkButton
+                anchorId={anchorId}
+                label="Copy link to this post"
+              />
             )}
           </div>
 

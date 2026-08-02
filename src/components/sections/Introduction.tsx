@@ -37,8 +37,15 @@ const PDFModal = dynamic(
 
 export function Introduction() {
   const shouldReduceAnimations = useShouldReduceAnimations();
-  const { isOpen, pdfUrl, title, downloadFileName, openPDF, closePDF } =
-    usePDFViewer();
+  const {
+    isOpen,
+    pdfUrl,
+    title,
+    downloadFileName,
+    shareSlug,
+    openPDF,
+    closePDF,
+  } = usePDFViewer();
   const [sectionRef, isVisible] = useIntersectionObserver({
     threshold: 0.3,
   });
@@ -70,8 +77,11 @@ export function Introduction() {
   }, [generateBackgroundData]);
 
   const handleResumeClick = () => {
+    // greeting.resumeLink rather than the path spelled out again: pdf-registry
+    // builds the /pdf/cv route from that same field, and the reader resolves
+    // its share link by matching the URL, so the two have to be one string.
     openPDF(
-      "/pdfs/RomainClaret_CV.pdf",
+      greeting.resumeLink,
       "Resume - Romain Claret",
       "Romain_Claret_Resume.pdf",
     );
@@ -140,6 +150,7 @@ export function Introduction() {
         pdfUrl={pdfUrl}
         title={title}
         downloadFileName={downloadFileName}
+        shareSlug={shareSlug}
         onClose={closePDF}
       />
     </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
@@ -31,6 +31,7 @@ const getInterestColor = (interestName: string): string => {
   const colorMap: { [key: string]: string } = {
     "Artificial Life": "34, 197, 94", // Green
     "Bio-Inspired": "34, 197, 94", // Green
+    "Emergent Behavior": "34, 197, 94", // Green, matches the research card
     Neuroevolution: "139, 92, 246", // Purple
     "Evolutionary Computation": "139, 92, 246", // Purple
     "Open-Endedness": "59, 130, 246", // Blue
@@ -67,6 +68,62 @@ const findNearestBrainNode = (
 };
 
 // Calculate orbital positions for desktop (around the animation)
+/**
+ * Horizontal fit budget.
+ *
+ * The constellation is drawn inside one column of the hero grid, and its SVG
+ * is deliberately unclipped, so anything wider than the column bleeds over the
+ * text panel next to it. These bound the circle to the space it actually has.
+ */
+const FIT = {
+  /** Breathing room kept between the widest label and the column edge. */
+  edgeMargin: 8,
+  /** Gap from orb to label when there is room for it. Was a fixed 60. */
+  baseLabelDistance: 60,
+  minLabelDistance: 24,
+  /** Below this the circle stops reading as a circle; shrink the font instead. */
+  minRadius: 70,
+  /**
+   * Share of the leftover space spent on the orb-to-label gap rather than on
+   * the radius. Tuned so a ~570px column keeps a radius near 120 rather than
+   * collapsing to ~107, which is what holding the gap at 60 would force.
+   */
+  labelDistanceShare: 0.28,
+  /**
+   * Font size used only to rank label widths against each other. The real
+   * per-label size is computed later from its distance to the center.
+   */
+  referenceFontSize: 15,
+} as const;
+
+const clamp = (min: number, value: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+/**
+ * Which edge of the circle a slot's label sits on.
+ *
+ * This matters for horizontal fit, not just for looks. A "top" or "bottom"
+ * label is centered on its orb, so it reaches only HALF its width to each
+ * side. A "left" or "right" label is anchored at the orb and reaches its FULL
+ * width outward. Putting the longest name on a side slot is therefore the
+ * worst case, and is exactly what pushed "Emergent Behavior" over the hero
+ * text panel when a sixth interest was added.
+ */
+const getSlotSide = (angle: number): "top" | "right" | "bottom" | "left" => {
+  const normalizedAngle = (angle + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+
+  if (normalizedAngle > Math.PI * 0.25 && normalizedAngle < Math.PI * 0.75) {
+    return "right";
+  }
+  if (normalizedAngle >= Math.PI * 0.75 && normalizedAngle <= Math.PI * 1.25) {
+    return "bottom";
+  }
+  if (normalizedAngle > Math.PI * 1.25 && normalizedAngle < Math.PI * 1.75) {
+    return "left";
+  }
+  return "top";
+};
+
 const getDesktopPosition = (
   index: number,
   total: number,
@@ -101,11 +158,6 @@ const getDesktopPosition = (
     // Check if this is close to top position (first node, around -90 degrees)
     if (index === 0) {
       angle += angleOffset; // Shift top node 1° clockwise
-    }
-
-    // Check if this is close to bottom position (for 6 nodes, it's index 3)
-    if (total === 6 && index === 3) {
-      angle += angleOffset; // Shift bottom node 1° clockwise
     }
   }
 
@@ -232,62 +284,30 @@ const getLabelPosition = (
   orbX: number,
   orbY: number,
   angle: number,
-  _containerScale: number = 1,
+  baseLabelDistance: number = 60,
 ) => {
   // Responsive label distance based on container size and position
   // Reduce distance for nodes closer to edges
   const distanceFromCenter = Math.sqrt(orbX * orbX + orbY * orbY);
   const edgeFactor = Math.min(1, (250 - distanceFromCenter) / 100); // Reduce near edges
-  const baseLabelDistance = 60;
   const labelDistance = baseLabelDistance * Math.max(0.7, edgeFactor);
-  const normalizedAngle = (angle + Math.PI / 2) % (2 * Math.PI);
+  const side = getSlotSide(angle);
 
-  // Determine text anchor and position based on angle
-  let textAnchor = "middle";
-  let dx = 0;
-  let dy = 0;
-  let position = "top"; // Track position for hit area calculation
+  // Anchor and offset follow directly from which edge the label sits on.
+  const bySide = {
+    right: { textAnchor: "start", dx: labelDistance, dy: 0 },
+    bottom: { textAnchor: "middle", dx: 0, dy: labelDistance },
+    left: { textAnchor: "end", dx: -labelDistance, dy: 0 },
+    top: { textAnchor: "middle", dx: 0, dy: -labelDistance },
+  } as const;
 
-  // Right side (3 o'clock ± 45°)
-  if (normalizedAngle > Math.PI * 0.25 && normalizedAngle < Math.PI * 0.75) {
-    textAnchor = "start";
-    dx = labelDistance;
-    dy = 0;
-    position = "right";
-  }
-  // Bottom (6 o'clock ± 45°)
-  else if (
-    normalizedAngle >= Math.PI * 0.75 &&
-    normalizedAngle <= Math.PI * 1.25
-  ) {
-    textAnchor = "middle";
-    dx = 0;
-    dy = labelDistance;
-    position = "bottom";
-  }
-  // Left side (9 o'clock ± 45°)
-  else if (
-    normalizedAngle > Math.PI * 1.25 &&
-    normalizedAngle < Math.PI * 1.75
-  ) {
-    textAnchor = "end";
-    dx = -labelDistance;
-    dy = 0;
-    position = "left";
-  }
-  // Top (12 o'clock ± 45°)
-  else {
-    textAnchor = "middle";
-    dx = 0;
-    dy = -labelDistance;
-    position = "top";
-  }
+  const { textAnchor, dx, dy } = bySide[side];
 
   return {
     x: orbX + dx,
     y: orbY + dy,
     textAnchor,
-    position,
+    position: side,
   };
 };
 
@@ -306,11 +326,13 @@ export function InterestConstellation({
       ? "tablet"
       : "desktop",
   );
-  const [containerSize, setContainerSize] = useState({
-    width: 1000,
-    height: 1000,
-  });
+  // null means "not measured yet", which is deliberately distinct from a
+  // measurement of zero. The previous code stored a plain number and later did
+  // `containerSize.width || 1000`, so a genuine 0 was silently rewritten to
+  // 1000 and the layout was computed from a made-up width forever after.
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const { areAnimationsPlaying } = useAnimationState();
 
@@ -320,6 +342,32 @@ export function InterestConstellation({
   useEffect(() => {
     setIsHydrated(true);
 
+    /**
+     * Measure the component's own root, which carries `w-full`.
+     *
+     * The div holding the SVG cannot be measured: its only child is absolutely
+     * positioned, and absolutely positioned children never contribute to an
+     * ancestor's auto size, so it reports width 0. Walking up to find a
+     * non-zero ancestor was tried and is unreliable, because before first
+     * layout every ancestor can still be 0 and the walk then finds nothing to
+     * observe. An explicit `width: 100%` on our own root always resolves
+     * against the parent, even as a flex item, so there is a stable target.
+     */
+    let rafId = 0;
+    const measure = () => {
+      const width = rootRef.current?.getBoundingClientRect().width ?? 0;
+      if (width > 0) setContainerWidth(width);
+    };
+
+    // The resize event can arrive before the grid has reflowed to the new
+    // breakpoint, in which case measuring immediately reads the old column
+    // width and the layout stays stale until the next reload. Read on the
+    // following frame instead, once layout has settled.
+    const measureAfterLayout = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(measure);
+    };
+
     // Determine screen size for radius adjustment
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
@@ -328,56 +376,125 @@ export function InterestConstellation({
       } else {
         setScreenSize("tablet");
       }
-
-      // Update container size
-      if (svgContainerRef.current) {
-        const rect = svgContainerRef.current.getBoundingClientRect();
-        setContainerSize({ width: rect.width, height: rect.height });
-      }
+      measureAfterLayout();
     };
 
+    // Measure synchronously on mount so the first paint is already correct,
+    // then again next frame in case fonts or the grid settle late.
+    measure();
     handleResize();
     window.addEventListener("resize", handleResize);
 
     // Use ResizeObserver for more accurate container size tracking
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        setContainerSize({ width, height });
+        const width = entry.contentRect.width;
+        if (width > 0) setContainerWidth(width);
       }
     });
 
-    if (svgContainerRef.current) {
-      resizeObserver.observe(svgContainerRef.current);
+    if (rootRef.current) {
+      resizeObserver.observe(rootRef.current);
     }
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("resize", handleResize);
       resizeObserver.disconnect();
     };
   }, []);
 
+  /**
+   * Decide which interest goes in which slot, and how big the circle can be.
+   *
+   * Two things happen here, and they depend on each other. Slots on the left
+   * and right anchor their label at the orb and extend its full width outward;
+   * slots at the top and bottom center the label and extend only half. So the
+   * longest names go to the centered slots, and whatever is left on the sides
+   * then sets how much room the radius and the orb-to-label gap can have.
+   */
+  const layout = useMemo(() => {
+    const baseRadius = screenSize === "desktop" ? 150 : 120;
+    const items = interests ?? [];
+    const total = items.length;
+
+    if (total === 0) {
+      return {
+        interestForSlot: [] as number[],
+        radius: baseRadius,
+        labelDistance: FIT.baseLabelDistance,
+        halfWidth: 450,
+      };
+    }
+
+    // A slot's angle, and so which edge its label sits on, is fixed by the
+    // index and the count. Radius is irrelevant to the classification.
+    const centeredSlots: number[] = [];
+    const sideSlots: number[] = [];
+    for (let slot = 0; slot < total; slot++) {
+      const { angle } = getDesktopPosition(slot, total, 1, shouldUsePartialArc);
+      const side = getSlotSide(angle);
+      (side === "top" || side === "bottom" ? centeredSlots : sideSlots).push(
+        slot,
+      );
+    }
+
+    const widths = items.map(
+      (interest) =>
+        measureText(interest.interestName, FIT.referenceFontSize).width,
+    );
+    const widestFirst = widths
+      .map((width, index) => ({ width, index }))
+      .sort((a, b) => b.width - a.width);
+
+    // Longest names claim the centered slots, everything else goes to a side.
+    const interestForSlot: number[] = new Array(total);
+    let next = 0;
+    for (const slot of centeredSlots)
+      interestForSlot[slot] = widestFirst[next++].index;
+    for (const slot of sideSlots)
+      interestForSlot[slot] = widestFirst[next++].index;
+
+    const widestSideLabel = sideSlots.reduce(
+      (max, slot) => Math.max(max, widths[interestForSlot[slot]]),
+      0,
+    );
+
+    // Before the first measurement, keep the geometry the site already ships
+    // rather than guessing a width. The measurement lands on the first frame.
+    if (containerWidth === null) {
+      return {
+        interestForSlot,
+        radius: baseRadius,
+        labelDistance: FIT.baseLabelDistance,
+        halfWidth: 450,
+      };
+    }
+
+    const halfWidth = containerWidth / 2 - FIT.edgeMargin;
+    // What is left for the circle itself once the widest side label is paid for.
+    const available = halfWidth - widestSideLabel;
+    const labelDistance = clamp(
+      FIT.minLabelDistance,
+      available * FIT.labelDistanceShare,
+      FIT.baseLabelDistance,
+    );
+    const radius = clamp(FIT.minRadius, available - labelDistance, baseRadius);
+
+    return { interestForSlot, radius, labelDistance, halfWidth };
+  }, [interests, screenSize, shouldUsePartialArc, containerWidth]);
+
   // Always render the container to prevent hydration mismatch
   if (!interests || interests.length === 0) {
-    return <div className={cn("relative", className)} />;
+    return <div ref={rootRef} className={cn("relative w-full", className)} />;
   }
 
-  // Calculate responsive values based on container size
-  const minDimension = Math.min(
-    containerSize.width || 1000,
-    containerSize.height || 1000,
-  );
-  const containerScale = minDimension / 1000; // Scale relative to base 1000px
-
-  // Use different radius for tablet vs desktop, adjusted for container size
-  const baseRadius = screenSize === "desktop" ? 150 : 120;
-  const orbitalRadius =
-    baseRadius * Math.max(0.8, Math.min(1.2, containerScale));
-
-  // Simple fixed viewBox for stability (unused but kept for future reference)
+  const orbitalRadius = layout.radius;
 
   return (
-    <div className={cn("relative", className)}>
+    // w-full is load bearing: it is what makes the root measurable. Without an
+    // explicit width this sits in a flex container as a zero-width item.
+    <div ref={rootRef} className={cn("relative w-full", className)}>
       {/* Desktop and Tablet: Orbital constellation */}
       <div
         ref={svgContainerRef}
@@ -423,9 +540,11 @@ export function InterestConstellation({
           </defs>
 
           {isHydrated &&
-            interests.map((interest, index) => {
+            layout.interestForSlot.map((interestIndex, slot) => {
+              const interest = interests[interestIndex];
+              const index = interestIndex;
               const position = getDesktopPosition(
-                index,
+                slot,
                 interests.length,
                 orbitalRadius,
                 shouldUsePartialArc,
@@ -436,7 +555,7 @@ export function InterestConstellation({
                 position.x,
                 position.y,
                 position.angle,
-                containerScale,
+                layout.labelDistance,
               );
 
               // Find nearest brain node for this interest
@@ -458,10 +577,14 @@ export function InterestConstellation({
               const edgeScale = 1 - edgeProximity * 0.3; // Reduce size by up to 30% at edges
               const baseFontSize = Math.max(14, Math.min(18, 18 * edgeScale));
 
-              // Conservative viewBox bounds for text
+              // Bound the text by the column the constellation actually sits
+              // in, not by the SVG's own 1000px canvas. Against ±450 this
+              // check could never fire: labels reach about ±300, so it was
+              // guarding a box far larger than the visible space and the
+              // shrink never ran when it was needed.
               const viewBoxBounds = {
-                minX: -450,
-                maxX: 450,
+                minX: -layout.halfWidth,
+                maxX: layout.halfWidth,
                 minY: -450,
                 maxY: 450,
               };

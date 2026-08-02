@@ -31,6 +31,12 @@ export function FloatingNav() {
   // Don't render if not visible yet
   if (!isVisible) return null;
 
+  // Nothing to navigate between on a page with no sections, e.g.
+  // /pdf/<slug>, where these controls would otherwise render live but
+  // do nothing. Gated on the sections themselves rather than the
+  // pathname, so it stays right if another route appears.
+  if (sections.length === 0) return null;
+
   const showHomeButton = isInitialized && !isAtTop;
   const showUpButton = isInitialized && !isAtTop;
   const showDownButton = isInitialized && currentIndex < sections.length - 1;

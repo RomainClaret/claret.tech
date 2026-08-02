@@ -36,6 +36,14 @@ import {
 describe("PerformanceMonitorContext", () => {
   let cleanup: () => void;
 
+  // Captured before any test replaces them. beforeEach assigns stubs straight
+  // onto window, and vi.restoreAllMocks does not undo a plain assignment, so
+  // without this they leak to every later file in the batch. mockReset then
+  // strips the stub's implementation, leaving addEventListener a no-op and
+  // silently breaking any later test that relies on a real listener firing.
+  const realAddEventListener = window.addEventListener;
+  const realRemoveEventListener = window.removeEventListener;
+
   beforeEach(() => {
     // Use comprehensive context testing environment
     const testSetup = setupContextTesting();
@@ -97,6 +105,8 @@ describe("PerformanceMonitorContext", () => {
 
   afterEach(() => {
     cleanup();
+    window.addEventListener = realAddEventListener;
+    window.removeEventListener = realRemoveEventListener;
   });
 
   const createWrapper = () => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import { HighContrastToggle } from "./high-contrast-toggle";
 import {
@@ -21,6 +22,8 @@ import { cn } from "@/lib/utils";
 import { useTerminal } from "@/lib/terminal/terminal-context";
 import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { useAnimationState } from "@/contexts/animation-state-context";
+import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
+import { scrollToSection } from "@/lib/utils/scroll-to-section";
 
 const navItems = [
   { href: "#home", label: "Home", icon: Home },
@@ -69,26 +72,46 @@ export function Navigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const pathname = usePathname();
+  const router = useRouter();
+  const isHomePage = pathname === "/";
+
+  // Land on the right section when the page is *entered* at a hash, e.g.
+  // /#research from the nav on /pdf/<slug>, from the sitemap, or from a shared
+  // link. Neither a client navigation nor a full load scrolls there on its
+  // own: the sections are far down a very tall page whose content keeps
+  // loading, and the splash locks scrolling while it runs, so whatever the
+  // browser does early is lost.
+  //
+  // useCardDeepLink already solves exactly this for cards, including a settle
+  // loop that re-aligns as content above shifts and a release on first user
+  // scroll. The section elements carry the ids it needs, so it is reused
+  // as-is. Its highlight return values are irrelevant here: nothing applies
+  // the pulse class to a section.
+  useCardDeepLink(navItems.map((item) => item.href.replace("#", "")));
+
+  /**
+   * Section anchors only exist on the homepage. Everywhere else (/pdf/<slug>)
+   * they have to point back at it, or the link is inert.
+   */
+  const navHref = (href: string) => (isHomePage ? href : `/${href}`);
+
   const handleNavClick = (
     e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>,
     href: string,
   ) => {
-    e.preventDefault();
     setIsMobileMenuOpen(false);
 
-    const targetId = href.replace("#", "");
-    const element = document.getElementById(targetId);
+    // Off the homepage there is nothing here to scroll to, so let the anchor
+    // navigate normally. Cancelling first and only then looking for a target
+    // is what made every nav item dead on /pdf/<slug>: the click was consumed
+    // and then dropped. Leaving the default alone also keeps middle-click and
+    // open-in-new-tab working.
+    if (!isHomePage) return;
 
-    if (element) {
-      const offset = 64; // Navigation height (h-16 = 64px)
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - offset;
+    e.preventDefault();
 
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth",
-      });
-    }
+    scrollToSection(href.replace("#", ""));
   };
 
   return (
@@ -106,7 +129,7 @@ export function Navigation() {
           {/* Terminal-style Logo */}
           <div className="flex items-center text-sm md:text-base font-mono">
             <Link
-              href="#home"
+              href={isHomePage ? "#home" : "/"}
               onClick={(e) => handleNavClick(e, "#home")}
               className="flex items-center transition-colors hover:opacity-80"
             >
@@ -138,7 +161,7 @@ export function Navigation() {
             {navItems.map((item) => (
               <a
                 key={item.href}
-                href={item.href}
+                href={navHref(item.href)}
                 onClick={(e) => handleNavClick(e, item.href)}
                 className={cn(
                   "relative text-sm font-medium transition-colors hover:text-primary",
@@ -231,7 +254,7 @@ export function Navigation() {
                         return (
                           <a
                             key={item.href}
-                            href={item.href}
+                            href={navHref(item.href)}
                             onClick={(e) => handleNavClick(e, item.href)}
                             className={cn(
                               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
@@ -293,6 +316,12 @@ export function Navigation() {
                   {/* Contact Button - Prominent CTA */}
                   <button
                     onClick={(e) => {
+                      // A button has no navigation of its own to fall back on.
+                      if (!isHomePage) {
+                        setIsMobileMenuOpen(false);
+                        router.push(navHref("#contact"));
+                        return;
+                      }
                       handleNavClick(e, "#contact");
                     }}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-lg font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"

@@ -1,6 +1,31 @@
 // RSS Feed Generator
 import { logError } from "@/lib/utils/dev-logger";
 
+/**
+ * Escape text for an XML element or attribute.
+ *
+ * The feed is built by interpolation from Medium's content, which this site
+ * does not control. Unescaped, a crafted title or link closes the element and
+ * injects markup into a document served as application/xml from this origin.
+ */
+function xmlEscape(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Text for a CDATA section. CDATA does not make content inert: a literal
+ * "]]>" inside it ends the section early and everything after is parsed as
+ * markup. Splitting it across two sections is the standard fix.
+ */
+function cdata(value: unknown): string {
+  return String(value ?? "").replace(/]]>/g, "]]]]><![CDATA[>");
+}
+
 export async function GET() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://claret.tech";
 
@@ -59,21 +84,24 @@ export async function GET() {
 
                 return `
     <item>
-      <title><![CDATA[${post.title}]]></title>
-      <description><![CDATA[${cleanContent}]]></description>
-      <link>${post.link}</link>
-      <guid isPermaLink="true">${post.guid || post.link}</guid>
+      <title><![CDATA[${cdata(post.title)}]]></title>
+      <description><![CDATA[${cdata(cleanContent)}]]></description>
+      <link>${xmlEscape(post.link)}</link>
+      <guid isPermaLink="true">${xmlEscape(post.guid || post.link)}</guid>
       <pubDate>${new Date(post.pubDate).toUTCString()}</pubDate>
-      <dc:creator><![CDATA[${post.author || "Romain Claret"}]]></dc:creator>
+      <dc:creator><![CDATA[${cdata(post.author || "Romain Claret")}]]></dc:creator>
       ${
         post.categories && post.categories.length > 0
           ? post.categories
-              .map((cat: string) => `<category><![CDATA[${cat}]]></category>`)
+              .map(
+                (cat: string) =>
+                  `<category><![CDATA[${cdata(cat)}]]></category>`,
+              )
               .join("\n      ")
           : ""
       }
-      ${imageUrl ? `<enclosure url="${imageUrl}" type="image/jpeg" />` : ""}
-      <content:encoded><![CDATA[${post.content || cleanContent}]]></content:encoded>
+      ${imageUrl ? `<enclosure url="${xmlEscape(imageUrl)}" type="image/jpeg" />` : ""}
+      <content:encoded><![CDATA[${cdata(post.content || cleanContent)}]]></content:encoded>
     </item>`;
               },
             )

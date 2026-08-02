@@ -15,6 +15,9 @@ import "@xterm/xterm/css/xterm.css";
 // Type imports for TypeScript
 import type { Terminal as XTermType } from "@xterm/xterm";
 import type { FitAddon as FitAddonType } from "@xterm/addon-fit";
+// Types only: the terminal must not pull in any interactive mode's
+// implementation, or the Python client would land in the terminal chunk.
+import type { LineMode, PromptMode } from "@/lib/terminal/line-mode";
 
 interface TerminalProps {
   isOpen: boolean;
@@ -49,6 +52,27 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
   const isMountedRef = useRef(true);
   const [isTerminalReady, setIsTerminalReady] = useState(false);
   const currentCommandAbortControllerRef = useRef<AbortController | null>(null);
+  // Which prompt to draw. Modelled as a mode rather than a cached string,
+  // because the shell prompt is derived from currentUserRef and login/logout
+  // change it at runtime.
+  const promptModeRef = useRef<PromptMode>({ kind: "shell" });
+  // Set while an interactive command (the Python REPL) owns the input line.
+  const lineModeRef = useRef<LineMode | null>(null);
+  // Distinguishes the current command run from an earlier, cancelled one.
+  // Without it, an aborted command's promise settles later and clears the
+  // running flag out from under whatever is running by then.
+  const commandSeqRef = useRef(0);
+  // Set when the terminal closes: any late write from a settling Python run
+  // must not reach the disposed xterm.
+  const outputSinkDetachedRef = useRef(false);
+  // Distinguishes REPL submissions the same way commandSeqRef does for shell
+  // commands. Ctrl+C redraws the prompt itself, so the interrupted run's
+  // .finally() must not redraw a second one.
+  const replSeqRef = useRef(0);
+  // The half-typed line set aside when the user starts scrolling back through
+  // history, restored on the way past the newest entry. readline does this;
+  // without it, arrowing up and back down silently discards what you typed.
+  const replDraftRef = useRef("");
 
   // Terminal state from context
   const {
@@ -205,6 +229,36 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
       setIsLoading(true);
       setIsTerminalReady(false);
 
+      // The React component stays mounted across open/close, so any
+      // interactive mode has to be torn down explicitly. Without this,
+      // reopening shows a ">>> " prompt for a shell, and an in-flight write
+      // callback would target the disposed xterm below.
+      //
+      // Detaching the sink is what makes the ordering safe: shutdown() below
+      // runs a microtask later and rejects any in-flight run, whose handler
+      // writes an error message. By then xterm is disposed, so the write has
+      // to become a no-op rather than a throw.
+      outputSinkDetachedRef.current = true;
+      lineModeRef.current = null;
+      promptModeRef.current = { kind: "shell" };
+      inputBufferRef.current = "";
+      cursorPosRef.current = 0;
+      commandSeqRef.current++;
+      isCommandRunningRef.current = false;
+      currentCommandAbortControllerRef.current = null;
+
+      // Release the interpreter and its heap, which is hundreds of megabytes.
+      // Unconditional: it was previously gated on a REPL having been active,
+      // so closing after a one-shot `python -c` (or after exit()) leaked the
+      // whole interpreter until the idle timer happened to fire. The dynamic
+      // import is what keeps the client out of the bundle for a terminal that
+      // never ran Python; webpack resolves it from cache if it was loaded.
+      void import("@/lib/python/pyodide-client")
+        .then(({ pythonClient }) => pythonClient.shutdown())
+        .catch(() => {
+          /* never loaded, nothing to release */
+        });
+
       // Dispose of xterm if it exists
       if (xtermRef.current) {
         xtermRef.current.dispose();
@@ -317,7 +371,14 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           term.focus();
         }, 50);
 
+        outputSinkDetachedRef.current = false;
+
         const writePrompt = () => {
+          const mode = promptModeRef.current;
+          if (mode.kind === "custom") {
+            term.write(mode.text);
+            return;
+          }
           const promptSymbol = currentUserRef.current === "guest" ? "%" : "$";
           const prompt = `\x1b[32m${currentUserRef.current}@Claret.Tech\x1b[0m ${promptSymbol} `;
           term.write(prompt);
@@ -325,8 +386,12 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
         // Helper functions for line wrapping
 
-        // Calculate the visual length of the prompt (without escape codes)
+        // Calculate the visual length of the prompt (without escape codes).
+        // Every cursor calculation on the line depends on this matching what
+        // writePrompt actually drew, so both read the same mode.
         const getPromptLength = () => {
+          const mode = promptModeRef.current;
+          if (mode.kind === "custom") return mode.length;
           const promptSymbol = currentUserRef.current === "guest" ? "%" : "$";
           return `${currentUserRef.current}@Claret.Tech ${promptSymbol} `
             .length;
@@ -441,7 +506,15 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
         // Clear all input content from current position
         const clearWrappedInput = (term: XTermType, text: string) => {
-          if (!text) return;
+          if (!text) {
+            // Still wipe the current row rather than returning. Every caller
+            // follows this with writePrompt(), so bailing out here leaves the
+            // existing prompt on screen and the caller draws a second one
+            // beside it: ">>> >>> ". That desyncs the line editor, which
+            // measures one prompt while two are drawn.
+            term.write("\r" + " ".repeat(term.cols) + "\r");
+            return;
+          }
 
           // Calculate where our input starts (beginning of prompt line)
           const currentPos = bufferPosToRowCol(
@@ -483,6 +556,47 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
             permanentInputBackup = inputBufferRef.current;
             permanentCursorBackup = cursorPosRef.current;
           }
+        };
+
+        // Forget the saved line outright.
+        //
+        // updatePermanentBackup cannot do this job at submit time: it is gated
+        // on !isCommandRunningRef, and that flag is already true by the time a
+        // dispatched command clears the buffer. The backup would keep the text
+        // that was just executed, and the next window resize would restore it
+        // into an empty prompt, so the following keystrokes get appended to a
+        // command that already ran.
+        const clearPermanentBackup = () => {
+          permanentInputBackup = "";
+          permanentCursorBackup = 0;
+        };
+
+        // Replace the input line with an entry from an interactive mode's
+        // history. Index history.length means "past the newest", i.e. the
+        // empty line the user was typing before they started scrolling back.
+        const recallFromLineMode = (mode: LineMode, direction: -1 | 1) => {
+          const next = mode.historyIndex.current + direction;
+          if (next < 0 || next > mode.history.length) return;
+
+          // Leaving the live line: remember it so Down-arrow can bring it back.
+          if (mode.historyIndex.current === mode.history.length) {
+            replDraftRef.current = inputBufferRef.current;
+          }
+
+          const oldText = inputBufferRef.current;
+          // Reads cursorPosRef, so it has to run before the buffer changes.
+          clearWrappedInput(term, oldText);
+
+          mode.historyIndex.current = next;
+          inputBufferRef.current =
+            next === mode.history.length
+              ? replDraftRef.current
+              : mode.history[next];
+          cursorPosRef.current = inputBufferRef.current.length;
+          updatePermanentBackup();
+
+          writePrompt();
+          writeWrappedInput(term, inputBufferRef.current);
         };
 
         const handleResize = () => {
@@ -564,36 +678,110 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
         // Handle keyboard input
         const onData = term.onData((data) => {
+          // A paste arrives as one chunk. In an interactive mode it may span
+          // several lines, and the branches below key off the FIRST character,
+          // so a multi-line paste would otherwise be spliced into the buffer
+          // with its newlines intact and rejected by codeop as "multiple
+          // statements", while a paste starting with a newline matched no
+          // branch at all and vanished. Replay it a line at a time instead.
+          if (lineModeRef.current && data.length > 1 && /[\r\n]/.test(data)) {
+            const mode = lineModeRef.current;
+            const lines = data.replace(/\r\n?/g, "\n").split("\n");
+
+            // Serialized, not a plain loop: each submitted line is an async
+            // round trip to the worker, and keystrokes are deliberately
+            // discarded while one is in flight. Feeding them all synchronously
+            // means every line after the first is dropped.
+            void (async () => {
+              for (let index = 0; index < lines.length; index++) {
+                while (mode.busy.current) {
+                  await new Promise((resolve) => setTimeout(resolve, 10));
+                }
+                // The user may have left the REPL while the paste was replaying.
+                if (lineModeRef.current !== mode) return;
+
+                // Feed the text, then the Enter that submits it. The final
+                // fragment has no trailing newline, so it is left in the buffer
+                // for the user to finish or submit themselves.
+                if (lines[index]) handleData(lines[index]);
+                if (index < lines.length - 1) handleData("\r");
+              }
+            })();
+            return;
+          }
+          handleData(data);
+        });
+
+        function handleData(data: string) {
           const code = data.charCodeAt(0);
 
           // Handle Ctrl+C - always allow cancellation
           if (code === 3) {
-            if (isCommandRunningRef.current) {
-              // Cancel running command
-              if (currentCommandAbortControllerRef.current) {
-                currentCommandAbortControllerRef.current.abort();
-                term.write("^C\r\n");
-                term.writeln("Command canceled by user");
-                term.writeln("");
-                writePrompt();
-                isCommandRunningRef.current = false;
-                currentCommandAbortControllerRef.current = null;
-                return;
-              }
-            } else {
-              // Cancel current input
+            // An interactive mode owns the interrupt: only it knows whether
+            // this abandons a half-typed block or kills a running statement.
+            if (lineModeRef.current) {
+              const mode = lineModeRef.current;
               inputBufferRef.current = "";
               cursorPosRef.current = 0;
               updatePermanentBackup();
-              historyIndexRef.current = commandHistoryRef.current.length;
-              term.write("^C\r\n");
+              mode.historyIndex.current = mode.history.length;
+              term.write("\r\n");
+              // Claim the redraw before onInterrupt() rejects the in-flight
+              // run: its .finally() would otherwise draw a second prompt on
+              // the same row, leaving 8 columns drawn where getPromptLength()
+              // reports 4 and desyncing every later cursor calculation.
+              replSeqRef.current++;
+              mode.onInterrupt();
+              promptModeRef.current = { kind: "custom", ...mode.prompt() };
               writePrompt();
               return;
             }
+
+            if (isCommandRunningRef.current) {
+              // Cancel running command
+              commandSeqRef.current++;
+              if (currentCommandAbortControllerRef.current) {
+                currentCommandAbortControllerRef.current.abort();
+              }
+              term.write("^C\r\n");
+              term.writeln("Command canceled by user");
+              term.writeln("");
+              writePrompt();
+              isCommandRunningRef.current = false;
+              currentCommandAbortControllerRef.current = null;
+              // Same reason as the Enter path: the flag was still set when the
+              // buffer was cleared, so the backup has to be dropped explicitly.
+              clearPermanentBackup();
+              return;
+            }
+
+            // Cancel current input
+            inputBufferRef.current = "";
+            cursorPosRef.current = 0;
+            updatePermanentBackup();
+            historyIndexRef.current = commandHistoryRef.current.length;
+            term.write("^C\r\n");
+            writePrompt();
+            return;
           }
 
+          // Discard input while an interactive mode is busy with a statement.
+          // This is deliberately not isCommandRunningRef: that flag also gates
+          // updatePermanentBackup, so holding it for a whole REPL session would
+          // silently break input restoration on window resize.
+          if (lineModeRef.current?.busy.current) return;
+
           // Don't process other input while a command is running
-          if (isCommandRunningRef.current) return;
+          if (!lineModeRef.current && isCommandRunningRef.current) return;
+
+          // Ctrl+D - end of input. Only meaningful to an interactive mode; in
+          // the shell it is ignored rather than silently closing the terminal.
+          if (code === 4) {
+            if (lineModeRef.current && inputBufferRef.current === "") {
+              lineModeRef.current.onEof();
+            }
+            return;
+          }
 
           // Handle special keys
           if (code === 1) {
@@ -601,11 +789,10 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
             if (cursorPosRef.current > 0) {
               cursorPosRef.current = 0;
               updatePermanentBackup();
-              // Calculate prompt length: "user@Claret.Tech $ " or "user@Claret.Tech % "
-              const promptSymbol =
-                currentUserRef.current === "guest" ? "%" : "$";
-              const promptText = `${currentUserRef.current}@Claret.Tech ${promptSymbol} `;
-              const promptLength = promptText.length;
+              // Must come from getPromptLength, not a second inline copy of the
+              // shell prompt: at a 4-column ">>> " prompt the hardcoded version
+              // would jump 16 columns into the user's own text.
+              const promptLength = getPromptLength();
               // Move cursor to right after the prompt
               term.write(`\r\x1b[${promptLength}C`);
             }
@@ -622,6 +809,39 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           } else if (code === 13) {
             // Enter
             term.write("\r\n");
+
+            // An interactive mode takes the raw line: leading whitespace is
+            // significant in Python, so it must not be trimmed away.
+            if (lineModeRef.current) {
+              const mode = lineModeRef.current;
+              const line = inputBufferRef.current;
+              inputBufferRef.current = "";
+              cursorPosRef.current = 0;
+              updatePermanentBackup();
+
+              mode.busy.current = true;
+              const seq = ++replSeqRef.current;
+              void mode
+                .onLine(line)
+                .catch((error: Error) => {
+                  term.writeln(`Error: ${error.message}`);
+                })
+                .finally(() => {
+                  mode.busy.current = false;
+                  // Exiting swaps the prompt back to the shell and prints its
+                  // own prompt, so only redraw while the mode is still live.
+                  if (lineModeRef.current !== mode) return;
+                  // Ctrl+C already redrew the prompt for this run. Redrawing
+                  // again would put two on one row.
+                  if (replSeqRef.current !== seq) return;
+                  // Re-read the prompt: an unfinished block switches it to the
+                  // continuation form, and the wrap math needs the new width.
+                  promptModeRef.current = { kind: "custom", ...mode.prompt() };
+                  writePrompt();
+                });
+              return;
+            }
+
             const command = inputBufferRef.current.trim();
 
             if (command) {
@@ -634,10 +854,18 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               // Create abort controller for this command
               const abortController = new AbortController();
               currentCommandAbortControllerRef.current = abortController;
+              // Claim this run. A cancelled command's promise still settles
+              // later, and without this check it would clear the running flag
+              // belonging to whatever started in the meantime.
+              const seq = ++commandSeqRef.current;
+              const isCurrentRun = () => commandSeqRef.current === seq;
 
               executeCommand(command, {
                 currentDirectory: currentDirectoryRef.current,
-                currentUser,
+                // Read through the ref: the effect that built this closure only
+                // reruns on open, so the captured state value goes stale as
+                // soon as someone logs in.
+                currentUser: currentUserRef.current,
                 setCurrentDirectory: stableSetCurrentDirectory,
                 setCurrentUser,
                 addToHistory: (line: string) =>
@@ -646,16 +874,42 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                 closeTerminal: () => onClose(),
                 terminalCols: term.cols,
                 terminalRows: term.rows,
-                writer: (text: string) => term.write(text),
+                writer: (text: string) => {
+                  if (outputSinkDetachedRef.current) return;
+                  term.write(text);
+                },
                 abortController,
+                enterLineMode: (mode) => {
+                  lineModeRef.current = mode;
+                  promptModeRef.current = { kind: "custom", ...mode.prompt() };
+                  // The REPL owns interrupts from here, so the shell's abort
+                  // controller must not keep claiming Ctrl+C.
+                  currentCommandAbortControllerRef.current = null;
+                  isCommandRunningRef.current = false;
+                  inputBufferRef.current = "";
+                  cursorPosRef.current = 0;
+                  // Drawn here rather than in the result handler, which is
+                  // suppressed precisely so it does not add a second prompt.
+                  writePrompt();
+                },
+                exitLineMode: () => {
+                  lineModeRef.current = null;
+                  promptModeRef.current = { kind: "shell" };
+                  inputBufferRef.current = "";
+                  cursorPosRef.current = 0;
+                  writePrompt();
+                },
               })
                 .then((result) => {
+                  if (!isCurrentRun()) return;
                   // Only process result if command wasn't aborted
                   if (!abortController.signal.aborted) {
                     if (result.output) {
                       term.writeln(result.output);
                     }
-                    if (command === "clear") {
+                    if (result.suppressPrompt) {
+                      // The command already drew its own prompt.
+                    } else if (command === "clear") {
                       // Write prompt immediately after clear
                       writePrompt();
                     } else if (command !== "exit") {
@@ -667,6 +921,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                   currentCommandAbortControllerRef.current = null;
                 })
                 .catch((error) => {
+                  if (!isCurrentRun()) return;
                   // Handle command execution errors
                   if (!abortController.signal.aborted) {
                     term.writeln(`Command error: ${error.message}`);
@@ -682,7 +937,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
             inputBufferRef.current = "";
             cursorPosRef.current = 0;
-            updatePermanentBackup();
+            clearPermanentBackup();
           } else if (code === 127) {
             // Backspace
             if (cursorPosRef.current > 0) {
@@ -745,6 +1000,55 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               }
             }
           } else if (code === 9) {
+            // Tab indents inside an interactive mode. Shell completion here
+            // would be actively harmful: it replaces the whole buffer when the
+            // input contains no space, so it would eat a Python line. Tab is
+            // also the only way to indent a block body in raw mode.
+            if (lineModeRef.current) {
+              const indent = "    ";
+              const oldText = inputBufferRef.current;
+              const pos = cursorPosRef.current;
+
+              // Full re-render rather than an in-place write: correct wherever
+              // the cursor sits, and Tab is rare enough that the extra redraw
+              // costs nothing. clearWrappedInput reads cursorPosRef, so it has
+              // to run before the position is updated, and it returns early on
+              // an empty buffer, which would leave the existing prompt on
+              // screen and have writePrompt draw a second one beside it.
+              clearWrappedInput(term, oldText);
+
+              inputBufferRef.current =
+                oldText.slice(0, pos) + indent + oldText.slice(pos);
+              cursorPosRef.current = pos + indent.length;
+              updatePermanentBackup();
+
+              writePrompt();
+              writeWrappedInput(term, inputBufferRef.current);
+
+              // Put the cursor back where it belongs when indenting mid-line.
+              if (cursorPosRef.current < inputBufferRef.current.length) {
+                const targetPos = bufferPosToRowCol(
+                  cursorPosRef.current,
+                  inputBufferRef.current,
+                  term.cols,
+                );
+                const endPos = bufferPosToRowCol(
+                  inputBufferRef.current.length,
+                  inputBufferRef.current,
+                  term.cols,
+                );
+                if (endPos.row > targetPos.row) {
+                  term.write(`\x1b[${endPos.row - targetPos.row}A`);
+                }
+                if (endPos.col > targetPos.col) {
+                  term.write(`\x1b[${endPos.col - targetPos.col}D`);
+                } else if (endPos.col < targetPos.col) {
+                  term.write(`\x1b[${targetPos.col - endPos.col}C`);
+                }
+              }
+              return;
+            }
+
             // Tab - autocomplete
             const completions = getCompletions(inputBufferRef.current, {
               currentDirectory: currentDirectoryRef.current,
@@ -789,6 +1093,15 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               writeWrappedInput(term, inputBufferRef.current);
             }
           } else if (data === "\x1b[A") {
+            // In an interactive mode the arrows walk that mode's own history
+            // unconditionally, which is what readline does and what anyone at a
+            // Python prompt expects. Sharing the shell's history ring would
+            // also mean a later shell Up-arrow replays "for i in range(3):"
+            // straight into the command dispatcher.
+            if (lineModeRef.current) {
+              recallFromLineMode(lineModeRef.current, -1);
+              return;
+            }
             // Up arrow - history if empty, otherwise navigate in wrapped text
             if (inputBufferRef.current === "") {
               // Navigate history when input is empty
@@ -869,6 +1182,10 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               }
             }
           } else if (data === "\x1b[B") {
+            if (lineModeRef.current) {
+              recallFromLineMode(lineModeRef.current, 1);
+              return;
+            }
             // Down arrow - history if empty, otherwise navigate in wrapped text
             if (inputBufferRef.current === "") {
               // Navigate history when input is empty
@@ -1157,7 +1474,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               }
             }
           }
-        });
+        }
 
         if (isMountedRef.current) {
           setIsLoading(false);

@@ -17,6 +17,12 @@ export interface ResearchProject {
   color?: string;
   year?: string;
   expandedHighlightDescriptions?: string[];
+  /**
+   * Deep-link hash for this project, e.g. #geenns. Same idea as
+   * `Paper.anchorId` and `WorkExperience.anchorId`. Once a value is published,
+   * treat it as permanent: people share these.
+   */
+  anchorId?: string;
 }
 
 export const researchSection = {
@@ -29,9 +35,9 @@ export const researchSection = {
       "Every field I touched taught me the same lesson: minds have to grow. Engineering them top-down never worked for me.",
   },
   journeyDescription:
-    "Started by breaking toys to build robots. Then breaking computers to make them smarter. Learned to code to control them. Studied physics and mathematics to simulate their brains. Dove into electronics and micro mechanics to build better bodies. Mastered computer science to let them take action. Explored AI to make them intelligent. Every step revealed I was still missing something. The lifelong obsession led to one insight: stop trying to create robots. Let them evolve and emerge. Watch them surprise you. Now breeding neural networks that think compositionally, that can develop their own architectures, letting robots rise from accelerated artificial selection. Why not give them billions of simulated years to evolve if we can? Current mission: making evolution 100x-1000x faster so robots can finally think for themselves instead of executing our code. From childhood tinkerer to researcher, the mission hasn't changed. Just the approach. The journey from breaking toys to breeding minds taught me to create the conditions for intelligence to emerge; building it directly kept failing. And maybe the next kid breaking toys won't wait 30+ years for answers.",
+    "Started by breaking toys to build robots. Then breaking computers to make them smarter. Learned to code to control them. Studied physics and mathematics to simulate their brains. Dove into electronics and micro mechanics to build better bodies. Mastered computer science to let them take action. Explored AI to make them intelligent. Every step revealed I was still missing something. The lifelong obsession led to one insight: stop trying to create robots. Set the conditions, let them evolve, and pay attention to what shows up. Now breeding neural networks that think compositionally, that can develop their own architectures, letting robots rise from accelerated artificial selection. Why not give them billions of simulated years to evolve if we can? Current mission: making evolution 100x-1000x faster so robots can finally think for themselves instead of executing our code. From childhood tinkerer to researcher, the mission hasn't changed. Just the approach. The journey from breaking toys to breeding minds taught me to create the conditions for intelligence to emerge; building it directly kept failing. And maybe the next kid breaking toys won't wait 30+ years for answers.",
   journeyShortDescription:
-    "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching intelligence arise from chaos rather than from architecture, code, or engineering. The way intelligence actually begins.",
+    "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching behavior arise from chaos rather than from architecture, code, or engineering. Whether that is where intelligence actually begins is the question, not the conclusion.",
   journeyBadge: "30+ Years in the Making",
 
   // Configuration for research section UI
@@ -42,6 +48,7 @@ export const researchSection = {
   projects: [
     {
       title: "GEENNS: Compositional Intelligence Through Evolution",
+      anchorId: "geenns",
       subtitle: "Lifetime Research Project (Post-PhD Phase)",
       shortDescription:
         "Intelligence is not one big network. It is a collaboration of specialists that evolution grows, freezes, and learns to recombine. GEENNS pushes that to its hard edge: get the collaboration itself to emerge, so behavior comes from evolution rather than from copying us or a dataset. The PhD proved the parts can be frozen and reused. Making the whole emerge is the work now.",
@@ -77,12 +84,46 @@ export const researchSection = {
         },
         {
           name: "Read the Introduction in PhD Thesis (Chapter 7)",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+          url: "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
         },
       ],
     },
     {
+      title: "Emerging Behaviors: Intelligence Without a Human Template",
+      anchorId: "emerging-behaviors",
+      subtitle: "Active Research Direction",
+      shortDescription:
+        "Networks that are grown rather than trained never see human data, so what they do has no obligation to resemble anything we would recognize. I study that on its own terms. The open problem is telling behavior that is genuinely new from behavior that only looks new to us, because every measure we have is calibrated on human data.",
+      description:
+        "An evolutionary algorithm keeps a population of candidate networks, varies them at random, keeps the ones that do best, and repeats. Nothing in that loop ever sees human data. The networks are grown, not trained, so nothing in the process shapes them toward looking intelligent to us. Mostly they do not, and that is the part worth studying rather than the part to correct. We mostly judge machine intelligence by how closely it resembles our own. That works while machines learn from our data, and fails for anything that does not. The thesis work made these systems fast enough to run at a scale where their behavior is worth looking at. What is missing is a way to tell whether what they do is genuinely new or only looks new to us. That turns out to be a measurement problem rather than a philosophical one. The common approach scores novelty by asking a large model how unusual something looks. That measures distance in a space the model learned from us, so behavior lying outside it has no coordinates there and cannot be separated from noise. Apparent emergence then says more about the instrument than about the system. So the work is an instrument that never looks at human data, and a test system small enough to calibrate it on. Today I have the systems and the claim. I do not have the measure, which is why I keep saying evolution finds behaviors I never programmed and cannot yet prove it.",
+      tags: [
+        "Artificial Life",
+        "Emergence",
+        "Open-Endedness",
+        "Evaluation",
+        "Neuroevolution",
+      ],
+      status: "active" as const,
+      yearsSpent: 1,
+      icon: "Sparkles",
+      color: "34, 197, 94",
+      year: "2026-Present",
+      highlights: [
+        "Grown, not trained: nothing in the evolutionary loop ever sees human data",
+        "Judged on its own terms: resemblance to human behavior is a poor test for a system that never learned from humans",
+        "The instrument problem: novelty scored by a large model measures distance in a space learned from us, so anything outside it reads as noise",
+        "The aim: a measure that never appeals to human data, and a system simple enough to calibrate it on",
+      ],
+      expandedHighlightDescriptions: [
+        "An evolutionary algorithm keeps a population of candidate networks, varies them at random, keeps the ones that do best, and repeats. There is no training set anywhere in that loop and no human demonstration to copy. Whatever the population settles on came out of selection pressure and the task, so it has no particular reason to look like anything a person would have written.",
+        "Judging machine intelligence by how closely it resembles our own is a reasonable test while a system learns from our data. It stops being reasonable for a system that never did. A network solving a task in a way nobody would recognize has not failed that test. The test was aimed at something else.",
+        "The common way to score novelty is to ask a large model how unusual something looks. That measures distance in a space the model learned from us, so behavior falling outside the space has no coordinates in it and cannot be told apart from noise. Whatever the instrument was not built to see gets recorded as nothing, and what survives the filter is mostly whatever happened to resemble us.",
+        "So the work is a measure that never appeals to human data at any step, and a system small enough that I can check the measure against something I already understand. Calibration is the harder half, because an instrument nobody can validate is just a number with a story attached. Today I have the systems and the claim, and not the measure.",
+      ],
+    },
+    {
       title: "Scaling Adaptive Substrate Neuroevolution",
+      anchorId: "phd-thesis",
       subtitle: "PhD Thesis",
       shortDescription:
         "Grow a big network from a tiny recipe, the way DNA grows a body. It never worked in practice. My thesis diagnoses why, then redesigns it to run at real scale.",
@@ -111,7 +152,7 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_PhD_Thesis.pdf",
+          url: "/pdfs/RomainClaret_PhD_Thesis.pdf",
         },
         {
           name: "EMR-HyperNEAT",
@@ -129,6 +170,7 @@ export const researchSection = {
     },
     {
       title: "GraphQA: Engineer Intelligence to Think Slow",
+      anchorId: "graphqa",
       subtitle: "Master's Thesis",
       shortDescription:
         "Built zero-shot conversational AI using sub-knowledge graphs. It proved to me that engineering creates brittle intelligence.",
@@ -152,7 +194,7 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Msc_Thesis.pdf",
+          url: "/pdfs/RomainClaret_Msc_Thesis.pdf",
         },
         {
           name: "Code Repository",
@@ -162,6 +204,7 @@ export const researchSection = {
     },
     {
       title: "Overclouds: When Privacy Met Democracy",
+      anchorId: "overclouds",
       subtitle: "Bachelor's Thesis",
       shortDescription:
         "Built anonymous, decentralized data sharing right through the browser. It taught me that distributed systems stand or fall on trust.",
@@ -180,7 +223,7 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/RomainClaret_Bsc_Thesis.pdf",
+          url: "/pdfs/RomainClaret_Bsc_Thesis.pdf",
         },
         {
           name: "Code Repository",
@@ -190,6 +233,7 @@ export const researchSection = {
     },
     {
       title: "When Senses Collide: Visual-Vestibular Integration",
+      anchorId: "vestibular-integration",
       subtitle: "Pre-Undergrad Research",
       shortDescription:
         "Watched brains fuse conflicting senses into truth. My first proof that intelligence comes from integrating senses rather than selecting one.",
@@ -218,7 +262,7 @@ export const researchSection = {
         },
         {
           name: "Conference Poster",
-          url: "https://docs.google.com/gview?url=https://claret.tech/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
+          url: "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
         },
       ],
     },

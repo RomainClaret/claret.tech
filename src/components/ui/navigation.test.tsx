@@ -24,6 +24,17 @@ import {
 } from "vitest";
 import { Navigation } from "./navigation";
 
+// The component reads the pathname to decide whether section anchors resolve
+// here or have to point back at the homepage. Mutable so a test can move off
+// the homepage.
+const mockPathname = vi.hoisted(() => ({ current: "/" }));
+const mockRouterPush = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockPathname.current,
+  useRouter: () => ({ push: mockRouterPush }),
+}));
+
 // Mock the external dependencies
 vi.mock("@/lib/terminal/terminal-context", () => ({
   useTerminal: vi.fn(() => ({
@@ -571,6 +582,87 @@ describe("Navigation", () => {
 
       const contactButton = screen.getByLabelText("Contact me");
       expect(contactButton).toBeInTheDocument();
+    });
+  });
+
+  describe("Off the homepage", () => {
+    // Regression: the site was one page, so every nav item was a bare
+    // "#section" and handleNavClick cancelled the click before looking for the
+    // target. Once /pdf/<slug> existed, none of those targets were present, so
+    // the whole menu and the logo went dead while the terminal kept working.
+    beforeEach(() => {
+      mockPathname.current = "/pdf/geenns";
+    });
+
+    afterEach(() => {
+      mockPathname.current = "/";
+    });
+
+    it("points section links back at the homepage", () => {
+      render(<Navigation />);
+
+      const research = screen.getAllByText("Research")[0].closest("a");
+      const skills = screen.getAllByText("Skills")[0].closest("a");
+
+      expect(research).toHaveAttribute("href", "/#research");
+      expect(skills).toHaveAttribute("href", "/#skills");
+    });
+
+    it("sends the logo to the homepage rather than to an anchor", () => {
+      render(<Navigation />);
+
+      expect(screen.getByText("Claret.Tech").closest("a")).toHaveAttribute(
+        "href",
+        "/",
+      );
+    });
+
+    it("lets the click through instead of swallowing it", () => {
+      // The heart of the bug. Leaving the default alone is what lets the link
+      // navigate, and it keeps middle-click and open-in-new-tab working.
+      render(<Navigation />);
+      const link = screen.getAllByText("Research")[0].closest("a")!;
+
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      });
+      link.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(mockScrollTo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("On the homepage", () => {
+    it("still scrolls in-page rather than navigating", () => {
+      const section = document.createElement("div");
+      section.id = "research";
+      document.body.appendChild(section);
+
+      render(<Navigation />);
+      const link = screen.getAllByText("Research")[0].closest("a")!;
+
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      });
+      link.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(mockScrollTo).toHaveBeenCalled();
+      expect(link).toHaveAttribute("href", "#research");
+
+      section.remove();
+    });
+
+    it("keeps the logo pointing at the top of the page", () => {
+      render(<Navigation />);
+
+      expect(screen.getByText("Claret.Tech").closest("a")).toHaveAttribute(
+        "href",
+        "#home",
+      );
     });
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Experience } from "./Experience";
 import { SlideInUpProps, NextImageProps, IconProps } from "@/test/mock-types";
+import { workExperiences } from "@/data/sections/experience";
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn(() => ({
@@ -199,10 +200,17 @@ describe("Experience", () => {
       fireEvent.click(expandButton);
 
       await waitFor(() => {
-        // Verify content is visible after expanding
+        // Taken from the data, not copied into the test. This assertion used to
+        // hardcode a sentence from one role's description; those are CV copy
+        // and get rewritten, which is exactly how this broke. Any role's
+        // description appearing proves the card expanded.
+        const shown = workExperiences.experience.filter(
+          (role) => role.desc && screen.queryAllByText(role.desc).length > 0,
+        );
         expect(
-          screen.getByText(/Research collaboration on neuroevolution/),
-        ).toBeInTheDocument();
+          shown.length,
+          "expanding revealed no role description",
+        ).toBeGreaterThan(0);
       });
 
       // Check button text changed

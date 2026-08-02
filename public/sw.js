@@ -1,5 +1,5 @@
 // Service Worker for claret.tech
-const CACHE_NAME = "claret-tech-v4";
+const CACHE_NAME = "claret-tech-v5";
 // The raw /fonts/ files are no longer referenced by any CSS (next/font
 // serves hashed copies from /_next/static/media), so precaching them was
 // 335KB of dead weight on first install.
@@ -32,9 +32,20 @@ self.addEventListener("install", (event) => {
 
 // Fetch event - network-first for HTML, cache-first for assets
 self.addEventListener("fetch", (event) => {
+  const pathname = new URL(event.request.url).pathname;
+
   // Never intercept API requests: their data (publications, blog feeds) must
   // always come from the network so content updates are visible immediately.
-  if (new URL(event.request.url).pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // Never intercept the Pyodide runtime. A dedicated worker inherits this
+  // service worker, so without the bypass every wasm/stdlib request would be
+  // proxied through a JS fetch round-trip that this handler then declines to
+  // cache. Letting it through means the immutable HTTP cache does the work and
+  // WebAssembly.instantiateStreaming keeps its Content-Type.
+  if (pathname.startsWith("/pyodide/")) {
     return;
   }
 

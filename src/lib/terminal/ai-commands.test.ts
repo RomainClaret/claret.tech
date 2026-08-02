@@ -106,6 +106,32 @@ describe("AI Commands Basic Tests", () => {
       expect(result.output).toBe("Chat history cleared.");
     });
 
+    it("ai chat routes to the chat handler instead of the unknown-subcommand path", async () => {
+      // "ai chat" is advertised in the help text above, in the man page, in tab
+      // completion, and by "ai init" itself, but the switch had no case for it
+      // and fell through to "Unknown AI subcommand". The help-text assertion in
+      // this file passed the whole time, which is exactly why the hole lasted:
+      // it checked that the command was mentioned, not that it ran. This one
+      // invokes it.
+      const result = await aiCommands.ai(
+        ["chat", "hello", "there"],
+        mockContext,
+      );
+
+      expect(result.output).not.toContain("Unknown AI subcommand");
+      // The AI is not initialized here, so the chat handler's own first check
+      // is what answers. Reaching it at all is the property under test.
+      expect(result.output).toBe('AI not initialized. Run "ai init" first.');
+      expect(result.success).toBe(false);
+    });
+
+    it("ai chat reaches the chat handler even with no message", async () => {
+      const result = await aiCommands.ai(["chat"], mockContext);
+
+      expect(result.output).not.toContain("Unknown AI subcommand");
+      expect(result.output).toBe('AI not initialized. Run "ai init" first.');
+    });
+
     it("ai command handles unknown subcommand", async () => {
       const result = await aiCommands.ai(["unknown"], mockContext);
 

@@ -11,6 +11,8 @@ interface PDFModalProps {
   pdfUrl: string;
   title?: string;
   downloadFileName?: string;
+  /** The document's /pdf/<slug> page, if it has one. See usePDFViewer. */
+  shareSlug?: string;
 }
 
 export function PDFModal({
@@ -19,6 +21,7 @@ export function PDFModal({
   pdfUrl,
   title,
   downloadFileName,
+  shareSlug,
 }: PDFModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -127,6 +130,7 @@ export function PDFModal({
             url={pdfUrl}
             title={title}
             downloadFileName={downloadFileName}
+            shareSlug={shareSlug}
             inModal={true}
           />
         </div>

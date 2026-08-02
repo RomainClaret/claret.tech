@@ -53,6 +53,10 @@ Thumbs.db
 
 # PDF.js worker (copied from node_modules, regenerated on install)
 /public/pdf.worker.min.mjs
+
+# Pyodide runtime + vendored wheels (copied/downloaded on install by
+# scripts/setup-assets.js, ~22MB, never hand-edited)
+/public/pyodide/
 *.temp
 .cache/
 

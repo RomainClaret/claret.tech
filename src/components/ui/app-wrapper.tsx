@@ -1,5 +1,7 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 import dynamic from "next/dynamic";
 import { useState, useCallback } from "react";
 import { terminalConfig } from "@/data/portfolio";
@@ -114,6 +116,12 @@ export function AppWrapper({ children }: AppWrapperProps) {
   const { isOpen: isTerminalOpen, setIsOpen: setIsTerminalOpen } =
     useTerminal();
   const [splashScreenComplete, setSplashScreenComplete] = useState(false);
+  const pathname = usePathname();
+
+  // /pdf/<slug> exists so a document can be opened directly. Playing the site
+  // intro over it defeats the point, so skip the splash there and treat it as
+  // already finished, which is also what gates the terminal.
+  const isDirectDocument = pathname?.startsWith("/pdf/") ?? false;
 
   const handleSplashComplete = useCallback(() => {
     setSplashScreenComplete(true);
@@ -137,15 +145,18 @@ export function AppWrapper({ children }: AppWrapperProps) {
               {!shouldReduceAnimations && (
                 <GridBackground className="fixed inset-0 z-0 opacity-30" />
               )}
-              <SplashScreen onComplete={handleSplashComplete} />
+              {!isDirectDocument && (
+                <SplashScreen onComplete={handleSplashComplete} />
+              )}
               <div className="relative z-10">{children}</div>
               {/* Terminal Component - Only render after splash screen completes */}
-              {terminalConfig.enabled && splashScreenComplete && (
-                <Terminal
-                  isOpen={isTerminalOpen}
-                  onClose={() => setIsTerminalOpen(false)}
-                />
-              )}
+              {terminalConfig.enabled &&
+                (splashScreenComplete || isDirectDocument) && (
+                  <Terminal
+                    isOpen={isTerminalOpen}
+                    onClose={() => setIsTerminalOpen(false)}
+                  />
+                )}
 
               {/* Performance Monitor - Production ready, only loads when activated */}
               <PerformanceMonitorRenderer />

@@ -7,6 +7,7 @@ import {
 } from "@/lib/api/fetch-publications";
 import { logError } from "@/lib/utils/dev-logger";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
+import { mayForceRefresh } from "@/lib/utils/refresh-key";
 
 const CACHE_FILE = path.join(process.cwd(), "public", "publications.json");
 
@@ -49,22 +50,17 @@ async function updateCache(): Promise<CachedData> {
     publications,
   };
 
-  // Save to cache
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(data, null, 2) + "\n");
-  } catch (error) {
-    logError(error, "Failed to write cache");
-  }
-
+  // Deliberately does not write CACHE_FILE. On Vercel that write always threw
+  // EROFS and was swallowed, so it never did anything in production; the one
+  // place it worked was a local dev server, where it overwrote the curated
+  // file with an unmerged rebuild. scripts/fetch-publications.js is the only
+  // writer, and it merges.
   return data;
 }
 
 async function getHandler(request: NextRequest) {
   try {
-    // Check if we want to force refresh
-    const { searchParams } = new URL(request.url);
-    const forceRefresh = searchParams.get("refresh") === "true";
+    const forceRefresh = mayForceRefresh(request);
 
     let data: CachedData | null = null;
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { usePDFViewer, isSafePdfUrl } from "./usePDFViewer";
+import { greeting } from "@/data/sections/greeting";
 
 describe("usePDFViewer", () => {
   describe("Initial State", () => {
@@ -431,6 +432,49 @@ describe("usePDFViewer", () => {
       });
 
       expect(result.current.pdfUrl).toBe("https://example.com/file.pdf");
+    });
+  });
+  describe("shareSlug", () => {
+    /**
+     * Resolved here rather than at each call site so Papers, Research and
+     * Introduction stay unaware of it: the hook already has the URL, and it
+     * is page bundled, so it can reach the registry that the lazily loaded
+     * reader deliberately cannot.
+     */
+
+    it("resolves the document's own page from the URL", () => {
+      const { result } = renderHook(() => usePDFViewer());
+
+      act(() => {
+        result.current.openPDF(greeting.resumeLink);
+      });
+
+      expect(result.current.shareSlug).toBe("cv");
+    });
+
+    it("leaves it undefined for a PDF with no route", () => {
+      // The reader hides its share control then, rather than offering a link
+      // that would 404.
+      const { result } = renderHook(() => usePDFViewer());
+
+      act(() => {
+        result.current.openPDF("https://example.com/not-ours.pdf");
+      });
+
+      expect(result.current.isOpen).toBe(true);
+      expect(result.current.shareSlug).toBeUndefined();
+    });
+
+    it("resolves it from the cleaned URL, not the Google viewer wrapper", () => {
+      const { result } = renderHook(() => usePDFViewer());
+
+      act(() => {
+        result.current.openPDF(
+          `https://docs.google.com/gview?url=${greeting.resumeLink}&embedded=true`,
+        );
+      });
+
+      expect(result.current.shareSlug).toBe("cv");
     });
   });
 });

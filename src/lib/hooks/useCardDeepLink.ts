@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+
+import { NAV_OFFSET, scrollToSection } from "@/lib/utils/scroll-to-section";
 
 /**
  * Deep-links cards by URL hash (#<card id>, the BibTeX-style keys).
@@ -19,6 +22,7 @@ export function useCardDeepLink(
   targetIds: string[],
   options?: { onMatch?: (id: string) => void },
 ) {
+  const pathname = usePathname();
   const [deepLinkedId, setDeepLinkedId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
@@ -52,15 +56,11 @@ export function useCardDeepLink(
       if (highlightTimer) clearTimeout(highlightTimer);
       highlightTimer = setTimeout(() => setHighlightedId(null), 2600);
 
-      requestAnimationFrame(() => {
-        const element = document.getElementById(hash);
-        if (element) {
-          // Same offset math as useScrollSection: clear the 64px fixed nav.
-          const top =
-            element.getBoundingClientRect().top + window.pageYOffset - 64;
-          window.scrollTo({ top, behavior: "smooth" });
-        }
-      });
+      // scrollToSection rather than a bare smooth scrollTo: Chrome drops a
+      // smooth scroll when layout shifts under it, which is routine here while
+      // the page loads, and the target may be thousands of pixels away. If the
+      // element is not mounted yet the settle loop below picks it up.
+      requestAnimationFrame(() => scrollToSection(hash));
     };
 
     applyHash();
@@ -69,7 +69,12 @@ export function useCardDeepLink(
       window.removeEventListener("hashchange", applyHash);
       if (highlightTimer) clearTimeout(highlightTimer);
     };
-  }, [targetsKey]);
+    // pathname is a dependency because Next navigates client-side with
+    // history.pushState, which fires no hashchange event. Without it, arriving
+    // from another route, e.g. the nav on /pdf/<slug> linking back to
+    // /#research, landed at the top of the homepage rather than the section
+    // that was clicked.
+  }, [targetsKey, pathname]);
 
   // Keep the deep-linked card aligned while the page settles: sections above
   // it (publications, projects, blog content) keep loading after our first
@@ -98,14 +103,18 @@ export function useCardDeepLink(
       lastY = currentY;
       if (moving) return;
 
-      const top = element.getBoundingClientRect().top + currentY - 64;
+      const top = element.getBoundingClientRect().top + currentY - NAV_OFFSET;
       const maxTop = Math.max(
         0,
         document.documentElement.scrollHeight - window.innerHeight,
       );
       const target = Math.min(Math.max(top, 0), maxTop);
       if (Math.abs(currentY - target) > 4) {
-        window.scrollTo({ top: target, behavior: "auto" });
+        // "instant", not "auto": globals.css sets html { scroll-behavior:
+        // smooth }, and "auto" defers to that, so this correction was itself
+        // an animated scroll and Chrome dropped it. The loop ran and moved
+        // nothing, which is why entering the site at #papers stayed at the top.
+        window.scrollTo({ top: target, behavior: "instant" });
       }
     };
 

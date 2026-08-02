@@ -54,7 +54,7 @@ export const greeting = {
     700,
   ],
   subTitle:
-    "Evolution spent billions of years creating intelligence. I'm compressing that into days. I evolve AI rather than train it: self-organizing, self-improving networks that keep surprising me. They discover solutions we never could imagine, behaviors that emerge without programming. This is intelligence, unchained. And I'm helping it build itself.",
+    "Evolution spent billions of years creating intelligence. I'm compressing that into days. I evolve AI rather than train it: self-organizing, self-improving networks that keep surprising me. They find solutions I did not design and would not have thought of, and since none of it is fitted to human data, there is no reason for the result to look familiar. Working out whether that is genuinely new or only looks new to us is the part I am still on.",
   resumeLink: "/pdfs/RomainClaret_CV.pdf",
   interests: [
     {
@@ -66,6 +66,10 @@ export const greeting = {
     {
       interestName: "Artificial Life",
       fontAwesomeClassname: "fas fa-bacterium",
+    },
+    {
+      interestName: "Emergent Behavior",
+      fontAwesomeClassname: "fas fa-sparkles",
     },
     { interestName: "Space", fontAwesomeClassname: "fas fa-space-shuttle" },
   ],

@@ -1,11 +1,11 @@
 {
   "lastUpdated": "2026-07-07T17:36:52.405Z",
-  "count": 8,
-  "totalCitations": 12,
+  "count": 7,
+  "totalCitations": 10,
   "publications": [
     {
-      "id": "claret2026activations",
-      "title": "Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity",
+      "id": "claret2026neuromodulation",
+      "title": "Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection",
       "authors": [
         "Romain Claret",
         "Michael O'Neill",
@@ -14,15 +14,16 @@
       ],
       "year": "2026",
       "venue": "Artificial Life Conference (ALIFE)",
-      "citations": 2,
-      "abstract": "Biological neurons achieve computational diversity through specialized types: tonic, bursting, adapting, and fast-spiking cells coexist within the same circuit. Artificial neural networks, by contrast, apply a single activation function uniformly to all nodes, which limits what they can represent. We show that this uniformity creates hard limits for evolutionary search: across sparse evolved substrates, monotonic functions fail to solve parity beyond its smallest instance, XOR, while a single oscillatory unit suffices at all tested scales. The gap is one of search and sparsity, not representation: monotonic networks can represent parity with a modest number of hidden units, and gradient descent recovers that solution. We evolve, to our knowledge for the first time in indirect encoding, per-node activation function assignments from an 18-function palette across more than 4,500 experimental runs spanning Boolean logic, regression, and spatial classification. Testing each of the 18 functions individually on Parity-4 reveals a three-tier solvability structure: oscillatory functions achieve 100%, intermediate functions 6.7--80%, and all 9 monotonic functions 0%. This divide is not universal. Recurrence collapses it, and gradient descent inverts it entirely, showing that the barrier is specific to evolutionary search in sparse substrates. What activation functions a network can use, beyond its topology and weights, determines what evolutionary search can solve. Indirect encoding discovers heterogeneous per-node activation assignments unlikely to be chosen by hand.",
-      "shortDescription": "Evolving per-node activation functions reveals a Parity-4 divide (oscillatory 100%, monotonic 0%) specific to evolutionary search in sparse substrates.",
+      "citations": 0,
+      "abstract": "Open-ended artificial life systems must acquire diverse competencies from a single evolving genotype. Biological brains combine neuromodulation, which reconfigures circuits without changing connections, with diverse neuron types matched to specific computational roles. Can artificial evolution achieve something analogous in indirectly encoded substrates? Using indirectly encoded substrates evolved via CPPNs, we show through more than 10,000 experiments that neuromodulation alone is insufficient: under evolutionary search, monotonic activation functions impose a 75% ceiling on parity tasks that persists regardless of capacity, topology, or population size. This is an evolutionary search barrier, not a representational limit, since Adam gradient descent achieves 100% on the identical architecture. We combine neuromodulation with per-task activation function selection, matching oscillatory primitives to parity tasks and monotonic to threshold tasks, producing multi-behavioral evolved substrates. The result: 100% simultaneous 5-task success across all 30 seeds (median 14 generations). This generalizes across the oscillatory activation class: all four functions reach 100% (30 seeds each). Neither mechanism suffices alone. The barrier extends to higher-arity and asymmetric tasks, while multi-layer depth provides an alternative path. For open-ended evolution, the computational primitive should itself be an evolvable trait. At inference, one evolved genotype expresses many behaviors.",
+      "shortDescription": "Neuromodulation alone stalls at a 75% parity ceiling; adding per-task activation selection lets one evolved genotype solve all five tasks at once, on every seed.",
       "status": "to-appear",
       "source": "static",
       "month": 8,
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
-      "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
-      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}"
+      "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
+      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}",
+      "starred": true
     },
     {
       "id": "claret2026emr",
@@ -73,8 +74,8 @@
       "bibtex": "@inproceedings{claret2026bio,\n  title={Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={International Conference on Parallel Problem Solving from Nature},\n  year={2026},\n  publisher={Springer}\n}"
     },
     {
-      "id": "claret2026neuromodulation",
-      "title": "Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection",
+      "id": "claret2026activations",
+      "title": "Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity",
       "authors": [
         "Romain Claret",
         "Michael O'Neill",
@@ -83,39 +84,15 @@
       ],
       "year": "2026",
       "venue": "Artificial Life Conference (ALIFE)",
-      "citations": 0,
-      "abstract": "Open-ended artificial life systems must acquire diverse competencies from a single evolving genotype. Biological brains combine neuromodulation, which reconfigures circuits without changing connections, with diverse neuron types matched to specific computational roles. Can artificial evolution achieve something analogous in indirectly encoded substrates? Using indirectly encoded substrates evolved via CPPNs, we show through more than 10,000 experiments that neuromodulation alone is insufficient: under evolutionary search, monotonic activation functions impose a 75% ceiling on parity tasks that persists regardless of capacity, topology, or population size. This is an evolutionary search barrier, not a representational limit, since Adam gradient descent achieves 100% on the identical architecture. We combine neuromodulation with per-task activation function selection, matching oscillatory primitives to parity tasks and monotonic to threshold tasks, producing multi-behavioral evolved substrates. The result: 100% simultaneous 5-task success across all 30 seeds (median 14 generations). This generalizes across the oscillatory activation class: all four functions reach 100% (30 seeds each). Neither mechanism suffices alone. The barrier extends to higher-arity and asymmetric tasks, while multi-layer depth provides an alternative path. For open-ended evolution, the computational primitive should itself be an evolvable trait. At inference, one evolved genotype expresses many behaviors.",
-      "shortDescription": "Neuromodulation alone stalls at a 75% parity ceiling; adding per-task activation selection lets one evolved genotype solve all five tasks at once, on every seed.",
+      "citations": 2,
+      "abstract": "Biological neurons achieve computational diversity through specialized types: tonic, bursting, adapting, and fast-spiking cells coexist within the same circuit. Artificial neural networks, by contrast, apply a single activation function uniformly to all nodes, which limits what they can represent. We show that this uniformity creates hard limits for evolutionary search: across sparse evolved substrates, monotonic functions fail to solve parity beyond its smallest instance, XOR, while a single oscillatory unit suffices at all tested scales. The gap is one of search and sparsity, not representation: monotonic networks can represent parity with a modest number of hidden units, and gradient descent recovers that solution. We evolve, to our knowledge for the first time in indirect encoding, per-node activation function assignments from an 18-function palette across more than 4,500 experimental runs spanning Boolean logic, regression, and spatial classification. Testing each of the 18 functions individually on Parity-4 reveals a three-tier solvability structure: oscillatory functions achieve 100%, intermediate functions 6.7--80%, and all 9 monotonic functions 0%. This divide is not universal. Recurrence collapses it, and gradient descent inverts it entirely, showing that the barrier is specific to evolutionary search in sparse substrates. What activation functions a network can use, beyond its topology and weights, determines what evolutionary search can solve. Indirect encoding discovers heterogeneous per-node activation assignments unlikely to be chosen by hand.",
+      "shortDescription": "Evolving per-node activation functions reveals a Parity-4 divide (oscillatory 100%, monotonic 0%) specific to evolutionary search in sparse substrates.",
       "status": "to-appear",
       "source": "static",
       "month": 8,
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
-      "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
-      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}",
-      "starred": true
-    },
-    {
-      "id": "claret2026pruner",
-      "title": "Early-Stopping Thresholds for ES-HyperNEAT: A Data-Driven Approach from Fitness Dynamics",
-      "authors": [
-        "Romain Claret",
-        "Arthur Gygax",
-        "Michael O'Neill",
-        "Paul Cotofrei",
-        "Pascal Felber"
-      ],
-      "year": "2026",
-      "venue": "IEEE World Congress on Computational Intelligence (WCCI)",
-      "citations": 0,
-      "abstract": "Most hyperparameter configurations for Evolvable-Substrate HyperNEAT (ES-HyperNEAT) produce networks that stagnate at random-guessing performance, wasting computational resources. We frame early stopping as binary classification on early fitness trajectories: for each trial, we compute the cumulative median of best-per-generation fitness and test it against a threshold derived by maximizing the F_1 score on an initial 90-trial dataset. The resulting rule (generation G^*=3, threshold T^*=0.140) achieves F_1=0.872 on 180 independent validation trials, retaining over 90% of successful trials while cutting computational cost by 41.6%. Compared to Hyperband, our domain-specific rule is 64% more efficient with higher mean fitness, though Hyperband occasionally discovers higher peak solutions. On a converged search population the rule becomes too aggressive (recall 31.1%), motivating adaptive thresholds. The specific thresholds are ES-HyperNEAT-specific, but the methodology, deriving stopping criteria from fitness dynamics classification, is applicable to other evolutionary algorithms with stagnation-prone hyperparameter spaces.",
-      "shortDescription": "A data-driven early-stopping rule keeps over 90% of successful ES-HyperNEAT runs on MNIST, cuts compute by 41.6%, and is 64% more efficient than Hyperband.",
-      "status": "to-appear",
-      "source": "static",
-      "month": 6,
-      "codeUrl": "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
-      "paperPdf": "/pdfs/paper_WCCI_2026_claret2026pruner.pdf",
-      "presentationPdf": "/pdfs/presentation_WCCI_2026_claret2026pruner.pdf",
-      "bibtex": "@inproceedings{claret2026pruner,\n  title={Early-Stopping Thresholds for {ES-HyperNEAT}: A Data-Driven Approach from Fitness Dynamics},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Felber, Pascal},\n  booktitle={Proceedings of the IEEE Congress on Evolutionary Computation},\n  year={2026},\n  publisher={IEEE}\n}"
+      "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
+      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}"
     },
     {
       "id": "claret2026partitioned",
@@ -141,6 +118,29 @@
       "bibtex": "@inproceedings{claret2026partitioned,\n  title={Breaking the Central Bias: Spatially Partitioned Experts for Coordinate-Based Neuroevolution},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Palma Mendes, Michael and Felber, Pascal},\n  booktitle={International conference on pattern recognition},\n  year={2026},\n  publisher={Springer}\n}"
     },
     {
+      "id": "claret2026pruner",
+      "title": "Early-Stopping Thresholds for ES-HyperNEAT: A Data-Driven Approach from Fitness Dynamics",
+      "authors": [
+        "Romain Claret",
+        "Arthur Gygax",
+        "Michael O'Neill",
+        "Paul Cotofrei",
+        "Pascal Felber"
+      ],
+      "year": "2026",
+      "venue": "IEEE World Congress on Computational Intelligence (WCCI)",
+      "citations": 0,
+      "abstract": "Most hyperparameter configurations for Evolvable-Substrate HyperNEAT (ES-HyperNEAT) produce networks that stagnate at random-guessing performance, wasting computational resources. We frame early stopping as binary classification on early fitness trajectories: for each trial, we compute the cumulative median of best-per-generation fitness and test it against a threshold derived by maximizing the F_1 score on an initial 90-trial dataset. The resulting rule (generation G^*=3, threshold T^*=0.140) achieves F_1=0.872 on 180 independent validation trials, retaining over 90% of successful trials while cutting computational cost by 41.6%. Compared to Hyperband, our domain-specific rule is 64% more efficient with higher mean fitness, though Hyperband occasionally discovers higher peak solutions. On a converged search population the rule becomes too aggressive (recall 31.1%), motivating adaptive thresholds. The specific thresholds are ES-HyperNEAT-specific, but the methodology, deriving stopping criteria from fitness dynamics classification, is applicable to other evolutionary algorithms with stagnation-prone hyperparameter spaces.",
+      "shortDescription": "A data-driven early-stopping rule keeps over 90% of successful ES-HyperNEAT runs on MNIST, cuts compute by 41.6%, and is 64% more efficient than Hyperband.",
+      "status": "to-appear",
+      "source": "static",
+      "month": 6,
+      "codeUrl": "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
+      "paperPdf": "/pdfs/paper_WCCI_2026_claret2026pruner.pdf",
+      "presentationPdf": "/pdfs/presentation_WCCI_2026_claret2026pruner.pdf",
+      "bibtex": "@inproceedings{claret2026pruner,\n  title={Early-Stopping Thresholds for {ES-HyperNEAT}: A Data-Driven Approach from Fitness Dynamics},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Felber, Pascal},\n  booktitle={Proceedings of the IEEE Congress on Evolutionary Computation},\n  year={2026},\n  publisher={IEEE}\n}"
+    },
+    {
       "id": "claret2024tpe",
       "title": "Investigating Hyperparameter Optimization and Transferability for ES-HyperNEAT: A TPE Approach",
       "authors": [
@@ -163,28 +163,6 @@
       "paperPdf": "/pdfs/paper_GECCO_2024_claret2024tpe.pdf",
       "presentationPdf": "/pdfs/presentation_GECCO_2024_claret2024tpe.pdf",
       "bibtex": "@inproceedings{claret2024tpe,\n  title={Investigating Hyperparameter Optimization and Transferability for {ES-HyperNEAT}: A {TPE} Approach},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '24 Companion)},\n  year={2024},\n  publisher={ACM},\n  pages={1879--1887},\n  doi={10.1145/3638530.3664144}\n}"
-    },
-    {
-      "id": "karmali2010perceptual",
-      "title": "Perceptual roll tilt thresholds demonstrate visual-vestibular fusion",
-      "authors": [
-        "Faisal Karmali",
-        "Koeun Lim",
-        "Adil Adatia",
-        "Romain Claret",
-        "Keyvan Nicoucar",
-        "Daniel M Merfeld"
-      ],
-      "year": "2010",
-      "venue": "40th Annual meeting of Neuroscience",
-      "citations": 2,
-      "abstract": "Prior studies show that visual motion perception is more precise than vestibular motion perception, but it is unclear whether this is universal or the result of specific experimental conditions. We compared visual and vestibular motion precision over a broad range of temporal frequencies by measuring thresholds for vestibular (subject motion in the dark), visual (visual scene motion) or visual-vestibular (subject motion in the light) stimuli.",
-      "shortDescription": "Investigating how the brain integrates visual and vestibular information for motion perception by comparing precision thresholds across sensory modalities.",
-      "openAccessUrl": "https://journals.physiology.org/doi/abs/10.1152/jn.00332.2013",
-      "googleScholarCitationId": "4650031951635731568",
-      "source": "static",
-      "posterPdf": "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
-      "bibtex": "@inproceedings{karmali2010perceptual,\n  title={Perceptual roll-tilt thresholds demonstrate visual-vestibular fusion},\n  author={Karmali, Faisal and Lim, Koeun and Adatia, Adil and Claret, Romain and Nicoucar, Keyvan and Merfeld, Daniel M},\n  booktitle={40th Annual meeting of Neuroscience, San Diego, CA, on November},\n  pages={13--17},\n  year={2010}\n}"
     }
   ]
 }

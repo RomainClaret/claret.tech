@@ -20,7 +20,7 @@ export function TestModeProvider({ children }: { children: React.ReactNode }) {
       const isPlaywright = urlParams.get("playwright") === "true";
       const isE2ETest =
         process.env.NODE_ENV === "test" ||
-        window.location.search.includes("playwright");
+        urlParams.get("playwright") === "true";
       return isPlaywright || isE2ETest;
     }
     return false;

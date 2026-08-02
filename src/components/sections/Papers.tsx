@@ -18,7 +18,6 @@ import {
   FileText,
   Sparkles,
   Star,
-  Link2,
   Presentation,
   Play,
 } from "lucide-react";
@@ -29,6 +28,7 @@ import { motion } from "framer-motion";
 import {
   comparePublications,
   publicationToBibTeX,
+  STATIC_PUBLICATIONS,
   type Publication,
 } from "@/lib/api/fetch-publications";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
@@ -36,6 +36,7 @@ import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { useConferenceLogo } from "@/lib/hooks/useConferenceLogo";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { HolographicCard } from "@/components/ui/holographic-card";
+import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { logError } from "@/lib/utils/dev-logger";
 
 // Lazy load PDF Modal
@@ -244,7 +245,6 @@ function PaperCard({
   isDeepLinked = false,
 }: PaperCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [bibtexCopied, setBibtexCopied] = useState(false);
 
   // Arriving via a deep link opens the full description.
@@ -259,14 +259,6 @@ function PaperCard({
     setTimeout(() => setBibtexCopied(false), 2000);
   };
 
-  const handleCopyLink = async () => {
-    if (!paper.anchorId) return;
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/#${paper.anchorId}`,
-    );
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
   const researchArea = detectResearchArea(paper);
   const fallbackColor = RESEARCH_COLORS[researchArea];
   const publicationStatus = detectPublicationStatus(paper);
@@ -384,18 +376,10 @@ function PaperCard({
                 </div>
               </div>
               {paper.anchorId && (
-                <button
-                  onClick={handleCopyLink}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
-                  title="Copy link to this paper"
-                  aria-label="Copy link to this paper"
-                >
-                  {linkCopied ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Link2 className="w-4 h-4" />
-                  )}
-                </button>
+                <CopyLinkButton
+                  anchorId={paper.anchorId}
+                  label="Copy link to this paper"
+                />
               )}
             </div>
 
@@ -556,7 +540,6 @@ function DynamicPaperCard({
   isDeepLinked?: boolean;
 }) {
   const [bibtexCopied, setBibtexCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Arriving via a deep link opens the full abstract.
@@ -595,14 +578,6 @@ function DynamicPaperCard({
     );
     setBibtexCopied(true);
     setTimeout(() => setBibtexCopied(false), 2000);
-  };
-
-  const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(
-      `${window.location.origin}/#${publication.id}`,
-    );
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   return (
@@ -730,18 +705,10 @@ function DynamicPaperCard({
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleCopyLink}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
-                title="Copy link to this paper"
-                aria-label="Copy link to this paper"
-              >
-                {linkCopied ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Link2 className="w-4 h-4" />
-                )}
-              </button>
+              <CopyLinkButton
+                anchorId={publication.id}
+                label="Copy link to this paper"
+              />
             </div>
 
             {/* Title */}
@@ -944,13 +911,29 @@ function DynamicPaperCard({
 
 export function Papers() {
   const shouldReduceAnimations = useShouldReduceAnimations();
-  const [dynamicPapers, setDynamicPapers] = useState<Publication[]>([]);
-  const [totalCitations, setTotalCitations] = useState(0);
+  // Seeded from the static list rather than empty. /api/publications serves
+  // public/publications.json, which is a mirror of this same array, so the
+  // seed is the same data one round trip earlier. It keeps the header from
+  // painting "4 academic works, 0 peer-reviewed" and correcting itself, and it
+  // means a failed fetch leaves the real publications on screen instead of an
+  // empty grid under a header that still claims seven.
+  const [dynamicPapers, setDynamicPapers] =
+    useState<Publication[]>(STATIC_PUBLICATIONS);
+  const [totalCitations, setTotalCitations] = useState(() =>
+    STATIC_PUBLICATIONS.reduce((sum, pub) => sum + (pub.citations ?? 0), 0),
+  );
   const [filterType, setFilterType] = useState<"all" | "papers" | "theses">(
     "all",
   );
-  const { isOpen, pdfUrl, title, downloadFileName, openPDF, closePDF } =
-    usePDFViewer();
+  const {
+    isOpen,
+    pdfUrl,
+    title,
+    downloadFileName,
+    shareSlug,
+    openPDF,
+    closePDF,
+  } = usePDFViewer();
 
   useEffect(() => {
     // Fetch dynamic publications
@@ -992,7 +975,19 @@ export function Papers() {
   }
 
   const hasDynamicPapers = dynamicPapers.length > 0;
-  const totalPapers = dynamicPapers.length + papersSection.papersCards.length;
+
+  // All three counts come from the data. The total says "works" rather than
+  // "publications" because four of them are filed below under Other Work as
+  // explicitly not that, and the header used to call all eleven publications.
+  // Deliberately unfiltered: these describe the record, not the current view.
+  const peerReviewedCount = dynamicPapers.length;
+  const totalWorks = peerReviewedCount + papersSection.papersCards.length;
+  const citationCount =
+    totalCitations +
+    papersSection.papersCards.reduce(
+      (sum, paper) => sum + (paper.citations ?? 0),
+      0,
+    );
 
   // Filter papers based on type
   const filteredDynamicPapers =
@@ -1016,12 +1011,16 @@ export function Papers() {
             <div className="flex items-center justify-center gap-6 mt-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <FileText className="w-4 h-4" />
-                {totalPapers} publications
+                {totalWorks} academic works
               </span>
-              {totalCitations > 0 && (
+              <span className="flex items-center gap-1">
+                <BookOpen className="w-4 h-4" />
+                {peerReviewedCount} peer-reviewed
+              </span>
+              {citationCount > 0 && (
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-4 h-4" />
-                  {totalCitations} citations
+                  {citationCount} citations
                 </span>
               )}
             </div>
@@ -1188,6 +1187,7 @@ export function Papers() {
             pdfUrl={pdfUrl}
             title={title}
             downloadFileName={downloadFileName}
+            shareSlug={shareSlug}
           />
         </div>
       </div>

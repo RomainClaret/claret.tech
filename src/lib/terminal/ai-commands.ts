@@ -344,6 +344,14 @@ export const aiCommands: Record<string, CommandFunction> = {
         };
       }
 
+      case "chat":
+        // Advertised in `ai help`, in the man page, in tab completion, and by
+        // `ai init` itself ("You can now use 'chat' or 'ai chat' commands"),
+        // but it had no case here and fell through to "Unknown AI subcommand".
+        // The top-level `chat` command below is the real implementation; this
+        // is only the route to it.
+        return aiCommands.chat(subArgs, context);
+
       case "clear":
         aiState.chatHistory = [];
         return {
@@ -501,14 +509,15 @@ Child me wanted thinking robots. Adult me breeds artificial minds that surprise 
 A life journey through physics, neuroscience, mechanics, and AI, all converging on one lesson: you grow minds, you cannot assemble them.
 
 Current Focus:
-- Emergent behaviors from bio-inspired artificial life, grown by evolution and judged on what they do, not on how well they copy us or a dataset
-- Genuine emergence: specialists that claim their own roles, coordination that transfers to problems it never saw, wholes that outdo their parts
+- Emergent behaviors from bio-inspired artificial life: nothing in the evolutionary loop ever sees human data, so the results are not built to look familiar
+- Measuring that honestly, which nobody can do yet: every test for novel behavior is calibrated on human data, so anything genuinely outside it reads as noise
+- Specialists that claim their own roles, coordination that transfers to problems it never saw, wholes that outdo their parts
 - Composition as reasoning, and getting the composition itself to emerge rather than be designed
 - Lifelong learning without forgetting: knowledge as reusable, evolvable components instead of overwritten weights
 - Building the tools this needs, because most of them do not exist yet
 
 Research Philosophy:
-Adaptation matters more than accuracy. I grow minds instead of training them, then judge what emerges by what it is, not by how closely it imitates a human or a test set. Evolution keeps finding behaviors I never programmed.
+Adaptation matters more than accuracy. I grow minds instead of training them, then judge what emerges by what it is, not by how closely it imitates a human or a test set. Evolution keeps finding behaviors I did not program, and pinning down whether they are genuinely new is the part I am still working on.
 
 Current Positions:
 - University Teaching Specialist, University College Dublin (2026-Present)

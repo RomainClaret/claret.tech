@@ -15,7 +15,14 @@ import { GET, POST } from "./route";
 vi.mock("next/server", () => ({
   NextRequest: vi.fn((url, options) => ({
     url,
-    headers: new Map(),
+    // Honour headers passed to the constructor: the refresh key is read from
+    // x-refresh-key, and a bare Map here made that unreadable.
+    headers: {
+      get: (name: string) =>
+        (options?.headers as Record<string, string> | undefined)?.[
+          name.toLowerCase()
+        ] ?? null,
+    },
     nextUrl: {
       pathname: url.split("?")[0],
       searchParams: {
@@ -138,6 +145,9 @@ describe("Publications API Route", () => {
     delete process.env.SEMANTIC_SCHOLAR_AUTHOR_ID;
     delete process.env.ORCID_ID;
     delete process.env.AUTHOR_NAME;
+    // The refresh tests set this; leaving it set would arm the refresh path
+    // for every file that runs after this one.
+    delete process.env.PUBLICATIONS_REFRESH_TOKEN;
   });
 
   describe("GET /api/publications", () => {
@@ -174,34 +184,79 @@ describe("Publications API Route", () => {
       expect(result).toEqual(oldData);
     });
 
-    it("fetches new data when force refresh is requested", async () => {
+    it("refetches on a forced refresh carrying the key", async () => {
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
       mockFs.readFile.mockResolvedValueOnce(JSON.stringify(mockCachedData));
       mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
 
       const request = new NextRequest(
         "http://localhost:3000/api/publications?refresh=true",
+        { headers: { "x-refresh-key": "s3cret" } },
       );
       await GET(request);
 
       expect(mockFetchAllPublications).toHaveBeenCalled();
-      expect(mockFs.writeFile).toHaveBeenCalled();
     });
 
-    it("writes the cache file with a trailing newline", async () => {
-      // A forced refresh re-fetches + writes via updateCache().
+    it("never writes the committed file, even on a forced refresh", async () => {
+      // The write only ever worked on a local dev server, where it replaced
+      // the hand-curated file with an unmerged rebuild. The fetch script is
+      // the only writer, and it merges.
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
       mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
 
       const request = new NextRequest(
         "http://localhost:3000/api/publications?refresh=true",
+        { headers: { "x-refresh-key": "s3cret" } },
       );
       await GET(request);
 
-      const calls = mockFs.writeFile.mock.calls;
-      const written = calls[calls.length - 1][1] as string;
-      // Generated JSON must end with "\n" to match the prettier convention and
-      // avoid a spurious diff against the committed publications.json.
-      expect(written.endsWith("\n")).toBe(true);
-      expect(JSON.parse(written)).toMatchObject({ count: 2 });
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it("ignores a refresh with no key and serves the committed data", async () => {
+      // Refresh reaches the academic APIs and returns uncurated results, so an
+      // anonymous caller must not be able to trigger it. Served as an ordinary
+      // request rather than refused, so the token cannot be probed for.
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(mockCachedData));
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/publications?refresh=true",
+      );
+      const response = await GET(request);
+
+      expect(mockFetchAllPublications).not.toHaveBeenCalled();
+      expect(await response.json()).toMatchObject({
+        count: mockCachedData.count,
+      });
+    });
+
+    it("ignores a refresh with the wrong key", async () => {
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(mockCachedData));
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/publications?refresh=true",
+        { headers: { "x-refresh-key": "guess" } },
+      );
+      await GET(request);
+
+      expect(mockFetchAllPublications).not.toHaveBeenCalled();
+    });
+
+    it("disables refresh entirely when no token is configured", async () => {
+      // Safer default than leaving it open: an unset variable means off.
+      delete process.env.PUBLICATIONS_REFRESH_TOKEN;
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(mockCachedData));
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/publications?refresh=true",
+        { headers: { "x-refresh-key": "anything" } },
+      );
+      await GET(request);
+
+      expect(mockFetchAllPublications).not.toHaveBeenCalled();
     });
 
     it("returns stale cache when fetch fails", async () => {
@@ -244,19 +299,20 @@ describe("Publications API Route", () => {
       expect(result.publications).toEqual([]);
     });
 
-    it("handles cache write errors gracefully", async () => {
+    it("serves fresh data without writing when the cache file is missing", async () => {
+      // The other way a rebuild used to reach the disk: an absent cache file
+      // sends a plain GET down the same path as a forced refresh. It still
+      // has to answer, it just must not persist what it fetched.
       mockFs.readFile.mockRejectedValueOnce(new Error("No cache"));
       mockFetchAllPublications.mockResolvedValueOnce(mockPublications);
-      mockFs.mkdir.mockResolvedValueOnce(undefined);
-      mockFs.writeFile.mockRejectedValueOnce(new Error("Write failed"));
 
       const request = new NextRequest("http://localhost:3000/api/publications");
       const response = await GET(request);
 
-      // Should still return the data even if cache write fails
       const result = await response.json();
       expect(result.count).toBe(2);
       expect(result.totalCitations).toBe(15);
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
     });
 
     it("calculates total citations correctly", async () => {

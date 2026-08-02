@@ -73,11 +73,11 @@ describe("fetchAllPublications - author normalization & curated fields", () => {
 
   it("leaves static publications' author names untouched", async () => {
     const pubs = await run();
-    const staticPub = pubs.find((p) => p.id === "karmali2010perceptual");
+    const staticPub = pubs.find((p) => p.id === "claret2026partitioned");
 
     expect(staticPub).toBeDefined();
     expect(staticPub!.authors).toContain("Romain Claret");
-    expect(staticPub!.authors).toContain("Faisal Karmali");
+    expect(staticPub!.authors).toContain("Michael O'Neill");
   });
 });
 

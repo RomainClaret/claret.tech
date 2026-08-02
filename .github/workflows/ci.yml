@@ -10,6 +10,11 @@ on:
 # Cancel superseded runs of the same ref (rapid pushes stack ~13 jobs each).
 # Group includes the workflow name so a deploy-invoked run never collides
 # with a push-triggered one.
+# Least privilege: these workflows only read the repo and run tests.
+# Without this they inherit the repo default, which is write.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -56,7 +61,7 @@ jobs:
             echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
           fi
           
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4
         id: filter
         with:
           base: ${{ steps.base_commit.outputs.base }}
@@ -70,11 +75,19 @@ jobs:
             components:
               - 'src/components/**'
               - 'src/test/helpers/**'
+              - 'src/lib/terminal/line-mode.ts'
               - 'package.json'
             utils:
               - 'src/lib/utils/**'
               - 'src/lib/validators/**'
               - 'src/lib/constants/**'
+              # The Python sandbox and the terminal both live under src/lib and
+              # are covered by `npm run test:utils`, which globs all of it.
+              # Without these entries they match no filter at all, so their
+              # tests would run on pull requests and never on a push to main.
+              - 'src/lib/python/**'
+              - 'src/lib/terminal/**'
+              - 'public/python-worker.js'
               - 'package.json'
             contexts:
               - 'src/contexts/**'

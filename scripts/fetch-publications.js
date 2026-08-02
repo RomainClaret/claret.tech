@@ -173,193 +173,32 @@ async function fetchPublicationsSimple() {
       "public",
       "publications.json",
     );
+    // Refuse to run without it rather than treating absence as a first run.
+    // The file is tracked in git, so it going missing is a symptom, and
+    // regenerating silently would drop any previously fetched publication
+    // that is not in the static list and reset lastUpdated to now.
     let existing = null;
     try {
       existing = JSON.parse(await fs.readFile(outputPath, "utf-8"));
-    } catch {
-      // First run / no existing file: nothing to merge.
+    } catch (error) {
+      console.error(
+        `\n❌ Could not read ${outputPath}\n` +
+          `   ${error.message}\n\n` +
+          `   This file is committed and is merged into on every run, so a\n` +
+          `   missing or unparseable one means something is wrong. Restore it\n` +
+          `   with: git checkout -- public/publications.json\n`,
+      );
+      process.exit(1);
     }
 
     const publications = [];
 
     // Add static publications first
-    const staticPublications = [
-      {
-        id: "claret2026activations",
-        paperPdf: "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
-        title:
-          "Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity",
-        authors: [
-          "Romain Claret",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Kilian Stoffel",
-        ],
-        year: "2026",
-        month: 8,
-        venue: "Artificial Life Conference (ALIFE)",
-        codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
-        status: "to-appear",
-        source: "static",
-      },
-      {
-        id: "claret2026emr",
-        paperPdf: "/pdfs/paper_GECCO_2026_claret2026emr.pdf",
-        posterPdf: "/pdfs/poster_GECCO_2026_claret2026emr.pdf",
-        videoUrl: "https://youtu.be/l3RuJW4uDL0",
-        title:
-          "Tensor-Accelerated Eager Multi-Resolution Grids for Evolving Large-Scale Substrates",
-        authors: [
-          "Romain Claret",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Kilian Stoffel",
-        ],
-        year: "2026",
-        month: 7,
-        starred: true,
-        venue: "Genetic and Evolutionary Computation Conference (GECCO)",
-        codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
-        doi: "10.1145/3795101.3805361",
-        openAccessUrl: "https://dl.acm.org/doi/10.1145/3795101.3805361",
-        paperUrl: "https://dl.acm.org/doi/10.1145/3795101.3805361",
-        source: "static",
-      },
-      {
-        id: "claret2026bio",
-        paperPdf: "/pdfs/paper_PPSN_2026_claret2026bio.pdf",
-        posterPdf: "/pdfs/poster_PPSN_2026_claret2026bio.pdf",
-        title:
-          "Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery",
-        authors: [
-          "Romain Claret",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Kilian Stoffel",
-        ],
-        year: "2026",
-        month: 9,
-        venue: "Parallel Problem Solving from Nature (PPSN)",
-        codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
-        status: "to-appear",
-        source: "static",
-      },
-      {
-        id: "claret2026neuromodulation",
-        starred: true,
-        paperPdf: "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
-        title:
-          "Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection",
-        authors: [
-          "Romain Claret",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Kilian Stoffel",
-        ],
-        year: "2026",
-        month: 8,
-        venue: "Artificial Life Conference (ALIFE)",
-        codeUrl: "https://github.com/RomainClaret/emr-hyperneat",
-        status: "to-appear",
-        source: "static",
-      },
-      {
-        id: "claret2026pruner",
-        presentationPdf: "/pdfs/presentation_WCCI_2026_claret2026pruner.pdf",
-        paperPdf: "/pdfs/paper_WCCI_2026_claret2026pruner.pdf",
-        title:
-          "Early-Stopping Thresholds for ES-HyperNEAT: A Data-Driven Approach from Fitness Dynamics",
-        authors: [
-          "Romain Claret",
-          "Arthur Gygax",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Pascal Felber",
-        ],
-        year: "2026",
-        month: 6,
-        venue: "IEEE World Congress on Computational Intelligence (WCCI)",
-        codeUrl:
-          "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
-        status: "to-appear",
-        source: "static",
-      },
-      {
-        id: "claret2026partitioned",
-        paperPdf: "/pdfs/paper_ICPR_2026_claret2026partitioned.pdf",
-        title:
-          "Breaking the Central Bias: Spatially Partitioned Experts for Coordinate-Based Neuroevolution",
-        authors: [
-          "Romain Claret",
-          "Arthur Gygax",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Michael Palma Mendes",
-          "Pascal Felber",
-        ],
-        year: "2026",
-        month: 8,
-        venue: "International Conference on Pattern Recognition (ICPR)",
-        codeUrl:
-          "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
-        status: "to-appear",
-        source: "static",
-      },
-      {
-        id: "claret2024tpe",
-        presentationPdf: "/pdfs/presentation_GECCO_2024_claret2024tpe.pdf",
-        paperPdf: "/pdfs/paper_GECCO_2024_claret2024tpe.pdf",
-        title:
-          "Investigating Hyperparameter Optimization and Transferability for ES-HyperNEAT: A TPE Approach",
-        authors: [
-          "Romain Claret",
-          "Michael O'Neill",
-          "Paul Cotofrei",
-          "Kilian Stoffel",
-        ],
-        year: "2024",
-        venue: "Genetic and Evolutionary Computation Conference (GECCO)",
-        citations: 5,
-        doi: "10.1145/3638530.3664144",
-        abstract:
-          "Neuroevolution of Augmenting Topologies (NEAT) and its advanced version, Evolvable-Substrate HyperNEAT (ES-HyperNEAT), have shown great potential in developing neural networks. However, their effectiveness heavily depends on the selection of hyperparameters. This study investigates the optimization of ES-HyperNEAT hyperparameters using the Tree-structured Parzen Estimator (TPE) on the MNIST classification task, exploring a search space of over 3 billion potential combinations. TPE effectively navigates this vast space, significantly outperforming random search in terms of mean, median, and best accuracy. During the validation process, the best hyperparameter configuration found by TPE achieves an accuracy of 29.00% on MNIST, surpassing previous studies while using a smaller population size and fewer generations. The transferability of the optimized hyperparameters is explored in logic operations and Fashion-MNIST tasks, revealing successful transfer to the more complex Fashion-MNIST problem but limited to simpler logic operations. This study emphasizes a method to unlock the full potential of neuroevolutionary algorithms and provides insights into the hyperparameters' transferability across tasks of varying complexity.",
-        shortDescription:
-          "Achieved 29% MNIST accuracy with ES-HyperNEAT through systematic TPE optimization, beating the previous 23.90% benchmark and transferring successfully to Fashion-MNIST.",
-        openAccessUrl: "https://dl.acm.org/doi/10.1145/3638530.3664144",
-        semanticScholarUrl:
-          "https://www.semanticscholar.org/paper/a450d758796fdcc7b5964f751cfa6e796499a693",
-        paperUrl: "https://dl.acm.org/doi/10.1145/3638530.3664144",
-        codeUrl:
-          "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
-        source: "static",
-      },
-      {
-        id: "karmali2010perceptual",
-        title:
-          "Perceptual roll tilt thresholds demonstrate visual-vestibular fusion",
-        authors: [
-          "Faisal Karmali",
-          "Koeun Lim",
-          "Adil Adatia",
-          "Romain Claret",
-          "Keyvan Nicoucar",
-          "Daniel M Merfeld",
-        ],
-        year: "2010",
-        venue: "40th Annual meeting of Neuroscience",
-        citations: 2,
-        abstract:
-          "Prior studies show that visual motion perception is more precise than vestibular motion perception, but it is unclear whether this is universal or the result of specific experimental conditions. We compared visual and vestibular motion precision over a broad range of temporal frequencies by measuring thresholds for vestibular (subject motion in the dark), visual (visual scene motion) or visual-vestibular (subject motion in the light) stimuli.",
-        shortDescription:
-          "Investigating how the brain integrates visual and vestibular information for motion perception by comparing precision thresholds across sensory modalities.",
-        posterPdf:
-          "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
-        openAccessUrl:
-          "https://journals.physiology.org/doi/abs/10.1152/jn.00332.2013",
-        googleScholarCitationId: "4650031951635731568",
-        source: "static",
-      },
-    ];
+    // The same file the app imports, rather than a copy. The copy that used
+    // to live here had drifted: it was missing bibtex and shortDescription on
+    // every entry, and only survived a run because the merge below restored
+    // those from the existing JSON.
+    const staticPublications = require("../src/lib/api/static-publications.json");
 
     // Add static publications to the list
     staticPublications.forEach((pub) => publications.push(pub));

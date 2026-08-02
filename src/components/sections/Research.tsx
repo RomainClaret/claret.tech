@@ -19,17 +19,21 @@ import {
   Shield,
   Bot,
   Ear,
+  BookOpen,
   ChevronDown,
   Rocket,
   Scaling,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { motion, AnimatePresence } from "framer-motion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
+import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
+import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
+import dynamic from "next/dynamic";
 
 interface ResearchCardProps {
   project: (typeof researchSection.projects)[0];
@@ -37,7 +41,31 @@ interface ResearchCardProps {
   isActive: boolean;
   onToggle: () => void;
   isLeftSide?: boolean;
+  /** Arrived via a deep link: hold the glow. */
+  isDeepLinked?: boolean;
+  /** Briefly ring-pulse this card after a deep link lands on it. */
+  isHighlighted?: boolean;
+  onOpenPDF: (url: string, title: string, fileName: string) => void;
 }
+
+/**
+ * A locally hosted PDF, which opens in the in-app reader rather than a new tab.
+ *
+ * Same predicate Papers uses for the same decision, so GitHub and journal
+ * links keep behaving like links.
+ */
+const isLocalPdf = (url: string) => url.startsWith("/") && url.endsWith(".pdf");
+
+const pdfFileName = (url: string) => url.split("/").pop() || "document.pdf";
+
+// Lazy load PDF Modal, same as Papers.
+const PDFModal = dynamic(
+  () => import("@/components/ui/pdf-modal").then((mod) => mod.PDFModal),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 
 const statusConfig = {
   active: {
@@ -87,6 +115,9 @@ function ResearchCard({
   isActive,
   onToggle,
   isLeftSide = false,
+  isDeepLinked = false,
+  isHighlighted = false,
+  onOpenPDF,
 }: ResearchCardProps) {
   const status = statusConfig[project.status];
   const Icon = project.icon
@@ -116,8 +147,19 @@ function ResearchCard({
         </div>
       )}
 
-      <div onClick={onToggle} className="h-full cursor-pointer">
-        <HolographicCard glowColor={nodeColor} className="h-full">
+      <div
+        id={project.anchorId}
+        onClick={onToggle}
+        className={cn(
+          "h-full cursor-pointer",
+          isHighlighted && "deep-link-highlight",
+        )}
+      >
+        <HolographicCard
+          glowColor={nodeColor}
+          className="h-full"
+          forceHover={isDeepLinked}
+        >
           <div className="p-4 sm:p-6">
             {/* Header */}
             <div className="flex items-start gap-3 mb-4">
@@ -252,23 +294,53 @@ function ResearchCard({
                           Resources & Publications
                         </h4>
                         <div className="flex flex-wrap gap-3">
-                          {project.links.map((link, i) => (
-                            <Link
-                              key={i}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline transition-colors font-medium"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {link.name.includes("GitHub") ? (
-                                <GitBranch className="w-4 h-4" />
-                              ) : (
-                                <ExternalLink className="w-4 h-4" />
-                              )}
-                              {link.name}
-                            </Link>
-                          ))}
+                          {project.links.map((link, i) => {
+                            const linkClass =
+                              "inline-flex items-center gap-1.5 text-sm text-primary hover:underline transition-colors font-medium";
+
+                            // stopPropagation on both branches: the whole card
+                            // is a click target that toggles expansion, so
+                            // without it opening a PDF also collapses the card
+                            // you opened it from.
+                            if (isLocalPdf(link.url)) {
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  className={linkClass}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenPDF(
+                                      link.url,
+                                      project.title,
+                                      pdfFileName(link.url),
+                                    );
+                                  }}
+                                >
+                                  <BookOpen className="w-4 h-4" />
+                                  {link.name}
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <Link
+                                key={i}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={linkClass}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {link.name.includes("GitHub") ? (
+                                  <GitBranch className="w-4 h-4" />
+                                ) : (
+                                  <ExternalLink className="w-4 h-4" />
+                                )}
+                                {link.name}
+                              </Link>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -314,6 +386,52 @@ export function Research() {
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
   const [isPhdExpanded, setIsPhdExpanded] = useState(false);
+  const {
+    isOpen,
+    pdfUrl,
+    title,
+    downloadFileName,
+    shareSlug,
+    openPDF,
+    closePDF,
+  } = usePDFViewer();
+
+  // Above the display check: hooks cannot sit behind an early return.
+  //
+  // The hero registers a second target, #<anchor>-full. Its plain anchor only
+  // points at the card, while the -full variant also opens the description,
+  // so a link can share the card without forcing the long read on the reader.
+  const { deepLinkedId, highlightedId } = useCardDeepLink(
+    researchSection.projects.flatMap((p, i) =>
+      p.anchorId
+        ? i === 0
+          ? [p.anchorId, `${p.anchorId}-full`]
+          : [p.anchorId]
+        : [],
+    ),
+  );
+  const heroAnchor = researchSection.projects[0].anchorId;
+  const heroFullAnchor = heroAnchor ? `${heroAnchor}-full` : undefined;
+  const heroIsLinked =
+    !!heroAnchor &&
+    (deepLinkedId === heroAnchor || deepLinkedId === heroFullAnchor);
+
+  // Arriving via a deep link opens the targeted card.
+  //
+  // Only the hero distinguishes the two variants. Grid cards always open,
+  // because collapsed they show a three-line teaser, so a link that left one
+  // shut would land the reader on something they still have to click.
+  useEffect(() => {
+    if (!deepLinkedId) return;
+    if (deepLinkedId === heroFullAnchor) {
+      setIsPhdExpanded(true);
+      return;
+    }
+    const target = researchSection.projects.findIndex(
+      (p) => p.anchorId === deepLinkedId,
+    );
+    if (target > 0) setActiveIndex(target);
+  }, [deepLinkedId, heroFullAnchor]);
 
   if (!researchSection.display) {
     return null;
@@ -325,7 +443,9 @@ export function Research() {
       (p) => p.status === "active",
     ).length,
     yearsOfResearch: getFormattedResearchYears(researchSection.projects),
-    researchAreas: 4, // Neuroevolution, Conversational AI, Decentralization, Neuroscience
+    // Hand-maintained, not derived from the data: several projects share a
+    // field, so counting distinct tags would overcount.
+    researchAreas: 5, // Neuroevolution, Artificial Life, Conversational AI, Decentralization, Neuroscience
     technologies: new Set(researchSection.projects.flatMap((p) => p.tags)).size,
   };
 
@@ -404,21 +524,25 @@ export function Research() {
                     My Research Journey
                   </h3>
 
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={isJourneyExpanded ? "full" : "short"}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-                        {isJourneyExpanded
-                          ? researchSection.journeyDescription
-                          : researchSection.journeyShortDescription}
-                      </p>
-                    </motion.div>
-                  </AnimatePresence>
+                  {/* Keyed motion.div rather than AnimatePresence mode="wait".
+                      With mode="wait" the incoming child only mounts once the
+                      outgoing one finishes exiting, and when exit animations do
+                      not run the swap stalls: the button label flips but the
+                      text never changes. Keying a plain motion.div makes React
+                      swap the node outright and framer just fades the new one
+                      in, which cannot get stuck. */}
+                  <motion.div
+                    key={isJourneyExpanded ? "full" : "short"}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl mx-auto">
+                      {isJourneyExpanded
+                        ? researchSection.journeyDescription
+                        : researchSection.journeyShortDescription}
+                    </p>
+                  </motion.div>
 
                   <div className="flex justify-center mt-6">
                     <motion.button
@@ -518,12 +642,25 @@ export function Research() {
         </div>
 
         {/* PhD Research Hero Feature - Standalone */}
-        <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-10">
+        {/* z-20, above the z-10 project grid below. The highlight tooltips
+            hang past this card's bottom edge, and at equal z-index the grid
+            wins on DOM order and paints over the escaping text. */}
+        <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-20">
           <motion.div
-            className="relative"
+            id={heroAnchor}
+            className={cn(
+              "relative",
+              (highlightedId === heroAnchor ||
+                highlightedId === heroFullAnchor) &&
+                "deep-link-highlight",
+            )}
             whileHover={{ scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
+            {/* useCardDeepLink scrolls to getElementById(hash), so the -full
+                variant needs an element of its own. Zero-size and at the top
+                of the card, so both anchors land on the same place. */}
+            <span id={heroFullAnchor} aria-hidden="true" />
             {/* Unified Badge - Elegant single pill design */}
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
               <div className="bg-background px-5 py-1.5 rounded-full border border-primary/50 shadow-lg shadow-primary/10">
@@ -558,9 +695,13 @@ export function Research() {
 
             <HolographicCard
               glowColor={researchSection.projects[0].color || "139, 92, 246"}
-              className="bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5 backdrop-blur-sm overflow-visible"
+              className="bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5 backdrop-blur-sm"
+              // The highlight boxes below open hover tooltips that are taller
+              // than the space left under them, so the card must not clip.
+              allowContentOverflow
+              forceHover={heroIsLinked}
             >
-              <div className="p-6 sm:p-8 overflow-visible">
+              <div className="p-6 sm:p-8">
                 <div className="text-center mb-4 sm:mb-6">
                   <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                     {researchSection.projects[0].title}
@@ -572,21 +713,25 @@ export function Research() {
 
                 {/* Expandable Description with Toggle */}
                 <div className="text-center mb-6 sm:mb-8 max-w-3xl mx-auto">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={isPhdExpanded ? "full" : "short"}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <p className="text-sm sm:text-base text-muted-foreground">
-                        {isPhdExpanded
-                          ? researchSection.projects[0].description
-                          : researchSection.projects[0].shortDescription}
-                      </p>
-                    </motion.div>
-                  </AnimatePresence>
+                  {/* Keyed motion.div rather than AnimatePresence mode="wait".
+                      With mode="wait" the incoming child only mounts once the
+                      outgoing one finishes exiting, and when exit animations do
+                      not run the swap stalls: the button label flips but the
+                      text never changes. Keying a plain motion.div makes React
+                      swap the node outright and framer just fades the new one
+                      in, which cannot get stuck. */}
+                  <motion.div
+                    key={isPhdExpanded ? "full" : "short"}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <p className="text-sm sm:text-base text-muted-foreground">
+                      {isPhdExpanded
+                        ? researchSection.projects[0].description
+                        : researchSection.projects[0].shortDescription}
+                    </p>
+                  </motion.div>
 
                   {/* Toggle Button */}
                   <div className="flex justify-center mt-4">
@@ -667,8 +812,10 @@ export function Research() {
                               {highlight}
                             </p>
 
-                            {/* Hover tooltip with expanded description */}
-                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64 group">
+                            {/* Hover tooltip with expanded description. Escapes
+                                the card via allowContentOverflow above; without
+                                it the card clips this and the text is cut off. */}
+                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64">
                               <div className="bg-popover text-popover-foreground rounded-lg shadow-xl border p-3">
                                 <p className="text-xs leading-relaxed">
                                   {expandedDescriptions[i]}
@@ -722,13 +869,36 @@ export function Research() {
                         );
                       }
 
+                      const heroLinkClass =
+                        "inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all hover:scale-105 hover:shadow-lg";
+
+                      if (isLocalPdf(link.url)) {
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            className={heroLinkClass}
+                            onClick={() =>
+                              openPDF(
+                                link.url,
+                                researchSection.projects[0].title,
+                                pdfFileName(link.url),
+                              )
+                            }
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            {link.name}
+                          </button>
+                        );
+                      }
+
                       return (
                         <Link
                           key={i}
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all hover:scale-105 hover:shadow-lg"
+                          className={heroLinkClass}
                         >
                           <GitBranch className="w-4 h-4" />
                           {link.name}
@@ -774,12 +944,29 @@ export function Research() {
                     setActiveIndex(activeIndex === index + 1 ? -1 : index + 1)
                   }
                   isLeftSide={index % 2 === 0}
+                  isDeepLinked={
+                    !!project.anchorId && deepLinkedId === project.anchorId
+                  }
+                  isHighlighted={
+                    !!project.anchorId && highlightedId === project.anchorId
+                  }
+                  onOpenPDF={openPDF}
                 />
               </SlideInUp>
             ))}
           </div>
         </div>
       </div>
+
+      {/* PDF Modal */}
+      <PDFModal
+        isOpen={isOpen}
+        onClose={closePDF}
+        pdfUrl={pdfUrl}
+        title={title}
+        downloadFileName={downloadFileName}
+        shareSlug={shareSlug}
+      />
     </div>
   );
 }

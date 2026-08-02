@@ -23,6 +23,8 @@ import {
 import { cn } from "@/lib/utils";
 import { getFormattedExperienceYears } from "@/lib/utils/experience-calculator";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
+import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { HolographicCard } from "@/components/ui/holographic-card";
 
@@ -30,6 +32,10 @@ interface ExperienceTimelineItemProps {
   experience: (typeof workExperiences.experience)[0];
   index: number;
   isLast: boolean;
+  /** Arrived via a deep link: hold the glow and open the details. */
+  isDeepLinked?: boolean;
+  /** Briefly ring-pulse this card after a deep link lands on it. */
+  isHighlighted?: boolean;
 }
 
 function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
@@ -80,10 +86,17 @@ function ExperienceTimelineItem({
   experience,
   index,
   isLast,
+  isDeepLinked = false,
+  isHighlighted = false,
 }: ExperienceTimelineItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
+
+  // Arriving via a deep link opens the details.
+  useEffect(() => {
+    if (isDeepLinked) setIsExpanded(true);
+  }, [isDeepLinked]);
 
   const { theme } = useTheme();
   const fallbackColor = "rgb(59, 130, 246)";
@@ -124,12 +137,20 @@ function ExperienceTimelineItem({
     return () => observer.disconnect();
   }, []);
 
+  // Entrance is gated on the IntersectionObserver. A deep link can land on a
+  // card far down the page, so it must show regardless: scrolling the viewport
+  // to something still at opacity 0 would look like a broken link. Every
+  // entrance animation in this card reads this, not isVisible.
+  const shown = isVisible || isDeepLinked;
+
   return (
     <div
       ref={itemRef}
+      id={experience.anchorId}
       className={cn(
         "relative flex gap-4 sm:gap-6 transition-all duration-700",
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+        shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+        isHighlighted && "deep-link-highlight",
       )}
     >
       {/* Timeline line and dot */}
@@ -137,7 +158,7 @@ function ExperienceTimelineItem({
         {/* Dot */}
         <motion.div
           initial={{ scale: 0 }}
-          animate={isVisible ? { scale: 1 } : { scale: 0 }}
+          animate={shown ? { scale: 1 } : { scale: 0 }}
           transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
           className="relative z-10"
         >
@@ -195,18 +216,19 @@ function ExperienceTimelineItem({
             .replace("rgb(", "")
             .replace(")", "")}
           className="h-full cursor-pointer"
+          forceHover={isDeepLinked}
           onMouseEnter={() => {}}
           onMouseLeave={() => {}}
         >
           <motion.div
             initial={{ opacity: 0 }}
-            animate={isVisible ? { opacity: 1 } : { opacity: 0 }}
+            animate={shown ? { opacity: 1 } : { opacity: 0 }}
             transition={{ delay: index * 0.05 + 0.1 }}
             className="p-4 sm:p-6"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             {/* Year and Type badges */}
-            <div className="inline-flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2">
               <span
                 className="text-xs px-2 py-0.5 rounded-full font-medium"
                 style={{
@@ -229,6 +251,13 @@ function ExperienceTimelineItem({
                 <experienceType.icon className="w-3 h-3" />
                 {experienceType.label}
               </span>
+              {experience.anchorId && (
+                <CopyLinkButton
+                  anchorId={experience.anchorId}
+                  label={`Copy link to ${experience.role} at ${experience.company}`}
+                  className="ml-auto"
+                />
+              )}
             </div>
 
             {/* Role and Company */}
@@ -345,10 +374,114 @@ function ExperienceTimelineItem({
   );
 }
 
+/** Roles shown before the reader has to ask for the rest. */
+const COLLAPSED_COUNT = 5;
+
+/**
+ * The reveal control, built as a node ON the timeline rather than a button
+ * under it, so the list reads as continuing rather than ending.
+ *
+ * Geometry deliberately matches ExperienceTimelineItem: same column, same
+ * circle size as the company logos, so the node lands on the same vertical
+ * axis as every dot above it.
+ */
+function TimelineRevealNode({
+  hiddenCount,
+  expanded,
+  onToggle,
+}: {
+  hiddenCount: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="relative flex gap-4 sm:gap-6">
+      <div className="relative flex flex-col items-center">
+        {/* Dashed while collapsed: the timeline is interrupted, not finished.
+            Solid once open, matching the connectors between real cards. */}
+        <div
+          className={cn(
+            "w-0.5 h-6 -mt-2",
+            expanded
+              ? "bg-primary/30"
+              : "bg-[linear-gradient(to_bottom,currentColor_50%,transparent_50%)] bg-[length:2px_8px] text-primary/40",
+          )}
+        />
+        <button
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? "Collapse earlier roles"
+              : `Show ${hiddenCount} earlier roles`
+          }
+          className={cn(
+            "relative z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-dashed",
+            "flex items-center justify-center bg-background",
+            "border-primary/40 text-primary hover:border-primary hover:bg-primary/5",
+            "transition-colors",
+          )}
+        >
+          {expanded ? (
+            <ChevronRight className="w-5 h-5 -rotate-90" />
+          ) : (
+            <span className="text-sm font-semibold">+{hiddenCount}</span>
+          )}
+        </button>
+      </div>
+
+      <div className="flex-1 pb-8 sm:pb-12 flex items-center">
+        <button
+          onClick={onToggle}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="text-sm font-medium text-primary transition-colors hover:underline flex items-center gap-1"
+        >
+          {expanded
+            ? "Show fewer roles"
+            : `See all ${hiddenCount} earlier roles`}
+          <ChevronRight
+            className={cn(
+              "w-3 h-3 transition-transform",
+              expanded ? "-rotate-90" : "rotate-90",
+            )}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ExperienceTimeline() {
+  // Above the display check on purpose: hooks cannot sit behind an early
+  // return. The hook itself no-ops when the hash matches nothing.
+  const { deepLinkedId, highlightedId } = useCardDeepLink(
+    workExperiences.experience.flatMap((exp) =>
+      exp.anchorId ? [exp.anchorId] : [],
+    ),
+  );
+  const [showAll, setShowAll] = useState(false);
+
+  // A deep link to a role behind the cutoff has to reveal it, or the hash
+  // would resolve to nothing and the page would sit at the top. Only when the
+  // target is genuinely hidden: linking to one of the first roles must leave
+  // the list collapsed rather than dumping all eleven on the reader.
+  useEffect(() => {
+    if (!deepLinkedId) return;
+    const target = workExperiences.experience.findIndex(
+      (exp) => exp.anchorId === deepLinkedId,
+    );
+    if (target >= COLLAPSED_COUNT) setShowAll(true);
+  }, [deepLinkedId]);
+
   if (!workExperiences.display) {
     return null;
   }
+
+  const visibleExperiences = showAll
+    ? workExperiences.experience
+    : workExperiences.experience.slice(0, COLLAPSED_COUNT);
+  const hiddenCount = workExperiences.experience.length - COLLAPSED_COUNT;
 
   const stats = {
     totalPositions: workExperiences.experience.length,
@@ -445,14 +578,27 @@ export function ExperienceTimeline() {
 
       {/* Timeline */}
       <div className="relative">
-        {workExperiences.experience.map((exp, index) => (
+        {visibleExperiences.map((exp, index) => (
           <ExperienceTimelineItem
             key={index}
             experience={exp}
             index={index}
-            isLast={index === workExperiences.experience.length - 1}
+            // Measured against what is actually rendered, not the full array.
+            // Otherwise the fifth card keeps isLast false while collapsed and
+            // trails its connector line into empty space.
+            isLast={index === visibleExperiences.length - 1}
+            isDeepLinked={!!exp.anchorId && deepLinkedId === exp.anchorId}
+            isHighlighted={!!exp.anchorId && highlightedId === exp.anchorId}
           />
         ))}
+
+        {hiddenCount > 0 && (
+          <TimelineRevealNode
+            hiddenCount={hiddenCount}
+            expanded={showAll}
+            onToggle={() => setShowAll((open) => !open)}
+          />
+        )}
       </div>
     </div>
   );

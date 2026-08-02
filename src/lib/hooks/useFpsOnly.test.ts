@@ -47,6 +47,7 @@ describe("useFpsOnly", () => {
       expect(result.current).toEqual({
         fps: 60,
         isLowFps: false,
+        refreshRate: null,
       });
     });
 
@@ -60,6 +61,78 @@ describe("useFpsOnly", () => {
       renderHook(() => useFpsOnly(false));
 
       expect(global.requestAnimationFrame).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Refresh Rate Detection", () => {
+    /** Drive N frames spaced by `deltaMs`. */
+    const runFrames = (count: number, deltaMs: number) => {
+      for (let i = 0; i < count; i++) {
+        act(() => {
+          currentTime += deltaMs;
+          if (rafCallback) rafCallback(currentTime);
+        });
+      }
+    };
+
+    it("reports null until it has seen enough frames", () => {
+      const { result } = renderHook(() => useFpsOnly(true));
+
+      runFrames(20, 16.67);
+
+      expect(result.current.refreshRate).toBeNull();
+    });
+
+    it("measures a 60Hz display", () => {
+      const { result } = renderHook(() => useFpsOnly(true));
+
+      runFrames(200, 16.67);
+
+      expect(result.current.refreshRate).toBe(60);
+    });
+
+    it("measures a 120Hz display", () => {
+      const { result } = renderHook(() => useFpsOnly(true));
+
+      runFrames(200, 8.33);
+
+      expect(result.current.refreshRate).toBe(120);
+    });
+
+    it("sees 120Hz even when the page only renders 40 FPS on it", () => {
+      // The whole reason this exists. The frame COUNT here is about 40, which
+      // is indistinguishable from a 60Hz display doing 40. The frame DELTAS
+      // are whole multiples of 8.33ms, which is not.
+      const { result } = renderHook(() => useFpsOnly(true));
+
+      for (let i = 0; i < 240; i++) {
+        act(() => {
+          currentTime += 8.33 * (i % 15 === 0 ? 1 : 3);
+          if (rafCallback) rafCallback(currentTime);
+        });
+      }
+
+      expect(result.current.refreshRate).toBe(120);
+      // And the reported frame rate is still the real one, well under it.
+      expect(result.current.fps).toBeLessThan(60);
+    });
+
+    it("ignores frames measured while the tab is hidden", () => {
+      const { result } = renderHook(() => useFpsOnly(true));
+
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => true,
+      });
+      runFrames(200, 8.33);
+      expect(result.current.refreshRate).toBeNull();
+
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => false,
+      });
+      runFrames(200, 16.67);
+      expect(result.current.refreshRate).toBe(60);
     });
   });
 
@@ -244,6 +317,7 @@ describe("useFpsOnly", () => {
       expect(result.current).toEqual({
         fps: 60,
         isLowFps: false,
+        refreshRate: null,
       });
     });
   });

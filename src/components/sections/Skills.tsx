@@ -59,8 +59,20 @@ const techIconMap: { [key: string]: string } = {
   Documentation: "fas fa-file-alt",
 };
 
+// Hoisted out of the render loop, where it was being rebuilt once per panel
+// on every render.
+const RESEARCH_CATEGORY_COLORS = {
+  "Current Focus": "139, 92, 246",
+  "Why Evolution": "59, 130, 246",
+  "My Approach": "34, 197, 94",
+  Seeking: "245, 158, 11",
+} as const;
+
 export function Skills() {
   const [expandedActivity, setExpandedActivity] = useState<number | null>(null);
+  // Tracked separately from expandedActivity so opening a philosophy panel
+  // does not silently collapse a Core Activity card above it.
+  const [expandedInterest, setExpandedInterest] = useState<number | null>(null);
   // Force refresh: Updated tech order and alignment fixes
 
   if (!skillsSection.display) {
@@ -352,16 +364,11 @@ export function Skills() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(skillsSection.researchInterests).map(
-              ([category, interests], index) => {
-                const categoryColors = {
-                  "Current Focus": "139, 92, 246",
-                  "Why Evolution": "59, 130, 246",
-                  "My Approach": "34, 197, 94",
-                  Seeking: "245, 158, 11",
-                };
+              ([category, panel], index) => {
                 const categoryColor =
-                  categoryColors[category as keyof typeof categoryColors] ||
-                  "107, 114, 128";
+                  RESEARCH_CATEGORY_COLORS[
+                    category as keyof typeof RESEARCH_CATEGORY_COLORS
+                  ] || "107, 114, 128";
 
                 return (
                   <SlideInUp key={category} delay={500 + index * 100}>
@@ -420,8 +427,48 @@ export function Skills() {
                             </h4>
                           </div>
 
+                          {/* Framing paragraph. Without it the bullets below
+                              read as a list of fragments with no referent. */}
+                          <div className="mb-4">
+                            <p
+                              className={cn(
+                                "text-sm text-muted-foreground transition-all duration-300",
+                                expandedInterest === index
+                                  ? ""
+                                  : "line-clamp-3",
+                              )}
+                            >
+                              {expandedInterest === index
+                                ? panel.expandedDescription
+                                : panel.description}
+                            </p>
+                            <button
+                              className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
+                              onClick={() =>
+                                setExpandedInterest(
+                                  expandedInterest === index ? null : index,
+                                )
+                              }
+                              aria-label={
+                                expandedInterest === index
+                                  ? `Show less about ${category}`
+                                  : `Read more about ${category}`
+                              }
+                            >
+                              {expandedInterest === index
+                                ? "Show less"
+                                : "Read more"}
+                              <ChevronDown
+                                className={cn(
+                                  "w-3 h-3 transition-transform duration-300",
+                                  expandedInterest === index && "rotate-180",
+                                )}
+                              />
+                            </button>
+                          </div>
+
                           <div className="space-y-2">
-                            {interests.map((interest, idx) => (
+                            {panel.bullets.map((interest, idx) => (
                               <motion.div
                                 key={idx}
                                 className="flex items-start gap-2 text-sm group/interest"

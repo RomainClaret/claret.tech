@@ -12,6 +12,11 @@ on:
           - production
           - preview
 
+# Least privilege: these workflows only read the repo and run tests.
+# Without this they inherit the repo default, which is write.
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: '20'
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

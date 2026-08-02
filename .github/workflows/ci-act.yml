@@ -10,6 +10,11 @@ on:
     branches: ['*']  # Run on all pull requests
   workflow_call:  # Allow this workflow to be called by other workflows
 
+# Least privilege: these workflows only read the repo and run tests.
+# Without this they inherit the repo default, which is write.
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: '20'
   # CI environment detection variables

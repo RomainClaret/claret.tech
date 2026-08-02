@@ -23,12 +23,17 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
+        // Path-scoped: without a pathname these two turn /_next/image into an
+        // open image proxy for anyone's repository content, which is also the
+        // surface the Next image-optimizer advisories target.
         protocol: "https",
         hostname: "github.com",
+        pathname: "/RomainClaret/**",
       },
       {
         protocol: "https",
         hostname: "raw.githubusercontent.com",
+        pathname: "/RomainClaret/**",
       },
       {
         protocol: "https",
@@ -146,12 +151,25 @@ const nextConfig = {
     return config;
   },
 
+  async redirects() {
+    return [
+      {
+        // The raw files live under /pdfs/, so that is where people reach for
+        // the CV. The reader pages are /pdf/<slug>. Nothing in public/pdfs/ is
+        // named "cv", so no static file is shadowed by this.
+        source: "/pdfs/cv",
+        destination: "/pdf/cv",
+        permanent: true,
+      },
+    ];
+  },
+
   // Headers for caching and security
   async headers() {
     // Content Security Policy - strict but allows necessary resources
     const ContentSecurityPolicy = `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://va.vercel-scripts.com https://*.vercel.app https://vercel.live;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://va.vercel-scripts.com https://vercel.live;
       worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com https://avatars.githubusercontent.com https://cdn-images-1.medium.com https://cdn-images-2.medium.com https://miro.medium.com https://images.unsplash.com;
@@ -170,11 +188,24 @@ const nextConfig = {
     return [
       // Prevent caching of HTML pages to ensure fresh JS chunk references after deploys
       {
-        source: "/((?!_next|fonts|images|animations|pdfs|api|favicon|robots|sitemap).*)",
+        source: "/((?!_next|fonts|images|animations|pdfs|pyodide|api|favicon|robots|sitemap).*)",
         headers: [
           {
             key: "Cache-Control",
             value: "public, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        // The Pyodide runtime is ~18MB of version-pinned bytes vendored by
+        // scripts/setup-assets.js. Its filenames never change within a release,
+        // and a new release lands in a fresh deploy, so immutable is safe and
+        // saves a revalidation round-trip per asset per session.
+        source: "/pyodide/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },
@@ -224,6 +255,42 @@ const nextConfig = {
             // break cross-origin images (GitHub/Medium) and WebLLM.
             key: "Cross-Origin-Opener-Policy",
             value: "same-origin",
+          },
+        ],
+      },
+      {
+        // The Python sandbox worker gets its own complete policy, not a delta
+        // on the site-wide one.
+        //
+        // This is what closes the last egress channel. Dynamic import() is
+        // syntax, not a global, so it cannot be stripped from the worker the
+        // way fetch and WebSocket are: escaped code can always evaluate
+        // import("https://..."). The import throws on a non-module response,
+        // but the REQUEST still happens, so any origin the policy allows is a
+        // working exfiltration endpoint - and the site-wide script-src allows
+        // https://*.vercel.app, a wildcard over every Vercel preview
+        // deployment on the internet.
+        //
+        // Nothing in this worker legitimately talks to a third party: Pyodide,
+        // the wasm and the wheels are all same-origin under /pyodide/. So the
+        // worker gets 'self' and nothing else, and import() can only reach
+        // code this site already trusts.
+        source: "/python-worker.js",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'none'",
+              // 'self' covers /pyodide/pyodide.mjs and pyodide.asm.mjs.
+              "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
+              // pyodide.asm.wasm, python_stdlib.zip, the numpy wheel.
+              "connect-src 'self'",
+              // Nested workers are stripped at runtime; this is the second lock.
+              "worker-src 'none'",
+              "child-src 'none'",
+              "object-src 'none'",
+              "base-uri 'none'",
+            ].join("; "),
           },
         ],
       },

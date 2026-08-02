@@ -83,37 +83,68 @@ export const skillsSection = {
     title: "Research Philosophy",
     subtitle: "Building AI that adapts instead of memorizing",
   },
+  /**
+   * Each panel leads with a short framing line so the bullets underneath have
+   * something to attach to. Read as a bare list they lose their referent: a
+   * bullet starting "Measuring it honestly" under a heading that just says
+   * "Current Focus" gives the reader no way to work out what "it" is.
+   *
+   * `description` has to read well in a narrow four-across card, so keep it to
+   * one sentence. `expandedDescription` is what Read more swaps in.
+   */
   researchInterests: {
-    "Current Focus": [
-      "Emergent behaviors in bio-inspired artificial life, grown by evolution and judged on what they do, not on how well they copy us or a dataset",
-      "Genuine emergence as the frontier: specialists that claim their own roles, coordination that carries to problems it never saw",
-      "Composition as reasoning: assemble solutions from evolved specialists, then get the assembly itself to emerge",
-      "Lifelong learning without forgetting: reuse settled behaviors instead of overwriting them",
-      "Interpretable by construction: a mind you can read as parts, not one opaque blob",
-    ],
-    "Why Evolution": [
-      "Cockroaches outlived dinosaurs. Adaptation beats optimization every time the world moves",
-      "Your brain runs on 20 watts of spaghetti code, and still outthinks every tidy system we design",
-      "Every biological 'bug' turns out to be a feature somewhere else you weren't looking",
-      "Messy survivors beat clean corpses. Robust and ugly outlasts elegant and brittle",
-      "Evolution has no final version and no ship date, just whatever survives the next surprise",
-      "Nobody designed the octopus or the immune system. Evolution found them by trying, failing, and keeping what worked",
-    ],
-    "My Approach": [
-      "Test systematically, or watch a year of computing vanish proving nothing",
-      "Grow behaviors, don't drill answers. One adapts to new problems, the other just recites the old ones",
-      "Chase adaptability, not benchmark scores. A high score that breaks on contact was never worth much",
-      "Failures are data, not mistakes. Every dead end quietly tells you where the real wall is",
-      "Set the conditions, then get out of the way and watch what evolution does with them",
-      "When the right tool doesn't exist yet, build it. The interesting problems never come with one",
-    ],
-    Seeking: [
-      "Collaborators who value adaptation over benchmarks, and a good argument over easy agreement",
-      "Patience to let evolution surprise you, because the results worth having rarely arrive on schedule",
-      "People who get that intelligence emerges on its own rather than being programmed in line by line",
-      "A taste for building toward the unknown, not for acing today's test",
-      "Wild theories, odd collaborations, and anyone convinced I'm wrong (bring proof)",
-      "Problems worth spending years on, the kind most people abandon after a few months",
-    ],
+    "Current Focus": {
+      description:
+        "What I am working on now, and the problem sitting under it.",
+      expandedDescription:
+        "Everything here follows from one choice: grow the networks rather than train them. That buys adaptability, and it costs you every familiar way of checking your work, because the usual tests assume the system learned from us. So half this list is the research and half is building the instruments to judge it.",
+      bullets: [
+        "Emergent behaviors in bio-inspired artificial life, grown by evolution and never fitted to us",
+        "Measuring emergence honestly, which nobody can do yet: every test for novel behavior is calibrated on human data, so behavior outside that space reads as noise",
+        "Specialists that claim their own roles, and coordination that carries to problems it never saw",
+        "Composition as reasoning: assemble solutions from evolved specialists, then get the assembly itself to emerge",
+        "Lifelong learning without forgetting: reuse settled behaviors instead of overwriting them",
+        "Interpretable by construction: a mind you can read as parts, not one opaque blob",
+      ],
+    },
+    "Why Evolution": {
+      description: "Why I grow networks instead of training them.",
+      expandedDescription:
+        "Optimization gives you the best answer to the question you asked. Adaptation gives you something that still works once the question changes. Biology has been running the second experiment for a few billion years, and almost nothing it produced was designed.",
+      bullets: [
+        "Cockroaches outlived dinosaurs. Adaptation beats optimization every time the world moves",
+        "Your brain runs on 20 watts of spaghetti code, and still outthinks every tidy system we design",
+        "Every biological 'bug' turns out to be a feature somewhere else you weren't looking",
+        "Messy survivors beat clean corpses. Robust and ugly outlasts elegant and brittle",
+        "Evolution has no final version and no ship date, just whatever survives the next surprise",
+        "Nobody designed the octopus or the immune system. Evolution found them by trying, failing, and keeping what worked",
+      ],
+    },
+    "My Approach": {
+      description: "How I work, mostly learned by wasting time first.",
+      expandedDescription:
+        "Long runs, systematic sweeps, and a lot of dead ends. These are the rules I keep relearning: test it before you trust it, measure what you actually claim, and build the tool yourself when the tool does not exist. Most of the useful signal arrived through failures I had not planned for.",
+      bullets: [
+        "Test systematically, or watch a year of computing vanish proving nothing",
+        "Grow behaviors, don't drill answers. One adapts to new problems, the other just recites the old ones",
+        "Chase adaptability, not benchmark scores. A high score that breaks on contact was never worth much",
+        "Failures are data, not mistakes. Every dead end quietly tells you where the real wall is",
+        "Set the conditions, then get out of the way and watch what evolution does with them",
+        "When the right tool doesn't exist yet, build it. The interesting problems never come with one",
+      ],
+    },
+    Seeking: {
+      description: "What I want from collaborators and from problems.",
+      expandedDescription:
+        "I would rather have a good argument than easy agreement, and rather spend three years on a question that matters than three months on one that scores well. If you think I am wrong about any of this, bring evidence and I will listen.",
+      bullets: [
+        "Collaborators who value adaptation over benchmarks, and a good argument over easy agreement",
+        "Patience to let evolution surprise you, because the results worth having rarely arrive on schedule",
+        "People who get that intelligence emerges on its own rather than being programmed in line by line",
+        "A taste for building toward the unknown, not for acing today's test",
+        "Wild theories, odd collaborations, and anyone convinced I'm wrong (bring proof)",
+        "Problems worth spending years on, the kind most people abandon after a few months",
+      ],
+    },
   },
 };

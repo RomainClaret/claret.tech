@@ -19,6 +19,18 @@ interface HolographicCardProps {
   /** Hold the hover color shift on, as if the pointer were over the card
    *  (used by paper deep links until the user interacts). */
   forceHover?: boolean;
+  /**
+   * Let children paint outside the card's bounds.
+   *
+   * The content wrapper clips by default so children respect the rounded
+   * corners. That also silently truncates anything meant to escape, such as a
+   * hover tooltip taller than the space left below it. Opt in per card rather
+   * than dropping the clip globally, since most cards do want it.
+   *
+   * Note this cannot be done from the caller's `className`: that prop is
+   * applied to the outer wrapper, which never clipped anything.
+   */
+  allowContentOverflow?: boolean;
   delay?: number;
   transitionDuration?: number;
 }
@@ -33,6 +45,7 @@ export function HolographicCard({
   isActive = false,
   isConnected = false,
   forceHover = false,
+  allowContentOverflow = false,
   delay = 0,
   transitionDuration = 300,
 }: HolographicCardProps) {
@@ -190,7 +203,12 @@ export function HolographicCard({
       <motion.div
         className={cn(
           "relative bg-card/95 dark:bg-card/90",
-          "rounded-lg overflow-hidden",
+          // This is the only element in the tree that clips card content.
+          // Nothing positioned inside it depends on the clip (the border,
+          // activity dot, light reflection and tint overlay are all inset), so
+          // opting out is safe where a child needs to escape.
+          "rounded-lg",
+          allowContentOverflow ? "overflow-visible" : "overflow-hidden",
           "shadow-lg border border-border",
           "transition-all",
           "before:absolute before:inset-0 before:bg-gradient-to-br",

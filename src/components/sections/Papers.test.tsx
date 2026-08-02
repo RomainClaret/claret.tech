@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { Papers } from "./Papers";
-import type { Publication } from "@/lib/api/fetch-publications";
+import {
+  STATIC_PUBLICATIONS,
+  type Publication,
+} from "@/lib/api/fetch-publications";
 import {
   FadeInProps,
   SlideInUpProps,
@@ -52,6 +61,9 @@ vi.mock("@/data/portfolio", () => ({
         date: "2016",
         status: "preprint",
         anchorId: "claret2016blockchain",
+        // An Other Work card carrying citations, so the header's citation
+        // total can be shown to include them and not just the publications.
+        citations: 4,
         shortDescription:
           "Demystifying blockchain when everyone thought it would change everything. Technical reality vs. religious fervor.",
         subtitle:
@@ -358,13 +370,68 @@ describe("Papers", () => {
       });
     });
 
-    it("displays publication count and citations", async () => {
+    it("counts academic works and peer-reviewed publications separately", async () => {
+      // The header used to call all of them "publications" while the body
+      // filed several under Other Work as explicitly not that.
       render(<Papers />);
 
       await waitFor(() => {
-        expect(screen.getByText("5 publications")).toBeInTheDocument(); // 3 static + 2 dynamic
-        expect(screen.getByText("23 citations")).toBeInTheDocument();
+        expect(screen.getByText("5 academic works")).toBeInTheDocument(); // 3 cards + 2 publications
+        expect(screen.getByText("2 peer-reviewed")).toBeInTheDocument();
+        // 23 from the publications feed plus the 4 on the blockchain card.
+        expect(screen.getByText("27 citations")).toBeInTheDocument();
       });
+    });
+
+    it("derives the counts from the data rather than a fixed number", async () => {
+      // Same component, a different number of publications: if either count
+      // were written into the copy, one of these renders would be wrong.
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              publications: [mockPublications[0]],
+              totalCitations: 7,
+              count: 1,
+            }),
+        } as Response),
+      );
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("4 academic works")).toBeInTheDocument();
+        expect(screen.getByText("1 peer-reviewed")).toBeInTheDocument();
+      });
+    });
+
+    it("counts citations from Other Work as well as publications", async () => {
+      // The vestibular poster carries its citations on the card, since those
+      // entries have no citation feed. Before this they vanished from the
+      // total the moment a card moved out of the publications list. The mock
+      // feed reports 23 and one card carries 4, so anything reading 23 here
+      // means the cards are being ignored again.
+      render(<Papers />);
+
+      await waitFor(() =>
+        expect(screen.getByText("27 citations")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("23 citations")).toBeNull();
+    });
+
+    it("leaves the counts alone when a filter hides cards", async () => {
+      // They describe the record, not the current view.
+      render(<Papers />);
+
+      await waitFor(() =>
+        expect(screen.getByText("5 academic works")).toBeInTheDocument(),
+      );
+
+      fireEvent.click(screen.getByText("Papers Only"));
+
+      expect(screen.getByText("5 academic works")).toBeInTheDocument();
+      expect(screen.getByText("2 peer-reviewed")).toBeInTheDocument();
     });
 
     it("handles API fetch errors gracefully", async () => {
@@ -377,10 +444,18 @@ describe("Papers", () => {
         screen.getByText("Blockchain, a techie overview"),
       ).toBeInTheDocument();
 
-      // Should show static paper count only
+      // The publications list is seeded from the static array the API mirrors,
+      // so a failed request leaves the real publications on screen instead of
+      // an empty grid under a header that still counts them. Asserted against
+      // that array rather than a literal, so adding a publication does not
+      // make this fail for the wrong reason.
+      const seeded = STATIC_PUBLICATIONS.length;
       await waitFor(() => {
-        expect(screen.getByText("3 publications")).toBeInTheDocument();
+        expect(screen.getByText(`${seeded} peer-reviewed`)).toBeInTheDocument();
       });
+      expect(
+        screen.getByText(`${seeded + 3} academic works`),
+      ).toBeInTheDocument();
     });
 
     it("respects display flag", () => {
@@ -643,20 +718,23 @@ describe("Papers", () => {
     it("expands paper cards to show full content", async () => {
       render(<Papers />);
 
-      // Find "Read more" buttons for static papers
-      const readMoreButtons = screen.getAllByText("Read more");
+      // Scoped to the blockchain card rather than taking the first "Read more"
+      // on the page: the publications grid renders above the static cards, so
+      // an index picks whichever card happens to sort first.
+      const card = screen
+        .getByText("Blockchain, a techie overview")
+        .closest("div[class]")!.parentElement!;
+      const readMore = within(card as HTMLElement).getByText("Read more");
 
-      if (readMoreButtons.length > 0) {
-        fireEvent.click(readMoreButtons[0]);
+      fireEvent.click(readMore);
 
-        // Full subtitle should be visible
-        await waitFor(() => {
-          expect(screen.getByText(/blockchain hysteria/)).toBeInTheDocument();
-        });
+      await waitFor(() => {
+        expect(screen.getByText(/blockchain hysteria/)).toBeInTheDocument();
+      });
 
-        // Should now show "Show less" button
-        expect(screen.getByText("Show less")).toBeInTheDocument();
-      }
+      expect(
+        within(card as HTMLElement).getByText("Show less"),
+      ).toBeInTheDocument();
     });
 
     it("copies the BibTeX entry to clipboard for dynamic papers", async () => {
@@ -1051,8 +1129,11 @@ describe("Papers", () => {
         screen.getByText("Blockchain, a techie overview"),
       ).toBeInTheDocument();
 
+      // An empty response means no peer-reviewed work to show, so the header
+      // must say zero rather than keep the seeded number.
       await waitFor(() => {
-        expect(screen.getByText("3 publications")).toBeInTheDocument();
+        expect(screen.getByText("3 academic works")).toBeInTheDocument();
+        expect(screen.getByText("0 peer-reviewed")).toBeInTheDocument();
       });
     });
   });

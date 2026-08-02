@@ -1112,6 +1112,36 @@ describe("Terminal Commands", () => {
       expect(result.output).toContain("Unknown section: invalid");
       expect(result.output).toContain("Navigation Commands:");
     });
+
+    it("goes to the homepage when the section is not on this page", () => {
+      // On /pdf/<slug> none of the sections exist, and goto used to report a
+      // section that plainly does exist as missing.
+      mockDocument.getElementById.mockReturnValue(null);
+      const originalLocation = window.location;
+      const href = { value: "" };
+      Object.defineProperty(window, "location", {
+        value: {
+          ...originalLocation,
+          set href(url: string) {
+            href.value = url;
+          },
+          get href() {
+            return href.value;
+          },
+        },
+        configurable: true,
+      });
+
+      const result = commands.goto(["research"], mockContext) as CommandResult;
+
+      expect(result.success).toBe(true);
+      expect(href.value).toBe("/#research");
+
+      Object.defineProperty(window, "location", {
+        value: originalLocation,
+        configurable: true,
+      });
+    });
   });
 
   describe("man command", () => {

@@ -56,13 +56,36 @@ function decodeHTMLEntities(text: string): string {
 }
 
 // Extract color from image buffer using server-side processing
+/** Medium's own image hosts. Anything else is not ours to fetch. */
+function isMediumImageHost(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol !== "https:") return false;
+    return hostname === "medium.com" || hostname.endsWith(".medium.com");
+  } catch {
+    return false;
+  }
+}
+
+/** Above any real article image, and small enough that libvips cannot be fed a bomb. */
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 async function extractColorFromImage(imageUrl: string): Promise<string | null> {
   try {
-    // Fetch the image
+    // The URL comes out of article HTML fetched from a third party, so it is
+    // not ours until proven. Without this the og:image and twitter:image
+    // fallbacks would make this a request-forgery primitive from inside the
+    // serverless function, and pipe arbitrary bytes into libvips.
+    if (!isMediumImageHost(imageUrl)) return null;
+
     const response = await fetch(imageUrl);
     if (!response.ok) return null;
 
+    const declaredLength = Number(response.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_IMAGE_BYTES) return null;
+
     const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > MAX_IMAGE_BYTES) return null;
 
     // Resize and get dominant color using sharp
     const { data, info } = await sharp(buffer)

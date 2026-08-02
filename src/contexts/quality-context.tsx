@@ -13,13 +13,18 @@ import {
 import { useFpsOnly } from "@/lib/hooks/useFpsOnly";
 import { showToast } from "@/components/ui/toast";
 import { useTestMode } from "@/components/providers/test-mode-provider";
+import { QualityMode } from "@/lib/quality/mode";
+import {
+  decideQuality,
+  initialQualityState,
+  type QualityDecisionState,
+} from "@/lib/quality/decide";
 
-export enum QualityMode {
-  BATTERY_SAVER = "battery",
-  LOW = "low",
-  BALANCED = "balanced",
-  MAXIMUM = "maximum",
-}
+// Imported for use below and re-exported, so every existing
+// `import { QualityMode } from "@/contexts/quality-context"` keeps working.
+// It is declared in lib so the pure decision logic can use it without
+// importing this context, which would be a cycle.
+export { QualityMode };
 
 export interface ComponentConfig {
   animate: boolean;
@@ -131,102 +136,84 @@ export function QualityProvider({ children }: { children: ReactNode }) {
 
   // FPS monitoring for auto-adjustment
   const fpsData = useFpsOnly(typeof window !== "undefined");
-  const [lastAdjustment, setLastAdjustment] = useState(0);
   // Latest fps for the polling interval below WITHOUT being an effect
-  // dependency: keying the effect on fps tore down and recreated the 5s
-  // interval every second, so the adjustment poll could starve.
-  const latestFpsRef = useRef(60);
-  latestFpsRef.current = fpsData.fps || 60;
+  // dependency: keying the effect on fps tore down and recreated the poll
+  // every second, so the adjustment could starve.
+  //
+  // Deliberately NOT `|| 60`. rAF is paused in a background tab, so the first
+  // frame count after returning divides about one frame by a multi-second gap
+  // and rounds to zero; the old fallback turned that worst-case sample into a
+  // perfect score and triggered an upgrade. decideQuality discards implausible
+  // readings instead, which is only possible if it sees the real value.
+  const latestFpsRef = useRef(0);
+  latestFpsRef.current = fpsData.fps;
+  // What the display can do, as opposed to what the page is achieving. The
+  // gap between the two is the headroom the upgrade gate is really asking
+  // about.
+  const refreshRateRef = useRef<number | null>(null);
+  refreshRateRef.current = fpsData.refreshRate;
+  // All the auto-adjust bookkeeping (sample window, consecutive counts, per
+  // tier backoff, toast rate limit) lives in a ref rather than state: none of
+  // it should trigger a render, and keeping it out of the dependency array is
+  // what lets the interval run uninterrupted.
+  const decisionRef = useRef<QualityDecisionState | null>(null);
 
-  // Auto-adjust quality based on performance
+  // Auto-adjust quality based on performance.
+  //
+  // A thin driver: every decision lives in decideQuality, which is pure and
+  // unit tested. The logic this replaced was a guaranteed oscillation
+  // (BALANCED up at 50, MAXIMUM down at 45, with the switch itself moving the
+  // frame rate across that band) that nothing could observe because it was
+  // buried in this effect.
   useEffect(() => {
     if (!isAuto || typeof window === "undefined" || isTestMode) return;
 
-    const ADJUSTMENT_COOLDOWN = 10000; // 10 seconds between adjustments
-
-    const adjustQuality = () => {
+    const tick = () => {
       const now = Date.now();
-      if (now - lastAdjustment < ADJUSTMENT_COOLDOWN) return;
+      const stored = decisionRef.current ?? initialQualityState(quality, now);
+      // Quality can change without going through this loop: a manual switch,
+      // or a value restored from localStorage. Re-base on it and restart the
+      // sample window rather than reasoning from a tier we are no longer on.
+      const current =
+        stored.quality === quality
+          ? stored
+          : {
+              ...stored,
+              quality,
+              samples: [],
+              consecutiveDown: 0,
+              consecutiveUp: 0,
+              lastChangeAt: now,
+            };
 
-      const fps = latestFpsRef.current;
+      const decision = decideQuality(current, {
+        fps: latestFpsRef.current,
+        now,
+        hidden: typeof document !== "undefined" && document.hidden,
+        measuredRefreshRate: refreshRateRef.current,
+      });
+      decisionRef.current = decision.state;
 
-      // Downgrade if struggling
-      if (fps < 20 && quality !== QualityMode.BATTERY_SAVER) {
-        setQualityState(QualityMode.BATTERY_SAVER);
-        setLastAdjustment(now);
-        showToast(
-          `🔋 Auto-switched to battery saver mode\nFPS: ${Math.round(fps)}`,
-          "warning",
-          4000,
-        );
-        return;
-      }
+      if (!decision.next) return;
+      setQualityState(decision.next);
 
-      if (
-        fps < 30 &&
-        quality !== QualityMode.BATTERY_SAVER &&
-        quality !== QualityMode.LOW
-      ) {
-        setQualityState(QualityMode.LOW);
-        setLastAdjustment(now);
-        showToast(
-          `🔅 Auto-switched to low performance mode\nFPS: ${Math.round(fps)}`,
-          "warning",
-          4000,
-        );
-        return;
-      }
-
-      if (fps < 45 && quality === QualityMode.MAXIMUM) {
-        setQualityState(QualityMode.BALANCED);
-        setLastAdjustment(now);
-        showToast(
-          `⚖️ Auto-switched to balanced mode\nFPS: ${Math.round(fps)}`,
-          "info",
-          4000,
-        );
-        return;
-      }
-
-      // Upgrade if performing well
-      if (fps > 55 && quality === QualityMode.BATTERY_SAVER) {
-        setQualityState(QualityMode.LOW);
-        setLastAdjustment(now);
-        showToast(
-          `🔅 Auto-upgraded to low performance mode\nFPS: ${Math.round(fps)}`,
-          "success",
-          4000,
-        );
-        return;
-      }
-
-      if (fps > 50 && quality === QualityMode.LOW) {
-        setQualityState(QualityMode.BALANCED);
-        setLastAdjustment(now);
-        showToast(
-          `⚖️ Auto-upgraded to balanced mode\nFPS: ${Math.round(fps)}`,
-          "success",
-          4000,
-        );
-        return;
-      }
-
-      if (fps > 50 && quality === QualityMode.BALANCED) {
-        setQualityState(QualityMode.MAXIMUM);
-        setLastAdjustment(now);
-        showToast(
-          `🚀 Auto-upgraded to maximum quality\nFPS: ${Math.round(fps)}`,
-          "success",
-          4000,
-        );
-        return;
-      }
+      if (!decision.notify) return;
+      const isRescue = decision.next === QualityMode.BATTERY_SAVER;
+      showToast(
+        isRescue
+          ? "🔋 Switched to battery saver to keep the site responsive"
+          : "🚀 Performance recovered, full quality restored",
+        isRescue ? "warning" : "success",
+        4000,
+      );
     };
 
-    // Check every 5 seconds, not every frame
-    const interval = setInterval(adjustQuality, 5000);
+    // One sample per second, matching what useFpsOnly produces. The decision
+    // function does its own smoothing and rate limiting, so polling faster
+    // than the data arrives would only discard samples.
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [quality, isAuto, lastAdjustment, isTestMode]);
+  }, [quality, isAuto, isTestMode]);
 
   // Save preferences to localStorage
   useEffect(() => {

@@ -1,0 +1,11 @@
+# Finder metadata. Deploys normally go through a clean CI checkout, but a
+# `vercel deploy` from a working directory would otherwise upload these and
+# serve a local directory listing at /.DS_Store.
+.DS_Store
+**/.DS_Store
+
+# Never needed at runtime.
+*.log
+coverage
+playwright-report
+test-results

@@ -26,10 +26,15 @@ async function handler(request: NextRequest) {
 
   // Check if this is a test environment (playwright only, not unit tests)
   const url = new URL(request.url);
+  // Deliberately NOT keyed on User-Agent. It used to also match a UA containing
+  // "Playwright", which made mock mode reachable on the bare URL: the response
+  // is cacheable and nothing sets Vary, so the edge stored it under the same
+  // key a real visitor uses. One request turned the public blog section and
+  // /rss.xml into "Test Article 1" for everyone until the entry expired. The
+  // query param is safe because it is part of the cache key.
   const isTestMode =
     url.searchParams.get("playwright") === "true" ||
-    (process.env.NODE_ENV === "test" && !process.env.VITEST) ||
-    request.headers.get("user-agent")?.includes("Playwright");
+    (process.env.NODE_ENV === "test" && !process.env.VITEST);
 
   // Return mock data in test environment to avoid API failures
   if (isTestMode) {
@@ -74,7 +79,9 @@ async function handler(request: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+          // Never shared: mock output must not be able to occupy a cache entry
+          // that a real visitor could be served from.
+          "Cache-Control": "private, no-store",
         },
       },
     );

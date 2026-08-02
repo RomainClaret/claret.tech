@@ -163,6 +163,7 @@ describe("Fetch All Repositories API Route", () => {
 
       const request1 = {
         nextUrl: { searchParams: { get: () => null, has: () => false } },
+        headers: { get: () => null },
       } as unknown as NextRequest;
 
       await GET(request1);
@@ -185,7 +186,8 @@ describe("Fetch All Repositories API Route", () => {
       expect(result.cached).toBe(true);
     });
 
-    it("forces fresh data when fresh=true parameter", async () => {
+    it("forces fresh data when fresh=true carries the refresh key", async () => {
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
       // Populate cache
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -212,6 +214,10 @@ describe("Fetch All Repositories API Route", () => {
             has: (key: string) => key === "fresh",
           },
         },
+        headers: {
+          get: (key: string) =>
+            key.toLowerCase() === "x-refresh-key" ? "s3cret" : null,
+        },
       } as unknown as NextRequest;
 
       const response = await GET(request2);
@@ -220,6 +226,38 @@ describe("Fetch All Repositories API Route", () => {
 
       const result = await response.json();
       expect(result.cached).toBe(false);
+    });
+
+    it("ignores fresh=true without the refresh key and serves cache", async () => {
+      // Each forced refresh costs an authenticated GitHub call per 100 repos
+      // and bypasses the CDN, so an anonymous caller must not be able to
+      // trigger it.
+      process.env.PUBLICATIONS_REFRESH_TOKEN = "s3cret";
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockGraphQLResponse),
+      });
+      const warm = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+        headers: { get: () => null },
+      } as unknown as NextRequest;
+      await GET(warm);
+
+      mockFetch.mockClear();
+      const anonymous = {
+        nextUrl: {
+          searchParams: {
+            get: (key: string) => (key === "fresh" ? "true" : null),
+            has: (key: string) => key === "fresh",
+          },
+        },
+        headers: { get: () => null },
+      } as unknown as NextRequest;
+
+      const response = await GET(anonymous);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect((await response.json()).cached).toBe(true);
     });
 
     it("handles pagination correctly", async () => {

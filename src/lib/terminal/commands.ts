@@ -2,6 +2,8 @@
 
 import { getFileAtPath, resolvePath } from "./fileSystem";
 import { aiCommands } from "./ai-commands";
+import { pythonCommand } from "./python-command";
+import type { LineMode } from "./line-mode";
 import { getUser, listUsernames } from "./users";
 import { contactInfo } from "@/data/sections/contact";
 import { socialMediaLinks } from "@/data/sections/social";
@@ -19,11 +21,32 @@ export interface CommandContext {
   terminalRows?: number;
   writer?: (text: string) => void;
   abortController?: AbortController;
+  /**
+   * The argument text exactly as typed, before whitespace collapsing.
+   *
+   * `executeCommand` tokenizes on /\s+/ and does not parse quotes, which is
+   * fine for every other command but destroys indentation and quoting in
+   * `python -c "for i in x:\n  print(i)"`. Optional because plenty of callers
+   * build a context by hand; consumers must fall back to `args.join(" ")`.
+   */
+  rawArgs?: string;
+  /** Hand the input line to an interactive mode (the Python REPL). */
+  enterLineMode?: (mode: LineMode) => void;
+  /** Return the input line to the shell. */
+  exitLineMode?: () => void;
 }
 
 export interface CommandResult {
   output: string;
   success: boolean;
+  /**
+   * Skip the trailing blank line and prompt after this command.
+   *
+   * Needed by commands that have already drawn their own prompt, such as
+   * `python` entering the REPL: the default epilogue would print a second one
+   * and leave the line editor's row math pointing at the wrong line.
+   */
+  suppressPrompt?: boolean;
 }
 
 export type CommandFunction = (
@@ -59,6 +82,7 @@ export const commands: Record<string, CommandFunction> = {
       { cmd: "cd <path>", desc: "Change directory" },
       { cmd: "pwd", desc: "Print working directory" },
       { cmd: "cat <file>", desc: "Display file contents" },
+      { cmd: "python [file|code]", desc: "Run Python in a sandbox" },
       { cmd: "clear", desc: "Clear the terminal" },
       { cmd: "echo <text>", desc: "Display text" },
       { cmd: "whoami", desc: "Display current user" },
@@ -821,6 +845,14 @@ ${formatCommands(aiCommands)}
       return { output: `Navigating to ${section}...`, success: true };
     }
 
+    // The section is not on this page, which happens on /pdf/<slug>. Go to it
+    // on the homepage rather than reporting a section that plainly exists as
+    // missing.
+    if (typeof window !== "undefined") {
+      window.location.href = `/#${section === "blog" ? "blogs" : section}`;
+      return { output: `Navigating to ${section}...`, success: true };
+    }
+
     return { output: `Section not found: ${section}`, success: false };
   },
 
@@ -842,6 +874,44 @@ ${formatCommands(aiCommands)}
         "    help",
       ],
 
+      python: [
+        "\x1b[1mNAME\x1b[0m",
+        "    python - run Python 3 in a sandboxed WebAssembly interpreter",
+        "",
+        "\x1b[1mSYNOPSIS\x1b[0m",
+        "    python",
+        "    python <file>",
+        "    python <code>",
+        "    python -c <code>",
+        "",
+        "\x1b[1mDESCRIPTION\x1b[0m",
+        "    Runs real CPython compiled to WebAssembly, inside a Web Worker",
+        "    with no access to the page, the network, or storage. The standard",
+        "    library is available, plus numpy.",
+        "",
+        "    With no arguments, starts the interactive interpreter. Blocks are",
+        "    continued with the ... prompt; Tab inserts an indent. Leave with",
+        "    exit(), quit(), or Ctrl+D.",
+        "",
+        "    A single argument is treated as a file when one exists at that",
+        "    path, and as code otherwise. An argument ending in .py that does",
+        "    not exist is reported as a missing file rather than evaluated.",
+        "",
+        "\x1b[1mLIMITS\x1b[0m",
+        "    Interrupting a running statement with Ctrl+C restarts the",
+        "    interpreter and discards your variables. This is unavoidable:",
+        "    stopping WebAssembly mid-execution requires SharedArrayBuffer,",
+        "    which this site does not enable.",
+        "",
+        "    There is no stdin, so input() is unavailable. Long-running code",
+        "    is stopped automatically, and very large output is truncated.",
+        "",
+        "\x1b[1mEXAMPLES\x1b[0m",
+        "    python",
+        "    python examples/hello.py",
+        "    python print(sum(range(101)))",
+        '    python -c "import numpy as np; print(np.arange(5).sum())"',
+      ],
       penguin: [
         "\x1b[1mNAME\x1b[0m",
         "    penguin - summon the colony",
@@ -1549,6 +1619,8 @@ Info: status`,
     }
   },
 
+  python: pythonCommand,
+
   // Add AI commands
   ...aiCommands,
 };
@@ -1573,7 +1645,12 @@ export async function executeCommand(
     };
   }
 
-  return await command(args, context);
+  // Preserve the arguments verbatim alongside the tokenized form. Sliced by
+  // length rather than indexOf, so a command whose name also appears in its own
+  // arguments cannot misalign the cut.
+  const rawArgs = trimmed.slice(commandName.length).replace(/^\s+/, "");
+
+  return await command(args, { ...context, rawArgs });
 }
 
 // Tab completion helper
@@ -1593,7 +1670,7 @@ export function getCompletions(
 
   // File/directory completion for certain commands
   const command = parts[0];
-  if (["cd", "cat", "ls"].includes(command)) {
+  if (["cd", "cat", "ls", "python"].includes(command)) {
     const partial = parts[parts.length - 1] || "";
     const dirPath = partial.includes("/")
       ? resolvePath(
@@ -1707,6 +1784,7 @@ export function getCompletions(
       "animations",
       "ai",
       "chat",
+      "python",
       "exit",
       "socialmedia",
     ];
