@@ -23,12 +23,17 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        // Path-scoped: without a pathname these two turn /_next/image into an
-        // open image proxy for anyone's repository content, which is also the
+        // Path-scoped: without a pathname these turn /_next/image into an open
+        // image proxy for anyone's repository content, which is also the
         // surface the Next image-optimizer advisories target.
+        //
+        // github.com serves the avatar as /RomainClaret.png, a single segment
+        // with no trailing slash, so /RomainClaret/** does not match it. That
+        // scoping broke the profile image; it is pinned to the exact file
+        // instead, which is the only github.com image the site uses.
         protocol: "https",
         hostname: "github.com",
-        pathname: "/RomainClaret/**",
+        pathname: "/RomainClaret.png",
       },
       {
         protocol: "https",
