@@ -9,7 +9,6 @@ import { useTerminal } from "@/lib/terminal/terminal-context";
 import { ServiceWorkerRegister } from "./service-worker-register";
 import { ProjectsProvider } from "@/contexts/projects-context";
 import { BackgroundProvider } from "@/contexts/background-context";
-import { AnimationProvider } from "@/contexts/animation-context";
 import {
   PerformanceMonitorProvider,
   usePerformanceMonitorContext,
@@ -136,39 +135,40 @@ export function AppWrapper({ children }: AppWrapperProps) {
   return (
     <ErrorBoundary>
       <BackgroundProvider>
-        <AnimationProvider>
-          <PerformanceMonitorProvider>
-            <ProjectsProvider>
-              <ServiceWorkerRegister />
-              <PenguinConsole />
-              {/* Site-wide grid background with very low opacity - Disabled on Safari for performance */}
-              {!shouldReduceAnimations && (
-                <GridBackground className="fixed inset-0 z-0 opacity-30" />
+        {/* AnimationProvider was mounted here with nothing under it consuming
+            useAnimation - the context module was imported by this file alone.
+            The module and its tests are kept; only the unused mount is gone. */}
+        <PerformanceMonitorProvider>
+          <ProjectsProvider>
+            <ServiceWorkerRegister />
+            <PenguinConsole />
+            {/* Site-wide grid background with very low opacity - Disabled on Safari for performance */}
+            {!shouldReduceAnimations && (
+              <GridBackground className="fixed inset-0 z-0 opacity-30" />
+            )}
+            {!isDirectDocument && (
+              <SplashScreen onComplete={handleSplashComplete} />
+            )}
+            <div className="relative z-10">{children}</div>
+            {/* Terminal Component - Only render after splash screen completes */}
+            {terminalConfig.enabled &&
+              (splashScreenComplete || isDirectDocument) && (
+                <Terminal
+                  isOpen={isTerminalOpen}
+                  onClose={() => setIsTerminalOpen(false)}
+                />
               )}
-              {!isDirectDocument && (
-                <SplashScreen onComplete={handleSplashComplete} />
-              )}
-              <div className="relative z-10">{children}</div>
-              {/* Terminal Component - Only render after splash screen completes */}
-              {terminalConfig.enabled &&
-                (splashScreenComplete || isDirectDocument) && (
-                  <Terminal
-                    isOpen={isTerminalOpen}
-                    onClose={() => setIsTerminalOpen(false)}
-                  />
-                )}
 
-              {/* Performance Monitor - Production ready, only loads when activated */}
-              <PerformanceMonitorRenderer />
+            {/* Performance Monitor - Production ready, only loads when activated */}
+            <PerformanceMonitorRenderer />
 
-              {/* Performance Dashboard Modal - Terminal access only */}
-              <PerformanceDashboardRenderer />
+            {/* Performance Dashboard Modal - Terminal access only */}
+            <PerformanceDashboardRenderer />
 
-              {/* Performance Report Modal - Terminal triggered */}
-              <PerformanceReportRenderer />
-            </ProjectsProvider>
-          </PerformanceMonitorProvider>
-        </AnimationProvider>
+            {/* Performance Report Modal - Terminal triggered */}
+            <PerformanceReportRenderer />
+          </ProjectsProvider>
+        </PerformanceMonitorProvider>
       </BackgroundProvider>
     </ErrorBoundary>
   );

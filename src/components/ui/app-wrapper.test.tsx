@@ -174,11 +174,18 @@ describe("AppWrapper", () => {
 
       expect(screen.getByTestId("error-boundary")).toBeInTheDocument();
       expect(screen.getByTestId("background-provider")).toBeInTheDocument();
-      expect(screen.getByTestId("animation-provider")).toBeInTheDocument();
       expect(
         screen.getByTestId("performance-monitor-provider"),
       ).toBeInTheDocument();
       expect(screen.getByTestId("projects-provider")).toBeInTheDocument();
+
+      // AnimationProvider was removed: nothing under it consumed useAnimation,
+      // and app-wrapper was the only file importing the context at all. The
+      // mock above is deliberately still registered, so this assertion is real
+      // rather than vacuous - re-mount the provider and it fails.
+      expect(
+        screen.queryByTestId("animation-provider"),
+      ).not.toBeInTheDocument();
     });
 
     it("renders children with proper z-index wrapper", () => {
@@ -420,11 +427,15 @@ describe("AppWrapper", () => {
       // Check that all provider components are rendered
       expect(screen.getByTestId("error-boundary")).toBeInTheDocument();
       expect(screen.getByTestId("background-provider")).toBeInTheDocument();
-      expect(screen.getByTestId("animation-provider")).toBeInTheDocument();
       expect(
         screen.getByTestId("performance-monitor-provider"),
       ).toBeInTheDocument();
       expect(screen.getByTestId("projects-provider")).toBeInTheDocument();
+
+      // Not AnimationProvider - see the structure test above.
+      expect(
+        screen.queryByTestId("animation-provider"),
+      ).not.toBeInTheDocument();
     });
   });
 
