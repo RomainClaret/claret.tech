@@ -681,18 +681,26 @@ test.describe("Accessibility", () => {
     }
   });
 
+  /**
+   * This used to open with
+   *
+   *   // Skip this complex test on mobile - it's unreliable and causes timeouts
+   *   test.skip(isMobile, "...due to reliability issues");
+   *
+   * which excluded the two projects where screen readers matter most. The
+   * claim does not hold any more: run on 2026-08-03 against Mobile Chrome and
+   * Mobile Safari, ten consecutive runs of each passed, the slowest project
+   * pair finishing in 13.8s against a 60s budget. The most likely explanation
+   * is that it was written before `test.setTimeout(60000)` on the next line
+   * and before ensurePlaywrightParam/dismissToasts existed, and nobody went
+   * back to check. Left running on every project; if it does start flaking,
+   * the fix is to record the failure, not to hide the platform again.
+   */
   test("should announce dynamic content changes", async ({
     page,
     browserName: _browserName,
-    isMobile,
   }) => {
     test.setTimeout(60000); // Increase timeout to 60s for CI
-
-    // Skip this complex test on mobile - it's unreliable and causes timeouts
-    test.skip(
-      isMobile,
-      "Skipping complex live region test on mobile devices due to reliability issues",
-    );
 
     await page.goto("/");
     await page.waitForLoadState("networkidle"); // Wait for network to be idle

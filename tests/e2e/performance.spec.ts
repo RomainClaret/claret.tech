@@ -440,6 +440,38 @@ test.describe("Performance", () => {
     expect(criticalErrors).toHaveLength(0);
   });
 
+  /**
+   * Still skipped, but now for a recorded reason rather than none.
+   *
+   * Enabled and run on 2026-08-03 it failed on all five projects, and not
+   * because the assertions are wrong: the site genuinely does not render
+   * without JavaScript. The h1 is in the HTML the server sends, so it is
+   * tempting to assume Next SSR covers this, but it arrives inside React's
+   * hidden streaming slot and nothing ever moves it out:
+   *
+   *   locator resolved to <h1 class="text-4xl ...">…</h1>
+   *      - unexpected value "hidden"
+   *
+   *   $ node -e "fetch('http://localhost:3000/').then(...)"
+   *     BAILOUT_TO_CLIENT_SIDE_RENDERING present: true  (x5)
+   *     h1 text present in SSR HTML: true
+   *     h1 is inside the hidden streaming slot: true
+   *
+   * Walking the h1's ancestors with JS disabled ends at
+   * `<div hidden><!--$--><!--/$--></div>`, a direct child of <body>, matched by
+   * `[hidden]:where(:not([hidden="until-found"]))  =>  display: none`. Every
+   * <section> on the page is inside it, so with JS off the page is blank, not
+   * degraded.
+   *
+   * Prime suspect for the five bailouts: src/components/ui/app-wrapper.tsx
+   * loads SplashScreen, Terminal, PerformanceMonitor, PerformanceModal and
+   * PerformanceReportModal through `next/dynamic` with `ssr: false` (lines 29,
+   * 53, 59, 67, 75) -- five of them, matching the five BAILOUT templates -- and
+   * AppWrapper wraps `{children}`, so the bailout takes the whole page with it.
+   *
+   * Re-enable this test as part of fixing that, not before. Making it pass by
+   * relaxing what it checks would only certify the blank page.
+   */
   test.skip("should support progressive enhancement", async ({ browser }) => {
     // Create a new context with JavaScript disabled
     const context = await browser.newContext({

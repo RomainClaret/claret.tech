@@ -478,13 +478,25 @@ test.describe("Terminal", () => {
       .toBe(true);
   });
 
+  /**
+   * Used to read `if (isMobile || browserName === "webkit")` with the trailing
+   * comment "// Webkit has issues with terminal interactions" as its entire
+   * justification. Run on the webkit project on 2026-08-03 it passed five
+   * times out of five, so webkit runs it now.
+   *
+   * The `isMobile` half is kept but is unreachable: test.beforeEach above
+   * (~line 50) already calls test.skip() for every mobile project, so this
+   * guard has never decided anything. Left in place rather than removed, since
+   * an unreachable guard is cheaper than a test that silently depends on a
+   * beforeEach twenty tests away. Same for the three tests below.
+   */
   test("should support tab completion", async ({
     page,
     isMobile,
-    browserName,
+    browserName: _browserName,
   }) => {
-    if (isMobile || browserName === "webkit") {
-      test.skip(); // Webkit has issues with terminal interactions
+    if (isMobile) {
+      test.skip();
       return;
     }
 
@@ -573,11 +585,47 @@ test.describe("Terminal", () => {
     expect(hasExpectedText).toBeTruthy();
   });
 
+  /**
+   * webkit stays skipped, but the bare `test.skip(); // Webkit has issues with
+   * drag interactions` is replaced by the measurement behind it.
+   *
+   * Investigated 2026-08-03. Unskipped on webkit the test *passes*, and passes
+   * for the wrong reason: `terminalHeader.dragTo(...)` completes without
+   * throwing, the window does not move, `expect(movedX > 10 || movedY > 10)`
+   * fails, and the pre-existing catch below swallows that into "just verify
+   * terminal is interactive". Replacing the catch with a rethrow shows what is
+   * really happening:
+   *
+   *   Error: expect(received).toBeTruthy()  Received: false
+   *
+   * Driving it the way the resize test does - mouse.down / mouse.move({steps:
+   * 10}) / mouse.up instead of dragTo - does not rescue it: 5 of 6 webkit runs
+   * still ended with the window at its original position, while chromium and
+   * firefox reach the real assertion under both techniques. So this is not a
+   * dragTo quirk.
+   *
+   * The likely root cause is in the app, not the test:
+   * src/components/terminal/Terminal.tsx:159-164. handleMouseUp does
+   *
+   *   if (dragAnimationFrameRef.current) {
+   *     cancelAnimationFrame(dragAnimationFrameRef.current);
+   *
+   * and applies nothing in its place, while handleMouseMove (line 136) only
+   * ever writes the new position from inside a requestAnimationFrame callback.
+   * Any drag whose final mousemove and mouseup land in the same frame - every
+   * automated drag, and a fast real one - has its last, and under webkit's
+   * event batching its only, position update cancelled. Fixing that is a
+   * Terminal change, out of scope here; unskip webkit as part of it.
+   */
   test("should be draggable", async ({ page, isMobile, browserName }) => {
-    if (isMobile || browserName === "webkit") {
-      test.skip(); // Webkit has issues with drag interactions
+    if (isMobile) {
+      test.skip();
       return;
     }
+    test.skip(
+      browserName === "webkit",
+      "webkit drops the drag: the window stays at its start position in 5 of 6 runs, with dragTo or with a stepped mouse drag. Suspected cause is Terminal.tsx:159-164 cancelling the pending rAF on mouseup without applying the final position.",
+    );
 
     // Wait for page to be fully loaded
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -631,9 +679,20 @@ test.describe("Terminal", () => {
     }
   });
 
-  test("should be resizable", async ({ page, isMobile, browserName }) => {
-    if (isMobile || browserName === "webkit") {
-      test.skip(); // Webkit has issues with resize interactions
+  /**
+   * Also used to skip webkit, justified only by "// Webkit has issues with
+   * resize interactions". It does not: five out of five webkit runs on
+   * 2026-08-03 passed, and unlike the drag test above there is no catch to
+   * pass through - `expect(newBox.width).not.toBe(initialBox.width)` is the
+   * assertion, and webkit satisfies it. Webkit runs it now.
+   *
+   * Worth noting against the drag test: this one drives the interaction with
+   * mouse.down / mouse.move / mouse.up rather than dragTo, and it is the only
+   * one of the two webkit can complete.
+   */
+  test("should be resizable", async ({ page, isMobile }) => {
+    if (isMobile) {
+      test.skip();
       return;
     }
 
@@ -768,6 +827,14 @@ test.describe("Terminal", () => {
     }
   });
 
+  /**
+   * Listed alongside the three above as an undocumented webkit skip, but it
+   * never skipped webkit - the condition is `isMobile` only, and webkit has
+   * been running this test all along. The guard is unreachable for the same
+   * reason as the others: test.beforeEach (~line 50) already skips every
+   * mobile project. Nothing to convert; recorded so the next reader does not
+   * spend the time working that out again.
+   */
   test("should handle special characters", async ({
     page,
     isMobile,
