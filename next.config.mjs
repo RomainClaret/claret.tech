@@ -159,11 +159,16 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        // The raw files live under /pdfs/, so that is where people reach for
-        // the CV. The reader pages are /pdf/<slug>. Nothing in public/pdfs/ is
-        // named "cv", so no static file is shadowed by this.
-        source: "/pdfs/cv",
-        destination: "/pdf/cv",
+        // The raw files live under /pdfs/, so that is where people reach for a
+        // document, and the reader pages are /pdf/<slug>. Forward the plural
+        // to the singular so a guessed URL lands somewhere useful.
+        //
+        // The negative lookahead is load-bearing: redirects are evaluated
+        // before filesystem routes, so without it this would swallow every
+        // real file in public/pdfs/, including the CV that greeting.resumeLink
+        // and the sitemap both point at.
+        source: "/pdfs/:slug((?!.*\\.pdf$).*)",
+        destination: "/pdf/:slug",
         permanent: true,
       },
     ];

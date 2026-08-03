@@ -72,12 +72,15 @@ export async function dismissToasts(
             element.style.position = "fixed";
             element.style.left = "-9999px";
             element.style.top = "-9999px";
-            // Also try to remove from DOM if possible
-            try {
-              element.remove();
-            } catch {
-              // Ignore removal errors
-            }
+            // Deliberately NOT element.remove(). One of the selectors above is
+            // the toast live region, which ToastContainer renders
+            // unconditionally and which sits directly after AppWrapper in the
+            // DOM. Detaching it left React holding a stale insertBefore
+            // reference, so the next host insertion -- the terminal div, on
+            // click -- threw NotFoundError and tore the whole app down. That
+            // crash only happened under CI, because this branch is gated on
+            // process.env.CI, and it presented as "the terminal never opens".
+            // The styles above already make the toast non-blocking.
           });
 
           // Also set up a mutation observer to catch dynamically added toasts
