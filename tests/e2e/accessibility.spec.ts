@@ -13,126 +13,43 @@ import {
 } from "./utils/toast-utils";
 
 /**
- * Enhanced mobile menu opening for accessibility tests with toast handling
+ * Open the mobile navigation menu, or fail the calling test.
+ *
+ * This used to be a 120-line selector shotgun wrapped in a try/catch that
+ * ended in `console.warn("Mobile menu could not be opened ... some tests may
+ * fail")`. Every failure mode - button missing, click intercepted, menu not
+ * expanding - was swallowed, so a broken mobile menu produced a passing
+ * accessibility run with a warning nobody reads. The button has a stable
+ * data-testid (src/components/ui/navigation.tsx:187) and drives aria-expanded
+ * and aria-controls, so there is nothing to guess at.
  */
 async function openMobileMenuForAccessibility(page: Page): Promise<void> {
-  try {
-    // Check if menu is already open
-    const mobileMenuButton = page
-      .locator(
-        '[data-testid="mobile-menu-button"], [aria-label*="menu" i]:not(nav), button.md\\:hidden',
-      )
-      .first();
+  const mobileMenuButton = page.locator('[data-testid="mobile-menu-button"]');
+  await expect(
+    mobileMenuButton,
+    "mobile menu button (src/components/ui/navigation.tsx:187) must be visible on a mobile viewport",
+  ).toBeVisible();
 
-    if ((await mobileMenuButton.count()) > 0) {
-      const ariaExpanded = await mobileMenuButton.getAttribute("aria-expanded");
-      if (ariaExpanded === "true") {
-        console.log(
-          `Mobile menu already open (aria-expanded="true") for accessibility test, skipping`,
-        );
-        return;
-      }
-    }
-
-    console.log("Opening mobile menu for accessibility test");
-
-    // CRITICAL: Dismiss toasts before attempting menu clicks to prevent interference
-    await dismissToasts(page, { timeout: 3000 });
-
-    // Force ensure navigation is clickable by manipulating z-index
-    await page.evaluate(() => {
-      const nav = document.querySelector("nav");
-      if (nav) {
-        nav.style.zIndex = "10000";
-        nav.style.position = "relative";
-      }
-
-      // Also ensure mobile menu button is clickable
-      const menuButton = document.querySelector(
-        '[data-testid="mobile-menu-button"]',
-      );
-      if (menuButton) {
-        (menuButton as HTMLElement).style.zIndex = "10001";
-        (menuButton as HTMLElement).style.position = "relative";
-      }
-    });
-
-    const mobileMenuSelectors = [
-      '[data-testid="mobile-menu-button"]',
-      '[aria-label*="menu" i]:not(nav)',
-      'button:has(svg[class*="h-6"])',
-      'button:has(svg[class*="w-6"])',
-      "button.md\\:hidden",
-      'button[class*="md:hidden"]',
-      "header button:visible",
-    ];
-
-    let menuOpened = false;
-    const maxAttempts = 2;
-
-    for (let attempt = 1; attempt <= maxAttempts && !menuOpened; attempt++) {
-      console.log(
-        `Mobile menu attempt ${attempt}/${maxAttempts} for accessibility`,
-      );
-
-      // Dismiss toasts before each attempt
-      if (attempt > 1) {
-        await dismissToasts(page, { timeout: 2000 });
-      }
-
-      for (const selector of mobileMenuSelectors) {
-        const button = page.locator(selector).first();
-        if ((await button.count()) > 0 && (await button.isVisible())) {
-          try {
-            // Use force click to bypass any remaining toast interference
-            await button.click({ timeout: 3000, force: true });
-            await page.waitForTimeout(500);
-
-            // Check if menu is now open via aria-expanded attribute (more reliable)
-            const ariaExpanded = await button.getAttribute("aria-expanded");
-
-            if (ariaExpanded === "true") {
-              console.log(
-                `Mobile menu opened successfully for accessibility test (aria-expanded="true")`,
-              );
-              menuOpened = true;
-              break;
-            } else {
-              // Fallback: check visible navigation links
-              const navLinksVisible = await page
-                .locator('nav a[href^="#"]:visible')
-                .count();
-
-              if (navLinksVisible >= 3) {
-                console.log(
-                  `Mobile menu opened for accessibility test (fallback), ${navLinksVisible} nav links visible`,
-                );
-                menuOpened = true;
-                break;
-              }
-            }
-          } catch (error) {
-            console.warn(
-              `Mobile menu click failed with ${selector} for accessibility:`,
-              error,
-            );
-          }
-        }
-      }
-
-      if (!menuOpened && attempt < maxAttempts) {
-        await page.waitForTimeout(300);
-      }
-    }
-
-    if (!menuOpened) {
-      console.warn(
-        "Mobile menu could not be opened for accessibility test, some tests may fail",
-      );
-    }
-  } catch (error) {
-    console.warn("Mobile menu opening failed for accessibility test:", error);
+  if ((await mobileMenuButton.getAttribute("aria-expanded")) === "true") {
+    return;
   }
+
+  // Toasts are suppressed under ?playwright=true, but page.goto("/") drops the
+  // query string that playwright.config.ts puts on baseURL, so they can still
+  // appear and overlap the header. Clear them instead of force-clicking
+  // through them: a force click would hide a real overlap regression.
+  await dismissToasts(page, { timeout: 3000 });
+
+  await mobileMenuButton.click();
+
+  await expect(
+    mobileMenuButton,
+    "clicking the mobile menu button must set aria-expanded=true",
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.locator('[data-testid="mobile-navigation-menu"]'),
+    "the panel referenced by aria-controls must become visible",
+  ).toBeVisible();
 }
 
 test.describe("Accessibility", () => {
@@ -191,18 +108,17 @@ test.describe("Accessibility", () => {
 
   test("should pass accessibility checks on dark theme", async ({
     page,
-    browserName,
     isMobile,
   }) => {
-    // Skip Firefox in CI due to consistent timeout issues
-    if (browserName === "firefox" && process.env.CI) {
-      test.skip(
-        true,
-        "Skipping Firefox accessibility tests in CI due to timeouts",
-      );
-      return;
-    }
-
+    // The `if (browserName === "firefox" && process.env.CI) test.skip()` that
+    // used to sit here was removed rather than re-scoped. Two independent
+    // reasons: (1) .github/workflows/playwright.yml:269 runs the accessibility
+    // job with `matrix: browser: [chromium, webkit]`, so Firefox has never
+    // reached this line in real CI and the guard only ever suppressed local
+    // `CI=1` runs; (2) re-run with the guard removed, Firefox passes this test
+    // under CI=1 (see the run recorded in the hardening notes). If Firefox
+    // starts timing out here again, the fix is a Firefox-specific timeout, not
+    // a skip - the axe scan is the only dark-theme coverage that exists.
     test.setTimeout(60000); // Increase timeout to 60s for CI
 
     await page.goto("/");
@@ -217,20 +133,37 @@ test.describe("Accessibility", () => {
     // Wait for any animations to complete
     await page.waitForTimeout(1000);
 
+    // The toggle is shipped unconditionally by navigation.tsx:183 (desktop)
+    // and :189 (mobile), once per breakpoint container, so exactly one copy is
+    // visible at any viewport. Assert that before trying to drive it: this is
+    // the deterministic half of what the old
+    // `test.skip(true, "Theme toggle feature not available")` was hiding.
+    const themeToggle = page
+      .getByRole("button", { name: /toggle theme/i })
+      .filter({ visible: true });
+    await expect(
+      themeToggle,
+      "exactly one visible theme toggle (src/components/ui/theme-toggle.tsx) must be reachable by its accessible name",
+    ).toHaveCount(1);
+    await expect(themeToggle).toBeEnabled();
+
     // Use the resilient theme toggle function with increased timeout and retries
     const themeToggleSuccess = await toggleThemeReliably(page, "dark", {
       timeout: 45000,
       retries: 5,
     });
 
-    // If theme toggle is not available, skip the test
-    if (!themeToggleSuccess) {
-      console.warn(
-        "Theme toggle feature not available, skipping dark theme test",
-      );
-      test.skip(true, "Theme toggle feature not available");
-      return;
-    }
+    // Not a skip. "Feature not available" can only mean the toggle broke -
+    // exactly the regression this test should catch. toggleThemeReliably()
+    // only returns false once every strategy has failed to put `dark` on
+    // <html>, and its strategies all go through the button's real click
+    // handler (the direct class-manipulation fallback was removed from
+    // toast-utils.ts precisely so that this expect can fail).
+    expect(
+      themeToggleSuccess,
+      "theme toggle (src/components/ui/theme-toggle.tsx) failed to switch the page to dark",
+    ).toBe(true);
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
 
     // Wait for any theme animation to complete
     await waitForAnimationCompletion(page, "body", 3000);
@@ -275,61 +208,37 @@ test.describe("Accessibility", () => {
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
 
-    // Find and click high contrast toggle
-    const highContrastSelectors = [
-      '[aria-label*="high contrast" i]',
-      '[title*="high contrast" i]',
-      'button:has-text("high contrast")',
-      '[data-testid*="contrast"]',
-    ];
+    // The four-selector shotgun that used to live here ended in
+    // `test.skip(true, "High contrast feature not available")`. The feature is
+    // shipped unconditionally - src/components/ui/high-contrast-toggle.tsx is
+    // rendered by src/components/ui/navigation.tsx at :182 (desktop) and :188
+    // (mobile) - so "not available" could only ever mean the toggle regressed,
+    // and the skip turned that regression into a green run.
+    //
+    // navigation.tsx renders two copies, one per breakpoint container, and the
+    // desktop copy comes first in the DOM. The old code took `.first()` and
+    // then quietly gave up when it was display:none, which is why this had to
+    // be visibility-filtered rather than index-picked.
+    const highContrastToggle = page
+      .getByRole("button", { name: /toggle high contrast/i })
+      .filter({ visible: true });
 
-    let toggleFound = false;
-    for (const selector of highContrastSelectors) {
-      try {
-        const toggle = page.locator(selector).first();
-        if ((await toggle.count()) > 0) {
-          await toggle
-            .waitFor({ state: "visible", timeout: 3000 })
-            .catch(() => {});
-          if (await toggle.isVisible()) {
-            await toggle.click();
-            toggleFound = true;
-            break;
-          }
-        }
-      } catch {
-        // Continue to next selector
-      }
-    }
+    await expect(
+      highContrastToggle,
+      "exactly one visible high contrast toggle must be reachable by its accessible name at this breakpoint",
+    ).toHaveCount(1);
+    await expect(highContrastToggle).toHaveAttribute("aria-pressed", "false");
 
-    if (!toggleFound) {
-      // Try role-based selector
-      try {
-        const highContrastToggle = page
-          .getByRole("button", {
-            name: /toggle high contrast/i,
-          })
-          .first();
+    await highContrastToggle.click();
 
-        if ((await highContrastToggle.count()) > 0) {
-          await highContrastToggle
-            .waitFor({ state: "visible", timeout: 3000 })
-            .catch(() => {});
-          if (await highContrastToggle.isVisible()) {
-            await highContrastToggle.click();
-            toggleFound = true;
-          }
-        }
-      } catch {
-        // High contrast feature not available
-      }
-    }
-
-    if (!toggleFound) {
-      console.warn("High contrast mode not available, skipping test");
-      test.skip(true, "High contrast feature not available");
-      return;
-    }
+    // The toggle's only job is to put `high-contrast` on <html>
+    // (high-contrast-toggle.tsx:22). If that stops happening, the axe scan
+    // below would silently be scanning the normal theme again.
+    await expect(
+      page.locator("html"),
+      "clicking the toggle must add the high-contrast class to <html>",
+    ).toHaveClass(/\bhigh-contrast\b/);
+    await expect(highContrastToggle).toHaveAttribute("aria-pressed", "true");
 
     await page.waitForTimeout(1000); // Wait for mode transition
 
@@ -515,24 +424,17 @@ test.describe("Accessibility", () => {
       // Skip empty fragment links
       if (href === "#") continue;
 
-      // Link should have either aria-label, text content, or title
+      // Link should have either aria-label, text content, or title.
+      // This used to be `if (process.env.CI) continue;` guarded by a
+      // console.warn, i.e. the one environment that gates merges was the one
+      // environment where a link with no accessible name could not fail the
+      // build. A missing accessible name is deterministic markup, not a race,
+      // so it fails everywhere now.
       const hasAccessibleName = ariaLabel || textContent?.trim() || title;
-      if (!hasAccessibleName) {
-        // console.log(`Link without accessible name: href="${href}"`);
-      }
-      // Be more lenient in CI to avoid flaky failures
-      if (!hasAccessibleName) {
-        const warningMsg = `Link missing accessible name: href="${href}"`;
-        console.warn(warningMsg);
-
-        // In CI, log warning but don't fail the test for missing ARIA labels
-        if (process.env.CI) {
-          continue; // Skip this link in CI
-        } else {
-          // Fail in local development
-          expect(hasAccessibleName).toBeTruthy();
-        }
-      }
+      expect(
+        hasAccessibleName,
+        `link has no accessible name (no aria-label, no text, no title): href="${href}"`,
+      ).toBeTruthy();
 
       // Early exit if approaching timeout
       if (Date.now() - testStartTime > MAX_TEST_DURATION) {
@@ -839,7 +741,21 @@ test.describe("Accessibility", () => {
       '[data-testid*="live"]',
     ].join(", ");
 
-    const liveRegions = page.locator(liveRegionSelectors);
+    // Counted with document.querySelectorAll rather than a Playwright locator
+    // on purpose. Locators pierce open shadow roots; querySelectorAll does not.
+    // That mismatch made this check self-contradicting in dev: the
+    // waitForFunction below (querySelectorAll) would time out reporting zero
+    // live regions while `page.locator(...).count()` on the very next line
+    // reported 2 - both of them Next's dev overlay (`div.nextjs-toast` and its
+    // `role="alert"` sibling) inside <nextjs-portal>'s shadow root, which does
+    // not exist in a production build. Verified 2026-08-03 by deleting the
+    // site's own live regions: the locator count stayed at 2 and the test still
+    // passed. Counting the same way the wait queries keeps this about the site.
+    const countLiveRegions = () =>
+      page.evaluate(
+        (selectors) => document.querySelectorAll(selectors).length,
+        liveRegionSelectors,
+      );
 
     // Enhanced wait for live regions with fallback
     let liveRegionCount = 0;
@@ -852,7 +768,7 @@ test.describe("Accessibility", () => {
         liveRegionSelectors,
         { timeout: 10000 },
       );
-      liveRegionCount = await liveRegions.count();
+      liveRegionCount = await countLiveRegions();
     } catch (waitError) {
       console.warn(
         "Initial live region wait failed, trying extended search...",
@@ -861,39 +777,37 @@ test.describe("Accessibility", () => {
 
       // Fallback: wait a bit more and recheck
       await page.waitForTimeout(2000);
-      liveRegionCount = await liveRegions.count();
+      liveRegionCount = await countLiveRegions();
 
       if (liveRegionCount === 0) {
-        // Final fallback: look for any element that could serve as a live region
-        const fallbackRegions = await page
-          .locator("body *")
-          .evaluateAll((elements) => {
-            return elements.filter(
+        // Final fallback, walking every element instead of trusting the
+        // selector list. It used to also count `.sr-only` elements and
+        // anything whose id or class contained "toast", neither of which is a
+        // live region - the page ships several sr-only description spans, so
+        // that clause alone guaranteed a non-zero count and made the assertion
+        // below unfalsifiable. Only the three real signals are counted now.
+        liveRegionCount = await page.evaluate(
+          () =>
+            [...document.querySelectorAll("body *")].filter(
               (el) =>
                 el.hasAttribute("aria-live") ||
                 el.getAttribute("role") === "alert" ||
-                el.getAttribute("role") === "status" ||
-                el.classList.contains("sr-only") ||
-                el.id.includes("toast") ||
-                (typeof el.className === "string"
-                  ? el.className
-                  : el.className.toString()
-                ).includes("toast"),
-            ).length;
-          });
-        liveRegionCount = fallbackRegions;
+                el.getAttribute("role") === "status",
+            ).length,
+        );
       }
     }
 
-    // Lenient assertion for CI
-    if (process.env.CI && liveRegionCount === 0) {
-      console.warn(
-        "No ARIA live regions found in CI, but this may be expected",
-      );
-      console.log("Live regions are important for screen reader accessibility");
-    } else {
-      expect(liveRegionCount).toBeGreaterThan(0);
-    }
+    // Not gated on CI any more. The previous form was
+    // `if (process.env.CI && liveRegionCount === 0) console.warn(...)`, which
+    // is the assertion inverted: the only case that mattered was the only case
+    // that was allowed to pass. ToastContainer renders the live region
+    // unconditionally (src/components/ui/toast.tsx), so zero live regions
+    // means it stopped rendering.
+    expect(
+      liveRegionCount,
+      "page must expose at least one ARIA live region for screen reader announcements",
+    ).toBeGreaterThan(0);
 
     // Test terminal announcements if terminal exists
     let terminalToggle = page.locator('button[aria-label="Toggle terminal"]');
@@ -1063,51 +977,51 @@ test.describe("Accessibility", () => {
             }
           }
 
-          // Multiple fallback checks for accessibility
-          if (!foundAccessibilityFeature) {
-            // Check if terminal button exists (indicates interactive terminal)
-            const terminalButton = document.querySelector(
-              'button[aria-label*="terminal" i], button[title*="terminal" i], button[data-testid*="terminal"]',
-            );
-            if (terminalButton) {
-              foundAccessibilityFeature = true;
-            }
-          }
-
-          // Final fallback: check for any interactive elements in terminal area
-          if (!foundAccessibilityFeature) {
-            const interactiveElements = document.querySelectorAll(
-              ".terminal input, .terminal textarea, .terminal [role], .xterm [tabindex], .xterm-viewport",
-            );
-            if (interactiveElements.length > 0) {
-              foundAccessibilityFeature = true;
-            }
-          }
+          // Two fallbacks were removed here. The first accepted the run as
+          // soon as `button[aria-label*="terminal"]` existed anywhere on the
+          // page - that is the toggle button this test had just clicked to
+          // open the terminal, so it made the check about the button rather
+          // than about the terminal, and it could not fail while the toggle
+          // existed. The second accepted the mere presence of `.xterm-viewport`
+          // or any `.terminal [role]`, which is markup, not accessibility.
+          // Terminal.tsx:1611-1617 gives the container role="application",
+          // aria-label, aria-describedby, aria-live and tabIndex, so the direct
+          // check above is satisfied by the real thing.
 
           return foundAccessibilityFeature;
         });
 
-        // Lenient assertion with detailed logging
-        if (!hasAccessibleLabel) {
-          console.warn(
-            "Terminal accessibility features not fully detected, but terminal appears functional",
-          );
-          // Don't fail the test - just warn. Terminal might be accessible through other means.
-          console.warn(
-            "Consider adding aria-label or role attributes to terminal for better accessibility",
-          );
-        }
+        // Was `if (process.env.CI) { console.log(...) } else { expect(...) }`,
+        // so the terminal's accessibility was only ever enforced on a
+        // developer laptop.
+        //
+        // Honest caveat: this expect is close to unfalsifiable on its own. The
+        // heuristic above walks up to three ancestors and accepts *any* role
+        // attribute, and also accepts `cursor: text`, which .xterm-screen has.
+        // Stripping role/aria-label/aria-describedby/aria-live/tabIndex off the
+        // terminal container still left it green (verified 2026-08-03). It is
+        // kept because it is strictly better un-gated than gated, but the
+        // assertion that actually holds the line is the explicit one below.
+        expect(
+          hasAccessibleLabel,
+          "opened terminal exposes no aria-label/role/aria-live hook to assistive technology",
+        ).toBeTruthy();
 
-        // Make assertion optional in CI to prevent false failures
-        if (process.env.CI) {
-          // In CI, we just log the issue but don't fail
-          console.log(
-            `Terminal accessibility check: ${hasAccessibleLabel ? "PASS" : "WARN - see console"}`,
-          );
-        } else {
-          // Locally, still expect accessibility
-          expect(hasAccessibleLabel).toBeTruthy();
-        }
+        // The real contract, asserted directly against the container that
+        // Terminal.tsx:1607-1617 renders.
+        const terminalContainer = page.locator('[data-testid="terminal"]');
+        await expect(
+          terminalContainer,
+          "terminal container must expose role=application (src/components/terminal/Terminal.tsx:1611)",
+        ).toHaveAttribute("role", "application");
+        await expect(
+          terminalContainer,
+          "terminal container must have a non-empty aria-label",
+        ).toHaveAttribute("aria-label", /\S/);
+        await expect(
+          terminalContainer,
+          "terminal output must be announced, i.e. the container must be an aria-live region",
+        ).toHaveAttribute("aria-live", /\S/);
       } else {
         // Terminal click failed, but test can still continue
         console.warn(

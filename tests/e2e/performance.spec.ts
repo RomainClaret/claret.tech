@@ -574,13 +574,32 @@ test.describe("Performance", () => {
     }
   });
 
+  /**
+   * This used to open with `if (process.env.CI) { test.skip(); return; }`,
+   * commented "CI environments have limited GPU capabilities", so the only
+   * animation budget in the suite had never run on the only machine that gates
+   * merges. The excuse does not survive measurement.
+   *
+   * Control run (headless Chromium, same machine, same 60-sample rAF probe,
+   * 3 samples each, 2026-08-03):
+   *
+   *   about:blank                    121 fps,  0/60 frames over 20ms
+   *   static 5000px-tall page        121 fps,  0/60
+   *   claret.tech /                48-62 fps, 14-24/60
+   *   ... with the two <canvas> removed        69-85 fps,  4-12/60
+   *   ... with prefers-reduced-motion: reduce  79-112 fps, 1-9/60
+   *
+   * The browser renders an empty page at 120 fps with zero long frames, so the
+   * 23-40% figure the site produces is the site's own cost, not headless
+   * jitter or a missing GPU. Removing the canvases or honoring reduced motion
+   * recovers most of it.
+   *
+   * This test therefore fails on purpose right now. Do not re-add the CI skip:
+   * either the always-on background animations get cheaper, or the budget on
+   * line "droppedRatio" gets moved deliberately, with the number above
+   * recorded as the new baseline.
+   */
   test("should handle animations efficiently", async ({ page }) => {
-    // Skip animation performance test in CI environments as they have limited GPU capabilities
-    if (process.env.CI) {
-      test.skip();
-      return;
-    }
-
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
@@ -622,12 +641,14 @@ test.describe("Performance", () => {
       });
     });
 
-    // Should maintain close to 60 FPS
-    expect(animationMetrics.avgFps).toBeGreaterThan(24); // > 24 FPS is acceptable
-
-    // Should have minimal dropped frames
     const droppedRatio =
       animationMetrics.droppedFrames / animationMetrics.totalFrames;
-    expect(droppedRatio).toBeLessThanOrEqual(0.2); // Less than or equal to 20% dropped frames
+    const measured = `measured ${animationMetrics.avgFps} fps, ${animationMetrics.droppedFrames}/${animationMetrics.totalFrames} frames over 20ms`;
+
+    // Should maintain close to 60 FPS
+    expect(animationMetrics.avgFps, measured).toBeGreaterThan(24); // > 24 FPS is acceptable
+
+    // Should have minimal dropped frames
+    expect(droppedRatio, measured).toBeLessThanOrEqual(0.2); // Less than or equal to 20% dropped frames
   });
 });

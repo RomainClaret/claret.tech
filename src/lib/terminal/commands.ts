@@ -715,21 +715,11 @@ ${formatCommands(aiCommands)}
     return { output: lines.join("\n"), success: true };
   },
 
-  about: () => {
-    const lines = [
-      "",
-      "\x1b[1m\x1b[36mRomain Claret\x1b[0m",
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-      "",
-      "I grow artificial minds instead of programming them, and study the behaviors nobody designed.",
-      "",
-      `${contactInfo.emailAddress}`,
-      "github.com/RomainClaret",
-      "",
-    ];
-
-    return { output: lines.join("\n"), success: true };
-  },
+  // No `about` here. This object ends with `...aiCommands` (see the bottom of
+  // the file), so the `about` in src/lib/terminal/ai-commands.ts wins and the
+  // copy that used to sit at this spot had never reached a user. Removed
+  // rather than kept, so there is one `about` to edit instead of two, one of
+  // which is invisible. The user-visible output is unchanged.
 
   skills: () => {
     const lines = [

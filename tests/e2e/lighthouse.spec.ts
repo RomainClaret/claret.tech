@@ -244,6 +244,20 @@ test.describe("Cross-Browser Lighthouse Performance", () => {
       // Increase timeout for Lighthouse tests as they take longer
       test.setTimeout(180000); // 3 minutes
 
+      // Two properties of this test that cost debugging time, recorded here
+      // rather than rediscovered:
+      //
+      // 1. It launches a *second* browser, so it does not use the `page`
+      //    fixture, and 9222 is hardcoded because playAudit attaches to that
+      //    port. If anything else already holds 9222, Chromium silently binds
+      //    a different port and playAudit ends up auditing the wrong target.
+      // 2. Run alongside the rest of the suite (4 workers against `next dev`)
+      //    it is unreliable: observed 2026-08-03 as a 180s test timeout and, on
+      //    retry, `LighthouseError: PROTOCOL_TIMEOUT`. Run on its own it
+      //    completes in ~40s and scores 76. Its CI job
+      //    (.github/workflows/playwright.yml "lighthouse-tests") runs this file
+      //    alone against `npm start`, which is the environment the thresholds
+      //    are calibrated for; a local full-suite run is not.
       const browser = await browserInfo.launcher.launch({
         args: [
           "--remote-debugging-port=9222", // Enable Chrome DevTools Protocol
@@ -262,7 +276,10 @@ test.describe("Cross-Browser Lighthouse Performance", () => {
       const page = await context.newPage();
 
       try {
-        // Navigate to the homepage
+        // `page.goto("/")` on a manually launched browser does resolve against
+        // baseURL: the runner installs it via playwright._defaultContextOptions,
+        // which browser.newContext() merges. See the note at the bottom of this
+        // file. The trace logs `navigating to "http://localhost:3000/"`.
         await page.goto("/", { waitUntil: "networkidle" });
 
         // Run Lighthouse audit (only works with Chromium)
@@ -430,11 +447,44 @@ test.describe("Cross-Browser Lighthouse Performance", () => {
     });
   }
 
+  /**
+   * ARMED LANDMINE - read before touching this test. Not defused here because
+   * moving its thresholds is a product decision, not a test-hardening one.
+   *
+   * It reads `test-results/lighthouse/performance-history.json`, which only the
+   * audit test above ever writes, and which Playwright deletes at the start of
+   * every run along with the rest of `test-results`. In a normal run it
+   * therefore starts before the ~40s audit has written anything, finds an empty
+   * history, and skips. That race is the only reason it is green.
+   *
+   * Force it to see data - `npx playwright test tests/e2e/lighthouse.spec.ts
+   * --project=chromium --workers=1` - and it fails immediately (verified
+   * 2026-08-03):
+   *
+   *   Critical performance issues detected: chromium: Performance score
+   *   below 80 (76)
+   *
+   * Two of its assertions cannot be satisfied by this codebase:
+   *   - `criticalIssues` is populated for any performance score < 80, while
+   *     PERFORMANCE_THRESHOLDS.chromium.performance at the top of this file is
+   *     60 and is annotated "Production baseline (actual: 62)". The file
+   *     contradicts itself.
+   *   - `avgPerformanceScore >= 85` is averaged over whichever browsers appear
+   *     in the history, but `browsers` on line ~211 is `[chromium]` only, so
+   *     the "cross-browser" average is always just chromium, and chromium has
+   *     never scored 85.
+   *
+   * Either the numbers move to match PERFORMANCE_THRESHOLDS, or the test stops
+   * claiming to be cross-browser. Do not "fix" it by keeping the skip.
+   */
   test("should generate cross-browser performance comparison", async () => {
     const history = loadPerformanceHistory();
 
     if (history.length === 0) {
-      test.skip();
+      test.skip(
+        true,
+        "no lighthouse history yet: the audit test above had not finished writing test-results/lighthouse/performance-history.json when this started",
+      );
       return;
     }
 
@@ -518,22 +568,30 @@ test.describe("Cross-Browser Lighthouse Performance", () => {
 });
 
 // The "Safari-Specific Performance" describe block that used to sit here was
-// deleted rather than re-enabled. Both of its tests were permanently skipped
-// and broken in two independent ways:
+// deleted rather than re-enabled.
 //
-//   1. Each did `webkit.launch()` -> `browser.newContext()` -> `page.goto("/")`.
-//      `baseURL` is a fixture option and is not applied to a manually launched
-//      browser, so the relative navigation threw.
-//   2. Passing `baseURL` into newContext() fixes that and they still fail:
-//      `page.goto("/", { waitUntil: "networkidle" })` times out at 60s in
-//      WebKit (verified 2026-08-03).
+// CORRECTION (2026-08-03). The note left here previously gave as its first
+// reason that "`baseURL` is a fixture option and is not applied to a manually
+// launched browser, so the relative navigation threw". That is wrong, and it
+// matters, because the same reasoning was applied to the audit test above.
+// Under the Playwright test runner, `browser.newContext()` merges
+// `playwright._defaultContextOptions` (node_modules/playwright-core/lib/client/
+// browser.js:67), which the runner populates from the project's `use` block
+// including baseURL (node_modules/playwright/lib/index.js:222 and :208). A
+// manually launched browser therefore *does* resolve `page.goto("/")` against
+// baseURL. Proof: the trace for the audit test above logs
+// `navigating to "http://localhost:3000/"` for its `page.goto("/")`, and the
+// audit completes with real scores. Only a bare `chromium.launch()` outside
+// the runner throws "Cannot navigate to invalid URL".
 //
-// Fixing both would still leave two hardware-dependent micro-benchmarks whose
-// assertions had already drifted away from their own titles: the "55+ FPS"
-// test asserted `averageFps > 30` with the comment "actual: ~31 FPS" and
-// `minFps > 1`, and the "backdrop-filter performance" test measured how long
-// the browser took to schedule the next animation frame after appending ten
-// divs, which is rAF scheduling latency rather than the cost of the filter.
-// Nothing here has ever run, so nothing is lost by removing it; Safari is
-// exercised for real by the desktop `webkit` project across the navigation,
+// What does hold: `page.goto("/", { waitUntil: "networkidle" })` times out in
+// WebKit against `next dev` (the same failure mode takes out nine
+// performance.spec.ts tests on the Mobile Safari project), and both deleted
+// tests were hardware-dependent micro-benchmarks whose assertions had drifted
+// away from their own titles - the "55+ FPS" test asserted `averageFps > 30`
+// with the comment "actual: ~31 FPS" and `minFps > 1`, and the
+// "backdrop-filter performance" test measured how long the browser took to
+// schedule the next animation frame after appending ten divs, which is rAF
+// scheduling latency rather than the cost of the filter. Safari is exercised
+// for real by the desktop `webkit` project across the navigation,
 // accessibility and terminal specs.

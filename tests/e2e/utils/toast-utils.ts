@@ -83,7 +83,13 @@ export async function dismissToasts(
             // The styles above already make the toast non-blocking.
           });
 
-          // Also set up a mutation observer to catch dynamically added toasts
+          // Catch toasts that mount while this call is still running. The
+          // observer used to be installed once and never disconnected, so it
+          // outlived the call and kept firing on every React commit for the
+          // rest of the page's life -- writing inline styles from inside a
+          // childList/subtree callback on document.body, in the same file
+          // whose element.remove() already cost a React teardown. It is now
+          // scoped to this dismissToasts() call and disconnected below.
           if (!window.__toastObserver) {
             window.__toastObserver = new MutationObserver(() => {
               const newElements = document.querySelectorAll(selector);
@@ -106,6 +112,17 @@ export async function dismissToasts(
       } catch {
         // Ignore errors during force-hide
       }
+    }
+
+    // Disconnect before returning, in a separate evaluate so it still runs if
+    // one of the attempts above threw (e.g. a navigation mid-call).
+    try {
+      await page.evaluate(() => {
+        window.__toastObserver?.disconnect();
+        delete window.__toastObserver;
+      });
+    } catch {
+      // Page navigated or closed; the observer went with it.
     }
   }
 
@@ -1044,28 +1061,21 @@ export async function toggleThemeReliably(
           });
         },
 
-        // Strategy 4: Direct theme class manipulation
-        async () => {
-          await page.evaluate((theme) => {
-            const html = document.documentElement;
-            if (theme === "dark") {
-              html.classList.add("dark");
-              html.setAttribute("data-theme", "dark");
-            } else {
-              html.classList.remove("dark");
-              html.setAttribute("data-theme", "light");
-            }
-
-            // Trigger storage event to sync with theme system
-            localStorage.setItem("theme", theme);
-            window.dispatchEvent(new Event("storage"));
-          }, targetTheme);
-        },
-
-        // Strategy 5: Keyboard shortcut if available
-        async () => {
-          await page.keyboard.press("Alt+T");
-        },
+        // Strategies 4 and 5 were removed on purpose.
+        //
+        // Strategy 4 set `dark` on <html> itself and fired a storage event.
+        // It could not fail, so this function could not return false, so the
+        // only caller's "did the theme toggle work" check was unfalsifiable -
+        // a deleted or broken ThemeToggle would still have produced a green
+        // dark-theme run with the class painted on by the test.
+        //
+        // Strategy 5 pressed Alt+T. Nothing in src/ listens for Alt+T; it was
+        // dead input that only cost the retry loop a round trip.
+        //
+        // Strategies 0-3 all go through the real button's click handler
+        // (strategy 3 uses HTMLElement.click(), which fires the React handler
+        // even when the breakpoint copy of the button is display:none), so a
+        // false return now means the product is broken.
       ];
 
       for (let i = 0; i < toggleStrategies.length; i++) {
