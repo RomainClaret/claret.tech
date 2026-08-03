@@ -1,5 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { dismissToasts } from "./utils/toast-utils";
+// The two helpers every keyboard-driven terminal test needs. They live in
+// utils/ because terminal.spec.ts needs exactly the same ones, and having two
+// copies is how one of them ends up reading `.xterm-screen` again.
+import { screen, focusTerminal } from "./utils/terminal-utils";
 
 /**
  * End-to-end coverage for the `python` terminal command.
@@ -73,29 +77,12 @@ test.describe("Terminal: python", () => {
   }
 
   /**
-   * Everything currently rendered in the xterm viewport, one row per line.
+   * Type a line, submit it, and wait until `expected` shows up on screen.
    *
-   * Reads the row elements rather than `.xterm-screen`: the DOM renderer
-   * injects a <style> block inside that container, so its textContent is
-   * several kilobytes of CSS with the terminal output buried in it, and
-   * assertions end up matching stylesheet text.
+   * Deliberately not the shared runCommand(): the boot timeout and the
+   * whole-screen echo check are specific to a REPL that can take a minute to
+   * answer its first line.
    */
-  async function screen(page: Page): Promise<string> {
-    const rows = await page.locator(".xterm-rows > div").allTextContents();
-    return rows.join("\n");
-  }
-
-  /**
-   * xterm reads from a hidden textarea. Focusing it explicitly is the
-   * difference between keystrokes reaching the terminal and disappearing:
-   * anything else on the page that takes focus after the terminal opens would
-   * otherwise swallow them silently.
-   */
-  async function focusTerminal(page: Page) {
-    await page.locator(".xterm-helper-textarea").first().focus();
-  }
-
-  /** Type a line, submit it, and wait until `expected` shows up on screen. */
   async function run(
     page: Page,
     command: string,

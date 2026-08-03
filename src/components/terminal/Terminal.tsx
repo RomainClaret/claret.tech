@@ -1152,6 +1152,22 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                     term.write(`\x1b[${diff}D`);
                   }
                 }
+              } else if (historyIndexRef.current > 0) {
+                // Already on the first visual row, so keep walking history the
+                // way Down-arrow does. Without this, recall stopped dead after
+                // one entry: the first Up filled the input buffer, so every
+                // later Up took this wrapped-text branch, and a single-line
+                // command has row 0, so nothing happened. `help` advertises
+                // Up/Down for history, and only the first step worked.
+                historyIndexRef.current--;
+                inputBufferRef.current =
+                  commandHistoryRef.current[historyIndexRef.current];
+                cursorPosRef.current = inputBufferRef.current.length;
+                updatePermanentBackup();
+
+                term.write("\r" + " ".repeat(term.cols) + "\r");
+                writePrompt();
+                writeWrappedInput(term, inputBufferRef.current);
               } else {
                 // At top of text, move cursor to beginning of input (position 0)
                 if (cursorPosRef.current > 0) {

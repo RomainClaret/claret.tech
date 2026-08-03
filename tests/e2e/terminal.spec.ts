@@ -3,6 +3,19 @@ import {
   dismissToasts,
   ensureElementNotBlockedByToast,
 } from "./utils/toast-utils";
+// Shared with python-terminal.spec.ts. Every keyboard-driven test below was
+// disabled because it typed into an element xterm does not read from and then
+// asserted against a container whose textContent is mostly injected CSS; these
+// helpers are the fix for both.
+import {
+  screen,
+  fullScreen,
+  currentLine,
+  hasOutputRow,
+  focusTerminal,
+  waitForTerminalReady,
+  runCommand,
+} from "./utils/terminal-utils";
 
 // CI-specific configuration for timeout optimization
 const isCI = !!process.env.CI;
@@ -20,16 +33,11 @@ test.describe("Terminal", () => {
     }
   });
 
-  // Helper to check if terminal feature exists
-  const checkTerminalExists = async (page: Page) => {
-    const terminal = page
-      .locator('[data-testid="terminal"], [role="application"], .terminal')
-      .first();
-    const count = await terminal.count();
-    return count > 0;
-  };
+  // the soft `checkTerminalExists` helper this file used to carry is gone: its
+  // only callers were the disabled tests below, and every one of them used it
+  // to `return` (reporting a pass) when the terminal was missing.
 
-  // hard version of the check above, used everywhere a test used to return
+  // hard version of the check, used everywhere a test used to return
   // early. a terminal that is missing or invisible after beforeEach opened it
   // is a regression, not an environment condition, so it has to fail instead of
   // reporting a silent pass.
@@ -283,190 +291,191 @@ test.describe("Terminal", () => {
     expect(text).toBeTruthy();
   });
 
-  test.skip("should execute help command", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should execute help command", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // Wait on the LAST line of the help text, not the first section header:
+    // help prints 37 lines into a 24-row terminal, so by the time it finishes
+    // the header has already scrolled out of the viewport.
+    await runCommand(page, "help", /Use Ctrl\+C to cancel current input/);
 
-    // Type help command
-    await page.keyboard.type("help");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(1000);
-
-    // Check for help output
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should show available commands
-    expect(text?.toLowerCase()).toContain("command");
+    // ...which is also why the assertions read the scrollback. The section
+    // headers come from src/lib/terminal/commands.ts.
+    const text = await fullScreen(page);
+    expect(text.toLowerCase()).toContain("command");
+    expect(text).toContain("System Commands:");
+    expect(text).toContain("POSIX-like Commands:");
   });
 
-  test.skip("should execute ls command", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should execute ls command", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // The old assertion here was `length > 10` against `.xterm-screen`, which
+    // the injected <style> block satisfied on its own: it passed with the
+    // terminal listing nothing at all. The real listing comes from
+    // src/lib/terminal/fileSystem.ts, so assert on its actual entries.
+    const text = await runCommand(page, "ls", /README\.md/);
 
-    // Type ls command
-    await page.keyboard.type("ls");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(1000);
-
-    // Check for ls output
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should show some files/directories or message
-    expect(text).toBeTruthy();
-    expect(text?.length).toBeGreaterThan(10);
+    expect(text).toContain("README.md");
+    expect(text).toContain("docs/");
+    expect(text).toContain("examples/");
+    // Hidden entries stay hidden without -a.
+    expect(text).not.toContain(".hiddenFile");
   });
 
-  test.skip("should execute about command", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should execute about command", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // `about` does NOT come from src/lib/terminal/commands.ts. That file
+    // defines one at line ~718, but `commands` spreads `...aiCommands` last,
+    // so src/lib/terminal/ai-commands.ts:503 wins and the commands.ts version
+    // is dead code. Editing the wrong one changes nothing on screen, which is
+    // how a mutation check first surfaced this.
+    //
+    // Wait on the last line of the real output; the heading may already have
+    // scrolled past on a short terminal.
+    await runCommand(page, "about", /Use 'ai init' to start the conversation/);
 
-    // Type about command
-    await page.keyboard.type("about");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(1000);
-
-    // Check for about output
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should show information
-    expect(text).toBeTruthy();
-    expect(text?.toLowerCase()).toMatch(
-      /romain|claret|portfolio|developer|engineer/i,
-    );
+    // The inherited assertion here was `toMatch(/romain|claret/i)` against the
+    // whole screen, which the shell prompt "guest@Claret.Tech %" satisfies on
+    // its own - it passed with the about command emitting nothing. These
+    // strings can only come from the command's output.
+    const text = await fullScreen(page);
+    expect(text).toContain("About Romain Claret");
+    expect(text).toContain("Research Philosophy:");
+    expect(text).toContain("Current Positions:");
   });
 
-  test.skip("should clear terminal screen", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should clear terminal screen", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // Fill the screen first, so an assertion about it being empty afterwards
+    // means something.
+    await runCommand(page, "help", /Use Ctrl\+C to cancel current input/);
+    expect(await screen(page)).toContain("AI Assistant:");
 
-    // First add some content
-    await page.keyboard.type("help");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
-
-    // Clear the terminal
+    await focusTerminal(page);
     await page.keyboard.type("clear");
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
 
-    // Terminal should be mostly empty now
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
+    // `clear` calls term.clear(), which drops the scrollback and leaves the
+    // prompt row. Both halves are polled together: term.clear() and the prompt
+    // rewrite that follows it are separate writes, and sampling between them
+    // catches a screen that is briefly blank - cleared but with no prompt.
+    await expect
+      .poll(
+        async () => {
+          const now = await screen(page);
+          return now.length < 500 && /Claret\.Tech/.test(now);
+        },
+        { timeout: 10_000, intervals: [100, 250, 500] },
+      )
+      .toBe(true);
 
-    // Should have reduced content (allow for prompt and some output)
-    expect(text?.length).toBeLessThan(500); // Relaxed for production
+    const text = await screen(page);
+    expect(text.length).toBeLessThan(500);
+    expect(text).not.toContain("AI Assistant:");
+    // The scrollback is gone too, not merely scrolled past.
+    expect(await fullScreen(page)).not.toContain("POSIX-like Commands:");
+    // A prompt is still there - "cleared" must not mean "dead".
+    expect(text).toMatch(/Claret\.Tech|%|\$/);
   });
 
-  test.skip("should handle invalid commands", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should handle invalid commands", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // commands.ts emits `${commandName}: command not found`.
+    const text = await runCommand(
+      page,
+      "invalidcommand123",
+      /invalidcommand123: command not found/,
+    );
 
-    // Type invalid command
-    await page.keyboard.type("invalidcommand123");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(1000);
-
-    // Check for error message
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should show error or "command not found"
-    expect(text?.toLowerCase()).toMatch(/not found|invalid|error|unknown/i);
+    expect(text).toContain("invalidcommand123: command not found");
   });
 
-  test.skip("should support command history with arrow keys", async ({
-    page,
-    isMobile,
-  }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  /**
+   * KNOWN FAILING - product defect, not a test defect. Left enabled on purpose.
+   *
+   * Up-arrow can only walk ONE step back through the shell's command history.
+   * With history [about, ls, clear], the first Up recalls "clear" and every
+   * later Up does nothing at all, so "ls" and "about" are unreachable from the
+   * keyboard - while the terminal's own `help` output advertises "Use Up/Down
+   * arrows for command history".
+   *
+   * src/components/terminal/Terminal.tsx, the "\x1b[A" branch (~line 1105):
+   * history recall is gated on `if (inputBufferRef.current === "")`. Recalling
+   * an entry fills that buffer, so the next Up takes the `else` branch, which
+   * only moves the cursor within wrapped input. A recalled single-line command
+   * has `currentPos.row === 0`, so that branch just parks the cursor at column
+   * 0 and returns; `historyIndexRef` is never decremented again.
+   *
+   * The Down-arrow branch in the same file (~line 1257) is the evidence that
+   * this is an oversight rather than a decision: its non-empty-buffer path has
+   * an explicit `else if (historyIndexRef.current < commandHistoryRef.current
+   * .length - 1)` fallback that keeps walking history. Up has no equivalent.
+   *
+   * Fix: give the "\x1b[A" branch the same fallback, i.e. when the cursor is
+   * already on the first visual row, step history instead of only moving the
+   * cursor. Do not weaken this test to match the bug.
+   */
+  test("should support command history with arrow keys", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    await runCommand(page, "about", /Use 'ai init' to start the conversation/);
+    await runCommand(page, "ls", /README\.md/);
 
-    // Type first command
-    await page.keyboard.type("help");
+    // Wipe the screen before exercising recall. Everything typed so far is
+    // still painted otherwise, so "the screen contains ls" passes with history
+    // completely broken - which is exactly what the old assertion did.
+    await focusTerminal(page);
+    await page.keyboard.type("clear");
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
+    await expect
+      .poll(async () => (await screen(page)).includes("README.md"), {
+        timeout: 10_000,
+      })
+      .toBe(false);
 
-    // Type second command
-    await page.keyboard.type("ls");
+    // History is now, oldest to newest: about, ls, clear.
+    await focusTerminal(page);
+    await page.keyboard.press("ArrowUp");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/clear$/);
+
+    // FAILS HERE: the buffer stays on "clear" forever. See the block comment
+    // above this test.
+    await page.keyboard.press("ArrowUp");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/ls$/);
+
+    await page.keyboard.press("ArrowUp");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/about$/);
+
+    // Down walks back toward the newest entry.
+    await page.keyboard.press("ArrowDown");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/ls$/);
+
+    // The recalled command is really in the input buffer, not just painted:
+    // submitting it runs `ls` on an otherwise blank screen.
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
-
-    // Press up arrow to get previous command
-    await page.keyboard.press("ArrowUp");
-    await page.waitForTimeout(200);
-
-    // Current line should show "ls"
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Check if command is visible (may be in prompt or output)
-    expect(text?.toLowerCase()).toContain("ls");
-
-    // Press up again for "help"
-    await page.keyboard.press("ArrowUp");
-    await page.waitForTimeout(200);
-
-    const text2 = await terminalContent.textContent();
-
-    // Check if help command is visible
-    expect(text2?.toLowerCase()).toContain("help");
+    await expect
+      .poll(async () => (await screen(page)).includes("README.md"), {
+        timeout: 10_000,
+      })
+      .toBe(true);
   });
 
   test("should support tab completion", async ({
@@ -1138,131 +1147,163 @@ test.describe("Terminal", () => {
     }
   });
 
-  test.skip("should support keyboard shortcuts", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should support keyboard shortcuts", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    // Type some text
-    await page.keyboard.type("test command");
+    // The old body typed text, pressed Ctrl+A "to select all", pressed Delete,
+    // and then asserted a count was <= 1 - which is satisfied by 0, i.e. by
+    // nothing having been typed at all. It also tested shortcuts the terminal
+    // does not implement: Terminal.tsx handles Ctrl+A as "move to start of
+    // line" (code === 1) and ignores the Delete key entirely (\x1b[3~ matches
+    // no branch). This exercises the shortcuts that exist, through their
+    // observable effect on what the shell finally runs.
+    await focusTerminal(page);
+    await page.keyboard.type("world");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/world$/);
 
-    // Ctrl+A to select all (or Cmd+A on Mac)
+    // Ctrl+A - jump to column 0, then type in front of the existing text.
     await page.keyboard.press("Control+a");
+    await page.keyboard.type("echo hello ");
 
-    // Delete selected text
-    await page.keyboard.press("Delete");
+    // Ctrl+E - jump back to the end, then append.
+    await page.keyboard.press("Control+e");
+    await page.keyboard.type("s");
 
-    // Terminal input should be cleared
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/echo hello worlds$/);
 
-    // Text should be reduced or cleared
-    const fullText = text?.toLowerCase() || "";
-    // Either the command is gone or significantly reduced
-    expect(fullText.match(/test command/g)?.length || 0).toBeLessThanOrEqual(1);
-  });
+    // A whole row, not a substring: "hello worlds" also appears inside the
+    // echoed command line, so only an output row proves the shell ran it.
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => await hasOutputRow(page, "hello worlds"), {
+        timeout: 10_000,
+      })
+      .toBe(true);
 
-  test.skip("should display colored output", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+    // Ctrl+C - abandon the current line. It must not reach the dispatcher.
+    await focusTerminal(page);
+    await page.keyboard.type("notacommand987");
+    await page.keyboard.press("Control+c");
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .not.toMatch(/notacommand987$/);
 
-    // Execute a command that typically produces colored output
-    await page.keyboard.type("ls");
     await page.keyboard.press("Enter");
     await page.waitForTimeout(1000);
+    expect(await screen(page)).not.toContain(
+      "notacommand987: command not found",
+    );
+  });
 
-    // Check for color styling (ANSI codes or CSS classes)
-    const hasColors = await page.evaluate(() => {
-      const terminal = document.querySelector(
-        ".xterm-screen, .terminal-content",
-      );
-      if (!terminal) return false;
+  test("should display colored output", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-      // Check for color classes or styles
-      const coloredElements = terminal.querySelectorAll(
-        '[style*="color"], [class*="color"], .xterm-fg-*, .xterm-bg-*',
-      );
-      return coloredElements.length > 0;
+    // `help` is written with explicit SGR codes in commands.ts
+    // ("\x1b[1m\x1b[36mAI Assistant:\x1b[0m", green command names), so colored
+    // spans are a requirement here rather than a nice-to-have. The old
+    // assertion was `expect(hasColors).toBeDefined()` on a boolean, which is
+    // true whatever the terminal renders - including nothing at all.
+    await runCommand(page, "help", /Use Ctrl\+C to cancel current input/);
+
+    const colored = await page
+      .locator('.xterm-rows span[class*="xterm-fg-"]')
+      .count();
+    expect(colored).toBeGreaterThan(0);
+
+    // And specifically: the section headers still on screen are the bold cyan
+    // ones, not plain text that happens to sit next to something colored.
+    const header = page.locator(
+      '.xterm-rows span[class*="xterm-fg-"][class*="xterm-bold"]',
+      { hasText: "AI Assistant:" },
+    );
+    expect(await header.count()).toBeGreaterThan(0);
+  });
+
+  test("should keep command history across close and reopen", async ({
+    page,
+  }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+
+    await runCommand(page, "about", /Use 'ai init' to start the conversation/);
+
+    // This replaces "should persist command history in session", which asserted
+    // that the screen matched /about|help/ - satisfied by the echoed commands
+    // still being painted - and never checked that recall worked.
+    //
+    // The behavior it should have been testing does exist. `isOpen` gates only
+    // the terminal's own markup (`{isOpen && ...}` inside AnimatePresence);
+    // app-wrapper.tsx keeps the <Terminal> component itself mounted for the
+    // life of the page, so commandHistoryRef survives. The close effect in
+    // Terminal.tsx resets the input buffer, prompt mode and line mode by hand
+    // and deliberately leaves the history ring alone.
+    const terminalToggle = page
+      .locator('button[aria-label="Toggle terminal"]')
+      .first();
+    await terminalToggle.click();
+    await expect(page.locator('[data-testid="terminal"]').first()).toBeHidden({
+      timeout: 10_000,
     });
 
-    // Terminal should support colors (this is optional but good to have)
-    expect(hasColors).toBeDefined();
-  });
-
-  test.skip("should persist command history in session", async ({
-    page,
-    isMobile,
-  }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
-
-    // Execute commands
-    await page.keyboard.type("help");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
-
-    await page.keyboard.type("about");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
-
-    // Close terminal
-    const terminalToggle = page.locator('button[aria-label="Toggle terminal"]');
     await terminalToggle.click();
-    await page.waitForTimeout(500);
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    // Reopen terminal
-    await terminalToggle.click();
-    await page.waitForTimeout(500);
+    // A fresh xterm, so the previous session's output is gone - which is what
+    // makes the recall assertion below meaningful.
+    expect(await screen(page)).not.toContain("About Romain Claret");
 
-    // Check if history is preserved
+    await focusTerminal(page);
     await page.keyboard.press("ArrowUp");
-    await page.waitForTimeout(200);
-
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should have previous commands in history
-    expect(text).toMatch(/about|help/i);
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/about$/);
   });
 
-  test.skip("should handle paste operations", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should handle paste operations", async ({ page }) => {
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-
-    // Copy text to clipboard
-    const textToPaste = "echo 'pasted text'";
+    // A real paste event on the helper textarea, rather than clipboard
+    // permissions plus Control+v: xterm listens for `paste` there and hands the
+    // payload to onData, so this is what a real paste looks like to the app and
+    // it needs no permission grant. The old version called
+    // navigator.clipboard.writeText() without clipboard-write permission (the
+    // promise rejected, unhandled and unawaited) and then pressed Control+v
+    // without focusing the textarea, so nothing could ever have been pasted.
+    await focusTerminal(page);
     await page.evaluate((text) => {
-      navigator.clipboard.writeText(text);
-    }, textToPaste);
+      const textarea = document.querySelector(".xterm-helper-textarea");
+      if (!textarea) throw new Error("xterm helper textarea not found");
+      const data = new DataTransfer();
+      data.setData("text/plain", text);
+      textarea.dispatchEvent(
+        new ClipboardEvent("paste", {
+          clipboardData: data,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    }, "echo pasted-into-terminal");
 
-    // Paste into terminal
-    await page.keyboard.press("Control+v");
-    await page.waitForTimeout(500);
+    await expect
+      .poll(async () => await currentLine(page), { timeout: 10_000 })
+      .toMatch(/echo pasted-into-terminal$/);
 
-    // Check if text was pasted
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-
-    // Should contain pasted text
-    expect(text).toContain("echo");
+    // The pasted text is in the input buffer, not merely painted: `echo` must
+    // print it back on a row of its own.
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => await hasOutputRow(page, "pasted-into-terminal"), {
+        timeout: 10_000,
+      })
+      .toBe(true);
   });
 
   test("should show terminal in correct theme", async ({ page }) => {
@@ -1315,46 +1356,26 @@ test.describe("Terminal", () => {
     expect(isFocused).toBeTruthy();
   });
 
-  test.skip("should handle window resize", async ({ page, isMobile }) => {
-    if (isMobile) {
-      test.skip();
-      return;
-    }
+  test("should handle window resize", async ({ page }) => {
+    const terminal = await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
-      .first();
-
-    // Resize viewport
+    // Resize the viewport. Terminal.tsx refits xterm on window resize, so this
+    // is where a broken refit would show up as a terminal that no longer takes
+    // input.
     await page.setViewportSize({ width: 1400, height: 900 });
-    await page.waitForTimeout(500);
-
-    // Terminal should still be visible and functional
     await expect(terminal).toBeVisible();
 
-    // Type a command to ensure it's still working
-    await page.keyboard.type("help");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
-
-    const terminalContent = page
-      .locator(".xterm-screen, .terminal-content")
-      .first();
-    const text = await terminalContent.textContent();
-    expect(text).toContain("help");
+    // Not `toContain("help")`, and not `echo something`: both are satisfied by
+    // the echoed input whether or not the command ran. `ls` prints filenames
+    // that cannot come from the two characters typed.
+    const text = await runCommand(page, "ls", /README\.md/);
+    expect(text).toContain("README.md");
+    expect(text).toContain("examples/");
   });
 
-  test.skip("should support mobile touch interactions", async ({
-    page: _page,
-    isMobile: _isMobile,
-    browserName: _browserName,
-  }) => {
-    // Skip this test - terminal is a desktop-only feature and should not be tested for mobile interactions
-    // This test was causing failures because it tried to test mobile functionality on a desktop-only feature
-  });
+  // "should support mobile touch interactions" was deleted rather than left
+  // skipped. Its body was two comment lines and nothing else, and the terminal
+  // is desktop-only by design (the beforeEach above skips every test in this
+  // file on mobile), so there was no behavior for it to assert.
 });

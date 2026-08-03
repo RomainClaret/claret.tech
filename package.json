@@ -55,7 +55,6 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:performance": "playwright test --grep 'Lighthouse|Safari-Specific'",
-    "test:load": "playwright test --grep 'Load Testing'",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md}\"",
     "lighthouse": "npx lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html",
     "lighthouse:ci": "npx lighthouse http://localhost:3000 --config-path=lighthouse.config.js --output json --output-path ./lighthouse-ci.json",

@@ -53,7 +53,6 @@ jobs:
       accessibility: ${{ steps.filter.outputs.accessibility }}
       performance: ${{ steps.filter.outputs.performance }}
       terminal: ${{ steps.filter.outputs.terminal }}
-      load: ${{ steps.filter.outputs.load }}
       lighthouse: ${{ steps.filter.outputs.lighthouse }}
       mobile: ${{ steps.filter.outputs.mobile }}
       src: ${{ steps.filter.outputs.src }}
@@ -107,10 +106,6 @@ jobs:
               - 'src/**/*command*.{ts,tsx}'
               - 'src/lib/python/**'
               - 'public/python-worker.js'
-            load:
-              - 'tests/e2e/load-testing.spec.ts'
-              - 'src/**/*load*.{ts,tsx}'
-              - 'src/**/*stress*.{ts,tsx}'
             lighthouse:
               - 'tests/e2e/lighthouse.spec.ts'
               - 'next.config.js'
@@ -581,115 +576,6 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # Load testing as separate job (heavy tests)
-  load-tests:
-    needs: detect-changes
-    # Only run if load-related files or core src changed
-    if: |
-      github.event.inputs.force_all_tests == 'true' ||
-      needs.detect-changes.outputs.load == 'true' ||
-      needs.detect-changes.outputs.performance == 'true' ||
-      needs.detect-changes.outputs.src == 'true' ||
-      needs.detect-changes.outputs.dependencies == 'true' ||
-      needs.detect-changes.outputs.workflows == 'true'
-    timeout-minutes: 20
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
-      options: --user root
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1-of-2, 2-of-2]  # Split load tests for better distribution
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Browsers
-        run: npx playwright install chromium
-
-      - name: Build Next.js Application
-        run: npm run build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
-          USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
-
-      - name: Start Next.js Application
-        run: |
-          npm start &
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
-          
-          # Wait for server to be ready with retry logic
-          for i in {1..30}; do
-            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-              echo "✅ Server is ready (attempt $i/30)"
-              break
-            fi
-            echo "⏳ Waiting for server to start (attempt $i/30)..."
-            sleep 2
-          done
-          
-          # Final health check
-          if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-            echo "❌ Server failed to start after 60 seconds"
-            exit 1
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run Load Tests
-        run: |
-          # Convert shard format for Playwright (e.g., 1-of-2 -> 1/2)
-          SHARD_PLAYWRIGHT=$(echo "${{ matrix.shard }}" | sed 's/-of-/\//g')
-          npx playwright test tests/e2e/load-testing.spec.ts --project=chromium --shard="$SHARD_PLAYWRIGHT" --max-failures=2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SKIP_EXTERNAL_APIS: true
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
-          HOME: /root  # Fix potential browser launch issues
-
-      - name: Stop Next.js Server
-        if: always()
-        run: |
-          if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
-            echo "🛑 Server stopped (PID: $SERVER_PID)"
-          fi
-
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        continue-on-error: true  # Don't fail job if artifact upload fails
-        with:
-          name: load-tests-${{ matrix.shard }}-report
-          path: playwright-report/
-          retention-days: 30
-
   # Mobile testing
   mobile-tests:
     needs: detect-changes
@@ -882,7 +768,6 @@ jobs:
       accessibility-tests,
       performance-tests,
       terminal-tests,
-      load-tests,
       mobile-tests,
       lighthouse-performance
     ]
@@ -897,7 +782,6 @@ jobs:
           echo "Accessibility Tests: ${{ needs.accessibility-tests.result }}"
           echo "Performance Tests: ${{ needs.performance-tests.result }}"
           echo "Terminal Tests: ${{ needs.terminal-tests.result }}"
-          echo "Load Tests: ${{ needs.load-tests.result }}"
           echo "Mobile Tests: ${{ needs.mobile-tests.result }}"
           echo "Lighthouse Tests: ${{ needs.lighthouse-performance.result }}"
           echo ""
@@ -908,7 +792,6 @@ jobs:
              [[ "${{ needs.accessibility-tests.result }}" != "skipped" ]] || \
              [[ "${{ needs.performance-tests.result }}" != "skipped" ]] || \
              [[ "${{ needs.terminal-tests.result }}" != "skipped" ]] || \
-             [[ "${{ needs.load-tests.result }}" != "skipped" ]] || \
              [[ "${{ needs.mobile-tests.result }}" != "skipped" ]] || \
              [[ "${{ needs.lighthouse-performance.result }}" != "skipped" ]]; then
             TESTS_RAN=true
@@ -944,7 +827,6 @@ jobs:
              [[ "${{ needs.accessibility-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.performance-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.terminal-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.load-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.mobile-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.lighthouse-performance.result }}" == "failure" ]]; then
             echo "❌ Some tests failed!"

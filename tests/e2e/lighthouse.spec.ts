@@ -1,4 +1,4 @@
-import { test, expect, chromium, webkit } from "@playwright/test";
+import { test, expect, chromium } from "@playwright/test";
 import { playAudit } from "playwright-lighthouse";
 import fs from "fs";
 import path from "path";
@@ -517,153 +517,23 @@ test.describe("Cross-Browser Lighthouse Performance", () => {
   });
 });
 
-// Safari-specific performance tests
-test.describe("Safari-Specific Performance", () => {
-  test.skip("should maintain 55+ FPS in Safari with animations", async () => {
-    const browser = await webkit.launch();
-    const context = await browser.newContext({
-      viewport: { width: 1920, height: 1080 },
-    });
-    const page = await context.newPage();
-
-    try {
-      await page.goto("/", { waitUntil: "networkidle" });
-
-      // Enable animations (if they were disabled for Safari)
-      await page.evaluate(() => {
-        document.body.classList.add("enable-animations");
-      });
-
-      // Measure FPS during scrolling and interactions
-      const fpsMetrics = await page.evaluate(() => {
-        return new Promise<{
-          averageFps: number;
-          minFps: number;
-          droppedFrames: number;
-          totalFrames: number;
-        }>((resolve) => {
-          const frames: number[] = [];
-          let lastTime = performance.now();
-
-          const measureFrame = () => {
-            const currentTime = performance.now();
-            const delta = currentTime - lastTime;
-            frames.push(1000 / delta); // FPS
-            lastTime = currentTime;
-
-            if (frames.length < 120) {
-              // Measure for ~2 seconds at 60fps
-              requestAnimationFrame(measureFrame);
-            } else {
-              const avgFps = frames.reduce((a, b) => a + b, 0) / frames.length;
-              const minFps = Math.min(...frames);
-              const droppedFrames = frames.filter((fps) => fps < 50).length;
-
-              resolve({
-                averageFps: avgFps,
-                minFps: minFps,
-                droppedFrames: droppedFrames,
-                totalFrames: frames.length,
-              });
-            }
-          };
-
-          // Trigger animations by scrolling
-          window.scrollTo({ top: 500, behavior: "smooth" });
-          requestAnimationFrame(measureFrame);
-        });
-      });
-
-      // console.log(`Safari FPS Metrics:`);
-      // console.log(`  Average FPS: ${fpsMetrics.averageFps.toFixed(1)}`);
-      // console.log(`  Minimum FPS: ${fpsMetrics.minFps.toFixed(1)}`);
-      // console.log(
-      //   `  Dropped frames: ${fpsMetrics.droppedFrames}/${fpsMetrics.totalFrames}`,
-      // );
-
-      // Safari-specific assertions (more lenient than other browsers)
-      expect(
-        fpsMetrics.averageFps,
-        "Safari should maintain 30+ average FPS",
-      ).toBeGreaterThan(30); // Relaxed for production reality (actual: ~31 FPS)
-
-      expect(
-        fpsMetrics.minFps,
-        "Safari minimum FPS should be above 1",
-      ).toBeGreaterThan(1); // Very relaxed due to measurement issues
-
-      const droppedFrameRatio =
-        fpsMetrics.droppedFrames / fpsMetrics.totalFrames;
-      expect(
-        droppedFrameRatio,
-        "Safari dropped frame ratio should be < 20%",
-      ).toBeLessThan(0.2);
-    } finally {
-      await context.close();
-      await browser.close();
-    }
-  });
-
-  test.skip("should handle backdrop-filter performance in Safari", async () => {
-    const browser = await webkit.launch();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    try {
-      await page.goto("/", { waitUntil: "networkidle" });
-
-      // Test backdrop-filter performance
-      const backdropFilterPerf = await page.evaluate(() => {
-        return new Promise<{ renderTime: number; layoutTime: number }>(
-          (resolve) => {
-            const startTime = performance.now();
-
-            // Create elements with backdrop-filter
-            const elements: HTMLElement[] = [];
-            for (let i = 0; i < 10; i++) {
-              const div = document.createElement("div");
-              div.style.cssText = `
-              position: fixed;
-              top: ${i * 50}px;
-              left: ${i * 50}px;
-              width: 200px;
-              height: 200px;
-              backdrop-filter: blur(10px);
-              background: rgba(255, 255, 255, 0.1);
-              z-index: 1000;
-            `;
-              document.body.appendChild(div);
-              elements.push(div);
-            }
-
-            requestAnimationFrame(() => {
-              const layoutTime = performance.now() - startTime;
-
-              // Clean up
-              elements.forEach((el) => el.remove());
-
-              resolve({
-                renderTime: layoutTime,
-                layoutTime: layoutTime,
-              });
-            });
-          },
-        );
-      });
-
-      // console.log(`Safari Backdrop-filter Performance:`);
-      // console.log(
-      //   `  Render time: ${backdropFilterPerf.renderTime.toFixed(2)}ms`,
-      // );
-
-      // Should render backdrop-filters within reasonable time
-      expect(
-        backdropFilterPerf.renderTime,
-        "Backdrop-filter rendering should be < 200ms",
-      ).toBeLessThan(200); // Relaxed for production
-    } finally {
-      await context.close();
-      await browser.close();
-    }
-  });
-});
+// The "Safari-Specific Performance" describe block that used to sit here was
+// deleted rather than re-enabled. Both of its tests were permanently skipped
+// and broken in two independent ways:
+//
+//   1. Each did `webkit.launch()` -> `browser.newContext()` -> `page.goto("/")`.
+//      `baseURL` is a fixture option and is not applied to a manually launched
+//      browser, so the relative navigation threw.
+//   2. Passing `baseURL` into newContext() fixes that and they still fail:
+//      `page.goto("/", { waitUntil: "networkidle" })` times out at 60s in
+//      WebKit (verified 2026-08-03).
+//
+// Fixing both would still leave two hardware-dependent micro-benchmarks whose
+// assertions had already drifted away from their own titles: the "55+ FPS"
+// test asserted `averageFps > 30` with the comment "actual: ~31 FPS" and
+// `minFps > 1`, and the "backdrop-filter performance" test measured how long
+// the browser took to schedule the next animation frame after appending ten
+// divs, which is rAF scheduling latency rather than the cost of the filter.
+// Nothing here has ever run, so nothing is lost by removing it; Safari is
+// exercised for real by the desktop `webkit` project across the navigation,
+// accessibility and terminal specs.
