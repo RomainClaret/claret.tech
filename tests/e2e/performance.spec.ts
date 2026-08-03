@@ -441,38 +441,71 @@ test.describe("Performance", () => {
   });
 
   /**
-   * Still skipped, but now for a recorded reason rather than none.
+   * This test guards the deletion of src/app/loading.tsx. Do not add that file
+   * back without reading this.
    *
-   * Enabled and run on 2026-08-03 it failed on all five projects, and not
-   * because the assertions are wrong: the site genuinely does not render
-   * without JavaScript. The h1 is in the HTML the server sends, so it is
-   * tempting to assume Next SSR covers this, but it arrives inside React's
-   * hidden streaming slot and nothing ever moves it out:
+   * A `loading.tsx` in a route segment is not just a fallback UI: its mere
+   * existence makes Next wrap the segment in a Suspense boundary
+   * (next/dist/client/components/layout-router.js, the boundary is created only
+   * when a loading module is present). The homepage subtree does not fill that
+   * boundary before the shell flushes, so the whole page shipped inside
+   * `<div hidden id="S:1">` with an inline `$RC("B:1","S:1")` script to unhide
+   * it. With JS that is invisible. With JS off nothing ran the script, so
+   * `[hidden]:where(:not([hidden="until-found"])) => display: none` kept every
+   * section collapsed and the page was blank, not degraded.
    *
-   *   locator resolved to <h1 class="text-4xl ...">…</h1>
-   *      - unexpected value "hidden"
+   * The old file returned `null` and its own comment said the real loading UI
+   * is SplashScreen, so it bought nothing and cost the whole no-JS render.
    *
-   *   $ node -e "fetch('http://localhost:3000/').then(...)"
-   *     BAILOUT_TO_CLIENT_SIDE_RENDERING present: true  (x5)
-   *     h1 text present in SSR HTML: true
-   *     h1 is inside the hidden streaming slot: true
+   * The five BAILOUT_TO_CLIENT_SIDE_RENDERING markers in the HTML are NOT the
+   * cause and are still there today. next/dist/shared/lib/lazy-dynamic/
+   * loadable.js wraps every `ssr:false` import in its own Suspense, so those
+   * bailouts are always local, and app-wrapper.tsx renders `{children}` as a
+   * sibling of them, not a descendant.
    *
-   * Walking the h1's ancestors with JS disabled ends at
-   * `<div hidden><!--$--><!--/$--></div>`, a direct child of <body>, matched by
-   * `[hidden]:where(:not([hidden="until-found"]))  =>  display: none`. Every
-   * <section> on the page is inside it, so with JS off the page is blank, not
-   * degraded.
+   * Cost of the deletion, measured 2026-08-04 on two clean production builds
+   * (`npm run build` + `npm start`), 7 navigations each, medians:
    *
-   * Prime suspect for the five bailouts: src/components/ui/app-wrapper.tsx
-   * loads SplashScreen, Terminal, PerformanceMonitor, PerformanceModal and
-   * PerformanceReportModal through `next/dynamic` with `ssr: false` (lines 29,
-   * 53, 59, 67, 75) -- five of them, matching the five BAILOUT templates -- and
-   * AppWrapper wraps `{children}`, so the bailout takes the whole page with it.
+   *              TTFB     FCP     LCP
+   *   with     21.6ms   120ms   120ms
+   *   without  21.4ms   116ms   132ms
    *
-   * Re-enable this test as part of fixing that, not before. Making it pass by
-   * relaxing what it checks would only certify the blank page.
+   * First load is unchanged. Giving up the streaming boundary was expected to
+   * cost TTFB, because the server can no longer flush a shell before the page
+   * is rendered; it does not here, because the homepage does no server-side
+   * data fetching, so there was never a slow render for streaming to hide.
+   *
+   * Measure against `npm start`, never `npm run dev`. A reading of TTFB 336ms
+   * / FCP 436ms taken here during this work came from a dev server, which
+   * compiles on demand; it says nothing about production and does not
+   * reproduce on a build.
+   *
+   * Isolating the server alone with an A-B-A benchmark (60 samples per state,
+   * no browser, swapping the built .next under one `next start`) puts the
+   * drift between two identical runs at 1.59ms, wider than the gap between
+   * the two states. The wire cost is +1,493 gzipped bytes (+2.5%), one extra
+   * TCP segment, which is the only first-load regression that survives.
+   *
+   * Soft navigation is the part that visibly changes, and it changes for the
+   * better. The only one this site performs is back to `/` from a /pdf/<slug>
+   * page via the nav bar: nothing anywhere renders a Link or a router.push
+   * INTO /pdf/*, so that direction is always a fresh document load.
+   *
+   * At 1200ms emulated RTT, the old behavior committed the route switch in
+   * 42ms - to 689 characters of body text. That frame is the nav bar with the
+   * footer collapsed directly beneath it and nothing in between, held for
+   * ~2.9s, which reads as a broken page rather than a loading one. With the
+   * boundary gone the router waits for the RSC payload, so the document the
+   * reader was already looking at stays fully painted for the same ~2.9s and
+   * the homepage then appears complete. Same time to content, no broken frame.
+   *
+   * So do not re-add this file to "fix" navigation latency; the latency was
+   * always there, the old version just rendered something misleading during it.
+   *
+   * Mutation-proven: restore src/app/loading.tsx, rebuild, and this test fails
+   * on chromium and webkit with `unexpected value "hidden"`.
    */
-  test.skip("should support progressive enhancement", async ({ browser }) => {
+  test("should support progressive enhancement", async ({ browser }) => {
     // Create a new context with JavaScript disabled
     const context = await browser.newContext({
       javaScriptEnabled: false,
