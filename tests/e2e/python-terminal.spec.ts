@@ -265,8 +265,23 @@ test.describe("Terminal: python", () => {
       // sanitizer previously used lazy-quantifier regexes with no guaranteed
       // terminator, so a single permitted 512KB message of escape introducers
       // was quadratic on the main thread.
-      const flood = "python -c \"print('" + "\\\\x1b]" + "' * 200000)\"";
-      await run(page, flood, /\$|%/, BOOT_TIMEOUT);
+      // Completion is a sentinel the run prints, not the shell prompt. The
+      // guest prompt symbol IS "%", and screen() reads the whole viewport
+      // including the prompt that prefixed this very command, so /\$|%/
+      // matched on the first poll and run() returned before Pyodide had even
+      // booted. Everything typed afterwards hit a legitimately busy terminal
+      // and was discarded, which read as a freeze. Same trap the SENTINEL
+      // above is written to avoid.
+      //
+      // The sentinel survives sanitisation only because the 400k-char print
+      // exceeds outputChunkChars and forces a flush, so it starts a fresh
+      // sanitize pass. Shrink the multiplier below ~8KB of output and it gets
+      // swallowed by the unterminated sequence instead.
+      const flood =
+        "python -c \"print('" +
+        "\\\\x1b]" +
+        "' * 200000); print('FLOOD'+'DONE')\"";
+      await run(page, flood, /FLOODDONE/, BOOT_TIMEOUT);
 
       // The real assertion: the page still responds afterwards.
       const text = await run(
