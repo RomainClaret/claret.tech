@@ -436,121 +436,108 @@ test.describe("Accessibility", () => {
     const testStartTime = Date.now();
     const MAX_TEST_DURATION = 70000; // 70 seconds (before 90s timeout)
 
-    try {
-      await page.goto("/");
-      await page.waitForSelector("h1", { timeout: 10000 });
+    // no catch->skip wrapper: a thrown expect must fail this test on mobile too
+    await page.goto("/");
+    await page.waitForSelector("h1", { timeout: 10000 });
 
-      // Open mobile menu on mobile devices to make navigation links accessible
-      if (isMobile) {
-        await openMobileMenuForAccessibility(page);
+    // Open mobile menu on mobile devices to make navigation links accessible
+    if (isMobile) {
+      await openMobileMenuForAccessibility(page);
+    }
+
+    // Check buttons have accessible names (with mobile optimizations)
+    const buttons = await page.locator("button:visible");
+    const buttonCount = await buttons.count();
+
+    // Limit checking on mobile to prevent timeouts
+    const maxButtonsToCheck = isMobile
+      ? Math.min(buttonCount, 10)
+      : buttonCount;
+
+    for (let i = 0; i < maxButtonsToCheck; i++) {
+      const button = buttons.nth(i);
+
+      // Skip if element is not in viewport on mobile (performance optimization)
+      if (isMobile && !(await button.isVisible())) {
+        continue;
       }
 
-      // Check buttons have accessible names (with mobile optimizations)
-      const buttons = await page.locator("button:visible");
-      const buttonCount = await buttons.count();
+      const ariaLabel = await button.getAttribute("aria-label");
+      const textContent = await button.textContent();
+      const title = await button.getAttribute("title");
 
-      // Limit checking on mobile to prevent timeouts
-      const maxButtonsToCheck = isMobile
-        ? Math.min(buttonCount, 10)
-        : buttonCount;
+      // Button should have either aria-label, text content, or title
+      expect(ariaLabel || textContent?.trim() || title).toBeTruthy();
 
-      for (let i = 0; i < maxButtonsToCheck; i++) {
-        const button = buttons.nth(i);
+      // Early exit if approaching timeout
+      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
+        console.warn("ARIA labels test approaching timeout, ending early");
+        break;
+      }
+    }
 
-        // Skip if element is not in viewport on mobile (performance optimization)
-        if (isMobile && !(await button.isVisible())) {
-          continue;
-        }
+    // Check links have accessible names (with mobile optimizations)
+    const links = await page
+      .locator("a:visible")
+      .filter({ hasNot: page.locator('[aria-hidden="true"]') });
 
-        const ariaLabel = await button.getAttribute("aria-label");
-        const textContent = await button.textContent();
-        const title = await button.getAttribute("title");
+    // Wait for links to be present and count them
+    await links
+      .first()
+      .waitFor({ state: "attached", timeout: 5000 })
+      .catch(() => {});
+    const linkCount = await links.count();
 
-        // Button should have either aria-label, text content, or title
-        expect(ariaLabel || textContent?.trim() || title).toBeTruthy();
+    // Limit checking to prevent timeouts - max 20 links for CI
+    const maxLinksToCheck = Math.min(linkCount, isMobile ? 10 : 20);
 
-        // Early exit if approaching timeout
-        if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-          console.warn("ARIA labels test approaching timeout, ending early");
-          break;
+    for (let i = 0; i < maxLinksToCheck; i++) {
+      const link = links.nth(i);
+
+      // Skip if element is not accessible within timeout
+      try {
+        await link.waitFor({ state: "visible", timeout: 2000 });
+      } catch {
+        continue;
+      }
+
+      // Skip if element is not in viewport on mobile (performance optimization)
+      if (isMobile && !(await link.isVisible())) {
+        continue;
+      }
+
+      // Get attributes with timeout protection
+      const ariaLabel = await link.getAttribute("aria-label").catch(() => null);
+      const textContent = await link.textContent().catch(() => null);
+      const title = await link.getAttribute("title").catch(() => null);
+      const href = await link.getAttribute("href").catch(() => null);
+
+      // Skip empty fragment links
+      if (href === "#") continue;
+
+      // Link should have either aria-label, text content, or title
+      const hasAccessibleName = ariaLabel || textContent?.trim() || title;
+      if (!hasAccessibleName) {
+        // console.log(`Link without accessible name: href="${href}"`);
+      }
+      // Be more lenient in CI to avoid flaky failures
+      if (!hasAccessibleName) {
+        const warningMsg = `Link missing accessible name: href="${href}"`;
+        console.warn(warningMsg);
+
+        // In CI, log warning but don't fail the test for missing ARIA labels
+        if (process.env.CI) {
+          continue; // Skip this link in CI
+        } else {
+          // Fail in local development
+          expect(hasAccessibleName).toBeTruthy();
         }
       }
 
-      // Check links have accessible names (with mobile optimizations)
-      const links = await page
-        .locator("a:visible")
-        .filter({ hasNot: page.locator('[aria-hidden="true"]') });
-
-      // Wait for links to be present and count them
-      await links
-        .first()
-        .waitFor({ state: "attached", timeout: 5000 })
-        .catch(() => {});
-      const linkCount = await links.count();
-
-      // Limit checking to prevent timeouts - max 20 links for CI
-      const maxLinksToCheck = Math.min(linkCount, isMobile ? 10 : 20);
-
-      for (let i = 0; i < maxLinksToCheck; i++) {
-        const link = links.nth(i);
-
-        // Skip if element is not accessible within timeout
-        try {
-          await link.waitFor({ state: "visible", timeout: 2000 });
-        } catch {
-          continue;
-        }
-
-        // Skip if element is not in viewport on mobile (performance optimization)
-        if (isMobile && !(await link.isVisible())) {
-          continue;
-        }
-
-        // Get attributes with timeout protection
-        const ariaLabel = await link
-          .getAttribute("aria-label")
-          .catch(() => null);
-        const textContent = await link.textContent().catch(() => null);
-        const title = await link.getAttribute("title").catch(() => null);
-        const href = await link.getAttribute("href").catch(() => null);
-
-        // Skip empty fragment links
-        if (href === "#") continue;
-
-        // Link should have either aria-label, text content, or title
-        const hasAccessibleName = ariaLabel || textContent?.trim() || title;
-        if (!hasAccessibleName) {
-          // console.log(`Link without accessible name: href="${href}"`);
-        }
-        // Be more lenient in CI to avoid flaky failures
-        if (!hasAccessibleName) {
-          const warningMsg = `Link missing accessible name: href="${href}"`;
-          console.warn(warningMsg);
-
-          // In CI, log warning but don't fail the test for missing ARIA labels
-          if (process.env.CI) {
-            continue; // Skip this link in CI
-          } else {
-            // Fail in local development
-            expect(hasAccessibleName).toBeTruthy();
-          }
-        }
-
-        // Early exit if approaching timeout
-        if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-          console.warn("ARIA labels test approaching timeout, ending early");
-          break;
-        }
-      }
-    } catch (error) {
-      console.warn("ARIA labels test failed:", error);
-      if (isMobile) {
-        test.skip(
-          true,
-          `ARIA labels test failed on mobile: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      } else {
-        throw error; // Re-throw for desktop
+      // Early exit if approaching timeout
+      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
+        console.warn("ARIA labels test approaching timeout, ending early");
+        break;
       }
     }
   });

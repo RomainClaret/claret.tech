@@ -32,7 +32,7 @@ export function HighContrastToggle() {
   return (
     <button
       onClick={toggleHighContrast}
-      className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       aria-label={`Toggle high contrast mode (currently ${isHighContrast ? "on" : "off"})`}
       aria-pressed={isHighContrast}
       aria-describedby="high-contrast-desc"

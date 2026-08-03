@@ -9,7 +9,27 @@ type HeaderRule = {
   headers: Array<{ key: string; value: string }>;
 };
 
+/**
+ * Headers as production serves them.
+ *
+ * HSTS and the two https-forcing CSP directives are production-only: emitted
+ * from `next dev` over plain http they make WebKit rewrite every asset to
+ * https://localhost and fail on TLS. This suite is about the deployed posture,
+ * so it asks for that explicitly rather than reading whatever NODE_ENV the
+ * runner happens to have.
+ */
 async function securityHeaderMap(): Promise<Map<string, string>> {
+  const env = process.env as Record<string, string | undefined>;
+  const previous = env.NODE_ENV;
+  env.NODE_ENV = "production";
+  try {
+    return await readHeaders();
+  } finally {
+    env.NODE_ENV = previous;
+  }
+}
+
+async function readHeaders(): Promise<Map<string, string>> {
   const rules = (await (
     nextConfig as { headers: () => Promise<HeaderRule[]> }
   ).headers()) as HeaderRule[];

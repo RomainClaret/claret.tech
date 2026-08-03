@@ -138,7 +138,10 @@ export function Navigation() {
             </Link>
             <button
               onClick={toggleTerminal}
-              className="flex items-center ml-1 transition-colors hover:opacity-80"
+              // min-h/min-w rather than a larger font: the prompt glyphs stay
+              // the same size, the tappable area reaches the 44px minimum.
+              // It measured 37x20, under even WCAG 2.2 AA's 24px floor.
+              className="flex items-center justify-center ml-1 min-h-11 min-w-11 transition-colors hover:opacity-80"
               aria-label="Toggle terminal"
             >
               <span className="text-gray-500 dark:text-gray-400">~&nbsp;$</span>
@@ -187,7 +190,7 @@ export function Navigation() {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               data-testid="mobile-menu-button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors hover:bg-muted"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm font-medium transition-colors hover:bg-muted"
               aria-label={
                 isMobileMenuOpen
                   ? "Close navigation menu"

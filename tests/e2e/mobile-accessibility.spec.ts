@@ -1,58 +1,24 @@
 import { test, expect, type Page } from "@playwright/test";
-import { dismissToasts, stabilizeMobileViewport } from "./utils/toast-utils";
-
-// Time tracking to avoid test timeouts
-const MAX_TEST_DURATION = 70000; // 70 seconds (before 90s timeout)
+import { dismissToasts } from "./utils/toast-utils";
 
 /**
- * Lightweight mobile menu opening for accessibility tests
+ * Open the mobile menu for accessibility checks and verify it opened.
+ *
+ * No retries, no force-clicks: if a plain click cannot open the menu, that
+ * is a regression and the test must fail.
  */
 async function openMobileMenuForAccessibility(page: Page): Promise<void> {
-  const MAX_RETRIES = 2;
+  // a missing or hidden menu button is a regression, not a reason to bail
+  const menuButton = page.getByTestId("mobile-menu-button");
+  await expect(menuButton).toBeVisible();
 
-  for (let retry = 0; retry < MAX_RETRIES; retry++) {
-    try {
-      // Check if menu is already open
-      const mobileMenuButton = page
-        .locator('[data-testid="mobile-menu-button"]')
-        .first();
-
-      if ((await mobileMenuButton.count()) > 0) {
-        const ariaExpanded =
-          await mobileMenuButton.getAttribute("aria-expanded");
-        if (ariaExpanded === "true") {
-          return; // Already open
-        }
-      }
-
-      // Dismiss toasts before attempting menu clicks
-      await dismissToasts(page, { timeout: 2000 });
-
-      // Force click the menu button
-      await mobileMenuButton.click({ force: true, timeout: 3000 });
-
-      // Wait for menu to open
-      await page.waitForFunction(
-        () => {
-          const btn = document.querySelector(
-            '[data-testid="mobile-menu-button"]',
-          );
-          return btn?.getAttribute("aria-expanded") === "true";
-        },
-        { timeout: 3000 },
-      );
-
-      return; // Success
-    } catch (error) {
-      console.warn(`Mobile menu opening attempt ${retry + 1} failed:`, error);
-      if (retry < MAX_RETRIES - 1) {
-        await page.waitForTimeout(1000);
-      }
-    }
+  if ((await menuButton.getAttribute("aria-expanded")) !== "true") {
+    // toasts overlay the header on load and can swallow the click
+    await dismissToasts(page, { timeout: 2000 });
+    await menuButton.click();
   }
 
-  // If we get here, skip the test gracefully
-  throw new Error("Mobile menu could not be opened - test will be skipped");
+  await expect(menuButton).toHaveAttribute("aria-expanded", "true");
 }
 
 test.describe("Mobile Accessibility", () => {
@@ -63,176 +29,127 @@ test.describe("Mobile Accessibility", () => {
     await page.goto("/?playwright=true");
 
     if (isMobile) {
-      await stabilizeMobileViewport(page);
+      // not stabilizeMobileViewport: its viewport-meta rewrite races Next's
+      // metadata hydration, which then appends a second meta[name="viewport"]
+      // and corrupts exactly what the viewport test below asserts on
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(500);
     }
   });
+
+  // no try/catch->skip in these tests: a thrown expect must fail the test
 
   test("should have accessible mobile menu button", async ({ page }) => {
     test.slow(); // Triple the timeout for mobile tests
 
-    const testStartTime = Date.now();
+    await dismissToasts(page, { timeout: 3000 });
 
-    try {
-      await dismissToasts(page, { timeout: 3000 });
+    // Check mobile menu button exists and has proper ARIA attributes
+    const menuButton = page.getByTestId("mobile-menu-button");
+    await expect(menuButton).toBeVisible();
 
-      // Check mobile menu button exists and has proper ARIA attributes
-      const menuButton = page
-        .locator('[data-testid="mobile-menu-button"]')
-        .first();
-      await expect(menuButton).toBeVisible();
+    // Check ARIA attributes
+    await expect(menuButton).toHaveAttribute("aria-label", /.+/);
+    await expect(menuButton).toHaveAttribute("aria-expanded", /^(true|false)$/);
 
-      // Check ARIA attributes
-      const ariaLabel = await menuButton.getAttribute("aria-label");
-      const ariaExpanded = await menuButton.getAttribute("aria-expanded");
+    // Test menu can be opened
+    await openMobileMenuForAccessibility(page);
 
-      expect(ariaLabel).toBeTruthy();
-      expect(ariaExpanded).toBeDefined();
-      expect(ariaExpanded).toMatch(/^(true|false)$/);
+    // Verify menu opened with proper ARIA state
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
 
-      // Test menu can be opened
-      await openMobileMenuForAccessibility(page);
-
-      // Verify menu opened with proper ARIA state
-      const expandedAfter = await menuButton.getAttribute("aria-expanded");
-      expect(expandedAfter).toBe("true");
-
-      // Check navigation links are now accessible
-      const navLinks = await page.locator('nav a[href^="#"]:visible').count();
-      expect(navLinks).toBeGreaterThan(2);
-
-      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-        console.warn("Approaching test timeout, ending test early");
-        return;
-      }
-    } catch (error) {
-      console.warn("Mobile menu accessibility test failed:", error);
-      test.skip(
-        true,
-        `Mobile menu accessibility failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    // Check navigation links are now accessible
+    const navLinks = await page.locator('nav a[href^="#"]:visible').count();
+    expect(navLinks).toBeGreaterThan(2);
   });
 
   test("should have proper touch target sizes", async ({ page }) => {
     test.slow(); // Triple the timeout for mobile tests
 
-    const testStartTime = Date.now();
+    await dismissToasts(page, { timeout: 3000 });
+    await openMobileMenuForAccessibility(page);
 
-    try {
-      await dismissToasts(page, { timeout: 3000 });
-      await openMobileMenuForAccessibility(page);
+    // Check that interactive elements have minimum 44x44px touch targets
+    const interactiveElements = await page
+      .locator('button:visible, a:visible, [role="button"]:visible')
+      .all();
 
-      // Check that interactive elements have minimum 44x44px touch targets
-      const interactiveElements = await page
-        .locator('button:visible, a:visible, [role="button"]:visible')
-        .all();
+    // Only check first 5 elements to avoid timeout
+    const elementsToCheck = Math.min(interactiveElements.length, 5);
 
-      // Only check first 5 elements to avoid timeout
-      const elementsToCheck = Math.min(interactiveElements.length, 5);
+    for (let i = 0; i < elementsToCheck; i++) {
+      const element = interactiveElements[i];
+      const boundingBox = await element.boundingBox();
 
-      for (let i = 0; i < elementsToCheck; i++) {
-        const element = interactiveElements[i];
-        const boundingBox = await element.boundingBox();
+      // a visible interactive element with no box is not tappable at all
+      expect(boundingBox).not.toBeNull();
 
-        if (boundingBox) {
-          // Minimum touch target size should be 44x44px (iOS HIG recommendation)
-          const minSize = 44;
-          expect(
-            boundingBox.width >= minSize || boundingBox.height >= minSize,
-          ).toBeTruthy();
-        }
-
-        if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-          console.warn("Approaching test timeout, ending test early");
-          break;
-        }
-      }
-    } catch (error) {
-      console.warn("Touch target size test failed:", error);
-      test.skip(
-        true,
-        `Touch target sizes failed: ${error instanceof Error ? error.message : String(error)}`,
+      // Minimum touch target size should be 44x44px (iOS HIG recommendation)
+      const minSize = 44;
+      const describe = await element.evaluate(
+        (el) =>
+          `${el.tagName.toLowerCase()}[aria-label="${el.getAttribute("aria-label") ?? ""}"]`,
       );
+      expect(
+        boundingBox!.width >= minSize || boundingBox!.height >= minSize,
+        `${describe} is ${boundingBox!.width}x${boundingBox!.height}px, below the ${minSize}px minimum`,
+      ).toBeTruthy();
     }
   });
 
   test("should support mobile keyboard navigation", async ({ page }) => {
     test.slow(); // Triple the timeout for mobile tests
 
-    const testStartTime = Date.now();
+    await dismissToasts(page, { timeout: 3000 });
 
-    try {
-      await dismissToasts(page, { timeout: 3000 });
+    // Test tab navigation through mobile menu
+    const menuButton = page.getByTestId("mobile-menu-button");
+    await expect(menuButton).toBeVisible();
+    await menuButton.focus();
 
-      // Test tab navigation through mobile menu
-      const menuButton = page
-        .locator('[data-testid="mobile-menu-button"]')
-        .first();
-      await menuButton.focus();
+    // Check focus is visible
+    const hasFocus = await menuButton.evaluate((el) => {
+      return document.activeElement === el;
+    });
+    expect(hasFocus).toBe(true);
 
-      // Check focus is visible
-      const hasFocus = await menuButton.evaluate((el) => {
-        return document.activeElement === el;
-      });
-      expect(hasFocus).toBe(true);
+    // Open menu with keyboard (Enter or Space)
+    await page.keyboard.press("Enter");
 
-      // Open menu with keyboard (Enter or Space)
-      await page.keyboard.press("Enter");
-      await page.waitForTimeout(500);
+    // enter on the focused button must really open the menu; passing
+    // silently when it stays closed hid a dead keyboard path
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
 
-      // Check if menu opened
-      const ariaExpanded = await menuButton.getAttribute("aria-expanded");
-      if (ariaExpanded === "true") {
-        // Tab through navigation links
-        await page.keyboard.press("Tab");
+    // Tab through navigation links
+    await page.keyboard.press("Tab");
 
-        // Check that focus moved to a navigation link
-        const focusedElement = await page.evaluate(() => {
-          return document.activeElement?.tagName.toLowerCase();
-        });
-        expect(["a", "button"].includes(focusedElement || "")).toBe(true);
-      }
-
-      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-        console.warn("Approaching test timeout, ending test early");
-        return;
-      }
-    } catch (error) {
-      console.warn("Mobile keyboard navigation test failed:", error);
-      test.skip(
-        true,
-        `Mobile keyboard navigation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    // Check that focus moved to a navigation link
+    const focusedElement = await page.evaluate(() => {
+      return document.activeElement?.tagName.toLowerCase();
+    });
+    expect(["a", "button"].includes(focusedElement || "")).toBe(true);
   });
 
   test("should have proper mobile viewport configuration", async ({ page }) => {
     test.slow(); // Triple the timeout for mobile tests
 
-    try {
-      await dismissToasts(page, { timeout: 3000 });
+    await dismissToasts(page, { timeout: 3000 });
 
-      // Check viewport meta tag exists and has proper configuration
-      const viewportMeta = await page
-        .locator('meta[name="viewport"]')
-        .getAttribute("content");
+    // Check viewport meta tag exists and has proper configuration; the
+    // strict locator is deliberate, the document must have exactly one
+    const viewportMeta = await page
+      .locator('meta[name="viewport"]')
+      .getAttribute("content");
 
-      expect(viewportMeta).toBeTruthy();
-      expect(viewportMeta).toContain("width=device-width");
-      expect(viewportMeta).toContain("initial-scale=1");
+    expect(viewportMeta).toBeTruthy();
+    expect(viewportMeta).toContain("width=device-width");
+    expect(viewportMeta).toContain("initial-scale=1");
 
-      // Check that content doesn't require horizontal scrolling
-      const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
-      const viewportWidth = await page.evaluate(() => window.innerWidth);
+    // Check that content doesn't require horizontal scrolling
+    const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
+    const viewportWidth = await page.evaluate(() => window.innerWidth);
 
-      // Allow small differences due to scrollbars
-      expect(bodyWidth - viewportWidth).toBeLessThan(20);
-    } catch (error) {
-      console.warn("Mobile viewport test failed:", error);
-      test.skip(
-        true,
-        `Mobile viewport configuration failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    // Allow small differences due to scrollbars
+    expect(bodyWidth - viewportWidth).toBeLessThan(20);
   });
 });

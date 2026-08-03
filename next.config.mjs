@@ -176,6 +176,14 @@ const nextConfig = {
 
   // Headers for caching and security
   async headers() {
+    // The two directives that force https, plus HSTS, are production-only.
+    // Served from `next dev` over plain http they make WebKit rewrite every
+    // asset request to https://localhost and fail on TLS, so the page loads
+    // with no chunks and no CSS: the Mobile Safari e2e project was asserting
+    // against an unhydrated document and reporting skips. Chromium ignores
+    // upgrade-insecure-requests for localhost, which is why it never showed.
+    const isProd = process.env.NODE_ENV === "production";
+
     // Content Security Policy - strict but allows necessary resources
     const ContentSecurityPolicy = `
       default-src 'self';
@@ -191,8 +199,7 @@ const nextConfig = {
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
-      block-all-mixed-content;
-      upgrade-insecure-requests;
+      ${isProd ? "block-all-mixed-content; upgrade-insecure-requests;" : ""}
     `.replace(/\s{2,}/g, ' ').trim();
 
     return [
@@ -253,10 +260,14 @@ const nextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
+          ...(isProd
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=63072000; includeSubDomains; preload",
+                },
+              ]
+            : []),
           {
             // Isolate our browsing context group from cross-origin popups so a
             // window we open (or one that opens us) cannot reach back through
