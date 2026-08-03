@@ -126,33 +126,51 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
       dragStartPos.current = { x: e.clientX, y: e.clientY };
       dragStartWindowPos.current = { ...position };
 
+      // Where the pointer last was, waiting to be turned into a window
+      // position. It lives out here rather than inside the frame callback so
+      // that mouseup can flush it: the callback used to be the only place that
+      // wrote the position, so a drag whose final mousemove and mouseup landed
+      // in the same frame had that move cancelled and never applied. WebKit
+      // batches pointer events aggressively enough that this was frequently
+      // the only move of the whole drag, and the window did not travel at all.
+      let pendingPointer: { x: number; y: number } | null = null;
+
+      const applyPendingPointer = () => {
+        if (!pendingPointer) return;
+
+        const deltaX = pendingPointer.x - dragStartPos.current.x;
+        const deltaY = pendingPointer.y - dragStartPos.current.y;
+        pendingPointer = null;
+
+        const newX = Math.max(
+          0,
+          Math.min(
+            dragStartWindowPos.current.x + deltaX,
+            window.innerWidth - size.width,
+          ),
+        );
+        const newY = Math.max(
+          0,
+          Math.min(
+            dragStartWindowPos.current.y + deltaY,
+            window.innerHeight - size.height,
+          ),
+        );
+
+        setPosition({ x: newX, y: newY });
+      };
+
       const handleMouseMove = (e: MouseEvent) => {
-        // Cancel any pending animation frame
-        if (dragAnimationFrameRef.current) {
-          cancelAnimationFrame(dragAnimationFrameRef.current);
-        }
+        pendingPointer = { x: e.clientX, y: e.clientY };
 
-        // Use requestAnimationFrame to throttle updates
+        // Coalesce to one position write per frame. A frame is already booked,
+        // so it will pick up the coordinates just stored; rescheduling would
+        // only churn.
+        if (dragAnimationFrameRef.current) return;
+
         dragAnimationFrameRef.current = requestAnimationFrame(() => {
-          const deltaX = e.clientX - dragStartPos.current.x;
-          const deltaY = e.clientY - dragStartPos.current.y;
-
-          const newX = Math.max(
-            0,
-            Math.min(
-              dragStartWindowPos.current.x + deltaX,
-              window.innerWidth - size.width,
-            ),
-          );
-          const newY = Math.max(
-            0,
-            Math.min(
-              dragStartWindowPos.current.y + deltaY,
-              window.innerHeight - size.height,
-            ),
-          );
-
-          setPosition({ x: newX, y: newY });
+          dragAnimationFrameRef.current = null;
+          applyPendingPointer();
         });
       };
 
@@ -162,6 +180,9 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           cancelAnimationFrame(dragAnimationFrameRef.current);
           dragAnimationFrameRef.current = null;
         }
+        // Apply whatever that frame would have applied, rather than dropping
+        // the last movement of every drag on the floor.
+        applyPendingPointer();
         setIsDragging(false);
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
