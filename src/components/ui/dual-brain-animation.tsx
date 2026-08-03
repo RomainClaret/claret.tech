@@ -78,8 +78,12 @@ export function DualBrainAnimation({
         animate={{ opacity: 1 }} // Always show, just control animations separately
         transition={{ duration: 1.5, delay: 0.5 }}
       >
+        {/* will-change-transform: this wrapper rotates forever and scales on
+            every pulse, and it contains a 600x600 canvas. Without the hint the
+            whole subtree is re-rasterized on each animation frame instead of
+            the compositor transforming one cached texture. */}
         <motion.div
-          className="relative w-[150%] h-[150%] flex items-center justify-center"
+          className="relative w-[150%] h-[150%] flex items-center justify-center will-change-transform"
           animate={{
             rotate:
               prefersReducedMotion || !areAnimationsPlaying || !config.animate
@@ -101,7 +105,13 @@ export function DualBrainAnimation({
             },
           }}
         >
-          <div className="absolute inset-0 bg-gradient-radial from-purple-500/2 via-blue-500/2 to-transparent blur-3xl" />
+          {/* No blur here on purpose. A Gaussian blur is a low-pass filter and
+              this is already a radial gradient at 2% alpha fading to
+              transparent, so blur-3xl (64px) had almost nothing left to
+              smooth. What it did cost was a 556x485 blur render pass that
+              Chromium re-ran every time the brain canvas underneath it
+              repainted. */}
+          <div className="absolute inset-0 bg-gradient-radial from-purple-500/2 via-blue-500/2 to-transparent" />
           <BrainNetworkVisualization
             className="w-full h-full opacity-[0.05] dark:opacity-[0.08] dual-brain-background"
             width={600}
@@ -115,8 +125,11 @@ export function DualBrainAnimation({
       </motion.div>
 
       {/* Primary Brain - Original positioning */}
+      {/* Same reason as the background wrapper: the entry animation scales
+          0.8 -> 1 over two seconds and each pulse scales it again, over a
+          subtree holding a 300x300 canvas and a 40px-blur glow. */}
       <motion.div
-        className="relative z-10"
+        className="relative z-10 will-change-transform"
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{
           opacity: 1, // Always show the brain

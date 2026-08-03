@@ -351,7 +351,35 @@ export function BrainNetworkVisualization({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Repaint budget from the quality profile. Redrawing the bitmap is what
+    // costs, not what gets drawn into it, so the loop still runs every display
+    // frame but only touches the canvas when the budget allows.
+    const targetFps = config.updateFrequency || 60;
+    const frameInterval = 1000 / targetFps;
+    let lastDrawTime = -Infinity;
+
+    // Node lookups were two linear scans of the node list per connection per
+    // frame; the list never changes between draws.
+    const nodeById = new Map(nodesRef.current.map((n) => [n.id, n]));
+    // Layering order is fixed too, so sorting belongs here and not in the loop.
+    const sizeOrder = { small: 0, medium: 1, large: 2 } as const;
+    const sortedNodes = [...nodesRef.current].sort(
+      (a, b) => sizeOrder[a.size] - sizeOrder[b.size],
+    );
+
     const animate = (timestamp: number) => {
+      if (timestamp - lastDrawTime < frameInterval) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      // Seconds since the previous painted frame, so motion speed is a
+      // property of the animation rather than of the viewer's refresh rate.
+      const deltaSeconds =
+        lastDrawTime === -Infinity
+          ? 1 / 60
+          : Math.min((timestamp - lastDrawTime) / 1000, 0.1);
+      lastDrawTime = timestamp;
+
       timeRef.current = timestamp / 1000;
 
       // Clear canvas
@@ -360,8 +388,8 @@ export function BrainNetworkVisualization({
 
       // Draw connections
       for (const connection of connectionsRef.current) {
-        const fromNode = nodesRef.current.find((n) => n.id === connection.from);
-        const toNode = nodesRef.current.find((n) => n.id === connection.to);
+        const fromNode = nodeById.get(connection.from);
+        const toNode = nodeById.get(connection.to);
 
         if (fromNode && toNode) {
           // Check if this connection has an active signal
@@ -394,13 +422,13 @@ export function BrainNetworkVisualization({
       const activeSignals: Signal[] = [];
 
       for (const signal of signalsRef.current) {
-        signal.progress += signal.speed * 0.015;
+        // 0.015 per frame at 60 Hz is 0.9 per second; expressing it that way
+        // keeps signals travelling at the same speed at any repaint rate.
+        signal.progress += signal.speed * 0.9 * deltaSeconds;
 
         if (signal.progress <= 1) {
-          const fromNode = nodesRef.current.find(
-            (n) => n.id === signal.fromNode,
-          );
-          const toNode = nodesRef.current.find((n) => n.id === signal.toNode);
+          const fromNode = nodeById.get(signal.fromNode);
+          const toNode = nodeById.get(signal.toNode);
 
           if (fromNode && toNode) {
             const x =
@@ -446,11 +474,16 @@ export function BrainNetworkVisualization({
           connectionsRef.current[
             Math.floor(Math.random() * connectionsRef.current.length)
           ];
-        // Generate unique ID to prevent duplicate key errors
-        const timestamp = Date.now();
+        // Generate unique ID to prevent duplicate key errors. The id needs a
+        // wall-clock stamp; the throttle above needs the rAF clock. A local
+        // `const timestamp = Date.now()` used to shadow the rAF parameter and
+        // then get written into lastSignalTimeRef, so after the very first
+        // spawn the gate compared a page-relative time against an epoch time
+        // and could never be true again -- the brain stopped emitting signals
+        // a second after load.
         const random = Math.random().toString(36).substring(2, 9);
         activeSignals.push({
-          id: `signal-${timestamp}-${random}`,
+          id: `signal-${Date.now()}-${random}`,
           fromNode: connection.from,
           toNode: connection.to,
           progress: 0,
@@ -461,12 +494,8 @@ export function BrainNetworkVisualization({
 
       signalsRef.current = activeSignals;
 
-      // Draw nodes (sorted by size for proper layering)
-      const sortedNodes = [...nodesRef.current].sort((a, b) => {
-        const sizeOrder = { small: 0, medium: 1, large: 2 };
-        return sizeOrder[a.size] - sizeOrder[b.size];
-      });
-
+      // Draw nodes (sorted by size for proper layering; order computed once
+      // outside the loop since the node list is fixed for this effect run)
       for (const node of sortedNodes) {
         const isHovered = hoveredNodeRef.current === node.id;
         const pulseScale = isPulsing
@@ -617,6 +646,13 @@ export function BrainNetworkVisualization({
     prefersReducedMotion,
     areAnimationsPlaying,
     config.animate,
+    config.updateFrequency,
+    // Not read in this effect, but the node map and the draw order above are
+    // built once from nodesRef.current, and the effect that fills that ref
+    // rebuilds it whenever this changes. Without it here the loop would keep
+    // a map of the old nodes while iterating the new connections, and every
+    // connection naming a new node would silently stop drawing.
+    showInternalConnections,
     drawStaticFrame,
   ]);
 

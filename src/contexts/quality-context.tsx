@@ -426,30 +426,42 @@ export const NEURAL_BACKGROUND_PROFILE: QualityProfile = {
   },
 };
 
+// updateFrequency is a repaint budget, not a motion speed. A <canvas> that is
+// redrawn every display frame has to be re-uploaded and re-composited every
+// display frame, and that cost is charged whether the frame drew one line or
+// a thousand: measured on the homepage, no-op'ing every fill and stroke while
+// still calling clearRect saved nothing (45 fps), while leaving the bitmap
+// untouched moved the same page to 78 fps. Every other animated component
+// already honors a frequency from this profile; the canvases were the one
+// group running at whatever the display would give them.
 export const NEURAL_CANVAS_PROFILE: QualityProfile = {
   battery: {
     animate: false,
     particleCount: 0,
     opacity: 0.05, // Very faint for battery saving
     nodeScale: 0.3,
+    updateFrequency: 0, // Not animating, so nothing to budget
   },
   low: {
     animate: true,
     particleCount: 0,
     opacity: 0.25, // Low visibility
     nodeScale: 0.6,
+    updateFrequency: 15, // 15 repaints/sec
   },
   balanced: {
     animate: true,
     particleCount: 0, // Will be calculated as Math.floor(nodeCount * 0.3)
     opacity: 0.6, // Good visibility
     nodeScale: 1.0,
+    updateFrequency: 30, // 30 repaints/sec
   },
   maximum: {
     animate: true,
     particleCount: 0, // Will be calculated as nodeCount
     opacity: 1.0, // Full brightness - very visible
     nodeScale: 1.5, // Larger nodes
+    updateFrequency: 60, // 60 repaints/sec
   },
 };
 

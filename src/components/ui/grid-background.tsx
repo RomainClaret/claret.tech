@@ -495,7 +495,19 @@ export function GridBackground({ className }: GridBackgroundProps) {
                     className="fill-orange-500/60 dark:fill-orange-400/50"
                     filter="url(#nodeGlow)"
                     style={{
-                      transition: `all ${DEFAULT_SPIKING_CONFIG.spikeDuration}ms ease-out`,
+                      // Only `transform` changes here, and it must stay a
+                      // transition so a spike eases rather than snaps.
+                      //
+                      // `all` cannot be used: `r` and `opacity` on this same
+                      // circle are driven by the SMIL <animate> elements
+                      // below, in Blink those are animated CSS properties, and
+                      // `transition: all` therefore started a fresh transition
+                      // on every SMIL sample. That left ~66 CSSTransitions
+                      // running permanently on the two mounted grids (measured
+                      // via document.getAnimations()) and drove ~43 style
+                      // recalculations per frame, each of which re-rasterized
+                      // a viewport-sized filtered SVG layer.
+                      transition: `transform ${DEFAULT_SPIKING_CONFIG.spikeDuration}ms ease-out`,
                       transform: isSpiking
                         ? `scale(${DEFAULT_SPIKING_CONFIG.spikeScale})`
                         : "scale(1)",
