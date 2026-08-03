@@ -29,25 +29,19 @@ test.describe("Terminal", () => {
     return count > 0;
   };
 
+  // hard version of the check above, used everywhere a test used to return
+  // early. a terminal that is missing or invisible after beforeEach opened it
+  // is a regression, not an environment condition, so it has to fail instead of
+  // reporting a silent pass.
+  const expectTerminalVisible = async (page: Page) => {
+    const terminal = page.locator('[data-testid="terminal"]').first();
+    await expect(terminal).toBeVisible({ timeout: 15000 });
+    return terminal;
+  };
+
   test.beforeEach(async ({ page, browserName, isMobile }) => {
     // Skip all terminal tests on mobile - terminal is desktop-only feature
     if (isMobile) {
-      test.skip();
-      return;
-    }
-
-    // Check if terminal is disabled via environment variable
-    const terminalEnabled = await page.evaluate(() => {
-      return (
-        window.process?.env?.NEXT_PUBLIC_ENABLE_TERMINAL !== "false" &&
-        !window.location.search.includes("terminal=false")
-      );
-    });
-
-    if (!terminalEnabled) {
-      console.log(
-        "Terminal disabled via environment - skipping terminal tests",
-      );
       test.skip();
       return;
     }
@@ -67,245 +61,171 @@ test.describe("Terminal", () => {
     // Dismiss any toasts that might interfere with terminal toggle
     await dismissToasts(page, { timeout: 5000 });
 
-    // Enhanced terminal toggle detection with graceful failure handling
-    const terminalSelectors = [
-      'button[aria-label="Toggle terminal"]',
-      '[data-testid="terminal-toggle"]',
-      'nav button[aria-label*="terminal" i]',
-      'button:has-text("Terminal")',
-      '.logo button, [class*="logo"] button',
-      "nav button:first-child",
-    ];
+    // the one selector the app actually renders (src/components/ui/navigation.tsx).
+    // the old fallback chain ended in "nav button:first-child", which matches
+    // unrelated buttons and only widens the window in which a broken app still
+    // looks fine.
+    const foundSelector = 'button[aria-label="Toggle terminal"]';
+    const terminalToggle = page.locator(foundSelector).first();
 
-    let terminalToggle = null;
-    let toggleFound = false;
-    let foundSelector = "";
-
-    // Try multiple selectors to find terminal toggle with extended timeout for CI
+    // assertion, not a skip: this gate decides whether all 22 tests in the file
+    // run, so a missing toggle is a regression to report, not an environment
+    // condition to route around.
     const selectorTimeout = isCI ? 10000 : 5000;
+    await expect(terminalToggle).toBeVisible({ timeout: selectorTimeout });
+    await expect(terminalToggle).toBeEnabled({ timeout: selectorTimeout });
 
-    for (const selector of terminalSelectors) {
-      const element = page.locator(selector).first();
-      if ((await element.count()) > 0) {
-        try {
-          await element.waitFor({ state: "visible", timeout: selectorTimeout });
-          // Additional check to ensure element is truly interactive
-          const isEnabled = await element.isEnabled().catch(() => false);
-          const isVisible = await element.isVisible().catch(() => false);
+    // Enhanced click with browser-specific handling
+    let clickSuccess = false;
+    const maxAttempts = browserName === "firefox" ? 4 : 3;
 
-          if (isEnabled && isVisible) {
-            terminalToggle = element;
-            toggleFound = true;
-            foundSelector = selector;
-            console.log(`°°·Terminal toggle found with selector: ${selector}`);
-            break;
-          }
-        } catch {
-          continue;
-        }
-      }
-    }
-
-    // If no terminal toggle found, skip the test
-    if (!toggleFound) {
-      console.log(
-        "Terminal toggle button not found or not interactive. Skipping terminal tests.",
-      );
-      test.skip();
-      return;
-    }
-
-    if (toggleFound && terminalToggle) {
-      // Enhanced click with browser-specific handling
-      let clickSuccess = false;
-      const maxAttempts = browserName === "firefox" ? 4 : 3;
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          // Firefox-specific strategy first
-          if (browserName === "firefox" && attempt === 1) {
-            try {
-              // Use dispatch event for Firefox
-              await terminalToggle.evaluate((el) => {
-                const element = el as HTMLButtonElement;
-                // Force element to be interactable
-                element.style.pointerEvents = "auto";
-                element.style.zIndex = "99999";
-                element.style.position = "relative";
-
-                // Use dispatch event instead of click
-                const clickEvent = new MouseEvent("click", {
-                  view: window,
-                  bubbles: true,
-                  cancelable: true,
-                  buttons: 1,
-                });
-                element.dispatchEvent(clickEvent);
-              });
-              clickSuccess = true;
-              console.log(
-                "Firefox dispatch event succeeded for terminal toggle",
-              );
-              break;
-            } catch (dispatchError) {
-              console.warn(
-                "Firefox dispatch event failed, trying standard click:",
-                dispatchError,
-              );
-            }
-          }
-
-          // Dismiss toasts before each click attempt
-          await dismissToasts(page);
-
-          // Ensure element is not blocked by toasts - only if we found the toggle
-          if (foundSelector) {
-            try {
-              await ensureElementNotBlockedByToast(
-                page,
-                foundSelector,
-                isCI ? 15000 : 8000, // Reduced timeout but still adequate for CI
-              );
-            } catch (toastError) {
-              console.warn(
-                `Toast dismissal failed for selector ${foundSelector} (attempt ${attempt}):`,
-                toastError instanceof Error
-                  ? toastError.message
-                  : String(toastError),
-              );
-              // Continue with the attempt anyway
-            }
-          }
-
-          // Firefox-specific preparation
-          if (browserName === "firefox") {
-            await terminalToggle.scrollIntoViewIfNeeded();
-            await page.waitForTimeout(500);
-          }
-
-          // Final aggressive toast clearing immediately before click
-          await page.evaluate(() => {
-            const toasts = document.querySelectorAll(
-              '[role="alert"], [data-testid="toast"], .toast, .notification, [class*="toast"]',
-            );
-            toasts.forEach((toast) => {
-              if (toast instanceof HTMLElement) {
-                toast.style.display = "none";
-                toast.style.pointerEvents = "none";
-                toast.style.zIndex = "-9999";
-                toast.style.position = "fixed";
-                toast.style.left = "-9999px";
-                toast.style.top = "-9999px";
-              }
-            });
-          });
-
-          await page.waitForTimeout(50); // Brief wait
-          await terminalToggle.click({
-            timeout: browserName === "firefox" ? 15000 : 8000,
-            force: browserName === "firefox",
-          });
-          clickSuccess = true;
-          break;
-        } catch (clickError) {
-          console.warn(
-            `Terminal toggle click attempt ${attempt} failed:`,
-            (clickError as Error).message,
-          );
-
-          if (attempt < maxAttempts) {
-            // Try alternative click methods for Firefox
-            if (browserName === "firefox") {
-              try {
-                // Clear toasts before JS click attempt
-                await page.evaluate(() => {
-                  const toasts = document.querySelectorAll(
-                    '[role="alert"], [data-testid="toast"], .toast, .notification, [class*="toast"]',
-                  );
-                  toasts.forEach((toast) => {
-                    if (toast instanceof HTMLElement) {
-                      toast.style.display = "none";
-                      toast.style.pointerEvents = "none";
-                      toast.style.zIndex = "-9999";
-                    }
-                  });
-                });
-
-                await terminalToggle.evaluate((el) =>
-                  (el as HTMLElement).click(),
-                );
-                clickSuccess = true;
-                break;
-              } catch (jsClickError) {
-                console.warn(
-                  `Firefox JS click attempt ${attempt} failed:`,
-                  (jsClickError as Error).message,
-                );
-              }
-            }
-            await page.waitForTimeout(1000);
-          }
-        }
-      }
-
-      if (clickSuccess) {
-        // Extended wait for Firefox terminal to load
-        const terminalLoadTimeout = browserName === "firefox" ? 3000 : 500;
-        await page.waitForTimeout(terminalLoadTimeout);
-
-        // Wait for terminal to be visible - try multiple selectors with extended timeout
-        const terminal = page
-          .locator(
-            '[data-testid="terminal"], [role="application"], .terminal, [class*="terminal"], .xterm',
-          )
-          .first();
-        const terminalCount = await terminal.count();
-
-        if (terminalCount > 0) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Firefox-specific strategy first
+        if (browserName === "firefox" && attempt === 1) {
           try {
-            const terminalTimeout = browserName === "firefox" ? 10000 : 5000;
-            await expect(terminal).toBeVisible({ timeout: terminalTimeout });
-          } catch (visibilityError) {
+            // Use dispatch event for Firefox
+            await terminalToggle.evaluate((el) => {
+              const element = el as HTMLButtonElement;
+              // Force element to be interactable
+              element.style.pointerEvents = "auto";
+              element.style.zIndex = "99999";
+              element.style.position = "relative";
+
+              // Use dispatch event instead of click
+              const clickEvent = new MouseEvent("click", {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                buttons: 1,
+              });
+              element.dispatchEvent(clickEvent);
+            });
+            clickSuccess = true;
+            console.log("Firefox dispatch event succeeded for terminal toggle");
+            break;
+          } catch (dispatchError) {
             console.warn(
-              "Terminal visibility check failed:",
-              (visibilityError as Error).message,
+              "Firefox dispatch event failed, trying standard click:",
+              dispatchError,
             );
-            // Don't fail setup, some tests might still work
           }
+        }
+
+        // Dismiss toasts before each click attempt
+        await dismissToasts(page);
+
+        // Ensure element is not blocked by toasts
+        try {
+          await ensureElementNotBlockedByToast(
+            page,
+            foundSelector,
+            isCI ? 15000 : 8000, // Reduced timeout but still adequate for CI
+          );
+        } catch (toastError) {
+          console.warn(
+            `Toast dismissal failed for selector ${foundSelector} (attempt ${attempt}):`,
+            toastError instanceof Error
+              ? toastError.message
+              : String(toastError),
+          );
+          // Continue with the attempt anyway
+        }
+
+        // Firefox-specific preparation
+        if (browserName === "firefox") {
+          await terminalToggle.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(500);
+        }
+
+        // Final aggressive toast clearing immediately before click
+        await page.evaluate(() => {
+          const toasts = document.querySelectorAll(
+            '[role="alert"], [data-testid="toast"], .toast, .notification, [class*="toast"]',
+          );
+          toasts.forEach((toast) => {
+            if (toast instanceof HTMLElement) {
+              toast.style.display = "none";
+              toast.style.pointerEvents = "none";
+              toast.style.zIndex = "-9999";
+              toast.style.position = "fixed";
+              toast.style.left = "-9999px";
+              toast.style.top = "-9999px";
+            }
+          });
+        });
+
+        await page.waitForTimeout(50); // Brief wait
+        await terminalToggle.click({
+          timeout: browserName === "firefox" ? 15000 : 8000,
+          force: browserName === "firefox",
+        });
+        clickSuccess = true;
+        break;
+      } catch (clickError) {
+        console.warn(
+          `Terminal toggle click attempt ${attempt} failed:`,
+          (clickError as Error).message,
+        );
+
+        if (attempt < maxAttempts) {
+          // Try alternative click methods for Firefox
+          if (browserName === "firefox") {
+            try {
+              // Clear toasts before JS click attempt
+              await page.evaluate(() => {
+                const toasts = document.querySelectorAll(
+                  '[role="alert"], [data-testid="toast"], .toast, .notification, [class*="toast"]',
+                );
+                toasts.forEach((toast) => {
+                  if (toast instanceof HTMLElement) {
+                    toast.style.display = "none";
+                    toast.style.pointerEvents = "none";
+                    toast.style.zIndex = "-9999";
+                  }
+                });
+              });
+
+              await terminalToggle.evaluate((el) =>
+                (el as HTMLElement).click(),
+              );
+              clickSuccess = true;
+              break;
+            } catch (jsClickError) {
+              console.warn(
+                `Firefox JS click attempt ${attempt} failed:`,
+                (jsClickError as Error).message,
+              );
+            }
+          }
+          await page.waitForTimeout(1000);
         }
       }
     }
+
+    // every test below assumes the toggle was clicked. a silent miss used to
+    // leave the whole file running against a closed terminal.
+    expect(clickSuccess, "terminal toggle click never landed").toBe(true);
+
+    // Extended wait for Firefox terminal to load
+    const terminalLoadTimeout = browserName === "firefox" ? 3000 : 500;
+    await page.waitForTimeout(terminalLoadTimeout);
+
+    // the toggle was clicked, so the terminal has to appear. a warning here used
+    // to let every downstream test run against a terminal that never opened.
+    const terminal = page.locator('[data-testid="terminal"]').first();
+    const terminalTimeout = browserName === "firefox" ? 10000 : 5000;
+    await expect(terminal).toBeVisible({ timeout: terminalTimeout });
   });
 
   test("should open and close terminal", async ({ page, browserName }) => {
-    // Terminal should be visible - try multiple selectors
-    const terminal = page
-      .locator(
-        '[data-testid="terminal"], [role="application"], .terminal, .xterm',
-      )
-      .first();
-    const terminalCount = await terminal.count();
+    const terminal = page.locator('[data-testid="terminal"]').first();
 
-    if (terminalCount === 0) {
-      // Terminal feature not found, skip test
-      test.skip(true, "Terminal feature not found");
-      return;
-    }
-
-    // Firefox needs more time to verify visibility
+    // assertions, not skips: beforeEach already clicked the toggle, so an
+    // absent or invisible terminal here is exactly the regression this test
+    // exists to catch.
     const visibilityTimeout = browserName === "firefox" ? 15000 : 5000;
-
-    try {
-      await expect(terminal).toBeVisible({ timeout: visibilityTimeout });
-    } catch (visibilityError) {
-      console.warn(
-        "Terminal visibility check failed:",
-        (visibilityError as Error).message,
-      );
-      // Skip test if terminal is not visible
-      test.skip(true, "Terminal not visible after opening");
-      return;
-    }
+    await expect(terminal).toBeVisible({ timeout: visibilityTimeout });
 
     // Close terminal
     const terminalToggle = page
@@ -333,42 +253,25 @@ test.describe("Terminal", () => {
   });
 
   test("should display welcome message", async ({ page }) => {
-    // Check if terminal exists
-    const terminal = page
-      .locator('[data-testid="terminal"], [role="application"], .terminal')
-      .first();
-    const terminalCount = await terminal.count();
-
-    if (terminalCount === 0) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // assertion, not an early return: a missing terminal is the regression, so
+    // returning here reported a pass for a terminal that never rendered.
+    await expectTerminalVisible(page);
 
     // Check for welcome message or prompt
     const terminalContent = page
       .locator(".xterm-screen, .terminal-content, .terminal")
       .first();
 
-    const contentCount = await terminalContent.count();
-    if (contentCount > 0) {
-      await expect(terminalContent).toBeVisible();
-      // Should contain some initial text
-      const text = await terminalContent.textContent();
-      expect(text).toBeTruthy();
-    }
+    await expect(terminalContent).toBeVisible();
+    // Should contain some initial text
+    const text = await terminalContent.textContent();
+    expect(text).toBeTruthy();
   });
 
   test("should show command prompt", async ({ page }) => {
-    // Check if terminal exists
-    const terminal = page
-      .locator('[data-testid="terminal"], [role="application"], .terminal')
-      .first();
-    const terminalCount = await terminal.count();
-
-    if (terminalCount === 0) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // assertion, not an early return: no terminal means a broken app, not an
+    // environment without the feature.
+    await expectTerminalVisible(page);
 
     // Look for prompt indicator
     const terminalContent = page
@@ -576,104 +479,89 @@ test.describe("Terminal", () => {
       return;
     }
 
-    // Check if terminal exists
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
+    // assertion, not an early return: tab completion cannot be exercised
+    // without a terminal, and a missing one is a regression.
+    await expectTerminalVisible(page);
+
+    // no try/catch here: a page that dies mid-test is a crash to report (that
+    // is exactly how the React teardown bug stayed invisible), not a reason to
+    // swallow the error and pass.
+
+    // Type partial command
+    await page.keyboard.type("hel");
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(1000); // Increased timeout
+
+    // Check if it completed to "help"
+    // xterm.js uses a complex DOM structure, need to extract text properly
+    const text = await page.evaluate(() => {
+      // Try to access xterm's terminal instance directly
+      const terminalEl = document.querySelector(".xterm");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (terminalEl && (terminalEl as any)._xtermTerminal) {
+        // If xterm instance is accessible, use its buffer
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const term = (terminalEl as any)._xtermTerminal;
+        const buffer = term.buffer?.active || term.buffer;
+        if (buffer) {
+          const lines: string[] = [];
+          for (let i = 0; i < buffer.cursorY + 1; i++) {
+            const line = buffer.getLine(i);
+            if (line) {
+              lines.push(line.translateToString());
+            }
+          }
+          return lines.join("\n");
+        }
+      }
+
+      // Fallback: Extract text from xterm-rows - improved for DOM renderer
+      const rows = document.querySelectorAll(".xterm-rows > div, .xterm-row");
+      if (rows.length > 0) {
+        const textLines: string[] = [];
+        rows.forEach((row) => {
+          // Try both span-based and direct text content
+          const spans = row.querySelectorAll("span");
+          let lineText = "";
+
+          if (spans.length > 0) {
+            spans.forEach((span) => {
+              const spanText = span.textContent || "";
+              lineText += spanText;
+            });
+          } else {
+            // Direct text content for DOM renderer
+            lineText = row.textContent || "";
+          }
+
+          if (lineText.trim()) {
+            textLines.push(lineText);
+          }
+        });
+        return textLines.join("\n");
+      }
+
+      // Last resort: try getting text from screen
+      const screen = document.querySelector(".xterm-screen");
+      if (screen instanceof HTMLElement) {
+        return screen.innerText || screen.textContent || "";
+      }
+
+      return "";
+    });
+
+    if (!text) {
+      // Fallback: just verify that typing worked
+      const inputExists = (await page.locator(".xterm-rows").count()) > 0;
+      expect(inputExists).toBeTruthy();
       return;
     }
 
-    try {
-      // Type partial command
-      await page.keyboard.type("hel");
-      await page.keyboard.press("Tab");
-      await page.waitForTimeout(1000); // Increased timeout
-
-      // Check if it completed to "help"
-      // xterm.js uses a complex DOM structure, need to extract text properly
-      const text = await page.evaluate(() => {
-        // Try to access xterm's terminal instance directly
-        const terminalEl = document.querySelector(".xterm");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (terminalEl && (terminalEl as any)._xtermTerminal) {
-          // If xterm instance is accessible, use its buffer
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const term = (terminalEl as any)._xtermTerminal;
-          const buffer = term.buffer?.active || term.buffer;
-          if (buffer) {
-            const lines: string[] = [];
-            for (let i = 0; i < buffer.cursorY + 1; i++) {
-              const line = buffer.getLine(i);
-              if (line) {
-                lines.push(line.translateToString());
-              }
-            }
-            return lines.join("\n");
-          }
-        }
-
-        // Fallback: Extract text from xterm-rows - improved for DOM renderer
-        const rows = document.querySelectorAll(".xterm-rows > div, .xterm-row");
-        if (rows.length > 0) {
-          const textLines: string[] = [];
-          rows.forEach((row) => {
-            // Try both span-based and direct text content
-            const spans = row.querySelectorAll("span");
-            let lineText = "";
-
-            if (spans.length > 0) {
-              spans.forEach((span) => {
-                const spanText = span.textContent || "";
-                lineText += spanText;
-              });
-            } else {
-              // Direct text content for DOM renderer
-              lineText = row.textContent || "";
-            }
-
-            if (lineText.trim()) {
-              textLines.push(lineText);
-            }
-          });
-          return textLines.join("\n");
-        }
-
-        // Last resort: try getting text from screen
-        const screen = document.querySelector(".xterm-screen");
-        if (screen instanceof HTMLElement) {
-          return screen.innerText || screen.textContent || "";
-        }
-
-        return "";
-      });
-
-      if (!text) {
-        // Fallback: just verify that typing worked
-        const inputExists = (await page.locator(".xterm-rows").count()) > 0;
-        expect(inputExists).toBeTruthy();
-        return;
-      }
-
-      // Should have completed to "help" or still contain "hel" (tab completion might not work in CI)
-      // More lenient check for CI environment
-      const hasExpectedText =
-        text.toLowerCase().includes("hel") ||
-        text.toLowerCase().includes("help");
-      expect(hasExpectedText).toBeTruthy();
-    } catch (error) {
-      // Handle page context closed errors gracefully
-      if (
-        error instanceof Error &&
-        error.message?.includes(
-          "Target page, context or browser has been closed",
-        )
-      ) {
-        console.log(
-          "Page context closed during tab completion test - skipping",
-        );
-        return;
-      }
-      throw error;
-    }
+    // Should have completed to "help" or still contain "hel" (tab completion might not work in CI)
+    // More lenient check for CI environment
+    const hasExpectedText =
+      text.toLowerCase().includes("hel") || text.toLowerCase().includes("help");
+    expect(hasExpectedText).toBeTruthy();
   });
 
   test("should be draggable", async ({ page, isMobile, browserName }) => {
@@ -685,30 +573,15 @@ test.describe("Terminal", () => {
     // Wait for page to be fully loaded
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // Check if terminal exists and is draggable
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
-      .first();
+    // assertion, not an early return: an absent terminal is a regression, and
+    // returning here reported a pass for a drag that never happened.
+    const terminal = await expectTerminalVisible(page);
     const terminalHeader = terminal
-      .locator(".terminal-header, [data-testid='terminal-header']")
+      .locator("[data-testid='terminal-header']")
       .first();
 
-    // Wait for terminal to be visible and interactive
-    await expect(terminal).toBeVisible({ timeout: 10000 });
-
-    // Check if header exists and is draggable
-    const headerExists = (await terminalHeader.count()) > 0;
-    if (!headerExists) {
-      // No draggable header found, skip test
-      console.log("Terminal header not found, skipping drag test");
-      return;
-    }
-
+    // the header is rendered unconditionally by Terminal.tsx, so its absence is
+    // also a regression rather than an optional feature.
     await expect(terminalHeader).toBeVisible({ timeout: 5000 });
 
     // Get initial position
@@ -761,24 +634,22 @@ test.describe("Terminal", () => {
     // Ensure page is fully loaded first
     await page.waitForLoadState("networkidle", { timeout: 20000 });
 
-    // Check if terminal exists
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
-      .first();
+    // assertion, not an early return: without a terminal there is nothing to
+    // resize, and a missing one is a regression.
+    const terminal = await expectTerminalVisible(page);
     const resizeHandle = terminal
-      .locator(".resize-handle, [data-testid='resize-handle']")
+      .locator("[data-testid='resize-handle']")
       .first();
+
+    // the handle is rendered whenever the window is in its normal state, which
+    // is how the terminal opens, so an invisible handle is a regression too.
+    await expect(resizeHandle).toBeVisible({ timeout: 5000 });
 
     // Get initial size
     const initialBox = await terminal.boundingBox();
     expect(initialBox).toBeTruthy();
 
-    if (initialBox && (await resizeHandle.isVisible())) {
+    if (initialBox) {
       // Resize terminal
       await resizeHandle.hover();
       await page.mouse.down();
@@ -807,119 +678,84 @@ test.describe("Terminal", () => {
     // Wait for page to be fully loaded
     await page.waitForLoadState("networkidle", { timeout: 20000 });
 
-    // Check if terminal exists
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // assertion, not an early return: a missing terminal is a regression, not
+    // an environment without the feature.
+    const terminal = await expectTerminalVisible(page);
 
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
+    // the window controls are part of the header Terminal.tsx always renders,
+    // so a missing minimize button is a regression as well. the old selector
+    // list ended in ".terminal-controls button:first-child" and, when nothing
+    // matched, logged and passed.
+    const minimizeButton = terminal
+      .locator('button[aria-label*="minimize" i]')
       .first();
+    await expect(minimizeButton).toBeVisible({ timeout: 5000 });
 
-    // Wait for terminal to be visible
-    await expect(terminal).toBeVisible({ timeout: 15000 });
+    try {
+      // Get initial visibility state
+      const initiallyVisible = await terminal.isVisible();
+      expect(initiallyVisible).toBeTruthy();
 
-    // Look for minimize button with various selectors
-    const minimizeSelectors = [
-      'button[aria-label*="minimize" i]',
-      'button[title*="minimize" i]',
-      'button[data-testid="minimize"]',
-      ".minimize-button",
-      ".terminal-controls button:first-child",
-    ];
+      // Minimize terminal. no catch-and-return around the click: a page that
+      // dies mid-test is a crash to report, not a reason to pass.
+      await minimizeButton.click();
+      await page.waitForTimeout(1500); // Increased timeout
 
-    let minimizeButton = null;
-    for (const selector of minimizeSelectors) {
-      const button = terminal.locator(selector).first();
-      if ((await button.count()) > 0 && (await button.isVisible())) {
-        minimizeButton = button;
-        break;
-      }
-    }
-
-    if (minimizeButton) {
-      try {
-        // Get initial visibility state
-        const initiallyVisible = await terminal.isVisible();
-        expect(initiallyVisible).toBeTruthy();
-
-        // Minimize terminal - wrap in try-catch for page context issues
-        try {
-          await minimizeButton.click();
-          await page.waitForTimeout(1500); // Increased timeout
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message?.includes(
-              "Target page, context or browser has been closed",
-            )
-          ) {
-            console.log("Page context closed during minimize test - skipping");
-            return;
-          }
-          throw error;
-        }
-
-        // Check if terminal is minimized (more lenient checks)
-        const isMinimizedOrHidden = await terminal.evaluate((el) => {
-          const styles = window.getComputedStyle(el);
-          const rect = el.getBoundingClientRect();
-          return (
-            styles.display === "none" ||
-            styles.visibility === "hidden" ||
-            styles.opacity === "0" ||
-            rect.height < 50 ||
-            el.hasAttribute("data-minimized") ||
-            el.classList.contains("minimized")
-          );
-        });
-
-        if (isMinimizedOrHidden) {
-          // Look for restore button
-          const restoreSelectors = [
-            'button[aria-label*="restore" i]',
-            'button[aria-label*="maximize" i]',
-            'button[title*="restore" i]',
-            'button[data-testid="restore"]',
-            ".restore-button",
-            ".taskbar button",
-          ];
-
-          let restoreButton = null;
-          for (const selector of restoreSelectors) {
-            const button = page.locator(selector).first();
-            if ((await button.count()) > 0 && (await button.isVisible())) {
-              restoreButton = button;
-              break;
-            }
-          }
-
-          if (restoreButton) {
-            await restoreButton.click();
-            await page.waitForTimeout(1000);
-
-            // Terminal should be visible again
-            await expect(terminal).toBeVisible({ timeout: 5000 });
-          } else {
-            // No restore button found - just verify minimize worked
-            expect(isMinimizedOrHidden).toBeTruthy();
-          }
-        } else {
-          // Terminal might not support minimizing - just verify it's interactive
-          const isInteractive = await minimizeButton.isEnabled();
-          expect(isInteractive).toBeTruthy();
-        }
-      } catch {
-        // Minimize/restore might not be fully implemented - just verify button exists
-        console.log(
-          "Minimize/restore functionality limited, verifying button exists",
+      // Check if terminal is minimized (more lenient checks)
+      const isMinimizedOrHidden = await terminal.evaluate((el) => {
+        const styles = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return (
+          styles.display === "none" ||
+          styles.visibility === "hidden" ||
+          styles.opacity === "0" ||
+          rect.height < 50 ||
+          el.hasAttribute("data-minimized") ||
+          el.classList.contains("minimized")
         );
-        expect(await minimizeButton.isVisible()).toBeTruthy();
+      });
+
+      if (isMinimizedOrHidden) {
+        // Look for restore button
+        const restoreSelectors = [
+          'button[aria-label*="restore" i]',
+          'button[aria-label*="maximize" i]',
+          'button[title*="restore" i]',
+          'button[data-testid="restore"]',
+          ".restore-button",
+          ".taskbar button",
+        ];
+
+        let restoreButton = null;
+        for (const selector of restoreSelectors) {
+          const button = page.locator(selector).first();
+          if ((await button.count()) > 0 && (await button.isVisible())) {
+            restoreButton = button;
+            break;
+          }
+        }
+
+        if (restoreButton) {
+          await restoreButton.click();
+          await page.waitForTimeout(1000);
+
+          // Terminal should be visible again
+          await expect(terminal).toBeVisible({ timeout: 5000 });
+        } else {
+          // No restore button found - just verify minimize worked
+          expect(isMinimizedOrHidden).toBeTruthy();
+        }
+      } else {
+        // Terminal might not support minimizing - just verify it's interactive
+        const isInteractive = await minimizeButton.isEnabled();
+        expect(isInteractive).toBeTruthy();
       }
-    } else {
-      // No minimize button found - terminal might not support this feature
-      console.log("No minimize button found, skipping minimize/restore test");
+    } catch {
+      // Minimize/restore might not be fully implemented - just verify button exists
+      console.log(
+        "Minimize/restore functionality limited, verifying button exists",
+      );
+      expect(await minimizeButton.isVisible()).toBeTruthy();
     }
   });
 
@@ -933,10 +769,9 @@ test.describe("Terminal", () => {
       return;
     }
 
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
+    // assertion, not an early return: typing into a terminal that is not there
+    // is a regression, not a feature the environment lacks.
+    await expectTerminalVisible(page);
 
     // Ensure terminal is visible by dismissing any blocking toasts
     await dismissToasts(page);
@@ -1431,13 +1266,9 @@ test.describe("Terminal", () => {
   });
 
   test("should show terminal in correct theme", async ({ page }) => {
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
-      .first();
+    // assertion, not an early return: no terminal means the app is broken, and
+    // returning here reported green for a theme check that never ran.
+    const terminal = await expectTerminalVisible(page);
 
     // Check initial theme
     const initialBg = await terminal.evaluate((el) => {
@@ -1461,13 +1292,9 @@ test.describe("Terminal", () => {
   });
 
   test("should be accessible", async ({ page }) => {
-    if (!(await checkTerminalExists(page))) {
-      // Terminal feature not found, skipping test
-      return;
-    }
-    const terminal = page
-      .locator('[data-testid="terminal"], .terminal, [role="application"]')
-      .first();
+    // assertion, not an early return: an absent terminal has no ARIA to check,
+    // and that absence is the regression worth reporting.
+    const terminal = await expectTerminalVisible(page);
 
     // Check ARIA attributes
     const role = await terminal.getAttribute("role");

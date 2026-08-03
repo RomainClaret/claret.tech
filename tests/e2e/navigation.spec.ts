@@ -1216,35 +1216,17 @@ test.describe("Navigation", () => {
     // Skip terminal toggle test on mobile - terminal is desktop-only feature
     test.skip(isMobile, "Terminal is desktop-only feature");
 
-    // Enhanced selectors for terminal toggle button
-    const terminalSelectors = [
-      'button[aria-label="Toggle terminal"]',
-      '[data-testid="terminal-toggle"]',
-      'nav button[aria-label*="terminal" i]',
-      'button:has-text("terminal")',
-      '.logo button, [class*="logo"] button',
-      "nav button:first-child",
-      "header button:has(svg)",
-    ];
+    // the one selector the nav actually renders. the old fallback chain ended
+    // in "nav button:first-child" / "header button:has(svg)", which match
+    // unrelated buttons and only widen the window in which a missing toggle
+    // still looks fine.
+    const terminalToggle = page
+      .locator('button[aria-label="Toggle terminal"]')
+      .first();
 
-    let terminalToggle = null;
-    let toggleFound = false;
-
-    // Try multiple selectors to find terminal toggle
-    for (const selector of terminalSelectors) {
-      const element = page.locator(selector).first();
-      if ((await element.count()) > 0 && (await element.isVisible())) {
-        terminalToggle = element;
-        toggleFound = true;
-        break;
-      }
-    }
-
-    if (!toggleFound || !terminalToggle) {
-      // Terminal toggle feature not present, skip test
-      test.skip(true, "Terminal toggle feature not found");
-      return;
-    }
+    // assertion, not a skip: the nav renders this button unconditionally, so
+    // its absence is a regression rather than an environment condition.
+    await expect(terminalToggle).toBeVisible({ timeout: 10000 });
 
     // Ensure element is ready for interaction
     await terminalToggle.scrollIntoViewIfNeeded();
@@ -1270,49 +1252,32 @@ test.describe("Navigation", () => {
       },
     );
 
-    if (!clickSuccess) {
-      // If all click attempts failed, skip the test
-      test.skip(
-        true,
-        "Could not successfully click terminal toggle button using enhanced mobile click",
-      );
-      return;
-    }
+    // assertion, not a skip: the button is present and enabled by this point,
+    // so a click that never lands is a regression in the nav, not a condition
+    // of the environment.
+    expect(clickSuccess, "terminal toggle click never landed").toBe(true);
 
     // Wait for animation/transition with increased timeout for mobile
     await page.waitForTimeout(isMobile ? 1000 : 500);
 
-    // Terminal should exist (may have different selectors)
-    const terminal = page
-      .locator(
-        '[data-testid="terminal"], .terminal, [role="log"], [class*="terminal"], .xterm',
-      )
-      .first();
-    const terminalCount = await terminal.count();
+    // the toggle was clicked, so the terminal has to be there. logging and
+    // passing here is what let a broken terminal report green.
+    const terminal = page.locator('[data-testid="terminal"]').first();
+    await expect(terminal).toBeVisible({ timeout: 15000 });
 
-    if (terminalCount > 0) {
-      // Terminal exists, verify we can interact with it
-      expect(terminalCount).toBeGreaterThan(0);
+    // Try to toggle again to ensure button is still interactive
+    try {
+      await terminalToggle.click({ timeout: 5000 });
+      await page.waitForTimeout(500);
 
-      // Try to toggle again to ensure button is still interactive
-      try {
-        await terminalToggle.click({ timeout: 5000 });
-        await page.waitForTimeout(500);
-
-        // Verify the toggle button is still interactive
-        expect(await terminalToggle.isEnabled()).toBe(true);
-      } catch (secondClickError) {
-        console.warn(
-          "Second terminal toggle click failed:",
-          (secondClickError as Error).message,
-        );
-        // Don't fail the test for this, terminal might have different behavior
-      }
-    } else {
-      console.log(
-        "Terminal element not found after toggle, feature may be disabled or have different implementation",
+      // Verify the toggle button is still interactive
+      expect(await terminalToggle.isEnabled()).toBe(true);
+    } catch (secondClickError) {
+      console.warn(
+        "Second terminal toggle click failed:",
+        (secondClickError as Error).message,
       );
-      // Don't fail the test, just log the observation
+      // Don't fail the test for this, terminal might have different behavior
     }
   });
 

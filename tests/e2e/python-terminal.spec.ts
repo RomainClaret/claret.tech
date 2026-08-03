@@ -64,7 +64,12 @@ test.describe("Terminal: python", () => {
         return;
       }
     }
-    test.skip(true, "terminal toggle not found");
+    // throw, do not skip: this gates every test in the file, and a toggle the
+    // app no longer renders is a regression rather than an environment the
+    // suite should route around.
+    throw new Error(
+      `terminal toggle not found (tried: ${toggles.join(", ")}) - the terminal did not render`,
+    );
   }
 
   /**
