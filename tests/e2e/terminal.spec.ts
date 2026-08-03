@@ -586,46 +586,91 @@ test.describe("Terminal", () => {
   });
 
   /**
-   * webkit stays skipped, but the bare `test.skip(); // Webkit has issues with
-   * drag interactions` is replaced by the measurement behind it.
+   * The drag test below is a weak detector, so this one exists beside it.
    *
-   * Investigated 2026-08-03. Unskipped on webkit the test *passes*, and passes
-   * for the wrong reason: `terminalHeader.dragTo(...)` completes without
-   * throwing, the window does not move, `expect(movedX > 10 || movedY > 10)`
-   * fails, and the pre-existing catch below swallows that into "just verify
-   * terminal is interactive". Replacing the catch with a rethrow shows what is
-   * really happening:
+   * `dragTo` emits several mousemoves with waits between them, which gives the
+   * old code a frame to land a position write in, so it passed on reverted
+   * code 3 times out of 3. This drives the defect condition directly: one
+   * mousemove, then mouseup with no frame in between, which is what a fast
+   * real drag looks like and what webkit's event batching produces almost
+   * every time.
    *
-   *   Error: expect(received).toBeTruthy()  Received: false
+   * Measured 2026-08-03. With the Terminal.tsx fix, 12 runs across chromium,
+   * firefox and webkit all moved the window by exactly dx=150 dy=40. With the
+   * fix reverted, webkit reported dx=0 dy=0 - the window did not move at all -
+   * while chromium still moved, which is the whole reason this looked like a
+   * webkit quirk for so long.
    *
-   * Driving it the way the resize test does - mouse.down / mouse.move({steps:
-   * 10}) / mouse.up instead of dragTo - does not rescue it: 5 of 6 webkit runs
-   * still ended with the window at its original position, while chromium and
-   * firefox reach the real assertion under both techniques. So this is not a
-   * dragTo quirk.
-   *
-   * The likely root cause is in the app, not the test:
-   * src/components/terminal/Terminal.tsx:159-164. handleMouseUp does
-   *
-   *   if (dragAnimationFrameRef.current) {
-   *     cancelAnimationFrame(dragAnimationFrameRef.current);
-   *
-   * and applies nothing in its place, while handleMouseMove (line 136) only
-   * ever writes the new position from inside a requestAnimationFrame callback.
-   * Any drag whose final mousemove and mouseup land in the same frame - every
-   * automated drag, and a fast real one - has its last, and under webkit's
-   * event batching its only, position update cancelled. Fixing that is a
-   * Terminal change, out of scope here; unskip webkit as part of it.
+   * Note the displacement is asserted, not just "something happened": the
+   * failure mode here is silence, and a test that tolerates zero movement is
+   * how this survived in the first place.
    */
-  test("should be draggable", async ({ page, isMobile, browserName }) => {
+  test("should apply the final movement of a drag", async ({
+    page,
+    isMobile,
+  }) => {
     if (isMobile) {
       test.skip();
       return;
     }
-    test.skip(
-      browserName === "webkit",
-      "webkit drops the drag: the window stays at its start position in 5 of 6 runs, with dragTo or with a stepped mouse drag. Suspected cause is Terminal.tsx:159-164 cancelling the pending rAF on mouseup without applying the final position.",
+
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    const terminal = await expectTerminalVisible(page);
+    const header = terminal.locator("[data-testid='terminal-header']").first();
+    await expect(header).toBeVisible({ timeout: 5000 });
+
+    const headerBox = await header.boundingBox();
+    const before = await terminal.boundingBox();
+    expect(headerBox, "terminal header has no bounding box").toBeTruthy();
+    expect(before, "terminal has no bounding box before the drag").toBeTruthy();
+    if (!headerBox || !before) return; // narrowing; the assertions above gate
+
+    await page.mouse.move(
+      headerBox.x + headerBox.width / 2,
+      headerBox.y + headerBox.height / 2,
     );
+    await page.mouse.down();
+    await page.mouse.move(
+      headerBox.x + headerBox.width / 2 + 150,
+      headerBox.y + headerBox.height / 2 + 120,
+    );
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+
+    const after = await terminal.boundingBox();
+    expect(after, "terminal has no bounding box after the drag").toBeTruthy();
+    if (!after) return;
+
+    const dx = Math.abs(after.x - before.x);
+    const dy = Math.abs(after.y - before.y);
+    expect(
+      dx > 10 || dy > 10,
+      `the final movement of the drag was dropped: dx=${dx}, dy=${dy}`,
+    ).toBeTruthy();
+  });
+
+  /**
+   * Runs on every desktop browser, including webkit.
+   *
+   * It used to skip webkit behind "// Webkit has issues with drag
+   * interactions", and it carried a catch that turned a failed drag into
+   * `expect(header.isEnabled()).toBeTruthy()` - so even unskipped it would
+   * have reported a pass while the window sat still. Both are gone, because
+   * the thing they were working around was a real bug rather than a webkit
+   * quirk: Terminal.tsx wrote the window position only from inside a
+   * requestAnimationFrame callback, and mouseup cancelled that frame without
+   * applying it, so the last movement of every drag was discarded. Webkit
+   * batches pointer events tightly enough that the last movement was usually
+   * the only one, which is why it looked browser-specific.
+   *
+   * If this starts failing on one browser again, check that fix before
+   * assuming the browser is at fault.
+   */
+  test("should be draggable", async ({ page, isMobile }) => {
+    if (isMobile) {
+      test.skip();
+      return;
+    }
 
     // Wait for page to be fully loaded
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -643,40 +688,36 @@ test.describe("Terminal", () => {
 
     // Get initial position
     const initialBox = await terminal.boundingBox();
-    expect(initialBox).toBeTruthy();
+    expect(
+      initialBox,
+      "terminal has no bounding box before the drag",
+    ).toBeTruthy();
+    if (!initialBox) return; // type narrowing; the assertion above is the gate
 
-    if (initialBox) {
-      try {
-        // Drag terminal with more reliable approach
-        await terminalHeader.hover();
-        await page.waitForTimeout(100);
+    await terminalHeader.hover();
+    await page.waitForTimeout(100);
 
-        await terminalHeader.dragTo(page.locator("body"), {
-          targetPosition: {
-            x: initialBox.x + 100,
-            y: initialBox.y + 100,
-          },
-        });
+    await terminalHeader.dragTo(page.locator("body"), {
+      targetPosition: {
+        x: initialBox.x + 100,
+        y: initialBox.y + 100,
+      },
+    });
 
-        await page.waitForTimeout(1000);
+    await page.waitForTimeout(1000);
 
-        // Check new position
-        const newBox = await terminal.boundingBox();
-        expect(newBox).toBeTruthy();
+    // Check new position
+    const newBox = await terminal.boundingBox();
+    expect(newBox, "terminal has no bounding box after the drag").toBeTruthy();
+    if (!newBox) return;
 
-        // Terminal should have moved (be lenient for CI)
-        if (newBox) {
-          const movedX = Math.abs(newBox.x - initialBox.x);
-          const movedY = Math.abs(newBox.y - initialBox.y);
-          expect(movedX > 10 || movedY > 10).toBeTruthy();
-        }
-      } catch {
-        // Drag might not be supported, just verify terminal is interactive
-        console.log("Drag not supported, checking if terminal is interactive");
-        const isInteractive = await terminalHeader.isEnabled();
-        expect(isInteractive).toBeTruthy();
-      }
-    }
+    // Terminal should have moved (be lenient for CI)
+    const movedX = Math.abs(newBox.x - initialBox.x);
+    const movedY = Math.abs(newBox.y - initialBox.y);
+    expect(
+      movedX > 10 || movedY > 10,
+      `terminal did not move: dx=${movedX}, dy=${movedY}`,
+    ).toBeTruthy();
   });
 
   /**
