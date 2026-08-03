@@ -44,7 +44,7 @@ function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
       colorClass: "text-purple-600 dark:text-purple-400",
       bgClass: "bg-purple-600/10 dark:bg-purple-400/10",
       borderClass: "border-purple-600/30 dark:border-purple-400/30",
-      label: "Research",
+      label: "Academic",
     };
   }
   if (role.includes("founder") || role.includes("co-founder")) {
