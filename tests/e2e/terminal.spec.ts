@@ -1374,7 +1374,32 @@ test.describe("Terminal", () => {
       .toMatch(/about$/);
   });
 
-  test("should handle paste operations", async ({ page }) => {
+  /**
+   * Not run on firefox, and the reason is the test technique rather than the
+   * app. Gecko will construct a ClipboardEvent with a DataTransfer attached,
+   * but refuses to expose synthetic clipboard payloads back to page script.
+   * Probed on this build, same page, all three engines:
+   *
+   *   const dt = new DataTransfer(); dt.setData("text/plain", "X");
+   *   new ClipboardEvent("paste", { clipboardData: dt })
+   *     .clipboardData.getData("text/plain")
+   *
+   *     chromium -> "X"      webkit -> "X"      firefox -> ""
+   *
+   * xterm reads exactly that property in its paste handler, so on firefox it
+   * receives an empty string and there is nothing to assert. A real Ctrl+V is
+   * unaffected, because then the browser fills clipboardData itself; testing
+   * that instead needs clipboard permissions firefox does not grant headlessly.
+   *
+   * So this is a gap in coverage, not a bug: paste is exercised on chromium and
+   * webkit, and firefox's paste path is the same application code.
+   */
+  test("should handle paste operations", async ({ page, browserName }) => {
+    test.skip(
+      browserName === "firefox",
+      'gecko does not expose synthetic ClipboardEvent payloads to page script (getData returns ""), so xterm\'s paste handler receives nothing; see the comment above',
+    );
+
     await expectTerminalVisible(page);
     await waitForTerminalReady(page);
 
