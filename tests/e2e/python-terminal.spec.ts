@@ -28,8 +28,13 @@ test.describe("Terminal: python", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "chromium only");
 
   test.beforeEach(async ({ page, isMobile }, testInfo) => {
-    // The terminal is desktop only, and the REPL needs a physical keyboard.
-    if (isMobile) test.skip();
+    // Reason goes in the call, not only the comment: a bare test.skip() shows
+    // up in the report with no explanation, which is how skips stop being
+    // reviewed.
+    test.skip(
+      isMobile,
+      "the terminal is desktop-only and the REPL needs a physical keyboard",
+    );
     testInfo.setTimeout(BOOT_TIMEOUT + 60_000);
 
     await page.goto("/");
@@ -555,12 +560,19 @@ test.describe("Terminal: python", () => {
   });
 
   test("has numpy available", async ({ page }) => {
+    // The wait accepts either outcome so a missing wheel surfaces as a failed
+    // assertion below rather than a poll timeout, which says far less about
+    // what went wrong. The assertion itself does not accept both: it used to
+    // repeat this same alternation, so the test passed whether numpy loaded or
+    // not while its name promised otherwise.
     const text = await run(
       page,
       "python -c \"import numpy as np; print('NUM'+'PY', np.arange(5).sum())\"",
       /NUMPY 10|not available/,
     );
-    // A deployment whose wheel download failed says so rather than breaking.
-    expect(text).toMatch(/NUMPY 10|not available/);
+    expect(
+      text,
+      "numpy did not load: the wheel under /pyodide is missing or failed to import",
+    ).toContain("NUMPY 10");
   });
 });

@@ -69,10 +69,46 @@ test.describe("Mobile Accessibility", () => {
     await dismissToasts(page, { timeout: 3000 });
     await openMobileMenuForAccessibility(page);
 
-    // Check that interactive elements have minimum 44x44px touch targets
+    // The header's own controls, checked strictly on both axes. These are the
+    // primary controls and the ones that regressed before - the toggles were
+    // 37x20 until they were given min-h-11/min-w-11 - so this is the assertion
+    // that guards that fix. Measured: all four are exactly 44x44 on Pixel 5 and
+    // iPhone 12.
+    const navButtons = await page.locator("nav button:visible").all();
+    expect(
+      navButtons.length,
+      "no visible nav buttons to measure: the header did not render",
+    ).toBeGreaterThan(0);
+
+    for (const control of navButtons) {
+      const box = await control.boundingBox();
+      const label = await control.evaluate(
+        (el) => el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "",
+      );
+      expect(box, `${label} has no box`).not.toBeNull();
+      expect(
+        box!.width >= 44 && box!.height >= 44,
+        `${label} is ${Math.round(box!.width)}x${Math.round(box!.height)}px, below 44x44`,
+      ).toBeTruthy();
+    }
+
+    // Everything else keeps the looser either-axis check, deliberately.
+    //
+    // Requiring 44 on both axes across every visible button, link and
+    // role=button flags 163 of 179 elements on this page, and almost none of
+    // them are defects: the skip links are 1x1 until focused, which is the
+    // standard pattern; inline text links like the nav prompt are 143x20 and
+    // are explicitly exempt under WCAG 2.2 2.5.8; and the skills cloud renders
+    // decorative 12x6 nodes. WCAG's own floor is 24x24 with exceptions, not 44
+    // on everything. Tightening this without narrowing the selector would mean
+    // 163 failures that no standard asks anyone to fix.
     const interactiveElements = await page
       .locator('button:visible, a:visible, [role="button"]:visible')
       .all();
+    expect(
+      interactiveElements.length,
+      "no visible interactive elements matched: the page did not render",
+    ).toBeGreaterThan(0);
 
     // Only check first 5 elements to avoid timeout
     const elementsToCheck = Math.min(interactiveElements.length, 5);

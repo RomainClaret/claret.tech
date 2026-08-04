@@ -1,3 +1,44 @@
+/**
+ * READ THIS BEFORE TRUSTING A GREEN RUN OF THIS FILE.
+ *
+ * Audited 2026-08-04 and deliberately left alone: fixing it will surface real
+ * bugs and was scoped out of that session. Of 19 tests here, 9 cannot fail on
+ * desktop. What follows is the inventory, so nobody reads this file's green as
+ * evidence that navigation works.
+ *
+ * Three tests verify nothing at all. `should navigate to primary sections`
+ * (~:308), `...portfolio sections` (~:474) and `...info sections` (~:640) are
+ * ~165 lines each and cover all nine sections between them. Each has exactly
+ * one expect - :412, :578, :744 - and each sits inside `catch { console.warn();
+ * continue; }` at :414, :585, :751, with an outer catch per section too. The
+ * comment at :468 says the quiet part: "this prevents the entire test from
+ * failing". They pass whenever the page loads.
+ *
+ * Four assume success after an error: :1032, :1037 ("assuming success"), :1141,
+ * :1149 ("assume element is in view for test robustness"). Those flags feed the
+ * only assertions in the smooth-scroll and section-visibility tests.
+ *
+ * Assertions that cannot fail: :1469 `expect(scrollY).toBeDefined()` in the
+ * reload-reset test, which never checks the reset; :1812/:1813
+ * `expect(getAttribute(...)).toBeDefined()`, and null is defined, so a menu
+ * button with no ARIA passes; :1801 asserts a `nav` locator's tagName is "NAV";
+ * :1194 treats any colour other than two specific greys as "active", so the
+ * highlight test passes with no highlighting.
+ *
+ * Two skips fire because the app is broken rather than because of the
+ * environment - :1836 and :1959 skip when the mobile menu's links never appear,
+ * so a menu regression reports skipped instead of failed. Five more mobile
+ * skips (:343, :509, :675, :1823, :1946) say only "known menu interaction
+ * issues" with no evidence behind them.
+ *
+ * And `openMobileMenuRobust` (:36-233) rewrites the page before asserting on
+ * it: :144-165 sets display, visibility, opacity and z-index on the mobile nav
+ * and on every `nav a[href^="#"]`. Tests downstream of it assert against a DOM
+ * the test produced, not the one the app rendered.
+ *
+ * Fixing this properly means expecting red for a while, which is why it is its
+ * own piece of work rather than a tidy-up.
+ */
 import { test, expect, Page } from "@playwright/test";
 import {
   waitForScrollCompletion,
