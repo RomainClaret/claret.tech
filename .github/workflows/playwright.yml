@@ -37,6 +37,18 @@ env:
   # Skip external API calls in CI for stability
   SKIP_EXTERNAL_APIS: true
 
+# There is deliberately no apt step installing cairo/pango/etc. It existed so
+# `npm ci` could compile the `canvas` devDependency from source, and it had
+# become the single largest cost in this workflow: 8-18 minutes per job against
+# ~1 minute of actual tests, and on 2026-08-04 it hit the 30-minute job timeout
+# and cancelled three firefox jobs before they ran a single test.
+#
+# It was never needed. canvas 2.11.2 publishes a prebuilt binary for Node 20 on
+# linux-glibc-x64 (node-v115), so it installs without any dev headers. Verified
+# in this exact image, mcr.microsoft.com/playwright:v1.57.0-jammy with Node
+# 20.19.0 and no apt packages: full `npm ci` succeeds in 86s and canvas, sharp
+# and jsdom all load. Nothing else in the tree compiles from source.
+#
 # QUOTA OPTIMIZATION FEATURES:
 # - workflow_dispatch: Manual triggering to control usage
 # - paths-ignore: Skip runs for documentation and non-code changes
@@ -155,16 +167,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -285,16 +287,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-
       - uses: actions/setup-node@v6
         with:
           node-version: 20
@@ -395,16 +387,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -512,16 +494,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
@@ -645,16 +617,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-
       - uses: actions/setup-node@v6
         with:
           node-version: 20
@@ -764,16 +726,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Install system dependencies for canvas
-        # --no-install-recommends drops the optional extras (was pulling ~100
-        # packages); Acquire::Retries survives archive.ubuntu.com throttling
-        # that timed out terminal-test shards on 2026-07-22.
-        run: |
-          apt-get update -o Acquire::Retries=3
-          apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
-            build-essential pkg-config libcairo2-dev libpango1.0-dev \
-            libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
 
       - uses: actions/setup-node@v6
         with:
