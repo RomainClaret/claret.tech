@@ -92,12 +92,49 @@ async function captureAt(
   }, top);
   if (!moved) return before;
 
-  await expect
-    .poll(async () => ((await screen(page)) !== before ? "repainted" : "..."), {
-      timeout: 5_000,
-      intervals: [50, 100, 200],
-    })
-    .toBe("repainted");
+  try {
+    await expect
+      .poll(
+        async () => ((await screen(page)) !== before ? "repainted" : "..."),
+        {
+          timeout: 5_000,
+          intervals: [50, 100, 200],
+        },
+      )
+      .toBe("repainted");
+  } catch (error) {
+    // Report and rethrow; pass and fail are unaffected. This wait times out on
+    // a CI runner and on no developer machine tried so far, including the same
+    // shard command, so the question is which half of the premise is wrong:
+    // that the element scrolled, or that a scroll makes xterm repaint.
+    const state = await page
+      .evaluate(() => {
+        const el = document.querySelector(".xterm-viewport");
+        const rows = document.querySelectorAll(".xterm-rows > div");
+        return {
+          scrollTop: el ? (el as HTMLElement).scrollTop : null,
+          scrollHeight: el ? el.scrollHeight : null,
+          clientHeight: el ? el.clientHeight : null,
+          rowCount: rows.length,
+          firstRow: (rows[0]?.textContent ?? "").slice(0, 60),
+          lastRow: (rows[rows.length - 1]?.textContent ?? "").slice(0, 60),
+          // If xterm is on the canvas or webgl renderer the row divs are not
+          // the source of truth and this whole approach is wrong, not slow.
+          rendererCanvases: document.querySelectorAll(".xterm canvas").length,
+        };
+      })
+      .catch((evaluateError) => ({ evaluateFailed: String(evaluateError) }));
+
+    console.log(
+      `SCROLLBACK_REPAINT_DIAGNOSTIC ${JSON.stringify({
+        requestedTop: top,
+        ...state,
+        beforeFirstLine: before.split("\n")[0]?.slice(0, 60),
+        beforeLength: before.length,
+      })}`,
+    );
+    throw error;
+  }
 
   return screen(page);
 }

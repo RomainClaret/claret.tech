@@ -54,6 +54,22 @@ test.describe("Terminal", () => {
       return;
     }
 
+    // Collected from the first navigation so that the gate at the end of this
+    // hook can say WHY the terminal never appeared. The terminal is a lazy
+    // chunk behind the splash screen, so the interesting failures are a chunk
+    // that never arrived or a component that threw while mounting, and neither
+    // leaves a trace in the DOM the assertion can see.
+    const consoleErrors: string[] = [];
+    const pageErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        consoleErrors.push(message.text().slice(0, 300));
+      }
+    });
+    page.on("pageerror", (error) => {
+      pageErrors.push(String(error.message).slice(0, 300));
+    });
+
     await page.goto("/");
 
     // Firefox needs significantly more time to load and be interactive
@@ -230,7 +246,51 @@ test.describe("Terminal", () => {
     // still has to appear, and a missing one is still a failure.
     const terminalTimeout =
       browserName === "firefox" ? 10000 : isCI ? 15000 : 5000;
-    await expect(terminal).toBeVisible({ timeout: terminalTimeout });
+    try {
+      await expect(terminal).toBeVisible({ timeout: terminalTimeout });
+    } catch (error) {
+      // Report and rethrow. This changes nothing about pass or fail; it exists
+      // because "expected visible, got nothing" is the one thing the failure
+      // already told us, and this failure reproduces on a CI runner and on no
+      // developer machine tried so far. Everything gathered here is a candidate
+      // answer to "how far did the terminal get".
+      const state = await page
+        .evaluate(() => {
+          const chunk = performance
+            .getEntriesByType("resource")
+            .map((entry) => entry.name)
+            .filter((name) => /terminal|xterm/i.test(name));
+          return {
+            splashPresent: !!document.querySelector(
+              '[data-testid="splash-screen"], [class*="splash" i]',
+            ),
+            testIds: Array.from(document.querySelectorAll("[data-testid]"))
+              .map((el) => el.getAttribute("data-testid"))
+              .slice(0, 40),
+            terminalNodes: document.querySelectorAll('[data-testid="terminal"]')
+              .length,
+            xtermNodes: document.querySelectorAll(".xterm").length,
+            // app-wrapper catches a failed Terminal import and renders a
+            // fallback with no data-testid, so this is how that shows up.
+            fallbackText: document.body.innerText.includes(
+              "Error loading terminal",
+            ),
+            terminalChunkRequests: chunk.slice(0, 6),
+            readyState: document.readyState,
+          };
+        })
+        .catch((evaluateError) => ({ evaluateFailed: String(evaluateError) }));
+
+      console.log(
+        `TERMINAL_MOUNT_DIAGNOSTIC ${JSON.stringify({
+          browser: browserName,
+          ...state,
+          consoleErrors: consoleErrors.slice(0, 10),
+          pageErrors: pageErrors.slice(0, 10),
+        })}`,
+      );
+      throw error;
+    }
   });
 
   test("should open and close terminal", async ({ page, browserName }) => {
