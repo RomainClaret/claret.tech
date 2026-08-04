@@ -12,20 +12,37 @@ type HeaderRule = {
 /**
  * Headers as production serves them.
  *
- * HSTS and the two https-forcing CSP directives are production-only: emitted
- * from `next dev` over plain http they make WebKit rewrite every asset to
- * https://localhost and fail on TLS. This suite is about the deployed posture,
- * so it asks for that explicitly rather than reading whatever NODE_ENV the
- * runner happens to have.
+ * HSTS and the two https-forcing CSP directives depend on the origin actually
+ * being reachable over https: emitted over plain http they make WebKit rewrite
+ * every asset to https://<host> and fail on TLS. Two things turn them off,
+ * `next dev` and SERVE_HTTP=true, and both states are pinned below rather than
+ * left to whatever env the runner happens to have.
  */
 async function securityHeaderMap(): Promise<Map<string, string>> {
+  return withEnv(
+    { NODE_ENV: "production", SERVE_HTTP: undefined },
+    readHeaders,
+  );
+}
+
+async function withEnv<T>(
+  overrides: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
   const env = process.env as Record<string, string | undefined>;
-  const previous = env.NODE_ENV;
-  env.NODE_ENV = "production";
+  const previous: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(overrides)) {
+    previous[key] = env[key];
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
   try {
-    return await readHeaders();
+    return await fn();
   } finally {
-    env.NODE_ENV = previous;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
   }
 }
 
@@ -57,6 +74,45 @@ describe("security headers (next.config)", () => {
     expect(hsts).toContain("max-age=63072000");
     expect(hsts).toContain("includeSubDomains");
     expect(hsts).toContain("preload");
+  });
+
+  it("forces https on the deployed site", async () => {
+    const csp =
+      (await securityHeaderMap()).get("Content-Security-Policy") ?? "";
+
+    expect(csp).toContain("upgrade-insecure-requests");
+    expect(csp).toContain("block-all-mixed-content");
+  });
+
+  /**
+   * SERVE_HTTP is what the e2e jobs set, because they run `npm start` over
+   * http://localhost:3000. With the https-forcing headers on, WebKit rewrites
+   * every asset URL to https and fails on TLS: measured 19 failed requests,
+   * both stylesheets, the fonts and every JS chunk, leaving an unstyled page
+   * with no React on it. Chromium ignores the directive on localhost, so the
+   * whole WebKit suite was testing a blank document.
+   *
+   * It must stay opt-in. Vercel never sets it, so the assertions above are
+   * what the deployed site gets; this only describes a local http server.
+   */
+  it("drops the https-forcing headers when SERVE_HTTP is set", async () => {
+    const headers = await withEnv(
+      { NODE_ENV: "production", SERVE_HTTP: "true" },
+      readHeaders,
+    );
+    const csp = headers.get("Content-Security-Policy") ?? "";
+
+    expect(csp).not.toContain("upgrade-insecure-requests");
+    expect(csp).not.toContain("block-all-mixed-content");
+    expect(headers.get("Strict-Transport-Security")).toBeUndefined();
+
+    // Everything that does not depend on the scheme must survive, or this
+    // switch would quietly become a way to run the suite with no CSP at all.
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    expect(headers.get("X-Frame-Options")).toBe("DENY");
+    expect(headers.get("X-Content-Type-Options")).toBe("nosniff");
   });
 
   it("ships a restrictive Content-Security-Policy", async () => {

@@ -176,13 +176,29 @@ const nextConfig = {
 
   // Headers for caching and security
   async headers() {
-    // The two directives that force https, plus HSTS, are production-only.
-    // Served from `next dev` over plain http they make WebKit rewrite every
-    // asset request to https://localhost and fail on TLS, so the page loads
-    // with no chunks and no CSS: the Mobile Safari e2e project was asserting
-    // against an unhydrated document and reporting skips. Chromium ignores
-    // upgrade-insecure-requests for localhost, which is why it never showed.
-    const isProd = process.env.NODE_ENV === "production";
+    // The two directives that force https, plus HSTS, only make sense when the
+    // origin is actually reachable over https.
+    //
+    // Served over plain http they make WebKit rewrite every asset request to
+    // https://<host> and fail on TLS. Measured against `npm start` on
+    // localhost: 19 failed requests covering both stylesheets, the fonts and
+    // every JS chunk, leaving an unstyled document with no React on it.
+    // Chromium ignores upgrade-insecure-requests for localhost, which is why
+    // this only ever shows up on WebKit.
+    //
+    // That is not hypothetical for this repo: every e2e job in
+    // .github/workflows/playwright.yml serves the production build with
+    // `npm start` over http://localhost:3000, so the whole WebKit suite was
+    // running against a page that had never loaded. It reported green because
+    // the specs returned early when the terminal was missing instead of
+    // failing; once those soft checks became assertions, it surfaced.
+    //
+    // SERVE_HTTP is therefore opt-in and off by default: Vercel serves https
+    // and never sets it, so production keeps all three headers. Only a local
+    // or CI production server serving plain http turns them off, and
+    // src/app/security-headers.test.ts pins both states.
+    const servesOverHttp = process.env.SERVE_HTTP === "true";
+    const isProd = process.env.NODE_ENV === "production" && !servesOverHttp;
 
     // Content Security Policy - strict but allows necessary resources
     const ContentSecurityPolicy = `

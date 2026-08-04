@@ -202,6 +202,13 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
+        # SERVE_HTTP: this serves the production build over plain http, where
+        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
+        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
+        # React. See the comment in next.config.mjs. Vercel never sets this, so
+        # the deployed site keeps HSTS and both https-forcing directives.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -306,6 +313,13 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
+        # SERVE_HTTP: this serves the production build over plain http, where
+        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
+        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
+        # React. See the comment in next.config.mjs. Vercel never sets this, so
+        # the deployed site keeps HSTS and both https-forcing directives.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -405,6 +419,13 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
+        # SERVE_HTTP: this serves the production build over plain http, where
+        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
+        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
+        # React. See the comment in next.config.mjs. Vercel never sets this, so
+        # the deployed site keeps HSTS and both https-forcing directives.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -523,6 +544,13 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
+        # SERVE_HTTP: this serves the production build over plain http, where
+        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
+        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
+        # React. See the comment in next.config.mjs. Vercel never sets this, so
+        # the deployed site keeps HSTS and both https-forcing directives.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -630,6 +658,13 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
+        # SERVE_HTTP: this serves the production build over plain http, where
+        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
+        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
+        # React. See the comment in next.config.mjs. Vercel never sets this, so
+        # the deployed site keeps HSTS and both https-forcing directives.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -732,6 +767,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start application
+        # See the SERVE_HTTP comment on the other start steps and in
+        # next.config.mjs: production build, plain http, so the https-forcing
+        # headers have to be off or WebKit cannot load any asset.
+        env:
+          SERVE_HTTP: "true"
         run: |
           npm start &
           sleep 30
