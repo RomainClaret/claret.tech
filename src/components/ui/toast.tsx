@@ -89,12 +89,22 @@ export function Toast({
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
-      className={`fixed top-4 left-4 z-[9999] max-w-sm rounded-lg border backdrop-blur-sm shadow-lg transition-all duration-300 ${
+      // top-20, not top-4: the nav is `fixed top-0` and h-16 (64px), and this
+      // carries z-[9999], so at top-4 a toast sat on top of the nav's left end
+      // and swallowed clicks on the terminal toggle for as long as it was up.
+      // That is a real interaction bug - a transient notification blocking a
+      // persistent control - and it is worst on slow machines, where the
+      // quality watcher is what raises the toast in the first place. It also
+      // broke the WebKit e2e shards, which could not open the terminal at all.
+      className={`fixed top-20 left-4 z-[9999] max-w-sm rounded-lg border backdrop-blur-sm shadow-lg transition-all duration-300 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
       } ${getTypeStyles()}`}
-      style={{
-        pointerEvents: isTestMode ? "none" : isVisible ? "auto" : "none",
-      }}
+      // Never swallow a click meant for the page. The only thing in here worth
+      // clicking is the close button, which opts back in below, so the panel
+      // itself has no reason to capture events at any time. This used to be
+      // "none" only in test mode, which is backwards: it made the problem
+      // invisible to the suite while leaving it in front of users.
+      style={{ pointerEvents: "none" }}
       data-testid="toast"
     >
       <div className="p-4">
@@ -108,6 +118,9 @@ export function Toast({
           <button
             onClick={handleClose}
             className="flex-shrink-0 ml-2 opacity-70 hover:opacity-100 transition-opacity"
+            // Opt back in: the panel above is pointer-events:none, so this is
+            // the one part of a toast that can still be clicked.
+            style={{ pointerEvents: isTestMode ? "none" : "auto" }}
             aria-label="Close notification"
           >
             <span className="text-lg">×</span>
