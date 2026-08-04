@@ -222,7 +222,14 @@ test.describe("Terminal", () => {
     // the toggle was clicked, so the terminal has to appear. a warning here used
     // to let every downstream test run against a terminal that never opened.
     const terminal = page.locator('[data-testid="terminal"]').first();
-    const terminalTimeout = browserName === "firefox" ? 10000 : 5000;
+    // Terminal is a lazy chunk gated behind the splash screen, so this waits on
+    // a chunk fetch plus a mount, not just a state flip. 5s covers that on a
+    // developer machine; on a 2 vCPU CI runner with software rendering it does
+    // not, and WebKit shard 2 failed here while shards 1 and 3 passed on the
+    // same commit. Only the budget for a slow machine changes - the terminal
+    // still has to appear, and a missing one is still a failure.
+    const terminalTimeout =
+      browserName === "firefox" ? 10000 : isCI ? 15000 : 5000;
     await expect(terminal).toBeVisible({ timeout: terminalTimeout });
   });
 
