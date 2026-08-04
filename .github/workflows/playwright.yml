@@ -194,6 +194,18 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
           NEXT_PUBLIC_ENABLE_TERMINAL: true
           NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
@@ -202,13 +214,6 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
-        # SERVE_HTTP: this serves the production build over plain http, where
-        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
-        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
-        # React. See the comment in next.config.mjs. Vercel never sets this, so
-        # the deployed site keeps HSTS and both https-forcing directives.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -305,6 +310,18 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
           NEXT_PUBLIC_ENABLE_TERMINAL: true
           NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
@@ -313,13 +330,6 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
-        # SERVE_HTTP: this serves the production build over plain http, where
-        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
-        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
-        # React. See the comment in next.config.mjs. Vercel never sets this, so
-        # the deployed site keeps HSTS and both https-forcing directives.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -411,6 +421,18 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
           NEXT_PUBLIC_ENABLE_TERMINAL: true
           NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
@@ -419,13 +441,6 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
-        # SERVE_HTTP: this serves the production build over plain http, where
-        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
-        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
-        # React. See the comment in next.config.mjs. Vercel never sets this, so
-        # the deployed site keeps HSTS and both https-forcing directives.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -536,6 +551,18 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
           NEXT_PUBLIC_ENABLE_TERMINAL: true
           NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
@@ -544,13 +571,6 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
-        # SERVE_HTTP: this serves the production build over plain http, where
-        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
-        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
-        # React. See the comment in next.config.mjs. Vercel never sets this, so
-        # the deployed site keeps HSTS and both https-forcing directives.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -650,6 +670,18 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
           NEXT_PUBLIC_ENABLE_TERMINAL: true
           NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
@@ -658,13 +690,6 @@ jobs:
           MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
-        # SERVE_HTTP: this serves the production build over plain http, where
-        # the CSP's upgrade-insecure-requests makes WebKit rewrite every asset
-        # URL to https://localhost and fail on TLS - no CSS, no chunks, no
-        # React. See the comment in next.config.mjs. Vercel never sets this, so
-        # the deployed site keeps HSTS and both https-forcing directives.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           SERVER_PID=$!
@@ -765,13 +790,20 @@ jobs:
         run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Must be set HERE, on the build, not on `npm start`. Next evaluates
+          # headers() during `next build` and bakes the result into
+          # .next/routes-manifest.json; the runtime server only replays it, so
+          # setting this at start time is silently inert (verified: build
+          # without it + start with it still sends upgrade-insecure-requests).
+          #
+          # These jobs serve the production build over http://localhost:3000,
+          # and that directive makes WebKit rewrite every asset URL to https
+          # and fail on TLS - no CSS, no chunks, no React, 19 failed requests.
+          # Vercel never sets this, so the deployed site keeps HSTS and both
+          # https-forcing directives.
+          SERVE_HTTP: "true"
 
       - name: Start application
-        # See the SERVE_HTTP comment on the other start steps and in
-        # next.config.mjs: production build, plain http, so the https-forcing
-        # headers have to be off or WebKit cannot load any asset.
-        env:
-          SERVE_HTTP: "true"
         run: |
           npm start &
           sleep 30
