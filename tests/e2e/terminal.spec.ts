@@ -192,6 +192,31 @@ test.describe("Terminal", () => {
           (clickError as Error).message,
         );
 
+        // A click that timed out is not the same as a click that did not
+        // happen. Playwright reports a timeout when it does not get its
+        // acknowledgement back in time, and on a slow runner the press can
+        // still have reached the page: the CI trace shows attempt 1 logging
+        // "performing click action" and then never "click action done", while
+        // attempt 2 completed normally. Retrying blindly then toggled the
+        // terminal open and straight back closed, which is why the wait that
+        // follows timed out against a page with no errors, no failed chunk and
+        // no terminal - and why it only ever happened on the slow shard.
+        //
+        // So ask the page instead of assuming. This is the toggle's own
+        // effect, not a proxy for it.
+        const alreadyOpen = await page
+          .locator('[data-testid="terminal"]')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        if (alreadyOpen) {
+          console.warn(
+            `Terminal toggle click attempt ${attempt} timed out but the terminal is open; not clicking again`,
+          );
+          clickSuccess = true;
+          break;
+        }
+
         if (attempt < maxAttempts) {
           // Try alternative click methods for Firefox
           if (browserName === "firefox") {

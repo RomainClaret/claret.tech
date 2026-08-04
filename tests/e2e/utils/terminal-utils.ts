@@ -92,6 +92,30 @@ async function captureAt(
   }, top);
   if (!moved) return before;
 
+  // xterm swallows exactly one scroll event whenever it has just moved the
+  // viewport itself, which it does immediately after writing output:
+  //
+  //   if (this._ignoreNextScrollEvent) { this._ignoreNextScrollEvent = false; return; }
+  //
+  // (@xterm/xterm 5.5.0, Viewport._onScroll). So the first scroll of a walk
+  // that follows a command can be dropped: scrollTop moves, _onScroll returns
+  // early, the buffer is never synced and the rows never repaint. CI showed
+  // exactly that - scrollTop 0 as requested, rows still showing the bottom.
+  //
+  // The suppression is one-shot, so a second scroll gets through. It has to be
+  // a real movement to fire a fresh event, hence stepping away and back rather
+  // than setting the same value twice.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if ((await screen(page)) !== before) return screen(page);
+    if (attempt > 0) {
+      await viewport.evaluate((el, value) => {
+        el.scrollTop = value === 0 ? el.scrollHeight : 0;
+        el.scrollTop = value;
+      }, top);
+    }
+    await page.waitForTimeout(150);
+  }
+
   try {
     await expect
       .poll(

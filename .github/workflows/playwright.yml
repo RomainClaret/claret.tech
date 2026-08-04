@@ -603,18 +603,7 @@ jobs:
           # python-terminal.spec.ts skips itself on non-chromium projects, so
           # the webkit and firefox shards cost nothing here. It is the only
           # place the sandbox is exercised for real rather than against mocks.
-          # TEMPORARY INSTRUMENTATION - remove once webkit shard 2 is diagnosed.
-          #
-          # --trace=on because the config only traces on retry, so the trace for
-          # the first failure (the informative one) was never kept. --max-failures
-          # raised from 2 because the cap was hiding how many tests fail and
-          # whether they share a cause: the log listed five and only the first
-          # two had run.
-          #
-          # This inflates the artifacts. Put it back to
-          #   --max-failures=2
-          # with no --trace once the terminal mount failure is understood.
-          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=8 --trace=on
+          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
