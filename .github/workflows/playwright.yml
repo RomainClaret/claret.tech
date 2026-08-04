@@ -99,17 +99,32 @@ jobs:
               - 'src/**/header*.{ts,tsx}'
               - 'src/**/menu*.{ts,tsx}'
               - 'src/components/layout/**'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             accessibility:
               - 'tests/e2e/accessibility.spec.ts'
               - 'src/**/*aria*.{ts,tsx}'
               - 'src/**/*a11y*.{ts,tsx}'
               - 'src/**/*accessibility*.{ts,tsx}'
               - 'src/**/theme*.{ts,tsx}'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             performance:
               - 'tests/e2e/performance.spec.ts'
               - 'src/**/*performance*.{ts,tsx}'
               - 'src/**/*optimization*.{ts,tsx}'
               - 'src/**/*lazy*.{ts,tsx}'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             terminal:
               - 'tests/e2e/terminal.spec.ts'
               - 'tests/e2e/python-terminal.spec.ts'
@@ -118,11 +133,21 @@ jobs:
               - 'src/**/*command*.{ts,tsx}'
               - 'src/lib/python/**'
               - 'public/python-worker.js'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             lighthouse:
               - 'tests/e2e/lighthouse.spec.ts'
               - 'next.config.js'
               - 'src/app/**'
               - 'src/**/optimization*.{ts,tsx}'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             mobile:
               - 'tests/e2e/mobile-navigation.spec.ts'
               - 'tests/e2e/mobile-accessibility.spec.ts'
@@ -130,6 +155,11 @@ jobs:
               - 'src/**/*responsive*.{ts,tsx}'
               - 'src/**/*breakpoint*.{ts,tsx}'
               - 'tailwind.config.js'
+              # Shared helpers every spec imports. Without this a fix to
+              # tests/e2e/utils/ skips the very suite it was written for:
+              # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
+              # not run, so the change shipped unverified.
+              - 'tests/e2e/utils/**'
             src:
               - 'src/**'
               - 'public/**'
