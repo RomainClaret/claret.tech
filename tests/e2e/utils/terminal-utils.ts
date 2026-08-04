@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Shared plumbing for driving the xterm-based site terminal.
@@ -50,21 +50,56 @@ export async function fullScreen(page: Page): Promise<string> {
   const chunks: string[] = [];
   const step = Math.max(1, clientHeight);
   for (let top = 0; top < scrollHeight; top += step) {
-    await viewport.evaluate((el, value) => {
-      el.scrollTop = value;
-    }, top);
-    await page.waitForTimeout(80);
-    chunks.push(await screen(page));
+    chunks.push(await captureAt(page, viewport, top));
   }
 
   // Leave the terminal where it was: scrolled to the bottom, ready for input.
-  await viewport.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-  await page.waitForTimeout(80);
-  chunks.push(await screen(page));
+  chunks.push(await captureAt(page, viewport, scrollHeight));
 
   return chunks.join("\n");
+}
+
+/**
+ * Scroll the viewport to `top` and return the rows once xterm has actually
+ * repainted them.
+ *
+ * This used to be `scrollTop = top` followed by `waitForTimeout(80)`. xterm
+ * re-renders from its own `scroll` listener, so 80ms is a guess about how
+ * quickly the machine gets round to it, and on a CI runner it does not. The
+ * read then returned the frame from before the scroll, every chunk came back
+ * identical, and the whole walk reported nothing but the bottom of the buffer -
+ * which is how an assertion on "System Commands:" failed against a terminal
+ * that had printed it correctly. Reproduced locally by setting that timeout to
+ * 0: same failure, same output starting nine lines too low.
+ *
+ * Waiting for the rows to change is the real signal. If they never do, this
+ * fails loudly rather than handing back a stale frame and letting the
+ * assertion misreport what the terminal contains.
+ */
+async function captureAt(
+  page: Page,
+  viewport: Locator,
+  top: number,
+): Promise<string> {
+  const before = await screen(page);
+
+  // Scrolling to where we already are repaints nothing, so there would be no
+  // change to wait for. The final bottom capture usually lands here.
+  const moved = await viewport.evaluate((el, value) => {
+    const from = el.scrollTop;
+    el.scrollTop = value;
+    return el.scrollTop !== from;
+  }, top);
+  if (!moved) return before;
+
+  await expect
+    .poll(async () => ((await screen(page)) !== before ? "repainted" : "..."), {
+      timeout: 5_000,
+      intervals: [50, 100, 200],
+    })
+    .toBe("repainted");
+
+  return screen(page);
 }
 
 /**
