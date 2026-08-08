@@ -205,15 +205,28 @@ async function handler(request: NextRequest) {
       timestamp: Date.now(),
     };
 
-    return NextResponse.json({
-      success: true,
-      data: repositories,
-      cached: false,
-      meta: {
-        total: repositories.length,
-        username,
+    return NextResponse.json(
+      {
+        success: true,
+        data: repositories,
+        cached: false,
+        meta: {
+          total: repositories.length,
+          username,
+        },
       },
-    });
+      {
+        // Stated here rather than inherited: the blanket /api rule in
+        // next.config.mjs that used to supply this is gone, because it beat
+        // every handler that tried to set its own. This route spends one
+        // authenticated GitHub call per 100 repositories, so a cache miss is
+        // expensive and worth an hour.
+        headers: {
+          "Cache-Control":
+            "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      },
+    );
   } catch (error) {
     logError(error, "Error fetching repositories");
     return NextResponse.json(

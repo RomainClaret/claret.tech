@@ -13,7 +13,14 @@ const nextConfig = {
   eslint: {
     // Ignore test files during production builds
     ignoreDuringBuilds: false,
-    dirs: ['src/app', 'src/components', 'src/lib', 'src/hooks', 'src/contexts', 'src/data'],
+    dirs: [
+      "src/app",
+      "src/components",
+      "src/lib",
+      "src/hooks",
+      "src/contexts",
+      "src/data",
+    ],
   },
 
   // Disable source maps in production to prevent 404 errors for .map files
@@ -93,26 +100,27 @@ const nextConfig = {
     if (!isServer && dev) {
       // Use our custom plugin to remove problematic sourceMappingURL comments
       // This specifically targets known missing source maps like lucide-react.js.map
-      config.plugins.push(new RemoveProblematicSourceMapUrlsPlugin({
-        problematicMaps: [
-          'lucide-react.js.map',
-          'index.js.map',
-          '@lucide/react.js.map'
-        ]
-      }));
-      
+      config.plugins.push(
+        new RemoveProblematicSourceMapUrlsPlugin({
+          problematicMaps: [
+            "lucide-react.js.map",
+            "index.js.map",
+            "@lucide/react.js.map",
+          ],
+        }),
+      );
+
       // Note: The lucide-react package includes sourceMappingURL comments
       // but doesn't ship the actual .map files, causing 404 errors.
       // Our plugin removes these specific references while preserving other source maps.
     }
-
 
     // Optimize bundle size (only in production)
     if (!isServer && !dev) {
       config.optimization = {
         ...config.optimization,
         splitChunks: {
-          chunks: 'all',
+          chunks: "all",
           cacheGroups: {
             default: {
               minChunks: 2,
@@ -126,24 +134,24 @@ const nextConfig = {
             },
             // WebLLM chunk
             webllm: {
-              name: 'webllm',
-              chunks: 'async',
+              name: "webllm",
+              chunks: "async",
               test: /[\\/]node_modules[\\/]@mlc-ai[\\/]/,
               priority: 30,
               reuseExistingChunk: true,
             },
             // Terminal chunk
             terminal: {
-              name: 'terminal',
-              chunks: 'async',
+              name: "terminal",
+              chunks: "async",
               test: /[\\/]node_modules[\\/]@xterm[\\/]/,
               priority: 25,
               reuseExistingChunk: true,
             },
             // PDF.js chunk
             pdfjs: {
-              name: 'pdfjs',
-              chunks: 'async',
+              name: "pdfjs",
+              chunks: "async",
               test: /[\\/]node_modules[\\/](react-pdf|pdfjs-dist)[\\/]/,
               priority: 20,
               reuseExistingChunk: true,
@@ -216,12 +224,24 @@ const nextConfig = {
       form-action 'self';
       frame-ancestors 'none';
       ${isProd ? "block-all-mixed-content; upgrade-insecure-requests;" : ""}
-    `.replace(/\s{2,}/g, ' ').trim();
+    `
+      .replace(/\s{2,}/g, " ")
+      .trim();
 
     return [
       // Prevent caching of HTML pages to ensure fresh JS chunk references after deploys
+      //
+      // `rss` is in the exclusion list because headers set here WIN over the
+      // ones a route handler returns - Next applies these before the handler
+      // runs and will not overwrite an existing cache-control. Without the
+      // exclusion /rss.xml served max-age=0 while its handler asked for an
+      // hour, so every feed poll re-ran the self-proxy in rss.xml/route.ts,
+      // which fans out to rss2json plus a page fetch and an image fetch PER
+      // FEED ITEM. Measured before the fix:
+      //   /rss.xml -> public, max-age=0, must-revalidate
       {
-        source: "/((?!_next|fonts|images|animations|pdfs|pyodide|api|favicon|robots|sitemap).*)",
+        source:
+          "/((?!_next|fonts|images|animations|pdfs|pyodide|api|favicon|robots|rss|sitemap).*)",
         headers: [
           {
             key: "Cache-Control",
@@ -377,15 +397,24 @@ const nextConfig = {
       // year, freezing stale/mixed compiles in the browser (2026-07-19
       // pdf-modal crash). In production Next already serves /_next/static
       // with "public, max-age=31536000, immutable" on its own.
-      {
-        source: "/api/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, s-maxage=300, stale-while-revalidate=600",
-          },
-        ],
-      },
+      // Deliberately NO blanket Cache-Control for /api/:path* .
+      //
+      // There was one, and it silently beat every route handler: Next sets
+      // these before the handler runs and then refuses to overwrite an
+      // existing cache-control, so a handler's own value never reached the
+      // wire. Measured while it was in place:
+      //
+      //   /api/medium-posts?playwright=true -> public, s-maxage=300, ...
+      //                                        (handler asks for private, no-store)
+      //   /api/last-commit                  -> public, s-maxage=300, ...
+      //
+      // That downgraded the routes wanting an hour to five minutes, dropped
+      // the no-store on mock responses, and made the rate limiter's 429 -
+      // which sets no header of its own - publicly cacheable, so one client
+      // tripping the limit could plant it in a shared cache for everyone.
+      //
+      // Every route now states its own policy, which is also where the policy
+      // belongs; src/app/api/*/route.test.ts pins them.
     ];
   },
 };

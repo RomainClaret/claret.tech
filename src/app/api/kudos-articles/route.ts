@@ -41,11 +41,22 @@ async function handler(_request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({
-      status: "success",
-      articles: enrichedArticles,
-      count: enrichedArticles.length,
-    });
+    return NextResponse.json(
+      {
+        status: "success",
+        articles: enrichedArticles,
+        count: enrichedArticles.length,
+      },
+      {
+        // Stated here rather than inherited: the blanket /api rule in
+        // next.config.mjs that used to supply this is gone, because it beat
+        // every handler that tried to set its own.
+        headers: {
+          "Cache-Control":
+            "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      },
+    );
   } catch (error) {
     devError("Error fetching Kudos articles:", error);
     return NextResponse.json(

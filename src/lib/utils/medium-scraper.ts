@@ -56,6 +56,32 @@ function decodeHTMLEntities(text: string): string {
 }
 
 // Extract color from image buffer using server-side processing
+/**
+ * Medium's own article hosts. Anything else is not ours to fetch.
+ *
+ * The article URL arrives as `post.link` out of the rss2json response, so it
+ * is third-party input reaching a server-side fetch. Without this, a feed entry
+ * pointing at http://169.254.169.254/ or http://localhost:3000/ is fetched from
+ * inside the serverless function, and whatever comes back is run through the
+ * og:image / twitter:image patterns in extractImageFromHTML and returned to any
+ * anonymous caller as `enrichedImage`. The image leg below has been guarded for
+ * a while; this is the page fetch that feeds it.
+ *
+ * Same suffix discipline as the image check: `endsWith(".medium.com")`, never
+ * `includes`, so medium.com.example.invalid does not pass. Custom publication
+ * domains are not accepted - enrichment degrades to the feed thumbnail, which
+ * is what happens on any fetch failure anyway.
+ */
+function isMediumArticleHost(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol !== "https:") return false;
+    return hostname === "medium.com" || hostname.endsWith(".medium.com");
+  } catch {
+    return false;
+  }
+}
+
 /** Medium's own image hosts. Anything else is not ours to fetch. */
 function isMediumImageHost(url: string): boolean {
   try {
@@ -364,6 +390,12 @@ export async function fetchMediumArticle(articleUrl: string): Promise<{
     return { image: null, color: null };
   }
 
+  // Checked before the cache lookup as well as before the network call, so a
+  // rejected URL never becomes a cache key either.
+  if (!isMediumArticleHost(articleUrl)) {
+    return { image: null, color: null };
+  }
+
   // Load cache
   const cache = await loadCache();
 
@@ -377,12 +409,22 @@ export async function fetchMediumArticle(articleUrl: string): Promise<{
   }
 
   try {
-    // Fetch the Medium article page
+    // redirect "manual": the host check above only covers the URL we start
+    // with. Left on "follow", an allowlisted medium.com URL that 302s to
+    // http://169.254.169.254/ or a localhost port is followed without another
+    // check, which puts the guard back where it started. Medium serves article
+    // pages directly, so a redirect here is not the normal path.
+    //
+    // The timeout is new too: there was none, so a host that accepts the
+    // connection and never answers held the function open until the platform
+    // killed it.
     const response = await fetch(articleUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; Portfolio/1.0; +https://claret.tech)",
       },
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
