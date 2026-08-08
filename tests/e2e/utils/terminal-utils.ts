@@ -30,137 +30,60 @@ export async function screen(page: Page): Promise<string> {
  * Everything in the buffer, scrollback included.
  *
  * `screen()` only sees the viewport, and several commands print more than a
- * viewport: `help` is 37 lines against a terminal that opens about 25 rows
- * tall, so its first two section headers have already scrolled out of view by
- * the time the command finishes. Reading the tail only is how an assertion on
+ * viewport: `help` is 37 lines against a terminal about 34 rows tall, so its
+ * first section header has already scrolled out of view by the time the
+ * command finishes. Reading the tail only is how an assertion on
  * "System Commands:" fails against a perfectly working terminal.
  *
- * xterm's Viewport listens for `scroll` on `.xterm-viewport` and re-renders
- * the rows, so walking scrollTop down the element and collecting each frame
- * recovers the whole buffer. Rows overlap between frames; harmless for the
- * substring assertions this exists to serve.
+ * This drives xterm's own scrollback binding rather than touching the DOM.
+ * Three previous versions set `.xterm-viewport` scrollTop and waited, in
+ * increasingly elaborate ways, for the rows to repaint. They could not work:
+ * measured on a fresh page with 43 rows of buffer against a 34-row viewport,
+ * the element reports scrollHeight 688, clientHeight 544 and **scrollTop 0**.
+ * The element's scroll position and xterm's buffer position are decoupled, so
+ * `scrollTop = 0` was assigning the value it already held, firing no event and
+ * repainting nothing. Waiting longer, waiting for a change, and nudging away
+ * and back all waited on something that was never going to happen.
+ *
+ * Mouse wheel over the terminal does not move it either (measured: zero
+ * distinct screens over twelve wheel events, on both chromium and webkit).
+ * Shift+PageUp does, because xterm handles it internally and calls scrollLines,
+ * which updates the buffer and schedules the render directly.
+ *
+ * Rows overlap between frames; harmless for the substring assertions this
+ * exists to serve.
  */
 export async function fullScreen(page: Page): Promise<string> {
-  const viewport = page.locator(".xterm-viewport").first();
-  const { scrollHeight, clientHeight } = await viewport.evaluate((el) => ({
-    scrollHeight: el.scrollHeight,
-    clientHeight: el.clientHeight,
-  }));
+  // xterm reads keys from its hidden textarea, so scrollback keys go nowhere
+  // without this.
+  await focusTerminal(page);
 
-  const chunks: string[] = [];
-  const step = Math.max(1, clientHeight);
-  for (let top = 0; top < scrollHeight; top += step) {
-    chunks.push(await captureAt(page, viewport, top));
+  const chunks: string[] = [await screen(page)];
+
+  // Bounded: `scrollback` is 1000 lines, but no caller needs more than a few
+  // screens, and stopping when two consecutive presses show nothing new means
+  // reaching the top ends the walk on its own.
+  let unchanged = 0;
+  for (let press = 0; press < 12 && unchanged < 2; press++) {
+    await page.keyboard.press("Shift+PageUp");
+    await page.waitForTimeout(120);
+    const current = await screen(page);
+    if (chunks.includes(current)) unchanged++;
+    else {
+      unchanged = 0;
+      chunks.push(current);
+    }
   }
 
-  // Leave the terminal where it was: scrolled to the bottom, ready for input.
-  chunks.push(await captureAt(page, viewport, scrollHeight));
+  // Leave the terminal where every caller expects it: at the bottom, ready for
+  // input. A test that runs a command after this one would otherwise type into
+  // a scrolled-back view.
+  for (let press = 0; press < 14; press++) {
+    await page.keyboard.press("Shift+PageDown");
+  }
+  await page.waitForTimeout(120);
 
   return chunks.join("\n");
-}
-
-/**
- * Scroll the viewport to `top` and return the rows once xterm has actually
- * repainted them.
- *
- * This used to be `scrollTop = top` followed by `waitForTimeout(80)`. xterm
- * re-renders from its own `scroll` listener, so 80ms is a guess about how
- * quickly the machine gets round to it, and on a CI runner it does not. The
- * read then returned the frame from before the scroll, every chunk came back
- * identical, and the whole walk reported nothing but the bottom of the buffer -
- * which is how an assertion on "System Commands:" failed against a terminal
- * that had printed it correctly. Reproduced locally by setting that timeout to
- * 0: same failure, same output starting nine lines too low.
- *
- * Waiting for the rows to change is the real signal. If they never do, this
- * fails loudly rather than handing back a stale frame and letting the
- * assertion misreport what the terminal contains.
- */
-async function captureAt(
-  page: Page,
-  viewport: Locator,
-  top: number,
-): Promise<string> {
-  const before = await screen(page);
-
-  // Scrolling to where we already are repaints nothing, so there would be no
-  // change to wait for. The final bottom capture usually lands here.
-  const moved = await viewport.evaluate((el, value) => {
-    const from = el.scrollTop;
-    el.scrollTop = value;
-    return el.scrollTop !== from;
-  }, top);
-  if (!moved) return before;
-
-  // xterm swallows exactly one scroll event whenever it has just moved the
-  // viewport itself, which it does immediately after writing output:
-  //
-  //   if (this._ignoreNextScrollEvent) { this._ignoreNextScrollEvent = false; return; }
-  //
-  // (@xterm/xterm 5.5.0, Viewport._onScroll). So the first scroll of a walk
-  // that follows a command can be dropped: scrollTop moves, _onScroll returns
-  // early, the buffer is never synced and the rows never repaint. CI showed
-  // exactly that - scrollTop 0 as requested, rows still showing the bottom.
-  //
-  // The suppression is one-shot, so a second scroll gets through. It has to be
-  // a real movement to fire a fresh event, hence stepping away and back rather
-  // than setting the same value twice.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if ((await screen(page)) !== before) return screen(page);
-    if (attempt > 0) {
-      await viewport.evaluate((el, value) => {
-        el.scrollTop = value === 0 ? el.scrollHeight : 0;
-        el.scrollTop = value;
-      }, top);
-    }
-    await page.waitForTimeout(150);
-  }
-
-  try {
-    await expect
-      .poll(
-        async () => ((await screen(page)) !== before ? "repainted" : "..."),
-        {
-          timeout: 5_000,
-          intervals: [50, 100, 200],
-        },
-      )
-      .toBe("repainted");
-  } catch (error) {
-    // Report and rethrow; pass and fail are unaffected. This wait times out on
-    // a CI runner and on no developer machine tried so far, including the same
-    // shard command, so the question is which half of the premise is wrong:
-    // that the element scrolled, or that a scroll makes xterm repaint.
-    const state = await page
-      .evaluate(() => {
-        const el = document.querySelector(".xterm-viewport");
-        const rows = document.querySelectorAll(".xterm-rows > div");
-        return {
-          scrollTop: el ? (el as HTMLElement).scrollTop : null,
-          scrollHeight: el ? el.scrollHeight : null,
-          clientHeight: el ? el.clientHeight : null,
-          rowCount: rows.length,
-          firstRow: (rows[0]?.textContent ?? "").slice(0, 60),
-          lastRow: (rows[rows.length - 1]?.textContent ?? "").slice(0, 60),
-          // If xterm is on the canvas or webgl renderer the row divs are not
-          // the source of truth and this whole approach is wrong, not slow.
-          rendererCanvases: document.querySelectorAll(".xterm canvas").length,
-        };
-      })
-      .catch((evaluateError) => ({ evaluateFailed: String(evaluateError) }));
-
-    console.log(
-      `SCROLLBACK_REPAINT_DIAGNOSTIC ${JSON.stringify({
-        requestedTop: top,
-        ...state,
-        beforeFirstLine: before.split("\n")[0]?.slice(0, 60),
-        beforeLength: before.length,
-      })}`,
-    );
-    throw error;
-  }
-
-  return screen(page);
 }
 
 /**

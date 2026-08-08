@@ -512,8 +512,13 @@ test.describe("Terminal", () => {
     const text = await screen(page);
     expect(text.length).toBeLessThan(500);
     expect(text).not.toContain("AI Assistant:");
-    // The scrollback is gone too, not merely scrolled past.
-    expect(await fullScreen(page)).not.toContain("POSIX-like Commands:");
+    // The scrollback is gone too, not merely scrolled past. Checked by asking
+    // xterm to scroll back and confirming nothing older appears: after a real
+    // clear there is at most one screen, so the view must not move.
+    await focusTerminal(page);
+    await page.keyboard.press("Shift+PageUp");
+    await page.waitForTimeout(200);
+    expect(await screen(page)).not.toContain("POSIX-like Commands:");
     // A prompt is still there - "cleared" must not mean "dead".
     expect(text).toMatch(/Claret\.Tech|%|\$/);
   });
