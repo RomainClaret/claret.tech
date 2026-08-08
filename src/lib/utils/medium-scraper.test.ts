@@ -92,9 +92,9 @@ describe("fetchMediumArticle host guard", () => {
       new Response("<html></html>", { status: 200 }),
     );
 
-    // Distinct URL per test: results are cached by URL, so reusing one an
-    // earlier test already fetched means no second request and nothing to
-    // inspect here.
+    // Distinct URL per test as hygiene, not because it is required: with fs
+    // mocked above there is no cross-test cache, and this passes on the same
+    // URL an earlier test uses. It was load-bearing before the mock existed.
     await fetchMediumArticle("https://medium.com/@romainclaret/redirect-probe");
 
     // A guard on the initial URL alone is defeated by a 302, so the request
