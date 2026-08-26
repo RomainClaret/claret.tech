@@ -283,6 +283,54 @@ function PaperCard({
 
   // Determine paper type. A card with a poster PDF or a link named "Poster"
   // is a poster even when its title does not say so.
+  // A repository link, held to the end of the action row so BibTeX can sit
+  // ahead of it. Matched on the host rather than the label, because the label
+  // is free text: "Code", "Code Repository" and "GitHub Repository" are all in
+  // use across these cards.
+  const isRepoLink = (url: string) =>
+    /^https?:\/\/(www\.)?(github|gitlab)\.com\//.test(url);
+  const outwardFooterLinks = paper.footerLink.filter(
+    (link) => !isRepoLink(link.url),
+  );
+  const repoFooterLinks = paper.footerLink.filter((link) =>
+    isRepoLink(link.url),
+  );
+
+  const renderFooterLink = (link: { name: string; url: string }) => {
+    const isPDF = link.url.endsWith(".pdf") && link.url.startsWith("/");
+
+    if (isPDF) {
+      return (
+        <button
+          key={link.url}
+          onClick={(e) => handleLinkClick(e, link)}
+          className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+        >
+          <span className="truncate">{link.name}</span>
+          <Download
+            className={cn(
+              "w-3 h-3 flex-shrink-0",
+              !shouldReduceAnimations && "group-hover:animate-bounce",
+            )}
+          />
+        </button>
+      );
+    }
+
+    return (
+      <Link
+        key={link.url}
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+      >
+        <span className="truncate">{link.name}</span>
+        <ExternalLink className="w-3 h-3 flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+      </Link>
+    );
+  };
+
   const paperType = paper.title.toLowerCase().includes("thesis")
     ? "thesis"
     : paper.title.toLowerCase().includes("poster") ||
@@ -435,6 +483,34 @@ function PaperCard({
               </div>
             )}
 
+            {/* Authors, same treatment as a peer-reviewed card: same icon, same
+                clamp, and the site's own author in bold so a reader can find
+                the name without reading the list. Optional, because not every
+                Other Work entry has an author list worth asserting.
+
+                Placed after the image rather than under the title so it lands in
+                the same slot as a peer-reviewed card's, and a reader scanning
+                the two kinds of card finds the names in one place. */}
+            {paper.authors && paper.authors.length > 0 && (
+              <div className="text-sm text-muted-foreground flex items-start gap-1 mb-3">
+                <Users className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <p className="line-clamp-2">
+                  {paper.authors.map((author, i) => (
+                    <span key={i}>
+                      {i > 0 && ", "}
+                      {author === HIGHLIGHTED_AUTHOR ? (
+                        <span className="font-semibold text-foreground">
+                          {author}
+                        </span>
+                      ) : (
+                        author
+                      )}
+                    </span>
+                  ))}
+                </p>
+              </div>
+            )}
+
             {/* Abstract with expand/collapse */}
             <div className="flex-1 mb-4 min-h-[72px]">
               <p
@@ -459,42 +535,12 @@ function PaperCard({
 
             {/* Action buttons */}
             <div className="grid grid-cols-3 gap-2 mt-auto">
-              {paper.footerLink.map((link, i) => {
-                const isPDF =
-                  link.url.endsWith(".pdf") && link.url.startsWith("/");
-
-                if (isPDF) {
-                  return (
-                    <button
-                      key={i}
-                      onClick={(e) => handleLinkClick(e, link)}
-                      className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                    >
-                      <span className="truncate">{link.name}</span>
-                      <Download
-                        className={cn(
-                          "w-3 h-3 flex-shrink-0",
-                          !shouldReduceAnimations &&
-                            "group-hover:animate-bounce",
-                        )}
-                      />
-                    </button>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={i}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                  >
-                    <span className="truncate">{link.name}</span>
-                    <ExternalLink className="w-3 h-3 flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                  </Link>
-                );
-              })}
+              {/* Paper, then BibTeX, then Code - the same order the
+                  peer-reviewed cards put them in, so the two kinds of card
+                  read alike. footerLink is author-ordered and mixes outward
+                  links with repositories, so the repository ones are held back
+                  and the BibTeX button sits between the two groups. */}
+              {outwardFooterLinks.map(renderFooterLink)}
               {paper.bibtex && (
                 <button
                   onClick={handleBibTeXClick}
@@ -509,6 +555,7 @@ function PaperCard({
                   )}
                 </button>
               )}
+              {repoFooterLinks.map(renderFooterLink)}
             </div>
           </div>
         </HolographicCard>

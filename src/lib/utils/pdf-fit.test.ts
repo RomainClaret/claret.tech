@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fitScale, widestPageWidth, MIN_SCALE } from "./pdf-fit";
+import { fitScale, widestPageWidth, MIN_SCALE, MAX_SCALE } from "./pdf-fit";
 
 /**
  * Numbers here are the real ones measured in the reader: an A4 portrait page
@@ -8,13 +8,39 @@ import { fitScale, widestPageWidth, MIN_SCALE } from "./pdf-fit";
  */
 
 describe("fitScale", () => {
-  it("leaves a page that already fits alone", () => {
-    // A4 portrait in a desktop viewer: no reason to shrink anything.
-    expect(fitScale(595, 1120, 1)).toBe(1);
+  it("grows a page that is narrower than the viewer", () => {
+    // A4 portrait in a desktop viewer. Left at 1 it used half the pane; the
+    // reader fits it to the width instead.
+    const scale = fitScale(595, 1120, 1);
+
+    expect(scale).toBeGreaterThan(1);
+    expect(595 * scale).toBeLessThanOrEqual(1120);
+    // ...and close enough to the edge that the slack is gone.
+    expect(595 * scale).toBeGreaterThan(1100);
   });
 
-  it("does not shrink a landscape page that still fits", () => {
-    expect(fitScale(841, 1120, 1)).toBe(1);
+  it("grows a landscape page that fits, and still never shrinks it", () => {
+    const scale = fitScale(841, 1120, 1);
+
+    expect(scale).toBeGreaterThan(1);
+    expect(841 * scale).toBeLessThanOrEqual(1120);
+  });
+
+  it("does not blow a tiny page up without limit", () => {
+    // A thumbnail-sized page in a wide viewer would otherwise reach 20x.
+    expect(fitScale(50, 1120, 1)).toBe(MAX_SCALE);
+  });
+
+  it("never returns a scale the zoom control cannot reach", () => {
+    for (const [content, available] of [
+      [50, 1120],
+      [595, 1120],
+      [100000, 100],
+    ] as const) {
+      const scale = fitScale(content, available, 1);
+      expect(scale).toBeGreaterThanOrEqual(MIN_SCALE);
+      expect(scale).toBeLessThanOrEqual(MAX_SCALE);
+    }
   });
 
   it("scales a page down to fit a narrow viewer", () => {

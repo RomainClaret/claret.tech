@@ -15,14 +15,16 @@
       "year": "2026",
       "venue": "Artificial Life Conference (ALIFE)",
       "citations": 0,
+      "doi": "10.1162/ISAL.a.968",
       "abstract": "Open-ended artificial life systems must acquire diverse competencies from a single evolving genotype. Biological brains combine neuromodulation, which reconfigures circuits without changing connections, with diverse neuron types matched to specific computational roles. Can artificial evolution achieve something analogous in indirectly encoded substrates? Using indirectly encoded substrates evolved via CPPNs, we show through more than 10,000 experiments that neuromodulation alone is insufficient: under evolutionary search, monotonic activation functions impose a 75% ceiling on parity tasks that persists regardless of capacity, topology, or population size. This is an evolutionary search barrier, not a representational limit, since Adam gradient descent achieves 100% on the identical architecture. We combine neuromodulation with per-task activation function selection, matching oscillatory primitives to parity tasks and monotonic to threshold tasks, producing multi-behavioral evolved substrates. The result: 100% simultaneous 5-task success across all 30 seeds (median 14 generations). This generalizes across the oscillatory activation class: all four functions reach 100% (30 seeds each). Neither mechanism suffices alone. The barrier extends to higher-arity and asymmetric tasks, while multi-layer depth provides an alternative path. For open-ended evolution, the computational primitive should itself be an evolvable trait. At inference, one evolved genotype expresses many behaviors.",
       "shortDescription": "Neuromodulation alone stalls at a 75% parity ceiling; adding per-task activation selection lets one evolved genotype solve all five tasks at once, on every seed.",
-      "status": "to-appear",
       "source": "static",
       "month": 8,
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
       "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
-      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}",
+      "presentationPdf": "/pdfs/presentation_ALIFE_2026_claret2026neuromodulation.pdf",
+      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  pages={78},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.968},\n}",
+      "paperUrl": "https://doi.org/10.1162/ISAL.a.968",
       "starred": true
     },
     {
@@ -63,15 +65,16 @@
       "year": "2026",
       "venue": "Parallel Problem Solving from Nature (PPSN)",
       "citations": 0,
+      "doi": "10.1007/978-3-032-36217-9_23",
       "abstract": "Indirectly encoded neural networks can assign different activation functions to individual nodes, but the right functions are rarely known in advance. When the available set contains only standard monotonic functions, problems like parity become unsolvable, yet an all-inclusive palette underperforms a curated one. How should evolution discover which functions to use? We address this as a meta-learning problem, designing 13 strategies (11 inspired by biological adaptation mechanisms, plus baseline and oracle controls) that modify the set of available activation functions during evolution. Each strategy translates a biological principle into an evolutionary operator: for example, circadian-inspired oscillatory gating cycles functions in and out of the palette on a fixed schedule, while immune-inspired Clonal Selection permanently protects functions that consistently correlate with fitness. We evaluate all strategies across more than 3,000 runs on parity and non-parity problems, first evolving the activation palette alone, then co-evolving a per-node aggregation palette on harder problems; an independent replication with new seeds confirms a stable high-reliability tier, with Circadian holding its top rank. Bio-inspired strategies match the solve rate of a tuned baseline but converge up to twice as fast, with Circadian halving total compute. Strategy rankings reverse across problem types, with no single strategy dominating all domains. Strategy success is largely shaped by timescale compatibility: strategies whose characteristic operating timescale matches the evolutionary evaluation window consistently outperform those that operate too slowly. This gives a practical guideline: match the mechanism's timescale to the evaluation budget. Rescaling the slowest strategy bypasses the oscillatory barrier entirely: all nine solutions solve parity with non-oscillatory activations paired with min or max aggregation.",
       "shortDescription": "Eleven bio-inspired strategies for evolving activation palettes converge up to twice as fast as a tuned baseline, with success shaped by timescale compatibility.",
-      "status": "to-appear",
       "source": "static",
       "month": 9,
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
       "paperPdf": "/pdfs/paper_PPSN_2026_claret2026bio.pdf",
       "posterPdf": "/pdfs/poster_PPSN_2026_claret2026bio.pdf",
-      "bibtex": "@inproceedings{claret2026bio,\n  title={Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={International Conference on Parallel Problem Solving from Nature},\n  year={2026},\n  publisher={Springer}\n}"
+      "bibtex": "@inproceedings{claret2026bio,\n  title={Bio-Inspired Palette Evolution in Indirectly Encoded Substrates: Timescale Compatibility Shapes Activation Function Discovery},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Parallel Problem Solving from Nature -- PPSN XIX},\n  year={2026},\n  publisher={Springer},\n  doi={10.1007/978-3-032-36217-9_23}\n}",
+      "paperUrl": "https://doi.org/10.1007/978-3-032-36217-9_23"
     },
     {
       "id": "claret2026activations",
@@ -85,14 +88,16 @@
       "year": "2026",
       "venue": "Artificial Life Conference (ALIFE)",
       "citations": 2,
+      "doi": "10.1162/ISAL.a.1042",
       "abstract": "Biological neurons achieve computational diversity through specialized types: tonic, bursting, adapting, and fast-spiking cells coexist within the same circuit. Artificial neural networks, by contrast, apply a single activation function uniformly to all nodes, which limits what they can represent. We show that this uniformity creates hard limits for evolutionary search: across sparse evolved substrates, monotonic functions fail to solve parity beyond its smallest instance, XOR, while a single oscillatory unit suffices at all tested scales. The gap is one of search and sparsity, not representation: monotonic networks can represent parity with a modest number of hidden units, and gradient descent recovers that solution. We evolve, to our knowledge for the first time in indirect encoding, per-node activation function assignments from an 18-function palette across more than 4,500 experimental runs spanning Boolean logic, regression, and spatial classification. Testing each of the 18 functions individually on Parity-4 reveals a three-tier solvability structure: oscillatory functions achieve 100%, intermediate functions 6.7--80%, and all 9 monotonic functions 0%. This divide is not universal. Recurrence collapses it, and gradient descent inverts it entirely, showing that the barrier is specific to evolutionary search in sparse substrates. What activation functions a network can use, beyond its topology and weights, determines what evolutionary search can solve. Indirect encoding discovers heterogeneous per-node activation assignments unlikely to be chosen by hand.",
       "shortDescription": "Evolving per-node activation functions reveals a Parity-4 divide (oscillatory 100%, monotonic 0%) specific to evolutionary search in sparse substrates.",
-      "status": "to-appear",
       "source": "static",
       "month": 8,
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
       "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
-      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={Artificial Life Conference Proceedings 38},\n  year={2026},\n  publisher={MIT Press},\n}"
+      "posterPdf": "/pdfs/poster_ALIFE_2026_claret2026activations.pdf",
+      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  pages={80},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.1042},\n}",
+      "paperUrl": "https://doi.org/10.1162/ISAL.a.1042"
     },
     {
       "id": "claret2026partitioned",
@@ -115,6 +120,7 @@
       "month": 8,
       "codeUrl": "https://github.com/RomainClaret/es-hyperneat-optimization-studies",
       "paperPdf": "/pdfs/paper_ICPR_2026_claret2026partitioned.pdf",
+      "presentationPdf": "/pdfs/presentation_ICPR_2026_claret2026partitioned.pdf",
       "bibtex": "@inproceedings{claret2026partitioned,\n  title={Breaking the Central Bias: Spatially Partitioned Experts for Coordinate-Based Neuroevolution},\n  author={Claret, Romain and Gygax, Arthur and O'Neill, Michael and Cotofrei, Paul and Palma Mendes, Michael and Felber, Pascal},\n  booktitle={International conference on pattern recognition},\n  year={2026},\n  publisher={Springer}\n}"
     },
     {

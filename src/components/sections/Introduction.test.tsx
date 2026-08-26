@@ -309,7 +309,7 @@ describe("Introduction Section", () => {
       fireEvent.click(resumeButton);
       
       expect(mockPDFViewer.openPDF).toHaveBeenCalledWith(
-        "/pdfs/RomainClaret_CV.pdf",
+        "/pdfs/CV_RomainClaret.pdf",
         "Resume - Romain Claret",
         "Romain_Claret_Resume.pdf"
       );

@@ -108,7 +108,7 @@ describe("PDF_ROUTES", () => {
   it("gives the CV a route at /pdf/cv", () => {
     const route = findPdfRoute("cv");
     expect(route).toBeDefined();
-    expect(route!.url).toBe("/pdfs/RomainClaret_CV.pdf");
+    expect(route!.url).toBe("/pdfs/CV_RomainClaret.pdf");
     expect(route!.kind).toBe("cv");
   });
 
@@ -172,7 +172,7 @@ describe("PDF_ROUTES", () => {
       // not move with it, so it is asserted against the file, which is the
       // actual guarantee, rather than against whatever geenns points at today.
       expect(findPdfRoute("thesis-geenns")?.url).toBe(
-        "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+        "/pdfs/thesis_PHD_chapter_7.pdf",
       );
       expect(findPdfRoute("thesis-geenns")?.canonicalSlug).toBeUndefined();
     });
@@ -182,16 +182,14 @@ describe("PDF_ROUTES", () => {
       // appended after the real routes so the first match stays canonical;
       // reordering them would quietly start handing out /pdf/thesis-geenns
       // for a card that is about /pdf/geenns.
-      expect(
-        findPdfRouteByUrl("/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf")?.slug,
-      ).toBe("geenns");
-      expect(findPdfRouteByUrl("/pdfs/RomainClaret_PhD_Thesis.pdf")?.slug).toBe(
+      expect(findPdfRouteByUrl("/pdfs/thesis_PHD_chapter_7.pdf")?.slug).toBe(
+        "geenns",
+      );
+      expect(findPdfRouteByUrl("/pdfs/thesis_PHD.pdf")?.slug).toBe(
         "phd-thesis",
       );
-      expect(findPdfRouteByUrl("/pdfs/RomainClaret_Msc_Thesis.pdf")?.slug).toBe(
-        "graphqa",
-      );
-      expect(findPdfRouteByUrl("/pdfs/RomainClaret_Bsc_Thesis.pdf")?.slug).toBe(
+      expect(findPdfRouteByUrl("/pdfs/thesis_MSC.pdf")?.slug).toBe("graphqa");
+      expect(findPdfRouteByUrl("/pdfs/thesis_BSC.pdf")?.slug).toBe(
         "overclouds",
       );
     });
@@ -199,7 +197,7 @@ describe("PDF_ROUTES", () => {
     it("keeps the research cards' own slugs intact", () => {
       // An alias registered before the research loop would shadow a card.
       expect(findPdfRoute("geenns")?.url).toBe(
-        "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+        "/pdfs/thesis_PHD_chapter_7.pdf",
       );
       expect(findPdfRoute("phd-thesis")?.canonicalSlug).toBeUndefined();
     });
@@ -208,6 +206,6 @@ describe("PDF_ROUTES", () => {
   it("derives a sensible download filename", () => {
     const route = findPdfRoute("phd-thesis");
     expect(route).toBeDefined();
-    expect(pdfDownloadName(route!)).toBe("RomainClaret_PhD_Thesis.pdf");
+    expect(pdfDownloadName(route!)).toBe("thesis_PHD.pdf");
   });
 });

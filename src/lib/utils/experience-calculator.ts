@@ -10,6 +10,9 @@ interface DateRange {
  * - "2023" -> January 1, 2023
  * - "Present" -> Current date
  */
+/** 365.25 so leap years do not drift the total. */
+const MS_PER_YEAR = 1000 * 60 * 60 * 24 * 365.25;
+
 function parseDate(dateStr: string): Date {
   const cleaned = dateStr.trim();
 
@@ -165,7 +168,7 @@ function calculateTotalYears(ranges: DateRange[]): number {
   }, 0);
 
   // Convert milliseconds to years
-  return totalMs / (1000 * 60 * 60 * 24 * 365.25);
+  return totalMs / MS_PER_YEAR;
 }
 
 /**
@@ -220,18 +223,36 @@ export function getFormattedExperienceYears(
  * Calculate total years of research from research projects
  */
 export function calculateTotalResearchYears(
-  projects: Array<{ yearsSpent: number }>,
+  projects: Array<{ yearsSpent: number; researchStart?: string }>,
+  additionalYears = 0,
+  now: Date = new Date(),
 ): number {
-  return projects.reduce((total, project) => total + project.yearsSpent, 0);
+  const fromProjects = projects.reduce((total, project) => {
+    // An ongoing project states when it began instead of guessing a duration,
+    // so its contribution is measured against today and grows on its own.
+    if (project.researchStart) {
+      const [year, month] = project.researchStart.split("-").map(Number);
+      const start = new Date(year, (month || 1) - 1, 1);
+      const elapsed = (now.getTime() - start.getTime()) / MS_PER_YEAR;
+      // Clamped: a start date in the future would otherwise subtract from the
+      // total, which is a stranger number to debug than a zero.
+      return total + Math.max(0, elapsed);
+    }
+    return total + project.yearsSpent;
+  }, 0);
+
+  return fromProjects + additionalYears;
 }
 
 /**
  * Get a formatted string for years of research
  */
 export function getFormattedResearchYears(
-  projects: Array<{ yearsSpent: number }>,
+  projects: Array<{ yearsSpent: number; researchStart?: string }>,
+  additionalYears = 0,
+  now: Date = new Date(),
 ): string {
-  const years = calculateTotalResearchYears(projects);
+  const years = calculateTotalResearchYears(projects, additionalYears, now);
 
   // If it's a whole number, show without decimal
   if (years % 1 === 0) {

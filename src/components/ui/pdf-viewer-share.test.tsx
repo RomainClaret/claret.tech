@@ -79,7 +79,7 @@ describe("PDFViewer share control", () => {
     // navigator.clipboard, which replaces the spy these assertions are on.
     render(
       <PDFViewer
-        url="/pdfs/RomainClaret_CV.pdf"
+        url="/pdfs/CV_RomainClaret.pdf"
         title="Resume"
         shareSlug="cv"
       />,
@@ -108,7 +108,7 @@ describe("PDFViewer share control", () => {
     // against fake timers here, and the point of the fake clock is only to
     // reach the 2s reset without the test sleeping for it.
     vi.useFakeTimers();
-    render(<PDFViewer url="/pdfs/RomainClaret_CV.pdf" shareSlug="cv" />);
+    render(<PDFViewer url="/pdfs/CV_RomainClaret.pdf" shareSlug="cv" />);
     const title = () =>
       screen.getByRole("button", { name: SHARE }).getAttribute("title");
 
@@ -129,7 +129,7 @@ describe("PDFViewer share control", () => {
     // Denied permission, or plain http. Showing a confirmation for a copy that
     // did not happen is worse than showing nothing.
     writeText.mockRejectedValue(new Error("denied"));
-    render(<PDFViewer url="/pdfs/RomainClaret_CV.pdf" shareSlug="cv" />);
+    render(<PDFViewer url="/pdfs/CV_RomainClaret.pdf" shareSlug="cv" />);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: SHARE }));

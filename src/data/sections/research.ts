@@ -6,7 +6,17 @@ export interface ResearchProject {
   shortDescription?: string;
   tags: string[];
   status: "active" | "completed" | "ongoing";
+  /**
+   * How long the work took, in years. Ignored when `researchStart` is set.
+   */
   yearsSpent: number;
+  /**
+   * When ongoing work began, as "YYYY-MM". Set this instead of trusting
+   * `yearsSpent` for a project that is still running: the elapsed time is
+   * computed against today, so the figure cannot go stale the day after it is
+   * written.
+   */
+  researchStart?: string;
   links?: {
     name: string;
     url: string;
@@ -40,6 +50,17 @@ export const researchSection = {
     "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching behavior arise from chaos rather than from architecture, code, or engineering. Whether that is where intelligence actually begins is the question, not the conclusion.",
   journeyBadge: "30+ Years in the Making",
 
+  /**
+   * Research time that has no project card of its own, in years.
+   *
+   * 1 year of R&D at Versicherix, plus 1 year 6 months on the Artificialkind
+   * project. Both are real research periods, neither has a card, so they are
+   * added to the Evolution Lab's "Years of Research" total here rather than
+   * folded into some project's yearsSpent - which would misstate that
+   * project's duration and hide where the time came from.
+   */
+  additionalResearchYears: 1 + 1.5,
+
   // Configuration for research section UI
   publicationNote: "Will be public upon publication",
   highlightLabels: ["Compositional", "Evolutionary", "Growing", "Lifelong"],
@@ -61,7 +82,11 @@ export const researchSection = {
         "Evolutionary Computation",
       ],
       status: "active" as const,
-      yearsSpent: 5,
+      // Counted as 0 on purpose. This runs 2020-Present, which the
+      // PhD's 5.75 already covers in full, and its post-PhD phase is the same
+      // present-day work emerging-behaviors now counts from its start date.
+      // Giving it a number again would count those years twice.
+      yearsSpent: 0,
       icon: "Brain",
       color: "139, 92, 246",
       year: "2020-Present",
@@ -84,7 +109,7 @@ export const researchSection = {
         },
         {
           name: "Read the Introduction in PhD Thesis (Chapter 7)",
-          url: "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+          url: "/pdfs/thesis_PHD_chapter_7.pdf",
         },
       ],
     },
@@ -104,7 +129,8 @@ export const researchSection = {
         "Neuroevolution",
       ],
       status: "active" as const,
-      yearsSpent: 1,
+      yearsSpent: 0, // unused: researchStart drives this one
+      researchStart: "2026-07",
       icon: "Sparkles",
       color: "34, 197, 94",
       year: "2026-Present",
@@ -138,7 +164,8 @@ export const researchSection = {
         "GPU Acceleration",
       ],
       status: "completed" as const,
-      yearsSpent: 5.7,
+      // 5 years 9 months.
+      yearsSpent: 5.75,
       icon: "Scaling",
       color: "59, 130, 246",
       year: "2026",
@@ -152,7 +179,11 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "/pdfs/RomainClaret_PhD_Thesis.pdf",
+          url: "/pdfs/thesis_PHD.pdf",
+        },
+        {
+          name: "Read Presentation",
+          url: "/pdfs/presentation_PHD_2026_claret2026.pdf",
         },
         {
           name: "EMR-HyperNEAT",
@@ -194,7 +225,7 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "/pdfs/RomainClaret_Msc_Thesis.pdf",
+          url: "/pdfs/thesis_MSC.pdf",
         },
         {
           name: "Code Repository",
@@ -223,7 +254,7 @@ export const researchSection = {
       links: [
         {
           name: "Read Thesis",
-          url: "/pdfs/RomainClaret_Bsc_Thesis.pdf",
+          url: "/pdfs/thesis_BSC.pdf",
         },
         {
           name: "Code Repository",
@@ -246,7 +277,8 @@ export const researchSection = {
         "Psychophysics",
       ],
       status: "completed" as const,
-      yearsSpent: 1,
+      // 3 months.
+      yearsSpent: 0.25,
       icon: "Ear",
       color: "236, 72, 153",
       year: "2010",
@@ -262,7 +294,7 @@ export const researchSection = {
         },
         {
           name: "Conference Poster",
-          url: "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
+          url: "/pdfs/poster_SNF_2010_visual_vestibular_integration_in_sensory_recognition_thresholds.pdf",
         },
       ],
     },

@@ -10,8 +10,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:https": "next dev --experimental-https",
-    "postinstall": "node scripts/setup-assets.js",
-    "prebuild": "node scripts/extract-colors-simple.js && node scripts/extract-medium-colors.js",
+    "postinstall": "node scripts/setup-assets.js && node scripts/mirror-legacy-pdfs.js",
+    "prebuild": "node scripts/extract-colors-simple.js && node scripts/extract-medium-colors.js && node scripts/mirror-legacy-pdfs.js",
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",

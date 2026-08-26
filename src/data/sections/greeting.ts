@@ -55,7 +55,7 @@ export const greeting = {
   ],
   subTitle:
     "Evolution spent billions of years creating intelligence. I'm compressing that into days. I evolve AI rather than train it: self-organizing, self-improving networks that keep surprising me. They find solutions I did not design and would not have thought of, and since none of it is fitted to human data, there is no reason for the result to look familiar. Working out whether that is genuinely new or only looks new to us is the part I am still on.",
-  resumeLink: "/pdfs/RomainClaret_CV.pdf",
+  resumeLink: "/pdfs/CV_RomainClaret.pdf",
   interests: [
     {
       interestName: "Endless Evolution",

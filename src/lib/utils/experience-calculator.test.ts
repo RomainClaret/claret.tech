@@ -5,6 +5,7 @@ import {
   calculateTotalResearchYears,
   getFormattedResearchYears,
 } from "./experience-calculator";
+import { researchSection } from "@/data/sections/research";
 
 describe("experience-calculator", () => {
   beforeEach(() => {
@@ -213,6 +214,69 @@ describe("experience-calculator", () => {
     it("handles zero experience", () => {
       const result = getFormattedExperienceYears([]);
       expect(result).toBe("0+");
+    });
+  });
+
+  describe("ongoing research counted from a start date", () => {
+    // Every assertion passes an explicit `now`. Reading the real clock here
+    // would make these fail on some future day for no reason.
+    const AUG_2026 = new Date("2026-08-25T12:00:00Z");
+
+    it("measures an ongoing project against the given date", () => {
+      const projects = [{ yearsSpent: 0, researchStart: "2026-07" }];
+      const years = calculateTotalResearchYears(projects, 0, AUG_2026);
+      // 2026-07-01 to 2026-08-25 is about 55 days.
+      expect(years).toBeGreaterThan(0.13);
+      expect(years).toBeLessThan(0.17);
+    });
+
+    it("ignores yearsSpent when a start date is present", () => {
+      const withNumber = [{ yearsSpent: 99, researchStart: "2026-07" }];
+      const withoutNumber = [{ yearsSpent: 0, researchStart: "2026-07" }];
+      expect(calculateTotalResearchYears(withNumber, 0, AUG_2026)).toBe(
+        calculateTotalResearchYears(withoutNumber, 0, AUG_2026),
+      );
+    });
+
+    it("keeps growing as time passes", () => {
+      const projects = [{ yearsSpent: 0, researchStart: "2026-07" }];
+      const now = calculateTotalResearchYears(projects, 0, AUG_2026);
+      const later = calculateTotalResearchYears(
+        projects,
+        0,
+        new Date("2027-08-25T12:00:00Z"),
+      );
+      expect(later - now).toBeCloseTo(1, 1);
+    });
+
+    it("does not go negative on a start date in the future", () => {
+      const projects = [{ yearsSpent: 0, researchStart: "2030-01" }];
+      expect(calculateTotalResearchYears(projects, 0, AUG_2026)).toBe(0);
+    });
+
+    it("adds research time that has no project card", () => {
+      const projects = [{ yearsSpent: 2 }];
+      expect(calculateTotalResearchYears(projects, 2.5, AUG_2026)).toBe(4.5);
+    });
+
+    it("totals the real Evolution Lab data to the expected figure", () => {
+      // End to end rather than part by part: fixed durations 0.25 + 1 + 1 +
+      // 5.75, GEENNS at 0, the ongoing project from 2026-07, and 2.5 years of
+      // uncarded R&D. Change any duration in research.ts and this fails.
+      const years = calculateTotalResearchYears(
+        researchSection.projects,
+        researchSection.additionalResearchYears,
+        AUG_2026,
+      );
+      expect(years).toBeGreaterThan(10.6);
+      expect(years).toBeLessThan(10.8);
+      expect(
+        getFormattedResearchYears(
+          researchSection.projects,
+          researchSection.additionalResearchYears,
+          AUG_2026,
+        ),
+      ).toBe("10.7");
     });
   });
 

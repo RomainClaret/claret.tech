@@ -442,7 +442,10 @@ export function Research() {
     activeProjects: researchSection.projects.filter(
       (p) => p.status === "active",
     ).length,
-    yearsOfResearch: getFormattedResearchYears(researchSection.projects),
+    yearsOfResearch: getFormattedResearchYears(
+      researchSection.projects,
+      researchSection.additionalResearchYears,
+    ),
     // Hand-maintained, not derived from the data: several projects share a
     // field, so counting distinct tags would overcount.
     researchAreas: 5, // Neuroevolution, Artificial Life, Conversational AI, Decentralization, Neuroscience

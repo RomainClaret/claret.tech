@@ -18,7 +18,12 @@ import Check from "lucide-react/dist/esm/icons/check";
 // Import from our PDF configuration module (worker pre-configured)
 import { Document, Page } from "@/lib/pdf-config";
 import { isSafePdfUrl } from "@/lib/utils/safe-pdf-url";
-import { fitScale, widestPageWidth, MIN_SCALE } from "@/lib/utils/pdf-fit";
+import {
+  fitScale,
+  widestPageWidth,
+  MIN_SCALE,
+  MAX_SCALE,
+} from "@/lib/utils/pdf-fit";
 import { logError } from "@/lib/utils/dev-logger";
 import { setupPDFConsoleFilter } from "@/lib/utils/pdf-console-filter";
 
@@ -229,7 +234,7 @@ export function PDFViewer({
   // on the next resize.
   const zoomIn = () => {
     setUserZoomed(true);
-    setScale((prevScale) => Math.min(prevScale + 0.2, 2.0));
+    setScale((prevScale) => Math.min(prevScale + 0.2, MAX_SCALE));
   };
   const zoomOut = () => {
     setUserZoomed(true);
@@ -385,7 +390,7 @@ export function PDFViewer({
 
           <button
             onClick={zoomIn}
-            disabled={scale >= 2.0}
+            disabled={scale >= MAX_SCALE}
             className="p-2 rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Zoom in"
           >

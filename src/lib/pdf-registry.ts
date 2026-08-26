@@ -56,7 +56,7 @@ const SHORT_NAMES: Array<{ slug: string; of: string }> = [
 const PINNED: PdfRoute[] = [
   {
     slug: "thesis-geenns",
-    url: "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+    url: "/pdfs/thesis_PHD_chapter_7.pdf",
     title: "GEENNS: Compositional Intelligence Through Evolution",
     kind: "thesis",
   },
@@ -141,18 +141,31 @@ function buildRoutes(): PdfRoute[] {
     });
   }
 
-  // Research cards carry exactly one PDF, in their links array, so the card's
-  // own anchor is unambiguous as a slug.
+  // A research card may link several PDFs - the PhD card carries the thesis
+  // and its defense deck - so the card's anchor resolves to the first, and each
+  // file also gets a `<anchor>-<kind>` slug. Same shape as publicationRoutes
+  // above, for the same reason: a bare slug that always answers, plus a way to
+  // name one specific file. This used to take only `.find()`, which meant a
+  // second PDF on a card was linkable from the page but had no reader route.
   for (const project of researchSection.projects) {
     if (!project.anchorId) continue;
-    const pdf = project.links?.find((link) => isLocalPdf(link.url));
-    if (!pdf) continue;
+    const pdfs = (project.links ?? []).filter((link) => isLocalPdf(link.url));
+    if (pdfs.length === 0) continue;
+
     routes.push({
       slug: project.anchorId,
-      url: pdf.url,
+      url: pdfs[0].url,
       title: project.title,
-      kind: researchPdfKind(pdf.url, project.subtitle),
+      kind: researchPdfKind(pdfs[0].url, project.subtitle),
     });
+    for (const pdf of pdfs) {
+      routes.push({
+        slug: `${project.anchorId}-${researchPdfKind(pdf.url, project.subtitle)}`,
+        url: pdf.url,
+        title: project.title,
+        kind: researchPdfKind(pdf.url, project.subtitle),
+      });
+    }
   }
 
   for (const paper of papersSection.papersCards) {

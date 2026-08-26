@@ -179,6 +179,89 @@ const nextConfig = {
         destination: "/pdf/:slug",
         permanent: true,
       },
+      // Renamed files, 2026-08. The PDFs under public/pdfs were renamed into a
+      // consistent scheme, and these keep every URL that was shared before then
+      // working. The rule above cannot cover them: its negative lookahead
+      // deliberately skips anything ending .pdf, so without these entries a
+      // resume link in someone's job application 404s.
+      //
+      // 301 rather than `permanent: true`, which emits 308. These exist for
+      // links made before the rename, and old links are followed by old
+      // clients: 308 only dates from 2015, and the fetchers inside document
+      // viewers, link previewers and crawlers often implement just 301/302/307.
+      // 301 has been in HTTP since 1.0 and costs nothing here.
+      //
+      // Safe to prune once the old links have aged out. They are history, not
+      // routing: nothing in the site points at these names any more.
+      // No entry for /pdfs/RomainClaret_CV.pdf, deliberately. That path is
+      // served by a real file, copied from the current CV at build time by
+      // scripts/mirror-legacy-pdfs.js, because the resume URL is circulating
+      // in places whose fetchers may not follow a redirect at all.
+      //
+      // A redirect here would defeat that: redirects are evaluated before
+      // filesystem routes, so it would answer first and the copy would never
+      // be served. Measured, not assumed - a real file at that path plus this
+      // redirect returned 308, not the PDF.
+      {
+        source: "/pdfs/RomainClaret_PhD_Thesis.pdf",
+        destination: "/pdfs/thesis_PHD.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+        destination: "/pdfs/thesis_PHD_chapter_7.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/RomainClaret_Msc_Thesis.pdf",
+        destination: "/pdfs/thesis_MSC.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/RomainClaret_Msc_Thesis_Poster.pdf",
+        destination: "/pdfs/thesis_MSC_poster.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/RomainClaret_Bsc_Thesis.pdf",
+        destination: "/pdfs/thesis_BSC.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/RomainClaret_Bsc_Thesis_Poster.pdf",
+        destination: "/pdfs/thesis_BSC_poster.pdf",
+        statusCode: 301,
+      },
+      // No redirect for the arXiv -> ARXIV rename, deliberately. Next matches
+      // redirect sources case-insensitively, so any rule whose source is the
+      // old spelling also matches the new one: pointing it at the file made
+      // the URL redirect to itself, and pointing it at the reader page made
+      // the paper's own download link stop serving the PDF. Either way the
+      // live URL loses, which is a worse trade than an old link 404ing.
+      // /pdfs/preprint_arXiv_... therefore 404s on a case-sensitive host; the
+      // paper is reachable at /pdf/claret2026quadtree.
+      {
+        source: "/pdfs/preprint_self_blockchain_small_techie_overview_2016.pdf",
+        destination: "/pdfs/preprint_SELF_2016_blockchain_overview.pdf",
+        statusCode: 301,
+      },
+      {
+        source:
+          "/pdfs/poster_visual_vestibular_integration_in_sensory_recognition_thresholds_2010.pdf",
+        destination:
+          "/pdfs/poster_SNF_2010_visual_vestibular_integration_in_sensory_recognition_thresholds.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/poster_DEBS_2023.pdf",
+        destination: "/pdfs/poster_DEBS_2023_scaling_neuroevolution.pdf",
+        statusCode: 301,
+      },
+      {
+        source: "/pdfs/lecture_unige_demystifying_ai_light.pdf",
+        destination: "/pdfs/lecture_UNIGE_2022_demystifying_ai_light.pdf",
+        statusCode: 301,
+      },
     ];
   },
 

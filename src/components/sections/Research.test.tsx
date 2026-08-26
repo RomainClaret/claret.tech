@@ -101,9 +101,9 @@ describe("Research", () => {
       );
 
       expect(mockOpenPDF).toHaveBeenCalledWith(
-        "/pdfs/RomainClaret_PhD_Thesis_chapter_7.pdf",
+        "/pdfs/thesis_PHD_chapter_7.pdf",
         "GEENNS: Compositional Intelligence Through Evolution",
-        "RomainClaret_PhD_Thesis_chapter_7.pdf",
+        "thesis_PHD_chapter_7.pdf",
       );
     });
 
@@ -136,9 +136,9 @@ describe("Research", () => {
       fireEvent.click(readThesis);
 
       expect(mockOpenPDF).toHaveBeenCalledWith(
-        "/pdfs/RomainClaret_PhD_Thesis.pdf",
+        "/pdfs/thesis_PHD.pdf",
         "Scaling Adaptive Substrate Neuroevolution",
-        "RomainClaret_PhD_Thesis.pdf",
+        "thesis_PHD.pdf",
       );
       // The whole card is a click target, so without stopPropagation the
       // click that opened the PDF would also close the card behind it.
