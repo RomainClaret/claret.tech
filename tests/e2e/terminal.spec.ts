@@ -479,7 +479,7 @@ test.describe("Terminal", () => {
     const text = await fullScreen(page);
     expect(text).toContain("About Romain Claret");
     expect(text).toContain("Research Philosophy:");
-    expect(text).toContain("Current Positions:");
+    expect(text).toContain("Current Position:");
   });
 
   test("should clear terminal screen", async ({ page }) => {

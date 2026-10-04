@@ -1,4 +1,20 @@
-import { workExperiences, papersSection } from "@/data/portfolio";
+import {
+  workExperiences,
+  papersSection,
+  socialMediaLinks,
+} from "@/data/portfolio";
+
+// The profiles search engines use to tie this page to one person. Read from
+// the same links the site shows, so the two cannot drift: a hand-kept copy
+// here pointed at an ORCID record that does not exist.
+const SAME_AS_PROFILES = [
+  "github",
+  "linkedin",
+  "medium",
+  "orcid",
+  "stackoverflow",
+  "gitlab",
+] as const;
 
 export function generateStructuredData() {
   const baseUrl = "https://claret.tech";
@@ -12,14 +28,7 @@ export function generateStructuredData() {
     alternateName: "RomainClaret",
     url: baseUrl,
     image: "https://github.com/RomainClaret.png",
-    sameAs: [
-      "https://github.com/RomainClaret",
-      "https://www.linkedin.com/in/RomainClaret",
-      "https://medium.com/@romainclaret",
-      "https://orcid.org/0000-0002-6872-7815",
-      "https://stackoverflow.com/users/4023950/romain-claret",
-      "https://gitlab.com/romainclaret",
-    ],
+    sameAs: SAME_AS_PROFILES.map((profile) => socialMediaLinks[profile]),
     jobTitle: "Neuroevolution Researcher & Lecturer",
     worksFor: {
       "@type": "Organization",
@@ -45,6 +54,8 @@ export function generateStructuredData() {
       "Artificial Life",
       "Emergent Behavior",
       "Evolutionary Computation",
+      "Lifelong Learning",
+      "Interactive Evolution",
       "Software Engineering",
       "Distributed Systems",
       "Python",
@@ -54,7 +65,7 @@ export function generateStructuredData() {
       "Next.js",
     ],
     description:
-      "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life. Creator of GEENNS, an approach that grows artificial minds instead of programming them.",
+      "Neuroevolution researcher and lecturer. Creator of GEENNS, a long-term research program that grows artificial minds from evolved specialists that learn to work together and keep learning, and studies the behaviors that emerge.",
   };
 
   // WebSite Schema with SearchAction

@@ -16,10 +16,18 @@ export const NAV_OFFSET = 64;
  * If it is on its way, leave it alone and re-measure, because the target keeps
  * moving while content above it loads. Same shape as the settle loop in
  * useCardDeepLink, which lands reliably on this page.
+ *
+ * The check-back runs for up to two seconds and belongs to no component, so a
+ * caller that can go away passes `signal` and aborts it: on unmount, or when a
+ * newer scroll replaces this one. Without that it outlives its caller and
+ * keeps snapping the page to a target nobody is looking for any more.
  */
-export function scrollToSection(sectionId: string): boolean {
+export function scrollToSection(
+  sectionId: string,
+  { signal }: { signal?: AbortSignal } = {},
+): boolean {
   const element = document.getElementById(sectionId);
-  if (!element) return false;
+  if (!element || signal?.aborted) return false;
 
   const targetTop = () =>
     element.getBoundingClientRect().top + window.pageYOffset - NAV_OFFSET;
@@ -37,7 +45,7 @@ export function scrollToSection(sectionId: string): boolean {
     const target = targetTop();
 
     if (Math.abs(currentY - target) < 8 || ticks > 10) {
-      clearInterval(interval);
+      stop();
       return;
     }
 
@@ -54,9 +62,11 @@ export function scrollToSection(sectionId: string): boolean {
     clearInterval(interval);
     window.removeEventListener("wheel", stop);
     window.removeEventListener("touchmove", stop);
+    signal?.removeEventListener("abort", stop);
   };
   window.addEventListener("wheel", stop, { passive: true, once: true });
   window.addEventListener("touchmove", stop, { passive: true, once: true });
+  signal?.addEventListener("abort", stop, { once: true });
 
   return true;
 }

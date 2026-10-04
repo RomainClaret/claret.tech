@@ -7,7 +7,7 @@ import {
   findPdfRouteByUrl,
   pdfDownloadName,
 } from "./pdf-registry";
-import { researchSection } from "@/data/sections/research";
+import { isDisplayed, researchSection } from "@/data/sections/research";
 import { papersSection } from "@/data/sections/papers";
 import { greeting } from "@/data/sections/greeting";
 import { STATIC_PUBLICATIONS } from "@/lib/api/fetch-publications";
@@ -49,7 +49,7 @@ describe("PDF_ROUTES", () => {
     // Catches drift the other way: a PDF added to a card or publication that
     // never became linkable.
     const referenced = new Set<string>();
-    for (const project of researchSection.projects) {
+    for (const project of researchSection.projects.filter(isDisplayed)) {
       for (const link of project.links ?? []) {
         if (link.url.startsWith("/pdfs/")) referenced.add(link.url);
       }
@@ -77,7 +77,7 @@ describe("PDF_ROUTES", () => {
   });
 
   it("gives every research card with a PDF its own slug", () => {
-    for (const project of researchSection.projects) {
+    for (const project of researchSection.projects.filter(isDisplayed)) {
       const pdf = project.links?.find((l) => l.url.startsWith("/pdfs/"));
       if (!pdf || !project.anchorId) continue;
       expect(findPdfRoute(project.anchorId)?.url).toBe(pdf.url);
@@ -201,6 +201,23 @@ describe("PDF_ROUTES", () => {
       );
       expect(findPdfRoute("phd-thesis")?.canonicalSlug).toBeUndefined();
     });
+  });
+
+  it("gives a hidden research card no reader route", () => {
+    // Its /pdf page and sitemap entry would publish exactly what hiding the
+    // card holds back. Real data: this starts to matter the moment a hidden
+    // card carries a PDF, which is when the leak would happen.
+    const hiddenAnchors = researchSection.projects
+      .filter((p) => !isDisplayed(p))
+      .flatMap((p) => (p.anchorId ? [p.anchorId] : []));
+    const leaked = PDF_ROUTES.filter((route) =>
+      hiddenAnchors.some(
+        (anchor) =>
+          route.slug === anchor || route.slug.startsWith(`${anchor}-`),
+      ),
+    ).map((route) => route.slug);
+
+    expect(leaked).toEqual([]);
   });
 
   it("derives a sensible download filename", () => {

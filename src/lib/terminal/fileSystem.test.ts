@@ -55,7 +55,7 @@ describe("Terminal File System", () => {
       expect(file).toBeTruthy();
       expect(file?.type).toBe("file");
       expect(file?.name).toBe("README.md");
-      expect(file?.content).toContain("Interactive terminal");
+      expect(file?.content).toContain("Part terminal, part easter egg hunt.");
     });
 
     it("gets directories at root level", () => {

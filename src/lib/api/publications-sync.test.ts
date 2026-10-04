@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { STATIC_PUBLICATIONS } from "./fetch-publications";
+import { ARXIV_VARIANTS, STATIC_PUBLICATIONS } from "./fetch-publications";
 import { papersSection } from "@/data/sections/papers";
 
 /**
@@ -110,5 +110,60 @@ describe("publications against Other Work", () => {
       .filter((id) => cardIds.has(id));
 
     expect(collisions).toEqual([]);
+  });
+});
+
+/**
+ * arxivId is hand-typed into JSON and interpolated straight into
+ * https://arxiv.org/abs/<id>, so a pasted abstract URL or an "arXiv:" prefix
+ * would ship a dead link that nothing else would catch.
+ */
+describe("arXiv identifiers", () => {
+  // New-style (2608.24480, optionally version-pinned) and the pre-2007 style
+  // (cs.NE/0501001), which is still what the oldest papers carry.
+  const ARXIV_ID =
+    /^(\d{4}\.\d{4,5}(v\d+)?|[a-z-]+(\.[A-Z]{2})?\/\d{7}(v\d+)?)$/;
+
+  it("stores bare identifiers, not URLs", () => {
+    const bad = STATIC_PUBLICATIONS.filter(
+      (p) => p.arxivId !== undefined && !ARXIV_ID.test(p.arxivId),
+    ).map((p) => `${p.id}: ${p.arxivId}`);
+
+    expect(bad).toEqual([]);
+  });
+
+  it("does not call a to-appear paper's arXiv copy the published version", () => {
+    // "published version" is a claim about the record, and a to-appear paper
+    // does not have one yet. Omitting arxivVariant defaults to published, so
+    // this goes wrong silently rather than loudly.
+    const mislabelled = STATIC_PUBLICATIONS.filter(
+      (p) =>
+        p.arxivId !== undefined &&
+        p.status === "to-appear" &&
+        (p.arxivVariant ?? "published") === "published",
+    ).map((p) => p.id);
+
+    expect(mislabelled).toEqual([]);
+  });
+
+  it("names only arXiv variants the cards have a label for", () => {
+    // The JSON reaches Publication through a cast, so a typo such as
+    // "Accepted" compiles, and the card would render nothing for it.
+    const known: readonly string[] = ARXIV_VARIANTS;
+    const bad = [...STATIC_PUBLICATIONS, ...papersSection.papersCards]
+      .filter(
+        (e) => e.arxivVariant !== undefined && !known.includes(e.arxivVariant),
+      )
+      .map((e) => `${"id" in e ? e.id : e.title}: ${e.arxivVariant}`);
+
+    expect(bad).toEqual([]);
+  });
+
+  it("stores bare identifiers on Other Work cards too", () => {
+    const bad = papersSection.papersCards
+      .filter((c) => c.arxivId !== undefined && !ARXIV_ID.test(c.arxivId))
+      .map((c) => `${c.anchorId ?? c.title}: ${c.arxivId}`);
+
+    expect(bad).toEqual([]);
   });
 });

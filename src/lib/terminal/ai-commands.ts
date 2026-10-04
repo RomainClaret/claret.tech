@@ -509,21 +509,23 @@ Child me wanted thinking robots. Adult me breeds artificial minds that surprise 
 A life journey through physics, neuroscience, mechanics, and AI, all converging on one lesson: you grow minds, you cannot assemble them.
 
 Current Focus:
-- Emergent behaviors from bio-inspired artificial life: nothing in the evolutionary loop ever sees human data, so the results are not built to look familiar
-- Measuring that honestly, which nobody can do yet: every test for novel behavior is calibrated on human data, so anything genuinely outside it reads as noise
-- Specialists that claim their own roles, coordination that transfers to problems it never saw, wholes that outdo their parts
+- GEENNS: a mind as a team of evolved specialists that claim their own roles and learn to work together
 - Composition as reasoning, and getting the composition itself to emerge rather than be designed
 - Lifelong learning without forgetting: knowledge as reusable, evolvable components instead of overwritten weights
+- Emergent behaviors from bio-inspired artificial life: nothing in the evolutionary loop ever sees human data, so the results are not built to look familiar
+- Measuring that honestly: every test for novel behavior I know of is calibrated on human data, so anything genuinely outside it reads as noise
+- An image breeder whose vocabulary can change: picbreeder.claret.tech
 - Building the tools this needs, because most of them do not exist yet
 
 Research Philosophy:
 Adaptation matters more than accuracy. I grow minds instead of training them, then judge what emerges by what it is, not by how closely it imitates a human or a test set. Evolution keeps finding behaviors I did not program, and pinning down whether they are genuinely new is the part I am still working on.
 
-Current Positions:
-- University Teaching Specialist, University College Dublin (2026-Present)
-- Researcher, NCRA Lab, University College Dublin
+Current Position:
+- Neuroevolution Researcher & Lecturer, University College Dublin (2026-Present)
+  Research: Natural Computing Research and Applications Group, with Prof. Michael O'Neill
+  Teaching: Programming for Analytics, Smurfit School of Business
 
-Feel free to explore or challenge my approach. I'm here to explain why accuracy is a lie.
+Challenge any of it. I would rather have a good argument than easy agreement.
 Use 'ai init' to start the conversation.`,
       success: true,
     };

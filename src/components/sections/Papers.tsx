@@ -21,7 +21,7 @@ import {
   Presentation,
   Play,
 } from "lucide-react";
-import { OrcidIcon } from "@/components/icons";
+import { ArxivWordmark, OrcidIcon } from "@/components/icons";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -29,6 +29,7 @@ import {
   comparePublications,
   publicationToBibTeX,
   STATIC_PUBLICATIONS,
+  type ArxivVariant,
   type Publication,
 } from "@/lib/api/fetch-publications";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
@@ -222,6 +223,61 @@ function WatchVideoButton({ url }: { url: string }) {
       <Play className="w-3.5 h-3.5" />
       Watch Video
     </a>
+  );
+}
+
+// The arXiv copy of a paper is sometimes the published one and sometimes a
+// longer one. Which of the two it is, is the whole reason to click, so the
+// label says it. The wordmark supplies "arXiv", which is why the label does not
+// repeat it, and why the link carries its own accessible name.
+const ARXIV_LABELS: Record<
+  ArxivVariant,
+  { label: string; description: string }
+> = {
+  published: {
+    label: "published version",
+    description: "Published version on arXiv",
+  },
+  extended: {
+    label: "extended version",
+    description: "Extended version on arXiv, longer than the published paper",
+  },
+  accepted: {
+    label: "accepted version",
+    description:
+      "Authors' accepted manuscript on arXiv, not the publisher's final version",
+  },
+};
+
+// A line rather than another pill: it sits under the action row and points at a
+// second copy of the same work, not at a separate thing to do.
+function ArxivLine({
+  arxivId,
+  variant = "published",
+}: {
+  arxivId: string;
+  variant?: ArxivVariant;
+}) {
+  // A variant the map does not know, a typo in the hand-edited JSON, renders
+  // nothing: destructuring undefined would throw, and with no boundary around
+  // the section that replaces the whole homepage with the error page. Falling
+  // back to "published" instead would make the claim nobody checked.
+  const entry = ARXIV_LABELS[variant];
+  if (!entry) return null;
+  const { label, description } = entry;
+  return (
+    <Link
+      href={`https://arxiv.org/abs/${arxivId}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={description}
+      title={description}
+      className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary px-3 py-1.5 rounded-lg transition-colors duration-200 group"
+    >
+      <ArxivWordmark className="h-3.5 w-[31px] flex-shrink-0" />
+      <span>{label}</span>
+      <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+    </Link>
   );
 }
 
@@ -437,7 +493,10 @@ function PaperCard({
             </h3>
 
             {/* Read the locally hosted PDFs in the in-app reader + video link */}
-            {(paper.paperPdf || paper.posterPdf || paper.videoUrl) && (
+            {(paper.paperPdf ||
+              paper.posterPdf ||
+              paper.presentationPdf ||
+              paper.videoUrl) && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {paper.paperPdf && (
                   <ReadPdfButton
@@ -534,28 +593,36 @@ function PaperCard({
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-3 gap-2 mt-auto">
-              {/* Paper, then BibTeX, then Code - the same order the
-                  peer-reviewed cards put them in, so the two kinds of card
-                  read alike. footerLink is author-ordered and mixes outward
-                  links with repositories, so the repository ones are held back
-                  and the BibTeX button sits between the two groups. */}
-              {outwardFooterLinks.map(renderFooterLink)}
-              {paper.bibtex && (
-                <button
-                  onClick={handleBibTeXClick}
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
-                  title="Copy BibTeX"
-                >
-                  <span>BibTeX</span>
-                  {bibtexCopied ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </button>
+            <div className="mt-auto space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                {/* Paper, then BibTeX, then Code - the same order the
+                    peer-reviewed cards put them in, so the two kinds of card
+                    read alike. footerLink is author-ordered and mixes outward
+                    links with repositories, so the repository ones are held
+                    back and the BibTeX button sits between the two groups. */}
+                {outwardFooterLinks.map(renderFooterLink)}
+                {paper.bibtex && (
+                  <button
+                    onClick={handleBibTeXClick}
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
+                    title="Copy BibTeX"
+                  >
+                    <span>BibTeX</span>
+                    {bibtexCopied ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+                {repoFooterLinks.map(renderFooterLink)}
+              </div>
+              {paper.arxivId && (
+                <ArxivLine
+                  arxivId={paper.arxivId}
+                  variant={paper.arxivVariant}
+                />
               )}
-              {repoFooterLinks.map(renderFooterLink)}
             </div>
           </div>
         </HolographicCard>
@@ -766,6 +833,7 @@ function DynamicPaperCard({
             {/* Read the locally hosted PDFs in the in-app reader + video link */}
             {(publication.paperPdf ||
               publication.posterPdf ||
+              publication.presentationPdf ||
               publication.videoUrl) && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {publication.paperPdf && (
@@ -885,69 +953,84 @@ function DynamicPaperCard({
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-3 gap-2 mt-auto">
-              {publication.paperUrl && (
-                <Link
-                  href={publication.paperUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                >
-                  <span>Paper</span>
-                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </Link>
-              )}
-              {publication.pdfUrl && (
-                <button
-                  onClick={handlePDFClick}
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                >
-                  <span>Poster</span>
-                  <Download
-                    className={cn(
-                      "w-3 h-3",
-                      !shouldReduceAnimations && "group-hover:animate-bounce",
+            <div className="mt-auto space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                {publication.paperUrl && (
+                  <Link
+                    href={publication.paperUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                  >
+                    <span>Paper</span>
+                    <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </Link>
+                )}
+                {publication.pdfUrl && (
+                  <button
+                    onClick={handlePDFClick}
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                  >
+                    <span>Poster</span>
+                    <Download
+                      className={cn(
+                        "w-3 h-3",
+                        !shouldReduceAnimations && "group-hover:animate-bounce",
+                      )}
+                    />
+                  </button>
+                )}
+                {publication.bibtex && (
+                  <button
+                    onClick={handleBibTeXClick}
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
+                    title="Copy BibTeX"
+                  >
+                    <span>BibTeX</span>
+                    {bibtexCopied ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
                     )}
+                  </button>
+                )}
+                {publication.codeUrl && (
+                  <Link
+                    href={publication.codeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                  >
+                    <span>Code</span>
+                    <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </Link>
+                )}
+                {/* Details gives way to Code when a repo link exists */}
+                {publication.semanticScholarUrl && !publication.codeUrl && (
+                  <Link
+                    href={publication.semanticScholarUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                  >
+                    <span>Details</span>
+                    <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </Link>
+                )}
+              </div>
+              {/* Only curated entries, or a stated variant: the fetchers fill
+                  arxivId from Semantic Scholar on their own, and an omitted
+                  variant reads "published version", a claim nobody has
+                  checked for an uncurated paper such as an arXiv-only
+                  preprint. */}
+              {publication.arxivId &&
+                (publication.source === "static" ||
+                  publication.arxivVariant) && (
+                  <ArxivLine
+                    arxivId={publication.arxivId}
+                    variant={publication.arxivVariant}
                   />
-                </button>
-              )}
-              {publication.bibtex && (
-                <button
-                  onClick={handleBibTeXClick}
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
-                  title="Copy BibTeX"
-                >
-                  <span>BibTeX</span>
-                  {bibtexCopied ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </button>
-              )}
-              {publication.codeUrl && (
-                <Link
-                  href={publication.codeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                >
-                  <span>Code</span>
-                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </Link>
-              )}
-              {/* Details gives way to Code when a repo link exists */}
-              {publication.semanticScholarUrl && !publication.codeUrl && (
-                <Link
-                  href={publication.semanticScholarUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
-                >
-                  <span>Details</span>
-                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </Link>
-              )}
+                )}
             </div>
           </div>
         </HolographicCard>

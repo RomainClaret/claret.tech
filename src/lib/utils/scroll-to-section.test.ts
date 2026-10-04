@@ -89,6 +89,35 @@ describe("scrollToSection", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("stops correcting when its signal aborts", () => {
+    // How a caller that goes away, or a newer scroll, stops this one. Left
+    // running, the supervision outlives the caller by up to two seconds.
+    placeSection("research", 6503);
+    const calls = stubScroll({ smoothWorks: false });
+    const controller = new AbortController();
+
+    scrollToSection("research", { signal: controller.signal });
+    controller.abort();
+    vi.advanceTimersByTime(3000);
+
+    // Only the initial attempt, as when the user takes over.
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not scroll at all when its signal has already aborted", () => {
+    placeSection("research", 6503);
+    const calls = stubScroll({ smoothWorks: false });
+    const controller = new AbortController();
+    controller.abort();
+
+    expect(scrollToSection("research", { signal: controller.signal })).toBe(
+      false,
+    );
+    vi.advanceTimersByTime(3000);
+
+    expect(calls).toHaveLength(0);
+  });
+
   it("gives up rather than looping forever on a target it cannot reach", () => {
     // A section whose position keeps running away, e.g. content loading above
     // it indefinitely. The loop has to terminate.

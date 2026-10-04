@@ -1,3 +1,5 @@
+import type { ArxivVariant } from "@/lib/api/fetch-publications";
+
 // Papers section data
 export interface Paper {
   title: string;
@@ -11,6 +13,8 @@ export interface Paper {
   posterPdf?: string; // local /pdfs/ poster PDF (renders a Read Poster chip)
   presentationPdf?: string; // local /pdfs/ slides PDF (renders a Read Presentation chip)
   videoUrl?: string; // video presentation link, e.g. YouTube (renders a Watch Video button)
+  arxivId?: string; // bare arXiv identifier, e.g. "2608.24480" (renders the arXiv line)
+  arxivVariant?: ArxivVariant; // what the arXiv copy is; omitted means published
   citations?: number; // hand-maintained: these entries have no citation feed,
   // unlike the publications list, which carries counts from the academic APIs
   bibtex?: string; // verbatim curated BibTeX entry (copied by the BibTeX button)
@@ -76,7 +80,7 @@ export const papersSection = {
       shortDescription:
         "Scaling neuroevolution for heterogeneous tasks using a universal knowledge representation.",
       subtitle:
-        "A poster presented at the 17th ACM International Conference on Distributed and Event-based Systems (DEBS 2023), June 27-30, Neuchâtel, Switzerland. It asks one question: what is an optimal approach for a universal knowledge representation in neuroevolution for various heterogeneous tasks with fixed input and output neurons? The poster proposes a nature-inspired NEAT variation built around a universal knowledge format, so the same evolved networks can perform heterogeneous tasks without task-specific wiring. Objectives: extend NEAT to context-free heterogeneous tasks, combine artificial intelligence and neuroscience research, and explore scalable artificial collective intelligence for complex environments. The methodology evaluates on task-specific and heterogeneous tasks, comparing against x-NEAT variants and deep learning models. The proposed architecture has agents collectively weaving universal knowledge, an early sketch of the GEENNS framework (Graph-Embedded Evolving Neural Networks Synergy): universal knowledge representation, multitask learning, prediction consensus, continual learning, and more.",
+        "A poster presented at the 17th ACM International Conference on Distributed and Event-based Systems (DEBS 2023), June 27-30, Neuchâtel, Switzerland. It asks one question: what is an optimal approach for a universal knowledge representation in neuroevolution for various heterogeneous tasks with fixed input and output neurons? The poster proposes a nature-inspired NEAT variation built around a universal knowledge format, so the same evolved networks can perform heterogeneous tasks without task-specific wiring. Objectives: extend NEAT to context-free heterogeneous tasks, combine artificial intelligence and neuroscience research, and explore scalable artificial collective intelligence for complex environments. The methodology evaluates on task-specific and heterogeneous tasks, comparing against x-NEAT variants and deep learning models. The proposed architecture has agents collectively weaving universal knowledge, an early sketch of what became GEENNS (then spelled out as Graph-Embedded Evolving Neural Networks Synergy): universal knowledge representation, multitask learning, prediction consensus, continual learning, and more.",
       image: "/images/debs_2023.webp",
       posterPdf: "/pdfs/poster_DEBS_2023_scaling_neuroevolution.pdf",
       footerLink: [],
@@ -128,7 +132,7 @@ export const papersSection = {
         "/pdfs/poster_SNF_2010_visual_vestibular_integration_in_sensory_recognition_thresholds.pdf",
       footerLink: [
         {
-          name: "Journal Article",
+          name: "The Lab's Journal Paper",
           url: "https://journals.physiology.org/doi/abs/10.1152/jn.00332.2013",
         },
       ],

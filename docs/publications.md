@@ -36,6 +36,40 @@ Remove it from `static-publications.json` **and** `public/publications.json`, fi
 
 Nothing records that an entry was removed on purpose, so if an academic API lists it again it comes back as an uncurated duplicate. The sync test is what catches that.
 
+## Linking the arXiv copy
+
+`arxivId` renders a line under the action buttons: the arXiv wordmark, then a label
+chosen by `arxivVariant`. Store the bare identifier, not a URL: `"2608.24480"`, or
+`"2608.24480v2"` to pin a version. The line is absent when `arxivId` is.
+
+```json
+"arxivId": "2609.11518",
+"arxivVariant": "accepted"
+```
+
+| `arxivVariant` | label             | use when                                                                                                                     |
+| -------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| omitted        | published version | arXiv carries the paper as published                                                                                         |
+| `extended`     | extended version  | the arXiv copy is longer than the published one                                                                              |
+| `accepted`     | accepted version  | the arXiv copy is the authors' accepted manuscript, not the publisher's final version (true whether or not the paper is out) |
+
+Labels live in `ARXIV_LABELS` in `src/components/sections/Papers.tsx`, not in the data, so
+changing one is a single edit. The allowed values live in `ARXIV_VARIANTS` in
+`src/lib/api/fetch-publications.ts`. A new variant goes in both, and the compiler flags a
+missing label.
+
+**Do not let a `to-appear` paper claim to be published.** `published version` is a claim
+about the record, and omitting `arxivVariant` asserts it silently. The sync test fails on
+any `to-appear` entry whose arXiv line would read `published version`.
+
+**When arXiv is the only record, it is the paper.** A document with no published version
+and none coming links arXiv as "Paper" (`paperUrl`, or a `footerLink` named `Paper`, as
+`claret2026quadtree` does). Use `arxivId` where a published record exists or is on its
+way and arXiv is the second copy. Both fields work on `papersCards` too.
+
+`src/lib/api/publications-sync.test.ts` also rejects an `arxivId` that is not a bare
+identifier, which is what catches a pasted abstract URL.
+
 ## What can and cannot run on its own
 
 Nothing refreshes automatically. There is no cron.
@@ -48,4 +82,4 @@ Nothing refreshes automatically. There is no cron.
 
 ## Fields the APIs never supply
 
-`bibtex`, `shortDescription`, `starred`, `status`, `month`, and the three PDF paths are hand-written. Semantic Scholar and ORCID do not return them, and the merge only overlays non-empty fetched values, so they are safe. `openAccessUrl` is deliberately emitted as `""` by the fetch layer for the same reason.
+`bibtex`, `shortDescription`, `starred`, `status`, `month`, `arxivVariant`, and the three PDF paths are hand-written. Semantic Scholar and ORCID do not return them, and the merge only overlays non-empty fetched values, so they are safe. `openAccessUrl` is deliberately emitted as `""` by the fetch layer for the same reason. `arxivId` is different: Semantic Scholar does return it, but only on uncurated entries. Both fetch paths drop the fetched copy of a curated paper by title before anything is merged, so a curated paper's `arxivId` is added by hand, in `static-publications.json` and `public/publications.json` alike. On an uncurated entry the arXiv line is not shown unless `arxivVariant` is set, since an uncurated paper, an arXiv-only preprint for one, must not be labelled as published. A curated paper whose title Semantic Scholar spells differently is not matched, and comes back as a separate uncurated duplicate, which the sync test catches.

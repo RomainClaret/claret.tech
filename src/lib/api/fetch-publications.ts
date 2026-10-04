@@ -23,6 +23,14 @@ const AUTHOR_NAME_FIXES: Record<string, string> = authorNameFixes;
  */
 export const STATIC_PUBLICATIONS = staticPublications as Publication[];
 
+/**
+ * What an arXiv copy is. The one list the type, the card labels and the data
+ * test all come from: hand-edited JSON only reaches Publication through a
+ * cast, which accepts any string, so a typo here compiles.
+ */
+export const ARXIV_VARIANTS = ["published", "extended", "accepted"] as const;
+export type ArxivVariant = (typeof ARXIV_VARIANTS)[number];
+
 export interface Publication {
   id: string;
   title: string;
@@ -36,7 +44,8 @@ export interface Publication {
   shortDescription?: string; // Optional: Shows in collapsed state, expands to full abstract
   status?: "to-appear" | "presented" | "preprint"; // Optional: explicit status badge (defaults to Published)
   doi?: string;
-  arxivId?: string;
+  arxivId?: string; // bare arXiv identifier, e.g. "2608.24480" (renders the arXiv line)
+  arxivVariant?: ArxivVariant; // what the arXiv copy is; omitted means published
   pdfUrl?: string;
   paperPdf?: string; // local /pdfs/ paper PDF (renders a Read Paper chip)
   posterPdf?: string; // local /pdfs/ poster PDF (renders a Read Poster chip)

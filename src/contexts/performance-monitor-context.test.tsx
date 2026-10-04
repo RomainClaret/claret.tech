@@ -43,6 +43,10 @@ describe("PerformanceMonitorContext", () => {
   // silently breaking any later test that relies on a real listener firing.
   const realAddEventListener = window.addEventListener;
   const realRemoveEventListener = window.removeEventListener;
+  // dispatchEvent is replaced in the same beforeEach and was left out of this
+  // list, so it leaked as a no-op: a later file dispatching a hashchange on
+  // window reached no listener at all.
+  const realDispatchEvent = window.dispatchEvent;
 
   beforeEach(() => {
     // Use comprehensive context testing environment
@@ -107,6 +111,7 @@ describe("PerformanceMonitorContext", () => {
     cleanup();
     window.addEventListener = realAddEventListener;
     window.removeEventListener = realRemoveEventListener;
+    window.dispatchEvent = realDispatchEvent;
   });
 
   const createWrapper = () => {

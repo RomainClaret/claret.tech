@@ -130,6 +130,8 @@ describe("usePerformanceMonitor", () => {
   let mockWorker: MockWorker;
   let mockPerformanceObserver: MockPerformanceObserver;
   let currentTime = 0;
+  const realRequestAnimationFrame = global.requestAnimationFrame;
+  const realCancelAnimationFrame = global.cancelAnimationFrame;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -154,20 +156,24 @@ describe("usePerformanceMonitor", () => {
     // Mock performance.now
     vi.spyOn(performance, "now").mockImplementation(() => currentTime);
 
-    // Mock requestAnimationFrame and cancelAnimationFrame
-    mockRAF = vi
-      .spyOn(global, "requestAnimationFrame")
-      .mockImplementation((callback) => {
-        const id = Math.floor(Math.random() * 1000);
-        setTimeout(() => callback(currentTime), 16);
-        return id;
-      });
+    // Plain stubs, not vi.spyOn. A spy installed here records the fake
+    // clock's rAF as its original and stays in vitest's spy registry, so with
+    // restoreMocks on, every later file's restore wrote that dead function
+    // back onto window, after setup.ts had installed a working one. Research's
+    // deep-link tests then waited forever for a frame.
+    mockRAF = vi.fn((callback) => {
+      // Never 0: real rAF ids start at 1, and the hook only cancels a truthy
+      // id, so a 0 here made "cleans up animation frame" fail 1 run in 1000.
+      const id = Math.floor(Math.random() * 1000) + 1;
+      setTimeout(() => callback(currentTime), 16);
+      return id;
+    });
 
-    mockCAF = vi
-      .spyOn(global, "cancelAnimationFrame")
-      .mockImplementation((_id) => {
-        // Just track that it was called, don't use clearTimeout since ID is fake
-      });
+    mockCAF = vi.fn((_id) => {
+      // Just track that it was called, don't use clearTimeout since ID is fake
+    });
+    global.requestAnimationFrame = mockRAF;
+    global.cancelAnimationFrame = mockCAF;
 
     // Mock Worker
     mockWorker = {
@@ -250,6 +256,10 @@ describe("usePerformanceMonitor", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    // Put back by value what setup.ts installed, captured before this file
+    // touched anything: the stubs above are plain assignments.
+    global.requestAnimationFrame = realRequestAnimationFrame;
+    global.cancelAnimationFrame = realCancelAnimationFrame;
 
     // Clean up any classes added during tests
     if (document.body) {

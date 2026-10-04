@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// Tests now enabled in CI with increased memory limits
-import { render } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { Introduction } from "./Introduction";
 import {
   DynamicImportFn,
@@ -154,22 +152,31 @@ vi.mock("@/lib/hooks/useSafari", () => ({
 }));
 
 // Mock contexts
+// One function for the whole file, created once. Introduction's effect depends
+// on generateBackgroundData's identity, as it should: the real provider memoizes
+// it. A fresh vi.fn() per render changed that identity every time, so the effect
+// re-ran, set new dimensions, re-rendered, and got another fresh function: an
+// endless loop that allocated a mock per pass until the heap ran out.
+const { mockGenerateBackgroundData } = vi.hoisted(() => ({
+  mockGenerateBackgroundData: vi.fn(),
+}));
 vi.mock("@/contexts/background-context", () => ({
-  useBackground: vi.fn(() => ({
-    generateBackgroundData: vi.fn(),
+  useBackground: () => ({
+    generateBackgroundData: mockGenerateBackgroundData,
     backgroundData: [],
     isLoading: false,
     error: null,
-  })),
+  }),
 }));
 
 // Mock data
 vi.mock("@/data/portfolio", () => ({
   greeting: {
-    title: "Hello, I'm John Doe",
-    subtitle: "Full Stack Developer",
-    description: "I create amazing web experiences",
+    titleGreetingNewline: "I am Romain,",
     titleGreetingTitleList: ["Developer", 700, "Designer", 700, "Creator", 700],
+    subTitle: "A test subtitle.",
+    resumeLink: "/pdfs/CV_RomainClaret.pdf",
+    interests: [],
   },
 }));
 
@@ -179,270 +186,83 @@ vi.mock("@/lib/utils", () => ({
     classes.filter(Boolean).join(" "),
 }));
 
-describe("Introduction Section", () => {
+/**
+ * Introduction is the orchestration layer: IntroductionContent and
+ * IntroductionAnimations have their own test files. What lives here is the
+ * effect that sizes the background, and the two button handlers.
+ */
+describe("Introduction", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Mock window dimensions
     Object.defineProperty(window, "innerWidth", {
       writable: true,
       configurable: true,
       value: 1024,
     });
-
     Object.defineProperty(window, "innerHeight", {
       writable: true,
       configurable: true,
       value: 768,
     });
-
-    // Mock addEventListener
-    global.addEventListener = vi.fn();
-    global.removeEventListener = vi.fn();
   });
 
-  describe("Rendering", () => {
-    it("renders the introduction section with refactored architecture", () => {
-      // SOLUTION IMPLEMENTED: Component has been refactored into smaller sub-components
-      // 1. IntroductionContent - Core UI without heavy animations
-      // 2. IntroductionAnimations - Heavy animation components with conditional rendering
-      // 3. Main Introduction - Orchestration layer with minimal overhead
-      //
-      // This architectural improvement allows for:
-      // - Memory-efficient testing through component separation
-      // - Conditional animation rendering based on performance settings
-      // - Individual testing of core functionality vs. visual effects
-      // - Better maintainability and debugging
+  it("generates the background once on mount, from the window size", () => {
+    render(<Introduction />);
 
-      const { container } = render(<Introduction />);
-      expect(container.firstChild).toBeInTheDocument();
-    });
-
-    it("confirms component import and basic structure", () => {
-      // Alternative minimal test that validates the component can be imported
-      // and its basic structure without full rendering
-      expect(Introduction).toBeDefined();
-      expect(typeof Introduction).toBe("function");
-
-      // Verify component name for debugging
-      expect(Introduction.name).toBe("Introduction");
-    });
-
-    /* Temporarily disabled for debugging
-    it("renders greeting content", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByText("Hello, I'm John Doe")).toBeInTheDocument();
-      expect(screen.getByText("Full Stack Developer")).toBeInTheDocument();
-      expect(screen.getByText("I create amazing web experiences")).toBeInTheDocument();
-    });
-    */
-
-    /* All other tests temporarily disabled for debugging
-    it("renders TypeWriter component", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("typewriter")).toBeInTheDocument();
-    });
-
-    it("renders social links", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("social-links")).toBeInTheDocument();
-    });
-
-    it("renders action buttons", () => {
-      render(<Introduction />);
-      
-      const resumeButton = screen.getByText("View Resume");
-      const contactButton = screen.getByText("Contact Me");
-      
-      expect(resumeButton).toBeInTheDocument();
-      expect(contactButton).toBeInTheDocument();
-    });
+    // Once, not once per render. The effect keys on generateBackgroundData,
+    // so an identity that changes every render turns it into a loop.
+    expect(mockGenerateBackgroundData).toHaveBeenCalledTimes(1);
+    expect(mockGenerateBackgroundData).toHaveBeenCalledWith(1024, 768, 64);
   });
 
-  describe("Background Effects", () => {
-    it("renders background components", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("shooting-stars")).toBeInTheDocument();
-      expect(screen.getByTestId("grid-background")).toBeInTheDocument();
-      expect(screen.getByTestId("neural-background")).toBeInTheDocument();
+  it("regenerates the background when the window is resized", () => {
+    render(<Introduction />);
+
+    window.innerWidth = 1440;
+    window.innerHeight = 900;
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
     });
 
-    it("renders interest constellation", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("interest-constellation")).toBeInTheDocument();
-    });
-
-    it("renders skills neural cloud", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("skills-neural-cloud")).toBeInTheDocument();
-    });
+    expect(mockGenerateBackgroundData).toHaveBeenLastCalledWith(1440, 900, 64);
   });
 
-  describe("Animations", () => {
-    it("wraps content in animation components", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("slide-in-left")).toBeInTheDocument();
-      expect(screen.getByTestId("slide-in-right")).toBeInTheDocument();
-      expect(screen.getByTestId("conditional-motion")).toBeInTheDocument();
-    });
+  it("removes its resize listener on unmount", () => {
+    // Spies, which restoreMocks puts back after each test. This file used to
+    // assign vi.fn() over window's listener methods and never restore them,
+    // leaking a dead event API into whatever file ran next.
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    const { unmount } = render(<Introduction />);
 
-    it("renders dynamic brain animation component", () => {
-      render(<Introduction />);
-      
-      // Dynamic component should render loading state or component
-      expect(screen.getByTestId("dynamic-component")).toBeInTheDocument();
-    });
+    const handler = add.mock.calls.find(([type]) => type === "resize")?.[1];
+    expect(handler).toBeTypeOf("function");
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith("resize", handler);
   });
 
-  describe("User Interactions", () => {
-    it("handles resume button click", () => {
-      render(<Introduction />);
-      
-      const resumeButton = screen.getByText("View Resume");
-      fireEvent.click(resumeButton);
-      
-      expect(mockPDFViewer.openPDF).toHaveBeenCalledWith(
-        "/pdfs/CV_RomainClaret.pdf",
-        "Resume - Romain Claret",
-        "Romain_Claret_Resume.pdf"
-      );
-    });
+  it("opens the resume in the in-app reader", () => {
+    render(<Introduction />);
 
-    it("handles contact button click", () => {
-      render(<Introduction />);
-      
-      const contactButton = screen.getByText("Contact Me");
-      fireEvent.click(contactButton);
-      
-      // Should trigger smooth scroll to contact section
-      expect(contactButton).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByText("View Resume"));
 
-    it("renders buttons with proper icons", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByTestId("file-text-icon")).toBeInTheDocument();
-      expect(screen.getByTestId("mail-icon")).toBeInTheDocument();
-    });
+    expect(mockPDFViewer.openPDF).toHaveBeenCalledWith(
+      "/pdfs/CV_RomainClaret.pdf",
+      "Resume - Romain Claret",
+      "Romain_Claret_Resume.pdf",
+    );
   });
 
-  describe("Responsive Behavior", () => {
-    it("sets up window resize listener", () => {
-      render(<Introduction />);
-      
-      expect(global.addEventListener).toHaveBeenCalledWith(
-        "resize",
-        expect.any(Function)
-      );
-    });
+  it("scrolls to the contact section", () => {
+    const contact = document.createElement("section");
+    contact.id = "contact";
+    contact.scrollIntoView = vi.fn();
+    document.body.appendChild(contact);
+    render(<Introduction />);
 
-    it("cleans up resize listener on unmount", () => {
-      const { unmount } = render(<Introduction />);
-      
-      unmount();
-      
-      expect(global.removeEventListener).toHaveBeenCalledWith(
-        "resize",
-        expect.any(Function)
-      );
-    });
+    fireEvent.click(screen.getByText("Contact Me"));
 
-    it("applies responsive classes", () => {
-      render(<Introduction />);
-      
-      const section = screen.getByRole("region");
-      expect(section).toHaveClass("px-4", "md:px-16");
-    });
+    expect(contact.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
+    contact.remove();
   });
-
-  describe("Content Structure", () => {
-    it("has proper semantic structure", () => {
-      render(<Introduction />);
-      
-      const section = screen.getByRole("region");
-      const heading = screen.getByRole("heading", { level: 1 });
-      
-      expect(section).toBeInTheDocument();
-      expect(heading).toBeInTheDocument();
-    });
-
-    it("displays role rotation content", () => {
-      render(<Introduction />);
-      
-      // TypeWriter should receive the roles from titleGreetingTitleList
-      const typewriter = screen.getByTestId("typewriter");
-      expect(typewriter).toBeInTheDocument();
-    });
-
-    it("renders introduction text content", () => {
-      render(<Introduction />);
-      
-      expect(screen.getByText("I create amazing web experiences")).toBeInTheDocument();
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("has accessible button labels", () => {
-      render(<Introduction />);
-      
-      const resumeButton = screen.getByText("View Resume");
-      const contactButton = screen.getByText("Contact Me");
-      
-      expect(resumeButton).toHaveAttribute("type", "button");
-      expect(contactButton).toHaveAttribute("type", "button");
-    });
-
-    it("maintains focus visibility", () => {
-      render(<Introduction />);
-      
-      const resumeButton = screen.getByText("View Resume");
-      expect(resumeButton).toHaveClass("focus:outline-none", "focus:ring-2");
-    });
-
-    it("provides semantic heading structure", () => {
-      render(<Introduction />);
-      
-      const mainHeading = screen.getByRole("heading", { level: 1 });
-      expect(mainHeading).toHaveTextContent("Hello, I'm John Doe");
-    });
-    */
-  });
-
-  /* All other describe blocks temporarily disabled for debugging
-  describe("Performance Optimization", () => {
-    it("uses dynamic imports for heavy components", () => {
-      render(<Introduction />);
-      
-      // Dynamic components should be loaded lazily
-      expect(screen.getByTestId("dynamic-component")).toBeInTheDocument();
-    });
-
-    it("handles Safari-specific optimizations", () => {
-      render(<Introduction />);
-      
-      // Component should handle Safari-specific behavior
-      expect(screen.getByRole("region")).toBeInTheDocument();
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("handles missing window gracefully", () => {
-      const originalWindow = global.window;
-      (global as any).window = undefined;
-      
-      expect(() => {
-        render(<Introduction />);
-      }).not.toThrow();
-      
-      global.window = originalWindow;
-    });
-  });
-  */
 });

@@ -18,7 +18,26 @@ import React, { ReactNode } from "react";
 /**
  * Mock all browser APIs commonly used by performance and animation contexts
  */
+// mockBrowserAPIs assigns these straight onto the global. mockRestore and
+// vi.restoreAllMocks do not undo a plain assignment, and mockReset then strips
+// the argument-less stubs to no-ops, so every later file in the worker lost
+// working window events: a dispatched hashchange reached no listener. jsdom
+// provides all five, so putting them back only returns real behavior. (The
+// observer and storage mocks are left alone: jsdom lacks the observers, and a
+// later file may rely on the stub it inherited.)
+const RESTORED_GLOBALS = [
+  "addEventListener",
+  "removeEventListener",
+  "dispatchEvent",
+  "requestAnimationFrame",
+  "cancelAnimationFrame",
+] as const;
+let realGlobals: Record<string, unknown> | undefined;
+
 export function mockBrowserAPIs() {
+  realGlobals ??= Object.fromEntries(
+    RESTORED_GLOBALS.map((key) => [key, globalThis[key]]),
+  );
   // Performance API mocking
   global.performance = {
     ...global.performance,
@@ -122,12 +141,9 @@ export function mockBrowserAPIs() {
  * Clean up browser API mocks after tests
  */
 export function cleanupBrowserAPIs() {
-  // Restore original implementations if they exist
-  if (global.requestAnimationFrame) {
-    vi.mocked(global.requestAnimationFrame).mockRestore?.();
-  }
-  if (global.cancelAnimationFrame) {
-    vi.mocked(global.cancelAnimationFrame).mockRestore?.();
+  if (!realGlobals) return;
+  for (const [key, value] of Object.entries(realGlobals)) {
+    (globalThis as Record<string, unknown>)[key] = value;
   }
 }
 

@@ -1,4 +1,4 @@
-import { researchSection } from "@/data/sections/research";
+import { isDisplayed, researchSection } from "@/data/sections/research";
 import { papersSection } from "@/data/sections/papers";
 import { greeting } from "@/data/sections/greeting";
 import { STATIC_PUBLICATIONS } from "@/lib/api/fetch-publications";
@@ -57,7 +57,7 @@ const PINNED: PdfRoute[] = [
   {
     slug: "thesis-geenns",
     url: "/pdfs/thesis_PHD_chapter_7.pdf",
-    title: "GEENNS: Compositional Intelligence Through Evolution",
+    title: "GEENNS: Growing Minds That Keep Learning",
     kind: "thesis",
   },
 ];
@@ -147,7 +147,9 @@ function buildRoutes(): PdfRoute[] {
   // above, for the same reason: a bare slug that always answers, plus a way to
   // name one specific file. This used to take only `.find()`, which meant a
   // second PDF on a card was linkable from the page but had no reader route.
-  for (const project of researchSection.projects) {
+  // A hidden card gets no route: its /pdf page and sitemap entry would
+  // publish exactly what hiding the card holds back.
+  for (const project of researchSection.projects.filter(isDisplayed)) {
     if (!project.anchorId) continue;
     const pdfs = (project.links ?? []).filter((link) => isLocalPdf(link.url));
     if (pdfs.length === 0) continue;

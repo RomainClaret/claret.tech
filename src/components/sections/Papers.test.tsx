@@ -83,6 +83,12 @@ vi.mock("@/data/portfolio", () => ({
         shortDescription: "A forthcoming paper.",
         subtitle: "A forthcoming paper, to appear.",
         image: "/images/paper_geenns_2024.webp",
+        // Slides and nothing else: the chip row used to be gated on
+        // paperPdf/posterPdf/videoUrl, so this card rendered no chips.
+        presentationPdf: "/pdfs/presentation_static_mock.pdf",
+        // The arXiv copy of this one is longer than the version of record.
+        arxivId: "2601.00001",
+        arxivVariant: "extended",
         footerLink: [
           { name: "arXiv", url: "https://arxiv.org/abs/0000.00000" },
         ],
@@ -247,11 +253,17 @@ vi.mock("lucide-react", () => ({
   Play: () => <div data-testid="play-icon">Play</div>,
 }));
 
-// Mock ORCID icon
+// Mock the icon module. Every icon Papers.tsx imports has to be listed here,
+// or it renders as undefined and takes the whole file down with it.
 vi.mock("@/components/icons", () => ({
   OrcidIcon: ({ className }: IconProps) => (
     <div data-testid="orcid-icon" className={className}>
       ORCID
+    </div>
+  ),
+  ArxivWordmark: ({ className }: IconProps) => (
+    <div data-testid="arxiv-wordmark" className={className}>
+      arXiv
     </div>
   ),
 }));
@@ -635,11 +647,31 @@ describe("Papers", () => {
         "poster_test.pdf",
       );
 
-      fireEvent.click(screen.getByText("Read Presentation"));
+      const presentationChips = screen.getAllByText("Read Presentation");
+      // Dynamic pub + the static mock card whose only document is slides
+      expect(presentationChips.length).toBe(2);
+      fireEvent.click(presentationChips[0]);
       expect(mockOpenPDF).toHaveBeenCalledWith(
         "/pdfs/presentation_test.pdf",
         "Paper with PDFs",
         "presentation_test.pdf",
+      );
+    });
+
+    it("shows the reader chip when slides are the only document", () => {
+      // The chip row is drawn only when the card has something to put in it,
+      // and that test used to list paperPdf, posterPdf and videoUrl while the
+      // body also rendered presentationPdf. A talk with no accompanying paper
+      // therefore hid its own deck.
+      render(<Papers />);
+
+      const chips = screen.getAllByText("Read Presentation");
+      fireEvent.click(chips[chips.length - 1]);
+
+      expect(mockOpenPDF).toHaveBeenCalledWith(
+        "/pdfs/presentation_static_mock.pdf",
+        "Forthcoming Paper On Substrates",
+        "presentation_static_mock.pdf",
       );
     });
 
@@ -847,6 +879,162 @@ describe("Papers", () => {
       );
       // Details is suppressed for that paper but still shown for the other
       expect(screen.getAllByText("Details")).toHaveLength(1);
+    });
+
+    it("links the arXiv copy and says which version it is", async () => {
+      const mockPubsWithArxiv: Publication[] = [
+        {
+          id: "test-arxiv-published",
+          title: "Paper mirrored on arXiv",
+          authors: ["Author A"],
+          venue: "Conference 2026",
+          year: "2026",
+          paperUrl: "https://doi.org/10.1234/example",
+          arxivId: "2608.24480",
+          source: "static" as const,
+        },
+        {
+          id: "test-arxiv-extended",
+          title: "Paper extended on arXiv",
+          authors: ["Author B"],
+          venue: "Conference 2025",
+          year: "2025",
+          arxivId: "2501.12345v2",
+          arxivVariant: "extended" as const,
+          source: "static" as const,
+        },
+        {
+          id: "test-arxiv-accepted",
+          title: "Paper accepted and on arXiv",
+          authors: ["Author C"],
+          venue: "Conference 2026",
+          year: "2026",
+          status: "to-appear" as const,
+          arxivId: "2609.11518",
+          arxivVariant: "accepted" as const,
+          source: "static" as const,
+        },
+        {
+          id: "test-arxiv-uncurated",
+          title: "Preprint fetched from Semantic Scholar",
+          authors: ["Author D"],
+          year: "2026",
+          arxivId: "2610.99999",
+          source: "semantic-scholar" as const,
+        },
+        {
+          id: "test-arxiv-typo",
+          title: "Paper with a mistyped variant",
+          authors: ["Author E"],
+          year: "2026",
+          arxivId: "2610.88888",
+          // What a hand edit to the JSON can produce: the cast lets it through.
+          arxivVariant: "Accepted" as unknown as Publication["arxivVariant"],
+          source: "static" as const,
+        },
+        {
+          id: "test-arxiv-none",
+          title: "Paper not on arXiv",
+          authors: ["Author C"],
+          venue: "Conference 2024",
+          year: "2024",
+          source: "static" as const,
+        },
+      ];
+
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockPubsWithArxiv,
+              totalCitations: 0,
+              count: 6,
+            }),
+        } as Response),
+      );
+
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Paper mirrored on arXiv")).toBeInTheDocument();
+      });
+
+      // Scoped per card: an Other Work fixture also carries an arXiv line, so
+      // a page-wide query for these labels is ambiguous.
+      const card = (id: string) => within(document.getElementById(id)!);
+
+      // Omitting the variant means the arXiv copy is the published paper
+      const published = card("test-arxiv-published")
+        .getByText("published version")
+        .closest("a");
+      expect(published).toHaveAttribute(
+        "href",
+        "https://arxiv.org/abs/2608.24480",
+      );
+      expect(published).toHaveAttribute("target", "_blank");
+      expect(published).toHaveAttribute("rel", "noopener noreferrer");
+
+      // A version-pinned id is passed through untouched
+      const extended = card("test-arxiv-extended")
+        .getByText("extended version")
+        .closest("a");
+      expect(extended).toHaveAttribute(
+        "href",
+        "https://arxiv.org/abs/2501.12345v2",
+      );
+
+      // The wordmark carries the brand name, so it is aria-hidden and the
+      // accessible name has to supply "arXiv" instead
+      expect(published).toHaveAccessibleName(/arXiv/);
+      expect(extended).toHaveAccessibleName(/arXiv/);
+
+      // A paper accepted but not yet published says so, rather than claiming
+      // a record it does not have
+      const accepted = card("test-arxiv-accepted")
+        .getByText("accepted version")
+        .closest("a");
+      expect(accepted).toHaveAttribute(
+        "href",
+        "https://arxiv.org/abs/2609.11518",
+      );
+      expect(accepted).toHaveAccessibleName(/arXiv/);
+
+      // An id the fetcher filled in on an uncurated paper is not shown: the
+      // default label would call an unchecked preprint the published version
+      expect(
+        card("test-arxiv-uncurated").queryByTestId("arxiv-wordmark"),
+      ).not.toBeInTheDocument();
+
+      // A variant with no label renders no line, rather than throwing and
+      // taking the page down, or falling back to an unchecked "published"
+      expect(
+        screen.getByText("Paper with a mistyped variant"),
+      ).toBeInTheDocument();
+      expect(
+        card("test-arxiv-typo").queryByTestId("arxiv-wordmark"),
+      ).not.toBeInTheDocument();
+
+      // No arxivId, no line
+      expect(
+        card("test-arxiv-none").queryByTestId("arxiv-wordmark"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders no arXiv line for a publication without an arXiv copy", async () => {
+      // The shared mock publications carry no arxivId; the Other Work fixture
+      // does, so exactly one line comes from the static cards.
+      render(<Papers />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Neuroevolution Research Paper"),
+        ).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText("published version")).not.toBeInTheDocument();
+      const line = screen.getByText("extended version").closest("a");
+      expect(line).toHaveAttribute("href", "https://arxiv.org/abs/2601.00001");
+      expect(screen.getAllByTestId("arxiv-wordmark")).toHaveLength(1);
     });
   });
 

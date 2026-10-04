@@ -5,14 +5,13 @@
 [![Tests](https://img.shields.io/badge/Tests-100%25-brightgreen)](https://github.com/RomainClaret/claret.tech)
 [![Deploy](https://img.shields.io/badge/Deploy-Vercel-green?logo=vercel)](https://claret.tech)
 
-> **Neuroevolution researcher and lecturer breeding neural networks that assemble solutions from evolved components.**  
-> Evolution spent billions of years creating intelligence. I'm compressing that into days.
+> **Neuroevolution researcher and lecturer breeding neural networks that assemble solutions from evolved components.**
 
 ## ✨ Features
 
 - **Dual Brain Animation** - WebGL-powered neural visualization with particles
 - **Interactive Terminal** - Full xterm.js integration with WebLLM AI chat
-- **Privacy-First Design** - Zero tracking, no analytics, local-only AI processing
+- **Privacy-First Design** - No ads or third-party cookies, privacy-focused Vercel Analytics, local-only AI processing
 - **Adaptive Performance** - Optimized for all browsers including Safari
 - **Research Portfolio** - Publications, projects, and algorithm details
 

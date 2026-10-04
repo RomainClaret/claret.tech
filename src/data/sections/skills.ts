@@ -4,26 +4,26 @@ export const skillsSection = {
   display: true,
   title: "Evolution Over Engineering",
   subtitle: {
-    highlightedText: "Where everyone sees failure, I see evolution at work",
+    highlightedText: "Evolution works mostly by failing, and so do I",
     normalText:
       "Building AI that assembles components instead of memorizing patterns, because adaptive behavior beats accuracy.",
   },
   skills: [
     "Connecting neuroscience, physics, psychology, and engineering to understand intelligence.",
     "Testing an absurd number of setups to find the few that actually work.",
-    "Reducing 7-year bottlenecks to 6-month pipelines.",
-    "When tools don't exist, I create them. From research pipelines to evolutionary frameworks.",
-    "Publishing rigorous research on unconventional approaches.",
-    "Helping students think systematically about complex problems.",
-    "Breaking complex systems into components, understanding interactions, rebuilding understanding.",
+    "Rewriting slow pipelines until an experiment finishes in time to matter.",
+    "When the tool I need does not exist, I build it, usually a pipeline or an evolutionary framework.",
+    "Publishing what I find, including where a method breaks.",
+    "Teaching programming, mathematics and databases, and trying to make it stick.",
+    "Taking systems apart to see how the pieces interact, then putting them back together.",
     "Living in Python and JAX, bending them until evolution runs fast.",
     "Breeding whole populations of networks and keeping whatever survives.",
-    "Five years pursuing one insight through multiple paradigms with systematic execution.",
-    "Every 'wrong' approach revealed essential constraints and possibilities.",
+    "Following one question through several fields until the answers started to line up.",
+    "Keeping notes on what failed, because that is where the constraints show up.",
     "Understanding when to stop controlling and start observing.",
-    "From papers to documentation to making complex ideas accessible.",
-    "Sharing tools, frameworks, and research code with the community.",
-    "Willing to spend years on problems others abandon after months.",
+    "Writing it down so someone outside the field can follow it.",
+    "Publishing the code with each paper, so anyone can rerun it.",
+    "Happy to spend years on a problem if it is the right one.",
   ],
   // Core Expertise section configuration
   coreExpertiseSection: {
@@ -37,27 +37,27 @@ export const skillsSection = {
       icon: "🧬",
       title: "Evolutionary AI: Growing Intelligence Instead of Training It",
       description:
-        "While everyone's training networks the usual way, I'm evolving behaviors. Slower? Yes. More compute? Absolutely. But mine adapt when yours break.",
+        "I evolve networks instead of training them. It takes longer and costs more compute. What comes back is behavior I did not write, and working out what that behavior is worth is most of the job.",
       expandedDescription:
-        "Started with graph-based reasoning systems in 2020, before the transformer revolution. Realized we're building high-performing dead ends: record accuracy that dies the moment the world shifts. Explored symbolic reasoning, distributed agents, fuzzy logic. Each 'detour' revealed the same truth: intelligence has to grow. Now I evolve neural networks that discover behaviors I never programmed. In one published result, networks I evolved on one image task handled a different one they had never seen. Nobody told them to; they grew general instincts instead of memorizing answers. Evolved networks adapt because that's what evolution selects for. They survive change.",
+        "My master's thesis was a question-answering system built from engineered parts. It worked, and it was brittle in places nobody had planned for. Symbolic reasoning, distributed agents and fuzzy logic went the same way. What kept failing was designing the whole thing by hand, so I stopped. Now evolution builds the networks and I study what it finds. In my GECCO'24 study, settings found on one image task carried over to a harder one, though not to simple logic tasks. A small result, but the kind I care about: something that still holds when the problem changes.",
       technologies: ["NEAT/CPPNs/ES-HyperNEAT", "JAX/TensorNEAT"],
     },
     {
       icon: "🔬",
       title: "Research Through Systematic Exploration",
       description:
-        "Used more CPU hours than sensible. Set a record along the way, but the real signal was the behaviors carrying over to new problems on their own. That's when you know you're onto something fundamental.",
+        "Used more CPU hours than is sensible. The useful part was rarely the best score. It was learning which settings still held up when the task changed.",
       expandedDescription:
-        "I breed populations rather than training single networks. Each generation: mutations, selection pressure, survival of the most adaptable (rather than the most accurate). Along the way they set a record on a standard image test, but that was never the point. What matters is they carry their skills to new tasks without retraining. Like biological systems adapting to new environments. Currently developing methods to make evolution 100-1000x faster through systematic optimization, because waiting years to discover failure is masochism. Published at GECCO'24: proving systematic exploration beats random search, every time.",
+        "I breed populations rather than training single networks: mutate, select, repeat. Most of the work is finding settings under which that loop gets anywhere. My GECCO'24 study searched those settings with a guided method rather than at random. On MNIST it beat random search and earlier results for that algorithm, and the settings carried over to Fashion-MNIST, though not to simple logic tasks. The score was never the point. Making evolution fast enough to run at that scale took the rest of my PhD.",
       technologies: ["Hyperparameter Optimization", "Distributed Computing"],
     },
     {
       icon: "🤖",
-      title: "Compositional Intelligence: AI That Thinks in Parts",
+      title: "Thinking in Parts: Specialists That Learn to Work Together",
       description:
-        "My networks solve problems by assembling solutions from components. Not elegant. Not efficient. But interpretable and adaptable.",
+        "The networks I grow solve problems in parts: specialists that evolve separately, then learn to work together. It is messier than one big network, and you can look at the parts one at a time.",
       expandedDescription:
-        "Five years converging on this insight: intelligence is compositional rather than monolithic. Humans decompose, process, and recompose instead of memorizing. My research builds AI that thinks the same way. Networks that evolve specialized components, then learn to orchestrate them. They develop unexpected strategies: edge detectors here, pattern matchers there, weird routing behaviors I never designed. Remove connections? They route around damage. Change the task? They repurpose components. It's messy, redundant, and absolutely fascinating. Traditional AI gives you clean architectures that shatter on edge cases. Mine are biological messes that refuse to die. The mess is the point. The mess is intelligence.",
+        "The idea behind GEENNS is that a mind is a team of specialists rather than one big network. Evolution grows small specialist networks, freezes the ones that work, and then evolves coordinators that decide how to combine them for each new task. In the PhD prototype, the same frozen specialists carried over to new tasks without retraining. What they do along the way is often not what I would have designed, and a fair part of it is redundant. The mess is the point. The mess is intelligence.",
       technologies: ["Compositional Architectures", "Emergent Behaviors"],
     },
   ],
@@ -99,12 +99,12 @@ export const skillsSection = {
       expandedDescription:
         "Everything here follows from one choice: grow the networks rather than train them. That buys adaptability, and it costs you every familiar way of checking your work, because the usual tests assume the system learned from us. So half this list is the research and half is building the instruments to judge it.",
       bullets: [
-        "Emergent behaviors in bio-inspired artificial life, grown by evolution and never fitted to us",
-        "Measuring emergence honestly, which nobody can do yet: every test for novel behavior is calibrated on human data, so behavior outside that space reads as noise",
-        "Specialists that claim their own roles, and coordination that carries to problems it never saw",
+        "GEENNS: a mind as a team of evolved specialists that claim their own roles and learn to work together",
         "Composition as reasoning: assemble solutions from evolved specialists, then get the assembly itself to emerge",
         "Lifelong learning without forgetting: reuse settled behaviors instead of overwriting them",
-        "Interpretable by construction: a mind you can read as parts, not one opaque blob",
+        "Emergent behaviors in bio-inspired artificial life, grown by evolution and never fitted to us",
+        "Measuring emergence honestly: every test for novel behavior I know of is calibrated on human data, so behavior outside that space reads as noise",
+        "An image breeder whose vocabulary can change, to see how the material shapes what evolution can reach",
       ],
     },
     "Why Evolution": {

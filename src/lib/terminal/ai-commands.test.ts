@@ -183,7 +183,7 @@ describe("AI Commands Basic Tests", () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain("About Romain Claret");
       expect(result.output).toContain("Evolving Artificial Intelligence");
-      expect(result.output).toContain("University Teaching Specialist");
+      expect(result.output).toContain("Neuroevolution Researcher & Lecturer");
       expect(result.output).toContain("University College Dublin");
       expect(result.output).toContain("Use 'ai init' to start");
     });

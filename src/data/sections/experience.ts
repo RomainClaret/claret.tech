@@ -28,20 +28,24 @@ export const workExperiences = {
   subtitle: {
     highlightedText: "From engineering precision to evolving intelligence",
     normalText:
-      "I once thought I had answers; now I realize I only have questions. Each pivot stripping away what I thought I knew, teaching me that growth happens at the edge of understanding. The pattern matches evolution: survival goes to whatever adapts, right or wrong. Now I let each experience prove that everything is possible when you embrace mutation over optimization.",
+      "Watchmaking, startups, consulting, a PhD, and now research and teaching in Dublin. Each change taught me something by breaking an assumption I had not noticed I was making. The pattern matches evolution: survival goes to whatever adapts, right or wrong.",
   },
   experience: [
     {
-      role: "University Teaching Specialist",
+      role: "Neuroevolution Researcher & Lecturer",
       company: "University College Dublin",
+      // Permanent: deep links point here. Kept from the role's first title.
       anchorId: "ucd-teaching-specialist",
-      companyUrl: "https://www.smurfitschool.ie/",
+      companyUrl: "https://ncra.ucd.ie/",
       companyLogo: "/images/ucd_logo.webp",
-      companyDesc: "Smurfit School of Business",
+      companyDesc:
+        "Natural Computing Research & Applications Group, and Smurfit School of Business",
       date: "Aug. 2026 - Present",
-      desc: "Teaching Programming for Analytics in Trimester 1 at the UCD Smurfit School of Business, a master's class of about 150 students. Alongside the teaching I do research at the Natural Computing Research and Applications Group with Prof. Michael O'Neill.",
+      desc: "Research at the Natural Computing Research and Applications Group with Prof. Michael O'Neill, where GEENNS continues past the PhD. I also teach Programming for Analytics at the Smurfit School of Business, a master's class of about 150 students.",
       location: "Dublin, Ireland",
-      descBullets: ["#Lecturing #Programming #DataAnalytics #Python #Teaching"],
+      descBullets: [
+        "#Neuroevolution #ArtificialLife #Research #Lecturing #Python",
+      ],
     },
     {
       role: "Doctoral Assistant",
@@ -52,7 +56,7 @@ export const workExperiences = {
       companyDesc:
         "Information Management Institute at the Faculty of Economic Sciences",
       date: "Nov. 2020 - June 2026",
-      desc: "Teaching assistant at the Information Management Institute, under the supervision of Dr. Paul Cotofrei. Applied Mathematics (Analysis and Linear Algebra) ran every semester as a two-hour lecture plus a two-hour question session, for roughly 150 to 200 first-year bachelor students in Economics and Data Science. Databases (modeling, SQL, NoSQL, visualization) ran each spring, two hours of questions a week plus supervising student projects, for about 60 first and third-year students.",
+      desc: "Teaching assistant at the Information Management Institute, under the supervision of Adjunct Prof. Paul Cotofrei. Applied Mathematics (Analysis and Linear Algebra) ran every semester as a two-hour lecture plus a two-hour question session, for roughly 150 to 200 first-year bachelor students in Economics and Data Science. Databases (modeling, SQL, NoSQL, visualization) ran each spring, two hours of questions a week plus supervising student projects, for about 60 first and third-year students.",
       location: "Neuchâtel, Switzerland",
       descBullets: ["#Teaching #TA #Mathematics #Database"],
     },
@@ -133,7 +137,7 @@ export const workExperiences = {
       companyDesc:
         "Open-Source consensus-based distributed file-hosting service",
       date: "Dec. 2015 - Oct. 2016",
-      desc: "Lead developer on an Open-Source project. The tasks were to make software architectures, prototype & implement software, write documentation, and do research.",
+      desc: "The open-source project behind my bachelor's thesis: anonymous file sharing that runs entirely in the browser, with the network governing itself. I designed the architecture, built the prototypes, wrote the documentation, and did the research.",
       location: "Neuchâtel, Switzerland",
       descBullets: [
         "#WebRTC #P2P #WebTorrents #NodeJS #Serverless #Distributed #Privacy #DistributedConsensus #Blockchain",
@@ -158,14 +162,14 @@ export const workExperiences = {
       company: "Jenks Vestibular Lab",
       anchorId: "jenks-vestibular-internship",
       companyUrl:
-        "https://www.masseyeandear.org/research/otolaryngology/vestibular",
+        "https://research.massgeneralbrigham.org/en/institutes-centers/otolaryngology/jenks-vestibular-laboratories",
       companyLogo: "/images/jvpl_logo.webp",
       companyDesc:
         "Development of balance aids for patients suffering imbalance, as well as vestibular implants for patients who have lost inner ear function.",
       date: "May 2010 - Aug. 2010",
-      desc: "A summer at the Jenks Vestibular Physiology Lab, Massachusetts Eye and Ear Infirmary, Harvard Medical School, supervised by Asst. Prof. Dr. Faisal Karmali. The task was to design an experiment looking for a link between vision and the vestibular system: model the setup in 3D, build it by adapting a hydraulic flight simulator, run the Matlab simulations, test on human subjects, and interpret what came back. My first real taste of research, and the reason I kept going.",
+      desc: "A summer at the Jenks Vestibular Physiology Lab, Massachusetts Eye and Ear Infirmary, Harvard Medical School, supervised by Asst. Prof. Faisal Karmali. The task was to design an experiment looking for a link between vision and the vestibular system: model the setup in 3D, build it by adapting a hydraulic flight simulator, run the Matlab simulations, test on human subjects, and interpret what came back. My first real taste of research, and the reason I kept going.",
       location:
-        "Department of Ophthalmology, Harvard Medical School, Boston, USA",
+        "Department of Otolaryngology, Harvard Medical School, Boston, USA",
       descBullets: [],
     },
     {

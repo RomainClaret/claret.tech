@@ -123,6 +123,70 @@ describe("useCardDeepLink", () => {
     expect(window.pageYOffset).toBe(6504 - 64);
   });
 
+  it("stops the scroll's supervision when it unmounts", () => {
+    // scrollToSection supervises for two seconds. Left running past unmount
+    // it kept calling window.scrollTo: on the page, a scroll nobody asked for;
+    // in a test file, the next test's mock, which made "did not scroll"
+    // assertions pass or fail depending on what ran before them.
+    placeCard("research", 6504);
+    window.location.hash = "#research";
+    const { unmount } = renderHook(() => useCardDeepLink(["research"]));
+
+    unmount();
+    scrollCalls = [];
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(scrollCalls).toHaveLength(0);
+  });
+
+  it("lets a newer hash take over instead of fighting the older scroll", () => {
+    // Two supervisors at once each snap to their own target whenever the page
+    // is still, so the page lurched back to the first card before settling.
+    placeCard("first", 5000);
+    placeCard("second", 9000);
+    window.location.hash = "#first";
+    renderHook(() => useCardDeepLink(["first", "second"]));
+
+    act(() => {
+      window.location.hash = "#second";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    scrollCalls = [];
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(scrollCalls.map((call) => call.top)).not.toContain(5000 - 64);
+    expect(window.pageYOffset).toBe(9000 - 64);
+  });
+
+  it("stops its scroll when the hash moves to another section's card", () => {
+    // Each section runs its own instance. Landing on a Research card and then
+    // following a link to a Papers card within two seconds left Research's
+    // scroll supervision and settle loop running, snapping back to its card
+    // while Papers scrolled to the new one.
+    placeCard("research-card", 5000);
+    placeCard("papers-card", 9000);
+    window.location.hash = "#research-card";
+    const research = renderHook(() => useCardDeepLink(["research-card"]));
+    renderHook(() => useCardDeepLink(["papers-card"]));
+
+    act(() => {
+      window.location.hash = "#papers-card";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    scrollCalls = [];
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(research.result.current.deepLinkedId).toBeNull();
+    expect(scrollCalls.map((call) => call.top)).not.toContain(5000 - 64);
+    expect(window.pageYOffset).toBe(9000 - 64);
+  });
+
   it("ignores a hash that is not one of its targets", () => {
     placeCard("something-else", 500);
     window.location.hash = "#something-else";

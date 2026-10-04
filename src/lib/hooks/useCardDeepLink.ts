@@ -36,6 +36,10 @@ export function useCardDeepLink(
 
   useEffect(() => {
     let highlightTimer: ReturnType<typeof setTimeout> | undefined;
+    // One scroll at a time. A newer hash or an unmount aborts the running
+    // one, whose two-second supervision would otherwise keep snapping the
+    // page back to a card that is no longer the target.
+    let scroll: AbortController | undefined;
 
     const applyHash = () => {
       const rawHash = window.location.hash.slice(1);
@@ -48,7 +52,16 @@ export function useCardDeepLink(
       }
       if (!hash) return;
       const targets = targetsKey ? targetsKey.split("\n") : [];
-      if (!targets.includes(hash)) return;
+      if (!targets.includes(hash)) {
+        // Another section's card, or a section itself. Each section runs its
+        // own instance, so release this one: its scroll supervision and settle
+        // loop would otherwise keep pulling the page back to its own card.
+        // Keyboard and Back/Forward navigation fire no wheel or pointerdown,
+        // so nothing else would release it.
+        scroll?.abort();
+        setDeepLinkedId(null);
+        return;
+      }
 
       onMatchRef.current?.(hash);
       setDeepLinkedId(hash);
@@ -60,7 +73,10 @@ export function useCardDeepLink(
       // smooth scroll when layout shifts under it, which is routine here while
       // the page loads, and the target may be thousands of pixels away. If the
       // element is not mounted yet the settle loop below picks it up.
-      requestAnimationFrame(() => scrollToSection(hash));
+      scroll?.abort();
+      scroll = new AbortController();
+      const { signal } = scroll;
+      requestAnimationFrame(() => scrollToSection(hash, { signal }));
     };
 
     applyHash();
@@ -68,6 +84,7 @@ export function useCardDeepLink(
     return () => {
       window.removeEventListener("hashchange", applyHash);
       if (highlightTimer) clearTimeout(highlightTimer);
+      scroll?.abort();
     };
     // pathname is a dependency because Next navigates client-side with
     // history.pushState, which fires no hashchange event. Without it, arriving

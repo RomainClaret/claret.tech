@@ -17,7 +17,7 @@ export const blogSection = {
       url: "https://medium.com/@romainclaret",
       title: "Visit my Medium profile",
       description:
-        "Check out my articles on Medium where I write about AI, research, and technology.",
+        "Research notes, fiction, and the occasional rant, on Medium.",
       image: "",
     },
   ],

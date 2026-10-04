@@ -2,7 +2,7 @@
 
 export const footerNote = {
   update: "2022-12-15", // Fallback date if API fails
-  hostname: "GitHub",
+  hostname: "Vercel",
   hosturl: "https://github.com/RomainClaret/claret.tech",
   repository: {
     owner: "RomainClaret",

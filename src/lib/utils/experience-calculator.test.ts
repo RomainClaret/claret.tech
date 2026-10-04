@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { isDisplayed, researchSection } from "@/data/sections/research";
 import {
   calculateTotalExperience,
   getFormattedExperienceYears,
@@ -236,6 +237,19 @@ describe("experience-calculator", () => {
       expect(calculateTotalResearchYears(withNumber, 0, AUG_2026)).toBe(
         calculateTotalResearchYears(withoutNumber, 0, AUG_2026),
       );
+    });
+
+    it("lets only one displayed project count from a start date", () => {
+      // Two ongoing projects both run to today, so they always overlap, and
+      // the total would count the present-day months once per card. The
+      // emerging-behaviors card counts them; any other concurrent card sets
+      // yearsSpent: 0 and no researchStart, as GEENNS does.
+      const counting = researchSection.projects
+        .filter(isDisplayed)
+        .filter((p) => p.researchStart)
+        .map((p) => p.anchorId);
+
+      expect(counting.length).toBeLessThanOrEqual(1);
     });
 
     it("keeps growing as time passes", () => {

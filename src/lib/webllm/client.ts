@@ -5,6 +5,7 @@ import {
 } from "@mlc-ai/web-llm";
 import { WEBLLM_CONFIG } from "./config";
 import { logError } from "@/lib/utils/dev-logger";
+import { isPhilosophicalQuestion } from "./philosophy";
 
 export interface LLMLoadProgress {
   progress: number;
@@ -134,35 +135,7 @@ class WebLLMClient {
 
     // Check if the conversation contains philosophical themes
     const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const philosophicalTriggers = [
-      "meaning",
-      "purpose",
-      "existence",
-      "consciousness",
-      "death",
-      "void",
-      "chaos",
-      "humanity",
-      "god",
-      "why",
-      "transcend",
-      "entropy",
-      "dread",
-      "free will",
-      "determinism",
-      "reality",
-      "simulation",
-      "nothing",
-      "absurd",
-      "existential",
-      "nihilism",
-      "being",
-      "nothingness",
-    ];
-
-    const isPhilosophical = philosophicalTriggers.some((trigger) =>
-      lastUserMessage.toLowerCase().includes(trigger),
-    );
+    const isPhilosophical = isPhilosophicalQuestion(lastUserMessage);
 
     // Enhance system prompt for philosophical conversations
     let systemPrompt = WEBLLM_CONFIG.systemPrompt;

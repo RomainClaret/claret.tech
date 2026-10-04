@@ -38,7 +38,7 @@ const createUserFileSystem = (
     "README.md": {
       type: "file",
       name: "README.md",
-      content: `# Welcome, ${username}!\n\nThis is your home directory. Feel free to explore!\n`,
+      content: `# Welcome, ${username}!\n\nThis is your home directory. The penguins have already been through it.\n`,
     },
     ...customFiles,
   },

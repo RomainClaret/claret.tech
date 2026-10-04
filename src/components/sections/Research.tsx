@@ -1,6 +1,6 @@
 "use client";
 
-import { researchSection } from "@/data/sections/research";
+import { isDisplayed, researchSection } from "@/data/sections/research";
 import { FadeIn, SlideInUp, ScaleIn } from "@/components/ui/animated";
 import Link from "next/link";
 import {
@@ -34,6 +34,12 @@ import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import dynamic from "next/dynamic";
+
+// Hidden cards are dropped once, here, so the hero, the grid, the stats and
+// the deep links all index the same list. activeIndex is shared between
+// the deep-link lookup and the grid, so filtering only the grid would
+// open the card next to the one a link names.
+const visibleProjects = researchSection.projects.filter(isDisplayed);
 
 interface ResearchCardProps {
   project: (typeof researchSection.projects)[0];
@@ -402,7 +408,7 @@ export function Research() {
   // points at the card, while the -full variant also opens the description,
   // so a link can share the card without forcing the long read on the reader.
   const { deepLinkedId, highlightedId } = useCardDeepLink(
-    researchSection.projects.flatMap((p, i) =>
+    visibleProjects.flatMap((p, i) =>
       p.anchorId
         ? i === 0
           ? [p.anchorId, `${p.anchorId}-full`]
@@ -410,7 +416,7 @@ export function Research() {
         : [],
     ),
   );
-  const heroAnchor = researchSection.projects[0].anchorId;
+  const heroAnchor = visibleProjects[0].anchorId;
   const heroFullAnchor = heroAnchor ? `${heroAnchor}-full` : undefined;
   const heroIsLinked =
     !!heroAnchor &&
@@ -427,7 +433,7 @@ export function Research() {
       setIsPhdExpanded(true);
       return;
     }
-    const target = researchSection.projects.findIndex(
+    const target = visibleProjects.findIndex(
       (p) => p.anchorId === deepLinkedId,
     );
     if (target > 0) setActiveIndex(target);
@@ -438,18 +444,16 @@ export function Research() {
   }
 
   const stats = {
-    totalProjects: researchSection.projects.length,
-    activeProjects: researchSection.projects.filter(
-      (p) => p.status === "active",
-    ).length,
+    totalProjects: visibleProjects.length,
+    activeProjects: visibleProjects.filter((p) => p.status === "active").length,
     yearsOfResearch: getFormattedResearchYears(
-      researchSection.projects,
+      visibleProjects,
       researchSection.additionalResearchYears,
     ),
     // Hand-maintained, not derived from the data: several projects share a
     // field, so counting distinct tags would overcount.
     researchAreas: 5, // Neuroevolution, Artificial Life, Conversational AI, Decentralization, Neuroscience
-    technologies: new Set(researchSection.projects.flatMap((p) => p.tags)).size,
+    technologies: new Set(visibleProjects.flatMap((p) => p.tags)).size,
   };
 
   return (
@@ -672,12 +676,12 @@ export function Research() {
                     <Zap className="w-4 h-4" />
                     Current Focus
                   </span>
-                  {researchSection.projects[0].year && (
+                  {visibleProjects[0].year && (
                     <>
                       <div className="w-px h-4 bg-border" />
                       <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3 opacity-70" />
-                        {researchSection.projects[0].year}
+                        {visibleProjects[0].year}
                       </span>
                     </>
                   )}
@@ -689,7 +693,7 @@ export function Research() {
             <motion.div
               className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
               style={{
-                backgroundColor: `rgb(${researchSection.projects[0].color || "139, 92, 246"})`,
+                backgroundColor: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
               }}
               initial={{ opacity: 0.3 }}
               animate={{ opacity: [0.3, 0.5, 0.3] }}
@@ -697,7 +701,7 @@ export function Research() {
             />
 
             <HolographicCard
-              glowColor={researchSection.projects[0].color || "139, 92, 246"}
+              glowColor={visibleProjects[0].color || "139, 92, 246"}
               className="bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5 backdrop-blur-sm"
               // The highlight boxes below open hover tooltips that are taller
               // than the space left under them, so the card must not clip.
@@ -707,10 +711,10 @@ export function Research() {
               <div className="p-6 sm:p-8">
                 <div className="text-center mb-4 sm:mb-6">
                   <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                    {researchSection.projects[0].title}
+                    {visibleProjects[0].title}
                   </h3>
                   <p className="text-sm sm:text-base text-muted-foreground mb-2">
-                    {researchSection.projects[0].subtitle}
+                    {visibleProjects[0].subtitle}
                   </p>
                 </div>
 
@@ -731,8 +735,8 @@ export function Research() {
                   >
                     <p className="text-sm sm:text-base text-muted-foreground">
                       {isPhdExpanded
-                        ? researchSection.projects[0].description
-                        : researchSection.projects[0].shortDescription}
+                        ? visibleProjects[0].description
+                        : visibleProjects[0].shortDescription}
                     </p>
                   </motion.div>
 
@@ -742,9 +746,9 @@ export function Research() {
                       onClick={() => setIsPhdExpanded(!isPhdExpanded)}
                       className="group flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300"
                       style={{
-                        borderColor: `rgba(${researchSection.projects[0].color || "139, 92, 246"}, 0.3)`,
+                        borderColor: `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.3)`,
                         backgroundColor: isPhdExpanded
-                          ? `rgba(${researchSection.projects[0].color || "139, 92, 246"}, 0.1)`
+                          ? `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.1)`
                           : "transparent",
                       }}
                       whileHover={{ scale: 1.05 }}
@@ -753,7 +757,7 @@ export function Research() {
                       <span
                         className="text-xs font-medium"
                         style={{
-                          color: `rgb(${researchSection.projects[0].color || "139, 92, 246"})`,
+                          color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
                         }}
                       >
                         {isPhdExpanded ? "Show less" : "Read full description"}
@@ -764,7 +768,7 @@ export function Research() {
                           isPhdExpanded && "rotate-180",
                         )}
                         style={{
-                          color: `rgb(${researchSection.projects[0].color || "139, 92, 246"})`,
+                          color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
                         }}
                       />
                     </motion.button>
@@ -774,73 +778,65 @@ export function Research() {
                 {/* Visual Representation. auto-rows-fr + h-full equalize the
                     highlight boxes to the tallest one across all rows. */}
                 <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-fr gap-3 sm:gap-4 mb-6 sm:mb-8 relative">
-                  {researchSection.projects[0].highlights?.map(
-                    (highlight, i) => {
-                      const iconName =
-                        researchSection.highlightIcons?.[i] || "Brain";
-                      const Icon =
-                        iconMap[iconName as keyof typeof iconMap] || Brain;
-                      const expandedDescriptions =
-                        researchSection.projects[0]
-                          .expandedHighlightDescriptions || [];
+                  {visibleProjects[0].highlights?.map((highlight, i) => {
+                    const iconName =
+                      researchSection.highlightIcons?.[i] || "Brain";
+                    const Icon =
+                      iconMap[iconName as keyof typeof iconMap] || Brain;
+                    const expandedDescriptions =
+                      visibleProjects[0].expandedHighlightDescriptions || [];
 
-                      return (
-                        <ScaleIn
-                          key={i}
-                          delay={300 + i * 50}
-                          className="h-full"
+                    return (
+                      <ScaleIn key={i} delay={300 + i * 50} className="h-full">
+                        <motion.div
+                          className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
+                          whileHover={{ scale: 1.05 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 20,
+                          }}
                         >
-                          <motion.div
-                            className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
-                            whileHover={{ scale: 1.05 }}
-                            transition={{
-                              type: "spring",
-                              stiffness: 300,
-                              damping: 20,
-                            }}
-                          >
-                            <div className="flex flex-col items-center">
-                              <Icon
-                                className="w-6 h-6 sm:w-8 sm:h-8 mb-1.5 sm:mb-2"
-                                style={{
-                                  color: `rgb(${researchSection.projects[0].color || "139, 92, 246"})`,
-                                }}
-                              />
-                              <p className="text-lg sm:text-xl font-bold mb-1">
-                                {researchSection.highlightLabels[i] ||
-                                  highlight}
-                              </p>
-                            </div>
-                            <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
-                              {highlight}
+                          <div className="flex flex-col items-center">
+                            <Icon
+                              className="w-6 h-6 sm:w-8 sm:h-8 mb-1.5 sm:mb-2"
+                              style={{
+                                color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                              }}
+                            />
+                            <p className="text-lg sm:text-xl font-bold mb-1">
+                              {researchSection.highlightLabels[i] || highlight}
                             </p>
+                          </div>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
+                            {highlight}
+                          </p>
 
-                            {/* Hover tooltip with expanded description. Escapes
+                          {/* Hover tooltip with expanded description. Escapes
                                 the card via allowContentOverflow above; without
                                 it the card clips this and the text is cut off. */}
-                            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64">
-                              <div className="bg-popover text-popover-foreground rounded-lg shadow-xl border p-3">
-                                <p className="text-xs leading-relaxed">
-                                  {expandedDescriptions[i]}
-                                </p>
-                              </div>
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64">
+                            <div className="bg-popover text-popover-foreground rounded-lg shadow-xl border p-3">
+                              <p className="text-xs leading-relaxed">
+                                {expandedDescriptions[i]}
+                              </p>
                             </div>
-                          </motion.div>
-                        </ScaleIn>
-                      );
-                    },
-                  )}
+                          </div>
+                        </motion.div>
+                      </ScaleIn>
+                    );
+                  })}
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center mb-4 sm:mb-6">
-                  {researchSection.projects[0].tags.map((tag, i) => (
+                  {visibleProjects[0].tags.map((tag, i) => (
                     <span
                       key={i}
                       className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-medium rounded-lg"
                       style={{
-                        backgroundColor: `rgba(${researchSection.projects[0].color || "139, 92, 246"}, 0.1)`,
-                        color: `rgb(${researchSection.projects[0].color || "139, 92, 246"})`,
-                        border: `1px solid rgba(${researchSection.projects[0].color || "139, 92, 246"}, 0.3)`,
+                        backgroundColor: `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.1)`,
+                        color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                        border: `1px solid rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.3)`,
                       }}
                     >
                       {tag}
@@ -848,9 +844,9 @@ export function Research() {
                   ))}
                 </div>
 
-                {researchSection.projects[0].links && (
+                {visibleProjects[0].links && (
                   <div className="flex justify-center gap-4">
-                    {researchSection.projects[0].links.map((link, i) => {
+                    {visibleProjects[0].links.map((link, i) => {
                       const isGitHub = link.name
                         .toLowerCase()
                         .includes("github");
@@ -884,7 +880,7 @@ export function Research() {
                             onClick={() =>
                               openPDF(
                                 link.url,
-                                researchSection.projects[0].title,
+                                visibleProjects[0].title,
                                 pdfFileName(link.url),
                               )
                             }
@@ -937,7 +933,7 @@ export function Research() {
 
           {/* Other Research Projects Grid */}
           <div className="grid md:grid-cols-2 gap-4 sm:gap-6 relative z-10">
-            {researchSection.projects.slice(1).map((project, index) => (
+            {visibleProjects.slice(1).map((project, index) => (
               <SlideInUp key={index + 1} delay={300 + index * 100}>
                 <ResearchCard
                   project={project}

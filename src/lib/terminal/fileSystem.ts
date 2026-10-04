@@ -15,7 +15,7 @@ export const fileSystem: VirtualFile = {
     "README.md": {
       type: "file",
       name: "README.md",
-      content: `Interactive terminal exploring the intersection of human and machine intelligence.
+      content: `Part terminal, part easter egg hunt.
 
 Type 'help' to begin.`,
     },

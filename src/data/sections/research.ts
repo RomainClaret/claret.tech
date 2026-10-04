@@ -33,6 +33,23 @@ export interface ResearchProject {
    * treat it as permanent: people share these.
    */
   anchorId?: string;
+  /**
+   * Set to false to keep a card off the site for now, for example while the
+   * paper behind it is under double-blind review. A hidden card is left out
+   * of the grid, the stats, the deep links and the reader routes. Its text
+   * still ships in the page's JavaScript and in the git history, so this hides
+   * a card and does not make it private.
+   */
+  display?: boolean;
+}
+
+/**
+ * Whether a project appears on the site. Everything that reads the projects
+ * list goes through this: a card left out of the grid alone would still show
+ * up in the counts, the deep links and the reader routes.
+ */
+export function isDisplayed(project: ResearchProject): boolean {
+  return project.display !== false;
 }
 
 export const researchSection = {
@@ -45,10 +62,10 @@ export const researchSection = {
       "Every field I touched taught me the same lesson: minds have to grow. Engineering them top-down never worked for me.",
   },
   journeyDescription:
-    "Started by breaking toys to build robots. Then breaking computers to make them smarter. Learned to code to control them. Studied physics and mathematics to simulate their brains. Dove into electronics and micro mechanics to build better bodies. Mastered computer science to let them take action. Explored AI to make them intelligent. Every step revealed I was still missing something. The lifelong obsession led to one insight: stop trying to create robots. Set the conditions, let them evolve, and pay attention to what shows up. Now breeding neural networks that think compositionally, that can develop their own architectures, letting robots rise from accelerated artificial selection. Why not give them billions of simulated years to evolve if we can? Current mission: making evolution 100x-1000x faster so robots can finally think for themselves instead of executing our code. From childhood tinkerer to researcher, the mission hasn't changed. Just the approach. The journey from breaking toys to breeding minds taught me to create the conditions for intelligence to emerge; building it directly kept failing. And maybe the next kid breaking toys won't wait 30+ years for answers.",
+    "Started by breaking toys to build robots. Then breaking computers to make them smarter. Learned to code to control them. Studied physics and mathematics to simulate their brains. Dove into electronics and micro mechanics to build better bodies. Studied computer science to let them act, and AI to make them clever. Every step showed me I was still missing something, and eventually the missing piece was the approach itself: stop building the mind, set the conditions, let it evolve, and pay attention to what shows up. The PhD made that fast enough to try at a useful scale. Now the work is GEENNS: minds grown as teams of evolved specialists that learn to work together and keep learning without forgetting, and the harder question of how to tell genuinely new behavior from behavior that only looks new to us. The kid breaking toys wanted thinking robots. The approach changed. The question did not.",
   journeyShortDescription:
     "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching behavior arise from chaos rather than from architecture, code, or engineering. Whether that is where intelligence actually begins is the question, not the conclusion.",
-  journeyBadge: "30+ Years in the Making",
+  journeyBadge: "A Lifelong Question",
 
   /**
    * Research time that has no project card of its own, in years.
@@ -68,7 +85,7 @@ export const researchSection = {
 
   projects: [
     {
-      title: "GEENNS: Compositional Intelligence Through Evolution",
+      title: "GEENNS: Growing Minds That Keep Learning",
       anchorId: "geenns",
       subtitle: "Lifetime Research Project (Post-PhD Phase)",
       shortDescription:
@@ -148,6 +165,41 @@ export const researchSection = {
       ],
     },
     {
+      title: "Breeding with an Evolvable Vocabulary",
+      anchorId: "evolvable-vocabulary",
+      subtitle: "Active Research Direction",
+      shortDescription:
+        "An interactive image breeder where the genome's vocabulary can vary: which functions a node computes, and how it combines its inputs. Exploring how that choice shapes what can be bred.",
+      description:
+        "You breed an image by clicking. A grid of pictures appears, you pick the ones you like, their offspring become the next grid, and after a few minutes you have something nobody designed. Picbreeder made that idea famous, and later work has changed who does the choosing: crowds, aesthetic measures, and lately vision-language models. This breeder turns a different knob: the vocabulary, meaning the set of functions a node in the genome can compute and the way it combines its inputs before computing anything. The vocabulary is the material, like the difference between oils and watercolor, or between a synthesizer with one oscillator and one with a full bank, and it may shape which images can be reached at all. The questions behind it: does what is in a palette matter more than how much is in it, how much does the way a node combines its inputs matter, and is an image a palette can express also one its search can find? Two versions are online: the latest, with the most controls, lets you shape both the CPPN and the substrate; a simpler one gives control over the CPPN only.",
+      tags: [
+        "Interactive Evolution",
+        "Generative Art",
+        "CPPNs",
+        "Neuroevolution",
+        "Evolvability",
+      ],
+      status: "active" as const,
+      // Counted as 0 on purpose: this runs alongside emerging-behaviors, which
+      // already counts the present-day post-PhD time from its start date.
+      // A start date here would count those months twice.
+      yearsSpent: 0,
+      icon: "Sparkles",
+      color: "168, 85, 247",
+      year: "2026-Present",
+      links: [
+        // The play versions, latest first. The study will have a link of its own.
+        {
+          name: "Play: CPPN and Substrate",
+          url: "https://picbreeder.claret.tech",
+        },
+        {
+          name: "Play: CPPN Only",
+          url: "https://picbreeder-cppn.claret.tech",
+        },
+      ],
+    },
+    {
       title: "Scaling Adaptive Substrate Neuroevolution",
       anchorId: "phd-thesis",
       subtitle: "PhD Thesis",
@@ -204,9 +256,9 @@ export const researchSection = {
       anchorId: "graphqa",
       subtitle: "Master's Thesis",
       shortDescription:
-        "Built zero-shot conversational AI using sub-knowledge graphs. It proved to me that engineering creates brittle intelligence.",
+        "Built zero-shot conversational AI from sub-knowledge graphs. It convinced me that intelligence engineered by hand stays brittle.",
       description:
-        "While everyone was fine-tuning BERT, I spent 900+ hours building conversational AI from first principles. Zero-shot learning through pure algorithmic orchestration. Sub-knowledge graphs extracted from Wikidata. Modular architecture where specialized components handled different aspects of understanding. It worked, but that wasn't the point. Watching my engineered system take 182 seconds to answer 'What's the capital of France?' while humans do it in 200ms revealed the truth: intelligence doesn't follow flowcharts. You can't engineer emergence. This thesis was my last attempt at building intelligence top-down. Modular with an optimized pipeline, and still... dead. No adaptation, no surprise, just expensive graph traversal.",
+        "I spent 900+ hours building conversational AI from first principles: zero-shot question answering through algorithmic orchestration, with sub-knowledge graphs extracted from Wikidata and a modular architecture where each component handled one part of understanding. It worked, but that wasn't the point. Watching it take 182 seconds to answer 'What's the capital of France?', something a person answers in a fraction of a second, taught me more than the accuracy did. Every part did exactly what I designed and nothing more. This thesis was my last attempt at building intelligence top-down.",
       tags: [
         "NLP",
         "Conversational AI",
@@ -220,7 +272,7 @@ export const researchSection = {
       year: "2020",
       highlights: [
         "Sub-knowledge graphs as context holders (good idea, wrong implementation)",
-        "Proved that engineering ≠ intelligence",
+        "Convinced me to stop engineering intelligence by hand",
       ],
       links: [
         {
@@ -240,7 +292,7 @@ export const researchSection = {
       shortDescription:
         "Built anonymous, decentralized data sharing right through the browser. It taught me that distributed systems stand or fall on trust.",
       description:
-        "Is it possible to provide distributed storage that prevents spying WITHOUT opening Pandora's box for illegal content? That was the question. Overclouds was born: anonymous, decentralized data sharing through any browser. No installation, no corporate servers, no single point of failure. WebRTC for peer connections, WebTorrent for distribution, Ethereum for consensus. But here's what I actually built: a foundation for digital democracy. The network votes on everything, from storage limits to banned content types, what's allowed, who's trusted, what gets preserved. A 'Data Tribunal' where random peers judge flagged content. Proof-of-Participation rewarding good behavior. The technical parts worked: encrypted chunks spreading across browsers, webapps loading from hashes, serverless peer discovery. But the real discovery? Trust resisted engineering; it grew through consensus. This thesis planted the seed: evolve systems instead of building them.",
+        "Is it possible to provide distributed storage that prevents spying WITHOUT opening Pandora's box for illegal content? That was the question. Overclouds was born: anonymous, decentralized data sharing through any browser. No installation, no corporate servers, no single point of failure. WebRTC for peer connections, WebTorrent for distribution, Ethereum for consensus. The part I cared about most was governance: the network votes on everything, from storage limits to banned content types, what's allowed, who's trusted, what gets preserved. A 'Data Tribunal' where random peers judge flagged content. Proof-of-Participation rewarding good behavior. The technical parts worked: encrypted chunks spreading across browsers, webapps loading from hashes, serverless peer discovery. Trust resisted engineering; it grew through consensus. This thesis planted the seed: evolve systems instead of building them.",
       tags: ["Blockchain", "WebRTC", "P2P Networks", "Digital Democracy"],
       status: "completed" as const,
       yearsSpent: 1,
@@ -267,9 +319,9 @@ export const researchSection = {
       anchorId: "vestibular-integration",
       subtitle: "Pre-Undergrad Research",
       shortDescription:
-        "Watched brains fuse conflicting senses into truth. My first proof that intelligence comes from integrating senses rather than selecting one.",
+        "Watched brains fuse conflicting senses into one estimate. The first time I saw intelligence come from combining senses rather than picking one.",
       description:
-        "Fresh out of high school at Harvard's Jenks Lab, studying how brains judge motion when eyes and inner ear disagree. Expected to find one sense winning. Found something else entirely: Bayesian optimal integration. The brain weights each sense by its precision at that frequency. Vision below 2 Hz, vestibular above, perfect crossover at the boundary. Instead of picking the best input, the brain mathematically fuses all inputs weighted by reliability. Months on motion platforms, thousands of trials, watching biological intelligence optimize in real time. No algorithm programmed this behavior. Evolution discovered the math. Published in J Neurophysiol while still a teenager, but the real discovery was personal: intelligence doesn't come from having the right sensors or the right rules. It comes from integration patterns that emerge on their own. The brain was already doing what I would attempt fifteen years later: specialized components (senses), dynamic weighting (Bayesian fusion), and integration that emerges instead of being engineered. I just didn't know it yet.",
+        "Fresh out of high school at Harvard's Jenks Lab, I helped study how the brain judges motion when the eyes and the inner ear disagree. I expected one sense to win. What the lab found instead was optimal integration: the brain weights each sense by how precise it is at that frequency, vision at low frequencies and the inner ear at higher ones, and fuses them rather than picking one. Months on motion platforms and thousands of trials, watching a biological system do math nobody programmed into it. My part ended up on a poster at the Society for Neuroscience meeting that November, and the lab's full results appeared later in the Journal of Neurophysiology. What stayed with me was personal: the intelligence was not in any single sensor or rule, but in how they were combined. The brain was already doing what I would attempt a decade later: specialized components (the senses), weighting by reliability, and integration that emerges instead of being engineered. I just didn't know it yet.",
       tags: [
         "Sensory Fusion",
         "Bayesian Integration",
@@ -284,7 +336,7 @@ export const researchSection = {
       year: "2010",
       highlights: [
         "First exposure to emergence over engineering",
-        "Proved brain performs Bayesian optimal integration naturally",
+        "Worked on the study showing the brain combines vision and balance close to the statistical optimum",
         "Found the exact crossover where the brain flips from trusting the eyes to the inner ear",
       ],
       links: [

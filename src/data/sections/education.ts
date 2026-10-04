@@ -20,15 +20,14 @@ export const educationInfo = {
   display: true,
   title: "Degrees",
   subtitle: {
-    highlightedText:
-      "Every degree was a detour that turned out to be the destination",
+    highlightedText: "Every degree looked like a detour at the time",
     normalText:
-      "Spent a decade in universities learning how to engineer. Had to master building before I could discover growing.",
+      "Spent a decade in universities learning how to engineer things. I had to learn building before I could see the case for growing.",
   },
   certificationSection: {
     title: "Professional Certifications & Training",
     subtitle:
-      "Side Quests That Mattered. Formal certifications and training programs that taught me a different way to approach problems.",
+      "Side Quests That Mattered. Short courses and schools, each of which changed how I work.",
   },
   schools: [
     {
@@ -39,7 +38,7 @@ export const educationInfo = {
       duration: "November 2020 - August 2026",
       desc: "Thesis: Scaling Adaptive Substrate Neuroevolution",
       research:
-        "Supervisors: Prof. Dr. Kilian Stoffel and Adjunct Prof. Dr. Paul Cotofrei",
+        "Supervisors: Prof. Kilian Stoffel and Adjunct Prof. Paul Cotofrei",
       descBullets: [
         "Research: Bio-inspired, Neuroevolution, Evolving Artificial Neural Networks, Adaptive Substrates, Neuromodulation, Sparsity, Meta-Learning, Tensor Acceleration",
         "Teaching Assistant: Applied Mathematics (Analysis and Linear Algebra) for Bachelor in Economic Science and Data Science",
@@ -51,10 +50,10 @@ export const educationInfo = {
         "HES-SO - University of Applied Sciences and Arts Western Switzerland, Lausanne, Switzerland",
       schoolUrl: "https://master.hes-so.ch/master",
       logo: "/images/hes_so_logo_master.webp",
-      subHeader: "MSc in Engineering",
+      subHeader: "MSc in Software Engineering",
       duration: "September 2018 - April 2020",
       desc: "Thesis: Multi-hop Multi-turns Question-Answering Chatbot using Sub-Knowledge Graphs",
-      research: "Supervisor: Prof. Dr. Jean Hennebert",
+      research: "Supervisor: Prof. Jean Hennebert",
       descBullets: ["Specialization: Machine Learning"],
     },
     {
@@ -95,12 +94,12 @@ export const educationInfo = {
     {
       name: "Summer/Winter Schools",
       issuer: "GECCO, CUSO, BENEFRI",
-      year: "2022,2023,2024,2024,2025",
+      year: "2022,2023,2024,2025",
     },
     {
       name: "Teaching Students to Think",
       issuer: "Former Students",
-      year: "2023-present",
+      year: "2020-present",
     },
     {
       name: "Surviving a Ph.D.",

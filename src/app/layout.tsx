@@ -38,9 +38,9 @@ const agustina = localFont({
 export const metadata: Metadata = {
   title: "Romain Claret - Evolving Artificial Intelligence",
   description:
-    "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
+    "Neuroevolution researcher and lecturer growing artificial minds from evolved specialists that learn to work together, and studying the behaviors that emerge without human data.",
   keywords:
-    "Romain Claret, Evolving AI, Neuroevolution, Compositional Intelligence, ES-HyperNEAT, GECCO, Evolutionary Computation, Artificial Life, Emergent Intelligence, Lecturer, University College Dublin, University of Neuchâtel",
+    "Romain Claret, Evolving AI, Neuroevolution, GEENNS, Compositional Reasoning, Lifelong Learning, Artificial Life, Emergent Behavior, Interactive Evolution, ES-HyperNEAT, GECCO, Evolutionary Computation, Lecturer, University College Dublin, University of Neuchâtel",
   authors: [{ name: "Romain Claret" }],
   metadataBase: new URL("https://claret.tech"),
   alternates: {
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Romain Claret - Evolving Artificial Intelligence",
     description:
-      "Neuroevolution researcher and lecturer studying emergent behaviors in bio-inspired artificial life, where networks evolve their own behavior instead of reproducing training data or human patterns.",
+      "Neuroevolution researcher and lecturer growing artificial minds from evolved specialists that learn to work together, and studying the behaviors that emerge without human data.",
     type: "website",
     url: "https://claret.tech",
     images: [

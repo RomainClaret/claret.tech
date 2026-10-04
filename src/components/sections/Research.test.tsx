@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { Research } from "./Research";
+import { isDisplayed, researchSection } from "@/data/sections/research";
+import * as scrollModule from "@/lib/utils/scroll-to-section";
 
 /**
  * First tests for this component. The focus is the two pieces with real logic:
@@ -102,7 +110,7 @@ describe("Research", () => {
 
       expect(mockOpenPDF).toHaveBeenCalledWith(
         "/pdfs/thesis_PHD_chapter_7.pdf",
-        "GEENNS: Compositional Intelligence Through Evolution",
+        "GEENNS: Growing Minds That Keep Learning",
         "thesis_PHD_chapter_7.pdf",
       );
     });
@@ -171,6 +179,7 @@ describe("Research", () => {
       for (const id of [
         "geenns",
         "emerging-behaviors",
+        "evolvable-vocabulary",
         "phd-thesis",
         "graphqa",
         "overclouds",
@@ -237,12 +246,81 @@ describe("Research", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("ignores a hash that matches no project", () => {
+    it("ignores a hash that matches no project", async () => {
       window.location.hash = "#research";
 
       render(<Research />);
+      // The hook scrolls inside requestAnimationFrame, so asserting straight
+      // after render would pass even for an anchor it had registered.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
       expect(window.scrollTo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Hidden projects", () => {
+    // Real data, like the rest of this file: these bite while a card is
+    // hidden and pass trivially when none is.
+    const hidden = researchSection.projects.filter((p) => !isDisplayed(p));
+    const shown = researchSection.projects.filter(isDisplayed);
+
+    // A stat's number sits just before its label. "Active Research" is also
+    // the badge on each active card, hence picking the numeric sibling.
+    const statValue = (label: string) =>
+      screen
+        .getAllByText(label)
+        .map((el) => el.previousElementSibling?.textContent?.trim())
+        .find((text) => !!text && /^\d+$/.test(text));
+
+    it("keeps a hidden project off the page", () => {
+      render(<Research />);
+
+      for (const project of hidden) {
+        expect(screen.queryByText(project.title)).not.toBeInTheDocument();
+        if (project.anchorId) {
+          expect(document.getElementById(project.anchorId)).toBeNull();
+        }
+      }
+    });
+
+    it("does not answer a deep link to a hidden project", async () => {
+      // Watched at scrollToSection with the anchor itself, which names the
+      // card a scroll was for, where window.scrollTo only says that something
+      // scrolled.
+      const scrollSpy = vi.spyOn(scrollModule, "scrollToSection");
+
+      // Control: a visible card's anchor does reach the spy, so silence below
+      // means the hidden anchor was skipped, not that the spy is deaf.
+      const visibleAnchor = shown.find((p) => p.anchorId)!.anchorId!;
+      window.location.hash = `#${visibleAnchor}`;
+      const control = render(<Research />);
+      // Ids only: an exact-arguments match stops matching anything the moment
+      // the call gains a parameter, which would leave the check below vacuous.
+      const scrolledTo = () => scrollSpy.mock.calls.map(([id]) => id);
+      await waitFor(() => expect(scrolledTo()).toContain(visibleAnchor));
+      control.unmount();
+
+      for (const project of hidden.filter((p) => p.anchorId)) {
+        scrollSpy.mockClear();
+        window.location.hash = `#${project.anchorId}`;
+        const { unmount } = render(<Research />);
+
+        // The hook scrolls inside requestAnimationFrame, so checking straight
+        // after render would pass whether or not the anchor was registered.
+        await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+        expect(scrolledTo()).not.toContain(project.anchorId);
+        unmount();
+      }
+      scrollSpy.mockRestore();
+    });
+
+    it("counts only the projects on the page", () => {
+      render(<Research />);
+
+      expect(statValue("Research Projects")).toBe(String(shown.length));
+      expect(statValue("Active Research")).toBe(
+        String(shown.filter((p) => p.status === "active").length),
+      );
     });
   });
 });
