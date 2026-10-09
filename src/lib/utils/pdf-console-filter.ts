@@ -1,6 +1,12 @@
-// Suppress known PDF.js font warnings in production
+let installed = false;
+
+// Suppress known PDF.js font warnings in production. Installed once: every
+// reader mount used to wrap console.warn and console.error again, so after N
+// documents each console call went through N filters.
 export function setupPDFConsoleFilter() {
+  if (installed) return;
   if (process.env.NODE_ENV === "production") {
+    installed = true;
     const originalWarn = console.warn;
     const originalError = console.error;
 

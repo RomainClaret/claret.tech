@@ -12,28 +12,49 @@ import {
   detectSafari,
   storeSafariDetection,
   shouldResetAnimationPreference,
-  storeAnimationPreference,
   clearAnimationPreference,
 } from "@/lib/utils/safari-detection";
 import { logError, logWarning } from "@/lib/utils/dev-logger";
+import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 
 interface SplashScreenProps {
   onComplete?: () => void;
+  /** Its content is on screen: the backdrop in the HTML can go. */
+  onShow?: () => void;
+  /**
+   * The page reached the screen first (a slow connection; app-wrapper.tsx).
+   * The splash still does its work (browser detection, the background, the
+   * projects) but shows nothing, locks no scroll, and completes at once.
+   */
+  skip?: boolean;
 }
 
-export function SplashScreen({ onComplete }: SplashScreenProps) {
+export function SplashScreen({
+  onComplete,
+  onShow,
+  skip = false,
+}: SplashScreenProps) {
+  const onShowRef = useRef(onShow);
+  onShowRef.current = onShow;
   const shouldReduceAnimations = useShouldReduceAnimations();
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
-  const [progress, setProgress] = useState(0);
+  // The bar is written through refs on each frame rather than through state,
+  // which re-rendered the whole splash ~50 times in under a second. React
+  // only hears about the one change it renders: "Initializing..." -> "Ready!".
+  const [isReady, setIsReady] = useState(false);
+  const progressRootRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const progressTextRef = useRef<HTMLSpanElement>(null);
   const [isMounted, setIsMounted] = useState(false);
+  // The opaque splash covers the page: nothing behind it needs to move.
+  useOverlayLock(isVisible && !isExiting);
   const [animationData, setAnimationData] = useState<object | null>(null);
   const { theme } = useTheme();
   const animationFrameRef = useRef<number | null>(null);
   const { setAllProjects, setIsLoading } = useProjects();
-  const { generateBackgroundData } = useBackground();
+  const { ensureBackgroundData } = useBackground();
   const fetchStartedRef = useRef(false);
-  const backgroundGeneratedRef = useRef(false);
   const browserDetectionRef = useRef(false);
 
   useEffect(() => {
@@ -55,10 +76,9 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         if (shouldResetAnimationPreference(isSafari)) {
           clearAnimationPreference();
         }
-
-        // Set browser-appropriate default (Safari = false, others = true)
-        const animationDefault = !isSafari;
-        storeAnimationPreference(animationDefault, isSafari, false); // false = not user preference, just browser default
+        // No default is stored: the animation state provider works it out
+        // from the browser on every load. Storing it here replaced a
+        // visitor's own choice on every visit.
       } catch (error) {
         logWarning(
           `Failed browser detection during splash: ${error}`,
@@ -66,25 +86,29 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         );
       }
     }
+  }, []);
 
-    // Generate background data on mount
-    if (!backgroundGeneratedRef.current) {
-      backgroundGeneratedRef.current = true;
-      // Use window dimensions with default fallback
-      const width = typeof window !== "undefined" ? window.innerWidth : 1920;
-      const height = typeof window !== "undefined" ? window.innerHeight : 1080;
-      generateBackgroundData(width, height, 64); // 64px grid size
-    }
-  }, [generateBackgroundData]);
+  // The site grid needs a background on every route the splash plays on.
+  // On / the hero generated one already (the splash mounts after it, once
+  // its chunk loads) and this does nothing; generating again there drew a
+  // second, different background over the first.
+  useEffect(() => {
+    ensureBackgroundData(window.innerWidth, window.innerHeight, 64);
+  }, [ensureBackgroundData]);
 
   // Fetch the themed splash Lottie at runtime instead of bundling both
   // multi-MB JSONs into the splash chunk; /animations/* is immutable-cached
-  // so repeat visits read it from disk cache.
+  // so repeat visits read it from disk cache. Which also means a file whose
+  // content changes needs a new name: v2 is the minified data (8eaebe0),
+  // which the old names kept from every visitor who had the 1.6 MB
+  // originals cached, for up to a year.
   useEffect(() => {
+    // Nobody would see it.
+    if (skip) return;
     const file =
       theme === "light"
-        ? "graphNetworkBlueAnimation"
-        : "graphNetworkWhiteAnimation";
+        ? "graphNetworkBlueAnimation.v2"
+        : "graphNetworkWhiteAnimation.v2";
     let cancelled = false;
     fetch(`/animations/${file}.json`)
       .then((response) => {
@@ -100,7 +124,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [theme]);
+  }, [theme, skip]);
 
   // Fetch all projects during splash screen
   useEffect(() => {
@@ -135,12 +159,20 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       return;
     }
 
+    // Told before it showed (or while it waited to): the cleanup of the run
+    // that scheduled the show has cleared its timers and the scroll lock.
+    if (skip) {
+      onComplete?.();
+      return;
+    }
+
     // Reset progress to 0
-    setProgress(0);
+    setIsReady(false);
 
     // Small delay to ensure proper mounting
     const showTimer = setTimeout(() => {
       setIsVisible(true);
+      onShowRef.current?.();
     }, 10);
 
     // Animations are now controlled by the unified animation state system
@@ -150,6 +182,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     // Delay the animation start to ensure UI elements are visible
     const animationStartDelay = setTimeout(() => {
       let startTime: number | null = null;
+      let lastAnnounced = -Infinity;
 
       const animateProgress = (timestamp: number) => {
         if (!startTime) startTime = timestamp;
@@ -159,7 +192,22 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           100,
         );
 
-        setProgress(progressValue);
+        // The bar every frame; its CSS width transition smooths it as before.
+        if (progressBarRef.current) {
+          progressBarRef.current.style.width = `${progressValue}%`;
+        }
+        // Assistive tech about 10 times a second, and at the end.
+        if (timestamp - lastAnnounced >= 100 || progressValue >= 100) {
+          lastAnnounced = timestamp;
+          progressRootRef.current?.setAttribute(
+            "aria-valuenow",
+            String(progressValue),
+          );
+          // The text node React rendered, so React's own node stays in place.
+          const textNode = progressTextRef.current?.firstChild;
+          if (textNode) textNode.nodeValue = `${progressValue}% loaded. `;
+        }
+        if (progressValue >= 100) setIsReady(true);
 
         if (progressValue < 100) {
           animationFrameRef.current = requestAnimationFrame(animateProgress);
@@ -194,19 +242,21 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       }
       document.body.style.overflow = "auto";
     };
-  }, [isMounted, onComplete]);
+  }, [isMounted, onComplete, skip]);
 
   if (!isMounted || (!isVisible && !splashScreen.enabled)) return null;
 
   return (
     <div
+      ref={progressRootRef}
       className={cn(
         "fixed inset-0 z-[10000] bg-background flex items-center justify-center transition-all duration-500",
         isExiting ? "opacity-0 pointer-events-none" : "opacity-100",
         !isVisible && "hidden",
       )}
       role="progressbar"
-      aria-valuenow={progress}
+      // Written through the ref as the bar fills; React sets the start.
+      aria-valuenow={0}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Loading portfolio"
@@ -224,19 +274,19 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           !shouldReduceAnimations ? { willChange: "transform, opacity" } : {}
         }
       >
+        {/* One square box from the first frame. The animation is 800x800
+            and plays square at the box's width; before, the box was 200 px
+            while the data loaded, 0 for a frame, 200 px again while the
+            player loaded, then the width, and the name and progress bar
+            below moved down with each step. */}
         {animationData ? (
           <DisplayLottie
             animationData={animationData}
             loop={false}
-            className="w-full max-w-lg mx-auto"
+            className="w-full max-w-lg mx-auto aspect-square"
           />
         ) : (
-          // Same footprint as DisplayLottie's own dynamic-import placeholder
-          // so the loading text below does not jump when the JSON arrives.
-          <div
-            className="w-full max-w-lg mx-auto"
-            style={{ height: "200px" }}
-          />
+          <div className="w-full max-w-lg mx-auto aspect-square" />
         )}
 
         {/* Loading text and progress */}
@@ -260,9 +310,11 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           <div className={cn(!shouldReduceAnimations && "animate-fade-in")}>
             <div className="relative w-full max-w-xs mx-auto h-2 bg-muted rounded-full overflow-hidden">
               <div
+                ref={progressBarRef}
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-purple-600 transition-[width] duration-100 ease-out rounded-full"
                 style={{
-                  width: `${progress}%`,
+                  // Advanced through the ref; see animateProgress.
+                  width: "0%",
                   ...(shouldReduceAnimations
                     ? {}
                     : {
@@ -280,8 +332,10 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               aria-live="polite"
               aria-atomic="true"
             >
-              <span className="sr-only">{progress}% loaded. </span>
-              {progress < 100 ? "Initializing..." : "Ready!"}
+              <span ref={progressTextRef} className="sr-only">
+                {"0% loaded. "}
+              </span>
+              {isReady ? "Ready!" : "Initializing..."}
             </p>
           </div>
         </div>

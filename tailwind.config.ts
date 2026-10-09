@@ -44,7 +44,6 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-montserrat)", "system-ui", "sans-serif"],
-        display: ["var(--font-agustina)", "serif"],
       },
       animation: {
         "fade-in": "fadeIn 0.5s ease-in-out",

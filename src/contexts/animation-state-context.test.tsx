@@ -537,6 +537,8 @@ describe("AnimationStateContext", () => {
       vi.mocked(useFpsOnly).mockReturnValue({
         fps: 45,
         isLowFps: true,
+        refreshRate: null,
+        sample: 3,
       });
 
       vi.mocked(useSafariContext).mockReturnValue({
@@ -549,8 +551,9 @@ describe("AnimationStateContext", () => {
         wrapper: createWrapper(),
       });
 
+      // The sample number too: the hook counts each sample once.
       expect(vi.mocked(useFpsAutoDisable)).toHaveBeenCalledWith(
-        45,
+        { fps: 45, sample: 3 },
         true,
         expect.objectContaining({
           enabled: false, // Safari + animations disabled = no monitoring
@@ -560,40 +563,10 @@ describe("AnimationStateContext", () => {
   });
 
   describe("Preference Storage", () => {
-    it("stores preference after hydration", async () => {
-      const { useSafariContext } = await import("@/contexts/safari-context");
+    it("stores no browser default, only a visitor's own choice", async () => {
       const { storeAnimationPreference } = await import(
         "@/lib/utils/safari-detection"
       );
-
-      vi.mocked(useSafariContext).mockReturnValue({
-        isSafari: false,
-        isHydrated: true,
-        shouldReduceAnimations: false,
-      });
-
-      renderHook(() => useAnimationState(), {
-        wrapper: createWrapper(),
-      });
-
-      expect(vi.mocked(storeAnimationPreference)).toHaveBeenCalledWith(
-        true,
-        false,
-        false,
-      );
-    });
-
-    it("does not store preference before hydration", async () => {
-      const { useSafariContext } = await import("@/contexts/safari-context");
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
-
-      vi.mocked(useSafariContext).mockReturnValue({
-        isSafari: false,
-        isHydrated: false,
-        shouldReduceAnimations: false,
-      });
 
       renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
@@ -602,27 +575,81 @@ describe("AnimationStateContext", () => {
       expect(vi.mocked(storeAnimationPreference)).not.toHaveBeenCalled();
     });
 
-    it("stores preference for Safari browser correctly", async () => {
-      const { useSafariContext } = await import("@/contexts/safari-context");
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+    it("keeps a visitor's choice across a reload", () => {
+      // The provider stored every change as "not the visitor's choice", over
+      // what the control had just saved, so the next load put the browser
+      // default back. A remount is the reload.
+      const first = renderHook(() => useAnimationState(), {
+        wrapper: createWrapper(),
+      });
+      act(() => first.result.current.stopAnimations());
+      expect(first.result.current.areAnimationsPlaying).toBe(false);
+      first.unmount();
 
+      const reloaded = renderHook(() => useAnimationState(), {
+        wrapper: createWrapper(),
+      });
+
+      expect(reloaded.result.current.areAnimationsPlaying).toBe(false);
+    });
+
+    it("keeps animations a Safari visitor forced on, across a reload", async () => {
+      const { useSafariContext } = await import("@/contexts/safari-context");
       vi.mocked(useSafariContext).mockReturnValue({
         isSafari: true,
         isHydrated: true,
         shouldReduceAnimations: false,
       });
-
-      renderHook(() => useAnimationState(), {
+      const first = renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
       });
+      expect(first.result.current.areAnimationsPlaying).toBe(false); // Safari's default
 
-      expect(vi.mocked(storeAnimationPreference)).toHaveBeenCalledWith(
-        false,
-        true,
-        false,
+      // setupContextTesting stubs window's listeners: call the one the
+      // provider registered for the terminal's "animation force".
+      const force = vi
+        .mocked(window.addEventListener)
+        .mock.calls.find(([type]) => type === "animation-force")?.[1] as
+        | ((event: Event) => void)
+        | undefined;
+      expect(force).toBeDefined();
+      act(() => force!(new Event("animation-force")));
+      expect(first.result.current.areAnimationsPlaying).toBe(true);
+      first.unmount();
+
+      const reloaded = renderHook(() => useAnimationState(), {
+        wrapper: createWrapper(),
+      });
+      expect(reloaded.result.current.areAnimationsPlaying).toBe(true);
+    });
+  });
+  describe("Static HTML", () => {
+    it("renders playing on the server, without reading a stored choice", async () => {
+      const { renderToString } = await import("react-dom/server");
+      const { getAnimationPreference, shouldResetAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
+      vi.mocked(getAnimationPreference).mockReturnValue({
+        value: false,
+        browser: "other",
+        isUserPreference: true,
+        timestamp: 0,
+      });
+      function Probe() {
+        const { areAnimationsPlaying } = useAnimationState();
+        return <p>{areAnimationsPlaying ? "playing" : "stopped"}</p>;
+      }
+
+      const html = renderToString(
+        <AnimationStateProvider>
+          <Probe />
+        </AnimationStateProvider>,
       );
+
+      // The page is generated without the visitor's choice; read while
+      // rendering, it made the client's first render differ from it.
+      expect(html).toContain("playing");
+      expect(vi.mocked(getAnimationPreference)).not.toHaveBeenCalled();
+      expect(vi.mocked(shouldResetAnimationPreference)).not.toHaveBeenCalled();
     });
   });
 });

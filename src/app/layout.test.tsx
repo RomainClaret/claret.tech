@@ -527,7 +527,7 @@ describe("RootLayout", () => {
 
   describe("Font Configuration", () => {
     it("supports custom font loading patterns", () => {
-      // The actual layout loads Inter, Montserrat, and Agustina fonts
+      // The actual layout loads Montserrat through next/font
       // This test validates the structure supports font variables
       render(
         <TestLayout>

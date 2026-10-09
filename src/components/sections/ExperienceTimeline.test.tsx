@@ -78,19 +78,23 @@ vi.mock("@/components/ui/holographic-stats-card", () => ({
   ),
 }));
 
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({
-      children,
-      ...props
-    }: React.HTMLAttributes<HTMLDivElement> & {
-      children?: React.ReactNode;
-    }) => <div {...props}>{children}</div>,
-  },
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        ...props
+      }: React.HTMLAttributes<HTMLDivElement> & {
+        children?: React.ReactNode;
+      }) => <div {...props}>{children}</div>,
+    },
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Seven roles so the five-item cutoff is real: two sit behind it.
 // vi.hoisted because vi.mock is lifted above the file body, so a plain const

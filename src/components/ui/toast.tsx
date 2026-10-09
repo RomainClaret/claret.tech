@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTestMode } from "@/components/providers/test-mode-provider";
 
@@ -25,11 +25,19 @@ export function Toast({
     setMounted(true);
   }, []);
 
+  // ToastContainer passes a new onClose on every render. Read the latest one
+  // when the timer fires instead of restarting the timer for it: every
+  // toast's countdown used to start over whenever another toast arrived.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     // Call onClose immediately in test mode to prevent blocking
     if (isTestMode) {
       const timer = setTimeout(() => {
-        onClose?.();
+        onCloseRef.current?.();
       }, 10); // Very quick delay to allow ARIA regions to be detected
       return () => clearTimeout(timer);
     }
@@ -39,12 +47,12 @@ export function Toast({
     const timer = setTimeout(() => {
       setIsVisible(false);
       setTimeout(() => {
-        onClose?.();
+        onCloseRef.current?.();
       }, 300); // Allow fade-out animation to complete
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration, onClose, isVisible, isTestMode]);
+  }, [duration, isVisible, isTestMode]);
 
   const handleClose = () => {
     setIsVisible(false);

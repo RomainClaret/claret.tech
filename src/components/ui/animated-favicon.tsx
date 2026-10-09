@@ -42,6 +42,14 @@ interface FaviconWindow extends Window {
 }
 
 // Helper function to load scripts dynamically
+/**
+ * The favicon links: rel containing the token "icon". `rel*='icon'` also
+ * matched the five apple-touch-icon links, which every frame then rewrote
+ * with a 32 px data URL, and which iOS would have saved as the home-screen
+ * icon in place of the 180 px PNG.
+ */
+const ICON_LINKS = "link[rel~='icon']";
+
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
@@ -73,6 +81,10 @@ export function AnimatedFavicon() {
     let renderer: FaviconRenderer | null = null;
     let isPaused = false; // Track if we're in a pause between loops
     let pauseTimeout: NodeJS.Timeout | null = null;
+    // Set when this run is torn down. The scripts load asynchronously, and
+    // cleanup is only assigned once they have: a theme or tier change while
+    // they loaded left the superseded run free to start a second loop.
+    let cancelled = false;
 
     // Dynamic import to avoid SSR issues
     const loadFaviconAnimator = async () => {
@@ -84,19 +96,22 @@ export function AnimatedFavicon() {
         let OptimizedHybrid2Renderer = (window as FaviconWindow)
           .OptimizedHybrid2Renderer;
 
-        // Only load scripts if they haven't been loaded yet
-        if (!generateHybrid2 || !generateContinuousHybrid2) {
-          await loadScript("/favicons/animated/patterns.js");
-          generateHybrid2 = (window as FaviconWindow).generateHybrid2;
-          generateContinuousHybrid2 = (window as FaviconWindow)
-            .generateContinuousHybrid2;
-        }
-
-        if (!OptimizedHybrid2Renderer) {
-          await loadScript("/favicons/animated/renderer.js");
-          OptimizedHybrid2Renderer = (window as FaviconWindow)
-            .OptimizedHybrid2Renderer;
-        }
+        // Only load scripts if they haven't been loaded yet, both at once:
+        // neither depends on the other.
+        await Promise.all([
+          !generateHybrid2 || !generateContinuousHybrid2
+            ? loadScript("/favicons/animated/patterns.js")
+            : null,
+          !OptimizedHybrid2Renderer
+            ? loadScript("/favicons/animated/renderer.js")
+            : null,
+        ]);
+        if (cancelled) return;
+        generateHybrid2 = (window as FaviconWindow).generateHybrid2;
+        generateContinuousHybrid2 = (window as FaviconWindow)
+          .generateContinuousHybrid2;
+        OptimizedHybrid2Renderer = (window as FaviconWindow)
+          .OptimizedHybrid2Renderer;
 
         if (
           !generateHybrid2 ||
@@ -109,7 +124,7 @@ export function AnimatedFavicon() {
         // Set static favicon as fallback
         const setStaticFavicon = () => {
           if (!faviconLink) {
-            const links = document.querySelectorAll("link[rel*='icon']");
+            const links = document.querySelectorAll(ICON_LINKS);
             if (links.length > 0) {
               faviconLink = links[0] as HTMLLinkElement;
             } else {
@@ -171,7 +186,7 @@ export function AnimatedFavicon() {
         const initialDataUrl = canvas.toDataURL();
 
         // Update all favicon links
-        const links = document.querySelectorAll("link[rel*='icon']");
+        const links = document.querySelectorAll(ICON_LINKS);
         links.forEach((link) => {
           (link as HTMLLinkElement).href = initialDataUrl;
         });
@@ -198,7 +213,7 @@ export function AnimatedFavicon() {
           const dataUrl = canvas.toDataURL();
 
           // Update all favicon links
-          const links = document.querySelectorAll("link[rel*='icon']");
+          const links = document.querySelectorAll(ICON_LINKS);
           links.forEach((link) => {
             (link as HTMLLinkElement).href = dataUrl;
           });
@@ -304,11 +319,12 @@ export function AnimatedFavicon() {
           );
         };
       } catch (error) {
+        if (cancelled) return;
         logError(error, "animated-favicon-load");
         // Fallback to static favicon
         const staticFavicon =
           theme === "dark" ? "/favicon-dark.png" : "/favicon-light.png";
-        const links = document.querySelectorAll("link[rel*='icon']");
+        const links = document.querySelectorAll(ICON_LINKS);
         if (links.length > 0) {
           (links[0] as HTMLLinkElement).href = staticFavicon;
         } else {
@@ -325,6 +341,7 @@ export function AnimatedFavicon() {
 
     // Return cleanup function
     return () => {
+      cancelled = true;
       if (cleanup) {
         cleanup();
       }

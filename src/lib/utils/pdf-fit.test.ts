@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { fitScale, widestPageWidth, MIN_SCALE, MAX_SCALE } from "./pdf-fit";
+import {
+  fitScale,
+  pageSizes,
+  widestPageWidth,
+  MIN_SCALE,
+  MAX_SCALE,
+} from "./pdf-fit";
 
 /**
  * Numbers here are the real ones measured in the reader: an A4 portrait page
@@ -122,5 +128,61 @@ describe("widestPageWidth", () => {
     };
 
     await expect(widestPageWidth(pdf)).resolves.toBe(0);
+  });
+});
+
+describe("pageSizes", () => {
+  const pdfOf = (sizes: [number, number][]) => ({
+    numPages: sizes.length,
+    getPage: (n: number) =>
+      Promise.resolve({
+        getViewport: () => ({
+          width: sizes[n - 1][0],
+          height: sizes[n - 1][1],
+        }),
+      }),
+  });
+
+  it("measures every page, in order", async () => {
+    // A4 portrait, then the landscape page the thesis turns to.
+    await expect(
+      pageSizes(
+        pdfOf([
+          [595, 842],
+          [842, 595],
+        ]),
+      ),
+    ).resolves.toEqual([
+      { width: 595, height: 842 },
+      { width: 842, height: 595 },
+    ]);
+  });
+
+  it("gives a page it cannot read no size, and keeps the others", async () => {
+    const pdf = {
+      numPages: 2,
+      getPage: (n: number) =>
+        n === 1
+          ? Promise.reject(new Error("corrupt page"))
+          : Promise.resolve({
+              getViewport: () => ({ width: 595, height: 842 }),
+            }),
+    };
+
+    await expect(pageSizes(pdf)).resolves.toEqual([
+      { width: 0, height: 0 },
+      { width: 595, height: 842 },
+    ]);
+  });
+
+  it("measures nothing when the document cannot be read", async () => {
+    const pdf = {
+      numPages: 2,
+      getPage: vi.fn(() => {
+        throw new Error("no document");
+      }),
+    };
+
+    await expect(pageSizes(pdf)).resolves.toEqual([]);
   });
 });

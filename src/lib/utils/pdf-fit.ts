@@ -54,6 +54,53 @@ export function fitScale(
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, fitted));
 }
 
+/** A page's size at scale 1, in the units react-pdf lays pages out in. */
+export interface PageSize {
+  width: number;
+  height: number;
+}
+
+interface MeasurablePdf {
+  numPages: number;
+  getPage: (n: number) => Promise<{
+    getViewport: (p: { scale: number }) => { width: number; height?: number };
+  }>;
+}
+
+/**
+ * Every page's size at scale 1, from the document metadata.
+ *
+ * The reader gives each page a box of this size times the zoom before
+ * anything is drawn, so a page far from the viewport can go without its
+ * canvas and still hold its place: the scroll length, the page counter and
+ * the scroll position do not depend on which pages are drawn. A page that
+ * cannot be read gets 0x0 rather than failing the whole scan.
+ *
+ * Resolves to [] if the document cannot be measured at all.
+ */
+export async function pageSizes(pdf: MeasurablePdf): Promise<PageSize[]> {
+  try {
+    return await Promise.all(
+      Array.from({ length: pdf.numPages }, (_, i) =>
+        pdf
+          .getPage(i + 1)
+          .then((page) => {
+            const viewport = page.getViewport({ scale: 1 });
+            return { width: viewport.width, height: viewport.height ?? 0 };
+          })
+          .catch(() => ({ width: 0, height: 0 })),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** The widest of `sizes`, or 0 when there is none to go by. */
+export function widestOf(sizes: PageSize[]): number {
+  return sizes.reduce((max, size) => (size.width > max ? size.width : max), 0);
+}
+
 /**
  * The widest page in the document, in points.
  *
@@ -66,23 +113,6 @@ export function fitScale(
  * Resolves to 0 if the document cannot be measured, which callers should read
  * as "do not adjust the zoom".
  */
-export async function widestPageWidth(pdf: {
-  numPages: number;
-  getPage: (n: number) => Promise<{
-    getViewport: (p: { scale: number }) => { width: number };
-  }>;
-}): Promise<number> {
-  try {
-    const widths = await Promise.all(
-      Array.from({ length: pdf.numPages }, (_, i) =>
-        pdf
-          .getPage(i + 1)
-          .then((page) => page.getViewport({ scale: 1 }).width)
-          .catch(() => 0),
-      ),
-    );
-    return widths.reduce((max, w) => (w > max ? w : max), 0);
-  } catch {
-    return 0;
-  }
+export async function widestPageWidth(pdf: MeasurablePdf): Promise<number> {
+  return widestOf(await pageSizes(pdf));
 }

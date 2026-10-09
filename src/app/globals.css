@@ -4,6 +4,7 @@
 
 /* Performance optimizations */
 @import "../styles/performance.css";
+@import "../styles/motion.css";
 
 @layer base {
   :root {
@@ -582,6 +583,28 @@
   /* Ensure content is visible */
   .animate-on-scroll {
     opacity: 1 !important;
+  }
+}
+
+/* The splash's backdrop is in the HTML and only the bundle removes it
+   (app-wrapper.tsx). If the bundle never runs (a blocked or missing chunk,
+   an error before hydration), this hides it 6 s after its first paint, so
+   the page still shows. A working bundle removes it well before: 0.5 s
+   after the first paint locally, 3.6 s on Fast 3G with a 4x slower CPU
+   (docs/performance.md). It is in the stylesheet that draws the backdrop,
+   so the two load or fail together.
+   - 6 s is a delay, not a duration: reduced motion cuts every duration to
+     0.01 ms (above).
+   - !important keeps broader rules from cancelling or pausing it.
+   - visibility, because every browser animates it (display, only recent
+     ones), and a hidden box takes no clicks. */
+[data-splash-backdrop] {
+  animation: splash-backdrop-timeout 0s 6s forwards !important;
+}
+
+@keyframes splash-backdrop-timeout {
+  to {
+    visibility: hidden;
   }
 }
 

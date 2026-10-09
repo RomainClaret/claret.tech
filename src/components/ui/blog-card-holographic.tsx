@@ -14,10 +14,11 @@ import {
 import Image from "next/image";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { m } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface BlogCardHolographicProps {
   title: string;
@@ -144,9 +145,35 @@ export function BlogCardHolographic({
   const category = detectBlogCategory(title, description);
   const fallbackColor = BLOG_COLORS[category];
 
-  // Always call the hook (React hooks rules), but only use it if no server color provided
+  // A card with no color from the server takes it from its image, which
+  // costs colorthief, the full-size image and the extraction on the main
+  // thread. Done at load, every visit paid for it, including the ones that
+  // never reach the blog; it now starts once the card is within three
+  // screens of the viewport (at once for a deep link). Same image, same
+  // algorithm, same color.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isNear, setIsNear] = useState(false);
+  useEffect(() => {
+    if (providedColor || isNear) return;
+    const card = cardRef.current;
+    if (!card || typeof IntersectionObserver === "undefined") {
+      setIsNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (latestEntry(entries).isIntersecting) setIsNear(true);
+      },
+      { rootMargin: "300% 0px" },
+    );
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [providedColor, isNear]);
+
+  // Always call the hook (React hooks rules); an empty source extracts
+  // nothing and keeps the fallback.
   const { color: extractedColor } = useColorExtraction(
-    providedColor ? "" : image || "", // Pass empty string if we have server color
+    providedColor || !isNear ? "" : image || "",
     `rgb(${fallbackColor})`,
   );
 
@@ -159,7 +186,8 @@ export function BlogCardHolographic({
   const articleStatus = detectArticleStatus(date);
 
   return (
-    <motion.div
+    <m.div
+      ref={cardRef}
       className="h-full group/card relative card-animation"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -202,20 +230,13 @@ export function BlogCardHolographic({
                     />
                   )}
                 </div>
-                {/* Gentle breathing effect */}
-                <motion.div
-                  className="absolute inset-0 rounded-full pointer-events-none"
+                {/* Gentle breathing effect: a CSS loop (motion.css), 4 s */}
+                <div
+                  className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                   style={{
                     backgroundColor: `rgb(${nodeColor})`,
                     opacity: 0.1,
-                  }}
-                  animate={{
-                    scale: [1, 1.15, 1],
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: "easeInOut",
+                    animationDuration: "4s",
                   }}
                 />
               </div>
@@ -422,6 +443,6 @@ export function BlogCardHolographic({
           </div>
         </div>
       </HolographicCard>
-    </motion.div>
+    </m.div>
   );
 }

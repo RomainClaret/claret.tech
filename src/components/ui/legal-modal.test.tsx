@@ -36,10 +36,13 @@ describe("LegalModal", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
 
-    // Mock document.activeElement
+    // Mock document.activeElement. Configurable, and deleted in afterEach:
+    // left in place it shadowed the real getter (on Document.prototype) for
+    // every later file in the worker, so nothing could be seen focused.
     Object.defineProperty(document, "activeElement", {
       value: document.body,
       writable: true,
+      configurable: true,
     });
 
     // Reset body overflow
@@ -48,6 +51,7 @@ describe("LegalModal", () => {
 
   afterEach(() => {
     document.body.style.overflow = "auto";
+    delete (document as { activeElement?: unknown }).activeElement;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

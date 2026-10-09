@@ -19,7 +19,8 @@ import {
   Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTerminal } from "@/lib/terminal/terminal-context";
+import { useTerminalToggle } from "@/lib/terminal/terminal-context";
+import { terminalIntent } from "@/components/terminal/load-terminal";
 import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
@@ -38,7 +39,7 @@ const navItems = [
 ];
 
 export function Navigation() {
-  const { isOpen: isTerminalOpen, toggleTerminal } = useTerminal();
+  const { isOpen: isTerminalOpen, toggleTerminal } = useTerminalToggle();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
@@ -137,6 +138,7 @@ export function Navigation() {
               <span className="font-bold font-mono">Claret.Tech</span>
             </Link>
             <button
+              {...terminalIntent}
               onClick={toggleTerminal}
               // min-h/min-w rather than a larger font: the prompt glyphs stay
               // the same size, the tappable area reaches the 44px minimum.

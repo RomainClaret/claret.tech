@@ -104,23 +104,16 @@
     will-change: transform;
   }
 
-  .card-animation {
-    will-change: transform, box-shadow;
-    transform: translateZ(0);
-  }
-
   .frequent-update {
     will-change: contents;
   }
 
-  .group\/card {
-    will-change: transform;
-    transform: translateZ(0);
-  }
-
-  .group\/badge {
-    will-change: transform;
-  }
+  /* Cards and skill badges are not promoted to layers of their own any more
+     (.group/card, .group/badge and the blog card's .card-animation had
+     will-change: transform and translateZ(0)). With the promotion, the
+     main thread spent 269-349 ms painting during a scroll through the page;
+     without it, 94-127 ms (two rounds of three scrolls). A hover transition
+     still gets a layer for as long as it runs. */
 }
 
 /* Optimize shimmer and holographic animations */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 // Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import X from "lucide-react/dist/esm/icons/x";
 import FileText from "lucide-react/dist/esm/icons/file-text";
@@ -54,6 +54,9 @@ export function PerformanceReportModal({
   isOpen,
   onClose,
 }: PerformanceReportModalProps) {
+  // No overlay lock, unlike the content modals: the report measures the
+  // page while this is open, and pausing the decorative motion behind it
+  // would report an idle page (high frame rate, low CPU).
   // Removed unused context variables
   const [reportData, setReportData] = useState<PerformanceReportData | null>(
     null,
@@ -174,7 +177,7 @@ export function PerformanceReportModal({
 
   return (
     <AnimatePresence>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-[9999] flex items-center justify-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -182,7 +185,7 @@ export function PerformanceReportModal({
         transition={{ duration: 0.2 }}
       >
         {/* Backdrop */}
-        <motion.div
+        <m.div
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -191,7 +194,7 @@ export function PerformanceReportModal({
         />
 
         {/* Modal */}
-        <motion.div
+        <m.div
           className={cn(
             "relative bg-background border border-border shadow-2xl",
             "w-[90vw] h-[90vh] max-w-4xl max-h-[90vh]",
@@ -258,8 +261,8 @@ export function PerformanceReportModal({
           <div className="flex-1 overflow-auto p-6">
             <reportGenerator.ProgressUI />
           </div>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </AnimatePresence>
   );
 }

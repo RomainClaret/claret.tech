@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormattedExperienceYears } from "@/lib/utils/experience-calculator";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface ExperienceCardProps {
   experience: (typeof workExperiences.experience)[0];
@@ -113,7 +114,8 @@ const ExperienceCard = memo(function ExperienceCard({
   useEffect(() => {
     if (cardRef.current) {
       const observer = new IntersectionObserver(
-        ([entry]) => {
+        (entries) => {
+          const entry = latestEntry(entries);
           if (entry.isIntersecting) {
             setTimeout(() => {
               setIsVisible(true);

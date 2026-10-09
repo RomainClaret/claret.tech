@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, RefObject } from "react";
+import { latestEntry } from "@/lib/utils/intersection";
 
 /**
  * Hook to detect if an element is visible in the viewport
@@ -23,7 +24,8 @@ export function useVisibility<T extends HTMLElement>(
     }
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = latestEntry(entries);
         setIsVisible(entry.isIntersecting);
       },
       {

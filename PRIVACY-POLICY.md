@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2025-09-03**
+**Last Updated: 2026-10-08**
 
 ## Our Commitment to Privacy
 
@@ -25,7 +25,6 @@ At Claret.Tech, we believe in complete transparency and respect for your privacy
 We use only essential, functional cookies that are necessary for the website to work properly:
 
 - **Theme Preference:** Remembers if you prefer dark or light mode (stored locally)
-- **Safari Detection:** Helps optimize performance for Safari browsers (session only)
 
 These cookies contain no personal information and are not shared with any third parties.
 

@@ -11,12 +11,24 @@ import {
   useRef,
 } from "react";
 import { useFpsOnly } from "@/lib/hooks/useFpsOnly";
+import { readStorage, writeStorage } from "@/lib/utils/safe-storage";
+import { loadBackoff, saveBackoff, type Backoff } from "@/lib/quality/backoff";
+import {
+  getSnapshot as getMotionGate,
+  setMotionTier,
+} from "@/lib/utils/motion-gate";
+import { whenIdle } from "@/lib/utils/when-idle";
+import { probeDeviceOnce } from "@/lib/quality/probe";
 import { showToast } from "@/components/ui/toast";
 import { useTestMode } from "@/components/providers/test-mode-provider";
+import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
 import { QualityMode } from "@/lib/quality/mode";
 import {
   decideQuality,
   initialQualityState,
+  QUALITY_TUNING,
+  rebaseOnTier,
+  restartWindow,
   type QualityDecisionState,
 } from "@/lib/quality/decide";
 
@@ -96,43 +108,75 @@ const QUALITY_METRICS = {
   },
 } as const;
 
+/** The loop's first state, carrying what failed earlier this session. */
+const sessionState = (
+  tier: QualityMode,
+  now: number,
+): QualityDecisionState => ({
+  ...initialQualityState(tier, now),
+  ...loadBackoff(),
+});
+
+/** Set once the startup check has started this session at LOW. */
+const PROBE_APPLIED_KEY = "quality-probe-applied";
+
 export function QualityProvider({ children }: { children: ReactNode }) {
   const { isTestMode } = useTestMode();
 
-  // Initialize with Safari-aware defaults
-  const [quality, setQualityState] = useState<QualityMode>(() => {
-    if (typeof window === "undefined") return QualityMode.BALANCED;
+  // The tier and the auto switch the HTML was rendered with. The page is
+  // generated for every visitor, so its first render uses the defaults; the
+  // visitor's own (storage, browser) are restored by the layout effect
+  // below, before the browser paints. Read while rendering, they gave the
+  // client's first render other values than the HTML.
+  const [quality, setQualityState] = useState<QualityMode>(
+    QualityMode.BALANCED,
+  );
+  const [isAuto, setIsAutoState] = useState(true);
+  // Set once the visitor's values are in place. The effects that save,
+  // publish or act on the tier wait for it: run with the defaults first,
+  // they overwrote the stored choice and probed or adjusted a tier that was
+  // never the visitor's.
+  const [restored, setRestored] = useState(false);
 
-    // In test mode, use balanced quality without animations
-    if (isTestMode) return QualityMode.BALANCED;
-
-    // Check localStorage for saved preference first
-    const saved = localStorage.getItem("quality-mode");
+  useIsomorphicLayoutEffect(() => {
+    if (isTestMode) {
+      // Balanced, without automatic changes.
+      setIsAutoState(false);
+      setRestored(true);
+      return;
+    }
+    // A tier the visitor chose (auto off) is remembered across visits. A
+    // tier the automatic loop chose is remembered for this session only:
+    // kept across visits, one slow visit (a busy CPU, battery saver) lowered
+    // the site on every visit after it. Through readStorage: where the
+    // browser blocks storage, touching it throws.
+    const manual = readStorage("local", "quality-auto") === "false";
+    const saved = readStorage(manual ? "local" : "session", "quality-mode");
     if (saved && Object.values(QualityMode).includes(saved as QualityMode)) {
-      return saved as QualityMode;
-    }
-
-    // Auto-detect Safari and default to LOW mode for better compatibility
-    const isSafari =
+      setQualityState(saved as QualityMode);
+    } else if (
       /^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
-      /iPad|iPhone|iPod/.test(navigator.userAgent);
-
-    if (isSafari) {
-      return QualityMode.LOW; // Safari gets low quality by default for better performance
+      /iPad|iPhone|iPod/.test(navigator.userAgent)
+    ) {
+      // Safari gets low quality by default for better performance.
+      setQualityState(QualityMode.LOW);
     }
+    // Off only when switched off: anything else, including a value that is
+    // not JSON (which JSON.parse threw on), means automatic.
+    setIsAutoState(!manual);
+    setRestored(true);
+    // The values a test-mode switch below sets, it sets after this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    return QualityMode.BALANCED;
-  });
-
-  const [isAuto, setIsAutoState] = useState(() => {
-    if (typeof window === "undefined") return true;
-
-    // Disable auto-adjust in test mode
-    if (isTestMode) return false;
-
-    const saved = localStorage.getItem("quality-auto");
-    return saved ? JSON.parse(saved) : true;
-  });
+  // An end-to-end run's test mode is read from the URL after hydration too
+  // (test-mode-provider.tsx): balanced, without automatic changes, as soon
+  // as it is known.
+  useEffect(() => {
+    if (!isTestMode) return;
+    setQualityState(QualityMode.BALANCED);
+    setIsAutoState(false);
+  }, [isTestMode]);
 
   // FPS monitoring for auto-adjustment
   const fpsData = useFpsOnly(typeof window !== "undefined");
@@ -147,6 +191,11 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // readings instead, which is only possible if it sees the real value.
   const latestFpsRef = useRef(0);
   latestFpsRef.current = fpsData.fps;
+  // The sampler publishes once a second on its own clock; the tick below
+  // feeds only a sample it has not fed yet, never the same one twice.
+  const latestSampleRef = useRef(0);
+  latestSampleRef.current = fpsData.sample;
+  const fedSampleRef = useRef(0);
   // What the display can do, as opposed to what the page is achieving. The
   // gap between the two is the headroom the upgrade gate is really asking
   // about.
@@ -157,6 +206,29 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // it should trigger a render, and keeping it out of the dependency array is
   // what lets the interval run uninterrupted.
   const decisionRef = useRef<QualityDecisionState | null>(null);
+  // Set while the auto loop below is stopped (auto off, or test mode).
+  const loopStoppedRef = useRef(false);
+  // The backoff last saved (lib/quality/backoff.ts), so the loop, which
+  // ticks every second, writes only when a demotion, the recovery owed or
+  // the last toast's time changes.
+  const savedBackoffRef = useRef<Backoff | null>(null);
+  const setDecision = useCallback((state: QualityDecisionState) => {
+    decisionRef.current = state;
+    const saved = savedBackoffRef.current;
+    if (
+      saved?.demotions === state.demotions &&
+      saved.recoverTo === state.recoverTo &&
+      saved.lastToastAt === state.lastToastAt
+    ) {
+      return;
+    }
+    savedBackoffRef.current = {
+      demotions: state.demotions,
+      recoverTo: state.recoverTo,
+      lastToastAt: state.lastToastAt,
+    };
+    saveBackoff(state);
+  }, []);
 
   // Auto-adjust quality based on performance.
   //
@@ -166,33 +238,56 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // frame rate across that band) that nothing could observe because it was
   // buried in this effect.
   useEffect(() => {
-    if (!isAuto || typeof window === "undefined" || isTestMode) return;
+    if (!restored) return;
+    if (!isAuto || typeof window === "undefined" || isTestMode) {
+      loopStoppedRef.current = true;
+      return;
+    }
+    // Auto switched back on: the window still holds samples from before it
+    // was switched off, and on the same tier the tick's re-base keeps them,
+    // so a drop could follow from evidence minutes old. Start it over. Only
+    // then: this effect also restarts on the loop's own tier changes, which
+    // reset the window already and may have just recorded a recovery owed.
+    // After a reload with auto off there is no state in memory yet: restart
+    // from the session's, or its saved debt came back with the tier picked
+    // by hand, as if still owed.
+    if (loopStoppedRef.current) {
+      const now = Date.now();
+      setDecision(
+        restartWindow(
+          decisionRef.current ?? sessionState(quality, now),
+          quality,
+          now,
+        ),
+      );
+    }
+    loopStoppedRef.current = false;
 
     const tick = () => {
       const now = Date.now();
-      const stored = decisionRef.current ?? initialQualityState(quality, now);
+      const stored = decisionRef.current ?? sessionState(quality, now);
       // Quality can change without going through this loop: a manual switch,
-      // or a value restored from localStorage. Re-base on it and restart the
-      // sample window rather than reasoning from a tier we are no longer on.
-      const current =
-        stored.quality === quality
-          ? stored
-          : {
-              ...stored,
-              quality,
-              samples: [],
-              consecutiveDown: 0,
-              consecutiveUp: 0,
-              lastChangeAt: now,
-            };
+      // or a value restored from storage. Re-base on it.
+      const current = rebaseOnTier(stored, quality, now);
+
+      // A page covered by the splash or a modal is treated like a hidden
+      // one: the frame sampler pauses then, so the reading would be stale,
+      // and the page's own motion is suspended anyway.
+      const hidden =
+        (typeof document !== "undefined" && document.hidden) ||
+        getMotionGate().suspended;
+      // Visible but no new sample since the last tick (the two clocks drift,
+      // and the sampler restarts after a pause): nothing to decide on.
+      if (!hidden && latestSampleRef.current === fedSampleRef.current) return;
+      fedSampleRef.current = latestSampleRef.current;
 
       const decision = decideQuality(current, {
         fps: latestFpsRef.current,
         now,
-        hidden: typeof document !== "undefined" && document.hidden,
+        hidden,
         measuredRefreshRate: refreshRateRef.current,
       });
-      decisionRef.current = decision.state;
+      setDecision(decision.state);
 
       if (!decision.next) return;
       setQualityState(decision.next);
@@ -202,7 +297,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
       showToast(
         isRescue
           ? "🔋 Switched to battery saver to keep the site responsive"
-          : "🚀 Performance recovered, full quality restored",
+          : "🚀 Performance recovered, quality restored",
         isRescue ? "warning" : "success",
         4000,
       );
@@ -213,20 +308,127 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     // than the data arrives would only discard samples.
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [quality, isAuto, isTestMode]);
+  }, [quality, isAuto, isTestMode, setDecision, restored]);
 
   // Save preferences to localStorage
+  // Manual choices persist; automatic ones last the session (see above). An
+  // automatic tier left in localStorage by an earlier version is dropped.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("quality-mode", quality);
+    if (!restored) return;
+    try {
+      if (isAuto) {
+        sessionStorage.setItem("quality-mode", quality);
+        localStorage.removeItem("quality-mode");
+      } else {
+        localStorage.setItem("quality-mode", quality);
+      }
+    } catch {
+      // Storage blocked: the tier still applies for this page view.
     }
-  }, [quality]);
+  }, [quality, isAuto, restored]);
+
+  // Publish the tier to CSS (html[data-quality]) and to the motion gate, so
+  // CSS loops and gated components can follow it without React.
+  useEffect(() => {
+    if (!restored) return;
+    document.documentElement.dataset.quality = quality;
+    setMotionTier(quality);
+  }, [quality, restored]);
+
+  // Read by the startup check's idle callback, which runs after the visitor
+  // may have picked a tier by hand.
+  const isAutoRef = useRef(isAuto);
+  isAutoRef.current = isAuto;
+  // And the tier running then, to label the state it saves.
+  const qualityRef = useRef(quality);
+  qualityRef.current = quality;
+
+  // Machines that may not keep up (software rendering, no WebGL, Save Data)
+  // start at LOW instead of measuring seconds of stutter first. Probed once
+  // per session, in idle time, which the splash covers. Not on Safari, which
+  // starts at LOW already, not in test mode, and never over a manual choice.
+  const probedRef = useRef(false);
+  useEffect(() => {
+    if (!restored || probedRef.current) return;
+    probedRef.current = true;
+    if (!isAuto || isTestMode) return;
+    const isSafari =
+      /^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
+      /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isSafari) return;
+    return whenIdle(() => {
+      // A tier picked by hand since mount wins. Forced to LOW anyway, the
+      // pick was then saved as LOW, the visitor's "choice".
+      if (!isAutoRef.current) return;
+      const probe = probeDeviceOnce();
+      if (!probe.weak) return;
+      // Start at LOW. Where the browser reports software rendering, stay
+      // there: LOW runs smoothly on such a machine, which the loop would read
+      // as headroom and upgrade straight back into the tier it cannot
+      // sustain, so BALANCED is blocked for the session, as if it had already
+      // failed here. No WebGL (often a policy, or a hardened browser such as
+      // LibreWolf or Tor) and Save-Data (a bandwidth preference) say nothing
+      // about speed, since the site draws with Canvas 2D, SVG and CSS: those
+      // are blocked for the first backoff step only, then the loop may raise
+      // them like any machine. Pinned for the session, a fast desktop with
+      // WebGL off ran LOW until it chose a tier by hand.
+      //
+      // software-webgl is such a report, not WebGL alone in software. Only
+      // Chromium fails failIfMajorPerformanceCaveat (Safari ignores it, and
+      // Firefox does by default), only when WebGL runs on SwiftShader or
+      // WARP, and it then composites and rasterizes in software too
+      // (chrome://gpu: "Compositing: Software only"). The perf harness's
+      // headless Chromium is one (S7, S8).
+      const software =
+        probe.reason === "software-renderer" ||
+        probe.reason === "software-webgl";
+      // Software rendering is applied on every page view: that repeats the
+      // block the session's saved backoff restored (lib/quality/backoff.ts)
+      // and lowers any tier above LOW. The others are started at LOW once
+      // per session. Applied again on reload, they threw away the tier the
+      // loop had raised them to and blocked it for another minute.
+      if (!software) {
+        if (readStorage("session", PROBE_APPLIED_KEY) === "1") return;
+        writeStorage("session", PROBE_APPLIED_KEY, "1");
+      }
+      const now = Date.now();
+      // Labelled with the tier this leaves running (LOW where it forces
+      // LOW). Labelled LOW whatever ran, a session restored at battery
+      // saver was re-based on the next tick, which cleared the recovery the
+      // visitor was still owed.
+      const running = qualityRef.current;
+      const tier =
+        running === QualityMode.BALANCED || running === QualityMode.MAXIMUM
+          ? QualityMode.LOW
+          : running;
+      const base = decisionRef.current ?? sessionState(tier, now);
+      setDecision({
+        ...base,
+        demotions: {
+          ...base.demotions,
+          [QualityMode.BALANCED]: software
+            ? {
+                count: Number.POSITIVE_INFINITY,
+                blockedUntil: Number.POSITIVE_INFINITY,
+              }
+            : { count: 1, blockedUntil: now + QUALITY_TUNING.backoffMs[0] },
+        },
+      });
+      setQualityState((current) =>
+        current === QualityMode.BALANCED || current === QualityMode.MAXIMUM
+          ? QualityMode.LOW
+          : current,
+      );
+    });
+    // Once per mount, with the visitor's values: re-probing on every auto
+    // toggle buys nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("quality-auto", JSON.stringify(isAuto));
-    }
-  }, [isAuto]);
+    if (!restored) return;
+    writeStorage("local", "quality-auto", String(isAuto));
+  }, [isAuto, restored]);
 
   const setQuality = useCallback((newQuality: QualityMode) => {
     // Get current quality for comparison before updating
@@ -384,7 +586,11 @@ export const NEURAL_SIGNAL_PROFILE: QualityProfile = {
   },
   maximum: {
     animate: true, // Animated travel
-    particleCount: 8, // Many particles
+    // Particles that travel each signal's path. Eight were drawn while their
+    // SMIL clock was broken and they sat still at the path's end; once they
+    // moved, eight cost 7 points of main thread at the idle hero and 4,000+
+    // style recalculations a second, so three carry the effect.
+    particleCount: 3,
     strokeWidth: 6, // Thick, dramatic lines
     opacity: 1.0, // Full brightness
     effects: ["glow", "blur"], // Rainbow removed to prevent node corruption

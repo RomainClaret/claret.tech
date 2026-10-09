@@ -1,0 +1,195 @@
+/*
+ * Decorative motion that runs as CSS rather than SVG <animate> (SMIL) or a
+ * JavaScript loop.
+ *
+ * Why: Blink resolves style many times per frame for SMIL. The grids' ~80
+ * <animate> elements cost 838-2,382 style recalculations per second (about 27
+ * per frame) while the page sat idle. The same keyframes as CSS animations
+ * batch into one recalculation per frame (measured 2,335 -> 124 per second at
+ * 4x CPU, with the animation itself unchanged).
+ *
+ * The keyframes, durations and easing match what they replace, value for
+ * value, so nothing changes on screen.
+ */
+
+/*
+ * The gate (src/lib/utils/motion-gate.ts, src/lib/hooks/useMotionGate.ts).
+ * Decorative CSS loops carry .anim-decor. A container sets data-anim="off"
+ * while it is out of view, and <html data-motion="suspended"> covers a hidden
+ * tab or an open overlay. A paused animation resumes where it stopped, so
+ * nothing visibly restarts.
+ */
+html[data-motion="suspended"] .anim-decor,
+[data-anim="off"] .anim-decor,
+.anim-decor[data-anim="off"] {
+  animation-play-state: paused !important;
+}
+
+/* At the battery tier decoration holds still. */
+html[data-quality="battery"] .anim-decor {
+  animation: none !important;
+}
+
+/*
+ * Hover-only loops. The overlays they animate stay invisible (opacity 0)
+ * until their card is hovered, so they only need to run then. !important
+ * because these animations are set inline, and an inline animation shorthand
+ * resets the play state.
+ */
+.anim-hover {
+  animation-play-state: paused !important;
+}
+.group\/statscard:hover .anim-hover,
+.group\/badge:hover .anim-hover {
+  animation-play-state: running !important;
+}
+
+/*
+ * Breathing pulse behind section icons: was a framer-motion loop,
+ * scale [1, 1.15, 1] (or 1.2), duration 3 s, ease "easeInOut", repeat forever.
+ * framer applies that ease to each segment, and easeInOut is
+ * cubic-bezier(0.42, 0, 0.58, 1), so this is the same curve; CSS applies the
+ * timing function per keyframe interval too. framer cannot hand `scale` to
+ * the compositor, so each loop cost main-thread work on every frame; a CSS
+ * transform animation runs on the compositor. Longer durations and delays
+ * are set inline.
+ */
+@keyframes breathe-115 {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes breathe-120 {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.anim-breathe-115 {
+  animation: breathe-115 3s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+.anim-breathe-120 {
+  animation: breathe-120 3s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+/*
+ * Background brain sway: was a framer loop, rotate [-3, 3], 6 s, easeInOut,
+ * repeatType "reverse", i.e. alternate. The individual `rotate` property
+ * leaves the element's transform free.
+ */
+@keyframes sway {
+  from {
+    rotate: -3deg;
+  }
+  to {
+    rotate: 3deg;
+  }
+}
+
+.anim-sway {
+  animation: sway 6s cubic-bezier(0.42, 0, 0.58, 1) infinite alternate;
+}
+
+/* Skills badge border: was a framer backgroundPosition loop, linear 3 s. */
+@keyframes border-flow {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 200% 200%;
+  }
+}
+
+.anim-border-flow {
+  animation: border-flow 3s linear infinite;
+}
+
+/*
+ * Grid node pulse: was <animate r="4;5;4"> and <animate opacity="0.8;1;0.8">,
+ * dur 3s, linear (SMIL's default calcMode for a values list). The per-node
+ * phase comes from an inline animation-delay.
+ *
+ * The opacity is not animated directly. Chromium gives an SVG element with a
+ * running (or paused) opacity animation its own compositor layer, so ~40
+ * circles became ~40 layers under the grid's blur filter, and a software GPU
+ * then spent more per frame than it had under SMIL (frame throughput 89 -> 57
+ * fps, SwiftShader). Instead the keyframes animate a registered number,
+ * --grid-pulse, from 0 to 1 and back, and the opacity is 0.8 + 0.2 times it:
+ * the same linear path as before, value for value, with no layer. At rest
+ * (no animation) it is 1, so the circle sits at opacity 1 as it did when no
+ * SMIL ran. The var() fallback covers browsers without @property, where the
+ * number steps instead of gliding.
+ */
+@property --grid-pulse {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@keyframes grid-pulse {
+  0%,
+  100% {
+    r: 4px;
+    --grid-pulse: 0;
+  }
+  50% {
+    r: 5px;
+    --grid-pulse: 1;
+  }
+}
+
+.grid-pulse {
+  opacity: calc(0.8 + 0.2 * var(--grid-pulse, 1));
+  animation: grid-pulse 3s linear infinite;
+}
+
+/* On a machine that cannot keep up (LOW tier), the same pulse advances in
+   steps, 10 a second (15 per 1.5 s keyframe interval), so the blurred grid is
+   repainted a tenth as often. Higher tiers keep the continuous pulse. */
+html[data-quality="low"] .grid-pulse {
+  animation-timing-function: steps(15, end);
+}
+
+/*
+ * Grid node spike burst: was <animate r="6;16;20"> and
+ * <animate opacity="0.8;0.4;0">, once, over the spike duration (inline). The
+ * opacity runs through --grid-burst for the same reason as the pulse:
+ * 0.8 - 0.8 * (0, 0.5, 1) is 0.8, 0.4, 0. Its resting value is 1, so once
+ * the burst ends the circle is invisible, as the opacity="0" attribute left
+ * it under SMIL.
+ */
+@property --grid-burst {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@keyframes grid-burst {
+  0% {
+    r: 6px;
+    --grid-burst: 0;
+  }
+  50% {
+    r: 16px;
+    --grid-burst: 0.5;
+  }
+  100% {
+    r: 20px;
+    --grid-burst: 1;
+  }
+}
+
+.grid-burst {
+  opacity: calc(0.8 - 0.8 * var(--grid-burst, 1));
+  animation: grid-burst 300ms linear 1;
+}

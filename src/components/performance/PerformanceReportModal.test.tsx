@@ -11,32 +11,36 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { PerformanceReportModal } from "./PerformanceReportModal";
 
 // Mock all the external dependencies
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({
-      children,
-      className,
-      onClick,
-      ...props
-    }: React.PropsWithChildren<{
-      className?: string;
-      onClick?: React.MouseEventHandler<HTMLDivElement>;
-      [key: string]: unknown;
-    }>) => (
-      <div
-        className={className}
-        onClick={onClick}
-        data-testid="motion-div"
-        {...props}
-      >
-        {children}
-      </div>
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        className,
+        onClick,
+        ...props
+      }: React.PropsWithChildren<{
+        className?: string;
+        onClick?: React.MouseEventHandler<HTMLDivElement>;
+        [key: string]: unknown;
+      }>) => (
+        <div
+          className={className}
+          onClick={onClick}
+          data-testid="motion-div"
+          {...props}
+        >
+          {children}
+        </div>
+      ),
+    },
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
     ),
-  },
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock the deep per-icon imports used by the modal (see PerformanceReportModal.tsx)
 vi.mock("lucide-react/dist/esm/icons/x", () => ({

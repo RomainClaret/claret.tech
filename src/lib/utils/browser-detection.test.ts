@@ -3,8 +3,6 @@ import { detectBrowser, shouldReduceAnimations } from "./browser-detection";
 import {
   detectSafari,
   storeSafariDetection,
-  parseSafariFromCookieString,
-  getSafariFromNextCookies,
   getAnimationPreference,
   storeAnimationPreference,
   clearAnimationPreference,
@@ -115,7 +113,7 @@ describe("Browser and Hardware Detection", () => {
   // Capture the real globals so afterEach can restore them. Without this, the
   // Object.defineProperty mocks below leak into other files sharing the vitest
   // worker, notably the mock `document`, whose createElement impl gets wiped by
-  // mockReset, which intermittently broke animation-manager.test.ts.
+  // mockReset, which intermittently broke tests in other files.
   const realGlobals = {
     window: global.window,
     screen: global.screen,
@@ -238,13 +236,14 @@ describe("Browser and Hardware Detection", () => {
       expect(result.isEdge).toBe(true);
     });
 
-    it("uses Safari from cookie when available", () => {
+    it("ignores a safari-detected cookie left from before", () => {
+      // The middleware that set it is gone; a stale one must not decide.
       mockDocument.cookie = "safari-detected=true; other=value";
       mockNavigator.userAgent = "Mozilla/5.0 Chrome"; // Non-Safari UA
 
       const result = detectBrowser();
 
-      expect(result.isSafari).toBe(true); // Should use cookie value
+      expect(result.isSafari).toBe(false);
     });
 
     it("handles server-side rendering", () => {
@@ -291,18 +290,19 @@ describe("Browser and Hardware Detection", () => {
 
       const result = detectSafari();
 
-      expect(result.source).toBe("cookie"); // Should fallback to cookie
-      expect(result.isSafari).toBe(false);
+      expect(result.source).toBe("userAgent"); // Falls back to the browser
     });
 
-    it("falls back to cookie detection", () => {
+    it("ignores a safari-detected cookie left from before", () => {
       mockLocalStorage.getItem.mockReturnValue(null);
       mockDocument.cookie = "safari-detected=true; other=value";
+      mockNavigator.userAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 
       const result = detectSafari();
 
-      expect(result.isSafari).toBe(true);
-      expect(result.source).toBe("cookie");
+      expect(result.isSafari).toBe(false);
+      expect(result.source).toBe("userAgent");
     });
 
     it("falls back to user agent detection", () => {
@@ -324,30 +324,6 @@ describe("Browser and Hardware Detection", () => {
         "browser-detection",
         expect.stringContaining('"isSafari":true'),
       );
-    });
-
-    it("parses Safari from cookie string correctly", () => {
-      expect(
-        parseSafariFromCookieString("safari-detected=true; other=value"),
-      ).toBe(true);
-      expect(
-        parseSafariFromCookieString("safari-detected=false; other=value"),
-      ).toBe(false);
-      expect(parseSafariFromCookieString("other=value")).toBe(false);
-      expect(parseSafariFromCookieString("")).toBe(false);
-    });
-
-    it("handles Next.js cookies correctly", () => {
-      const mockCookieStore = {
-        get: vi.fn((key: string) =>
-          key === "safari-detected" ? { value: "true" } : undefined,
-        ),
-      };
-
-      expect(getSafariFromNextCookies(mockCookieStore)).toBe(true);
-
-      mockCookieStore.get.mockReturnValue(undefined);
-      expect(getSafariFromNextCookies(mockCookieStore)).toBe(true); // Fallback to safe mode
     });
 
     it("distinguishes Safari from Chrome on macOS", () => {

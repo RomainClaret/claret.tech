@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
@@ -20,7 +20,7 @@ export function EducationStyleCard({
   delay = 0,
 }: EducationStyleCardProps) {
   return (
-    <motion.div
+    <m.div
       className={cn("relative group/card h-full", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -87,6 +87,6 @@ export function EducationStyleCard({
 
         {children}
       </div>
-    </motion.div>
+    </m.div>
   );
 }

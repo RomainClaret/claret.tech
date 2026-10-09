@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, RefObject } from "react";
 import { logWarning } from "@/lib/utils/dev-logger";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface UseIntersectionObserverOptions {
   threshold?: number | number[];
@@ -39,7 +40,7 @@ export function useIntersectionObserver(
             return;
           }
 
-          const entry = entries[0];
+          const entry = latestEntry(entries);
           if (entry) {
             setIsIntersecting(entry.isIntersecting);
           }

@@ -22,11 +22,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormattedExperienceYears } from "@/lib/utils/experience-calculator";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { HolographicCard } from "@/components/ui/holographic-card";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface ExperienceTimelineItemProps {
   experience: (typeof workExperiences.experience)[0];
@@ -121,7 +122,8 @@ function ExperienceTimelineItem({
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = latestEntry(entries);
         if (entry.isIntersecting) {
           setIsVisible(true);
           observer.disconnect();
@@ -156,7 +158,7 @@ function ExperienceTimelineItem({
       {/* Timeline line and dot */}
       <div className="relative flex flex-col items-center">
         {/* Dot */}
-        <motion.div
+        <m.div
           initial={{ scale: 0 }}
           animate={shown ? { scale: 1 } : { scale: 0 }}
           transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
@@ -195,7 +197,7 @@ function ExperienceTimelineItem({
               className={cn("w-3 h-3", experienceType.colorClass)}
             />
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Line */}
         {!isLast && (
@@ -220,7 +222,7 @@ function ExperienceTimelineItem({
           onMouseEnter={() => {}}
           onMouseLeave={() => {}}
         >
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={shown ? { opacity: 1 } : { opacity: 0 }}
             transition={{ delay: index * 0.05 + 0.1 }}
@@ -331,7 +333,7 @@ function ExperienceTimelineItem({
             {/* Expanded content */}
             <AnimatePresence>
               {isExpanded && (
-                <motion.div
+                <m.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -364,10 +366,10 @@ function ExperienceTimelineItem({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </m.div>
         </HolographicCard>
       </div>
     </div>

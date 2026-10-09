@@ -42,58 +42,31 @@ export function SafariProvider({
   children,
   initialSafari,
 }: SafariProviderProps) {
-  // Use server-provided Safari state for consistent server/client rendering
-  const [isSafari, setIsSafari] = useState(() => {
-    // Use server-provided value if available, otherwise detect on client
-    if (initialSafari !== undefined) {
-      return initialSafari;
-    }
-
-    // Fallback to client detection (should only happen in edge cases)
-    if (typeof window !== "undefined") {
-      const detection = detectSafari();
-      return detection.isSafari;
-    }
-
-    return false; // Default for SSR
-  });
+  // The value the HTML was rendered with, so hydration matches it: the
+  // homepage is generated once, at build time, for every browser. The
+  // browser itself is known on the client only, and settled after mount.
+  const [isSafari, setIsSafari] = useState(initialSafari ?? false);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // After mount: the browser this really is. The head script has already
+  // set <html data-safari> before the first paint (lib/boot/head-boot.ts);
+  // detectSafari's user-agent test is the same one.
   useEffect(() => {
-    // Mark as hydrated and set up DOM attributes
     setIsHydrated(true);
+    const detected = detectSafari().isSafari;
+    if (detected !== isSafari) setIsSafari(detected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
 
-    // Add data attribute to body for CSS targeting
+  // CSS targets <body data-safari> and .enable-animations on <body>.
+  useEffect(() => {
     document.body.setAttribute("data-safari", isSafari.toString());
-
-    // Enable/disable animations based on Safari detection
     if (isSafari) {
       document.body.classList.remove("enable-animations");
     } else {
       document.body.classList.add("enable-animations");
     }
-
-    // Optional: Update detection if localStorage has newer info
-    if (typeof window !== "undefined") {
-      const detection = detectSafari();
-      if (
-        detection.isSafari !== isSafari &&
-        detection.source === "localStorage"
-      ) {
-        setIsSafari(detection.isSafari);
-        document.body.setAttribute(
-          "data-safari",
-          detection.isSafari.toString(),
-        );
-
-        if (detection.isSafari) {
-          document.body.classList.remove("enable-animations");
-        } else {
-          document.body.classList.add("enable-animations");
-        }
-      }
-    }
-  }, [isSafari, initialSafari]);
+  }, [isSafari]);
 
   // Only reduce animations for confirmed Safari browsers
   const shouldReduceAnimations = isSafari;

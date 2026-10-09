@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
-import { useAnimationManager } from "@/lib/animation-manager";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
 import { useAnimationState } from "@/contexts/animation-state-context";
-import { useQuality, NEURAL_CANVAS_PROFILE } from "@/contexts/quality-context";
+import {
+  useQuality,
+  NEURAL_CANVAS_PROFILE,
+  QualityMode,
+} from "@/contexts/quality-context";
 import {
   BRAIN_NODES,
   BRAIN_CONTOUR_CONNECTIONS,
@@ -16,6 +20,7 @@ import {
   type BrainNode,
   type BrainConnection,
 } from "@/lib/utils/brain-network-data";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface BrainNetworkVisualizationProps {
   className?: string;
@@ -89,10 +94,23 @@ export function BrainNetworkVisualization({
   const animationRef = useRef<number>();
   const [isVisible, setIsVisible] = useState(true);
   const prefersReducedMotion = useReducedMotion();
-  const animationControl = useAnimationManager("brain-network", "high");
+  // The splash, a modal or a hidden tab: the canvas keeps its last frame.
+  const { suspended } = useMotionGate();
   const { areAnimationsPlaying } = useAnimationState();
-  const { getConfig } = useQuality();
+  const { getConfig, quality } = useQuality();
   const config = getConfig(NEURAL_CANVAS_PROFILE);
+  // On a machine that cannot keep up (LOW), draw into half the backing
+  // resolution: a quarter of the pixels per draw at the same CSS size, so
+  // the brain looks softer rather than slower. Not on Safari, whose LOW is
+  // its default tier rather than a sign of struggle.
+  const isSafari = useMemo(
+    () =>
+      typeof navigator !== "undefined" &&
+      (/^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
+        /iPad|iPhone|iPod/.test(navigator.userAgent)),
+    [],
+  );
+  const resolution = quality === QualityMode.LOW && !isSafari ? 0.5 : 1;
 
   const nodesRef = useRef<CanvasNode[]>([]);
   const signalsRef = useRef<Signal[]>([]);
@@ -179,6 +197,8 @@ export function BrainNetworkVisualization({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    // Draw in logical coordinates whatever the backing resolution.
+    ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
 
     // Ensure nodes are initialized before drawing
     if (!nodesRef.current.length || !connectionsRef.current.length) return;
@@ -261,13 +281,20 @@ export function BrainNetworkVisualization({
       ctx.arc(node.canvasX, node.canvasY, radius, 0, Math.PI * 2);
       ctx.stroke();
     }
-  }, [width, height, opacity]);
+  }, [width, height, opacity, resolution]);
 
-  // Draw static frame when nodes are ready and animations are disabled
+  // Draw static frame when nodes are ready and animations are disabled, or
+  // when the canvas is resized while an overlay has stopped the loop: a
+  // resize clears the bitmap (the tier can change the backing resolution),
+  // and the brain stayed blank behind the overlay until it closed. Read
+  // through a ref, so an overlay opening does not itself replace the frozen
+  // frame with the still one.
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
   useEffect(() => {
     if (
       nodesRef.current.length > 0 &&
-      (!areAnimationsPlaying || !config.animate) &&
+      (!areAnimationsPlaying || !config.animate || suspendedRef.current) &&
       !prefersReducedMotion &&
       isVisible
     ) {
@@ -281,34 +308,22 @@ export function BrainNetworkVisualization({
     drawStaticFrame,
   ]);
 
-  // Register with animation manager
-  useEffect(() => {
-    animationControl.register(
-      () => {}, // onPause
-      () => {}, // onResume
-    );
-  }, [animationControl]);
-
   // Intersection Observer
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = latestEntry(entries);
         setIsVisible(entry.isIntersecting);
-        if (entry.isIntersecting) {
-          animationControl.requestStart();
-        } else {
-          animationControl.requestStop();
-        }
       },
       { threshold: 0.1 },
     );
 
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [animationControl]);
+  }, []);
 
   // Mouse interaction
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -342,6 +357,7 @@ export function BrainNetworkVisualization({
     if (
       !canvasRef.current ||
       !isVisible ||
+      suspended ||
       prefersReducedMotion ||
       !config.animate
     )
@@ -350,13 +366,30 @@ export function BrainNetworkVisualization({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    // Draw in logical coordinates whatever the backing resolution.
+    ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
 
     // Repaint budget from the quality profile. Redrawing the bitmap is what
-    // costs, not what gets drawn into it, so the loop still runs every display
-    // frame but only touches the canvas when the budget allows.
+    // costs, not what gets drawn into it, so the canvas is only touched when
+    // the budget allows. Between draws the loop sleeps on a timer instead of
+    // waking on every display frame: at 30 Hz on a 120 Hz screen that is 30
+    // wakeups a second rather than 120.
     const targetFps = config.updateFrequency || 60;
     const frameInterval = 1000 / targetFps;
     let lastDrawTime = -Infinity;
+    let wakeTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleNextDraw = () => {
+      // Wake a little early; requestAnimationFrame then aligns the draw to
+      // the frame it would have landed on anyway.
+      const wait = lastDrawTime + frameInterval - performance.now() - 4;
+      if (wait > 0) {
+        wakeTimer = setTimeout(() => {
+          animationRef.current = requestAnimationFrame(animate);
+        }, wait);
+      } else {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
 
     // Node lookups were two linear scans of the node list per connection per
     // frame; the list never changes between draws.
@@ -618,7 +651,7 @@ export function BrainNetworkVisualization({
 
       // Only continue animation if animations are enabled
       if (areAnimationsPlaying && config.animate) {
-        animationRef.current = requestAnimationFrame(animate);
+        scheduleNextDraw();
       }
     };
 
@@ -633,6 +666,7 @@ export function BrainNetworkVisualization({
     }
 
     return () => {
+      if (wakeTimer !== undefined) clearTimeout(wakeTimer);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -643,10 +677,12 @@ export function BrainNetworkVisualization({
     isPulsing,
     opacity,
     isVisible,
+    suspended,
     prefersReducedMotion,
     areAnimationsPlaying,
     config.animate,
     config.updateFrequency,
+    resolution,
     // Not read in this effect, but the node map and the draw order above are
     // built once from nodesRef.current, and the effect that fills that ref
     // rebuilds it whenever this changes. Without it here the loop would keep
@@ -660,8 +696,8 @@ export function BrainNetworkVisualization({
     <div className={cn("relative overflow-hidden rounded-lg", className)}>
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
+        width={Math.round(width * resolution)}
+        height={Math.round(height * resolution)}
         className="w-full h-full"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => {

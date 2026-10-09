@@ -24,15 +24,18 @@ import {
 import { ArxivWordmark, OrcidIcon } from "@/components/icons";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   comparePublications,
+  exportToBibTeX,
   publicationToBibTeX,
   STATIC_PUBLICATIONS,
   type ArxivVariant,
   type Publication,
 } from "@/lib/api/fetch-publications";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
+import { pdfReaderIntent } from "@/lib/pdf-reader-preload";
+import { loadPdfModal } from "@/components/ui/pdf-modal-loader";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { useConferenceLogo } from "@/lib/hooks/useConferenceLogo";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
@@ -40,14 +43,11 @@ import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { logError } from "@/lib/utils/dev-logger";
 
-// Lazy load PDF Modal
-const PDFModal = dynamic(
-  () => import("@/components/ui/pdf-modal").then((mod) => mod.PDFModal),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
+// Fetched on intent and mounted only while open (pdf-reader-preload.ts).
+const PDFModal = dynamic(loadPdfModal, {
+  ssr: false,
+  loading: () => null,
+});
 
 // Research area colors
 const RESEARCH_COLORS: Record<string, string> = {
@@ -197,6 +197,7 @@ function ReadPdfButton({
   const { color, Icon, label } = READ_PDF_VARIANTS[variant];
   return (
     <button
+      {...pdfReaderIntent}
       onClick={() =>
         onOpenPDF(pdf, title, pdf.split("/").pop() || "document.pdf")
       }
@@ -359,6 +360,7 @@ function PaperCard({
       return (
         <button
           key={link.url}
+          {...pdfReaderIntent}
           onClick={(e) => handleLinkClick(e, link)}
           className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
         >
@@ -397,7 +399,7 @@ function PaperCard({
 
   return (
     <SlideInUp delay={index * 100} className="h-full">
-      <motion.div
+      <m.div
         className="relative h-full"
         whileHover={{ scale: 1.02 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -413,7 +415,7 @@ function PaperCard({
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <motion.div
+                  <m.div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{ backgroundColor: `rgba(${nodeColor}, 0.1)` }}
                     whileHover={{ scale: 1.1 }}
@@ -434,21 +436,14 @@ function PaperCard({
                         style={{ color: `rgb(${nodeColor})` }}
                       />
                     )}
-                  </motion.div>
-                  {/* Gentle breathing effect instead of aggressive pulse */}
-                  <motion.div
-                    className="absolute inset-0 rounded-full pointer-events-none"
+                  </m.div>
+                  {/* Gentle breathing effect: a CSS loop (motion.css) that
+                      pauses with its card when off-screen */}
+                  <div
+                    className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                     style={{
                       backgroundColor: `rgb(${nodeColor})`,
                       opacity: 0.1,
-                    }}
-                    animate={{
-                      scale: [1, 1.15, 1],
-                    }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
                     }}
                   />
                 </div>
@@ -626,7 +621,7 @@ function PaperCard({
             </div>
           </div>
         </HolographicCard>
-      </motion.div>
+      </m.div>
     </SlideInUp>
   );
 }
@@ -696,7 +691,7 @@ function DynamicPaperCard({
 
   return (
     <SlideInUp delay={index * 100} className="h-full">
-      <motion.div
+      <m.div
         className="relative h-full"
         whileHover={{ scale: 1.02 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -712,7 +707,7 @@ function DynamicPaperCard({
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <motion.div
+                  <m.div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{ backgroundColor: `rgba(${nodeColor}, 0.1)` }}
                     whileHover={{ scale: 1.1 }}
@@ -733,21 +728,14 @@ function DynamicPaperCard({
                         style={{ color: `rgb(${nodeColor})` }}
                       />
                     )}
-                  </motion.div>
-                  {/* Gentle breathing effect instead of aggressive pulse */}
-                  <motion.div
-                    className="absolute inset-0 rounded-full pointer-events-none"
+                  </m.div>
+                  {/* Gentle breathing effect: a CSS loop (motion.css) that
+                      pauses with its card when off-screen */}
+                  <div
+                    className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                     style={{
                       backgroundColor: `rgb(${nodeColor})`,
                       opacity: 0.1,
-                    }}
-                    animate={{
-                      scale: [1, 1.15, 1],
-                    }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
                     }}
                   />
                 </div>
@@ -968,6 +956,7 @@ function DynamicPaperCard({
                 )}
                 {publication.pdfUrl && (
                   <button
+                    {...pdfReaderIntent}
                     onClick={handlePDFClick}
                     className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
                   >
@@ -1034,7 +1023,7 @@ function DynamicPaperCard({
             </div>
           </div>
         </HolographicCard>
-      </motion.div>
+      </m.div>
     </SlideInUp>
   );
 }
@@ -1276,19 +1265,24 @@ export function Papers() {
           <FadeIn delay={600} className="text-center mt-12 space-y-4">
             {hasDynamicPapers && (
               <button
-                onClick={async () => {
-                  const response = await fetch("/api/publications", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ publications: dynamicPapers }),
-                  });
-                  const bibtex = await response.text();
+                onClick={() => {
+                  // Built here: posting the papers to /api/publications ran
+                  // this same function, and saved the rate limiter's 429 or
+                  // a 500 as the .bib file whenever the request failed.
+                  const bibtex = exportToBibTeX(dynamicPapers);
                   const blob = new Blob([bibtex], { type: "text/plain" });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;
                   a.download = "romainclaret-publications.bib";
                   a.click();
+                  // Released after the download has had time to read it:
+                  // WebKit (and older Firefox) may still be resolving the URL
+                  // after click() returns, and revoking at once can fail the
+                  // download. FileSaver.js waits 40 s for the same reason. The
+                  // blob is a few KB; without this every export kept it for
+                  // the life of the page.
+                  setTimeout(() => URL.revokeObjectURL(url), 40_000);
                 }}
                 className="inline-flex items-center gap-2 text-primary hover:underline transition-colors"
               >
@@ -1311,14 +1305,16 @@ export function Papers() {
           </FadeIn>
 
           {/* PDF Modal */}
-          <PDFModal
-            isOpen={isOpen}
-            onClose={closePDF}
-            pdfUrl={pdfUrl}
-            title={title}
-            downloadFileName={downloadFileName}
-            shareSlug={shareSlug}
-          />
+          {isOpen && (
+            <PDFModal
+              isOpen={isOpen}
+              onClose={closePDF}
+              pdfUrl={pdfUrl}
+              title={title}
+              downloadFileName={downloadFileName}
+              shareSlug={shareSlug}
+            />
+          )}
         </div>
       </div>
     </div>

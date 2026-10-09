@@ -10,6 +10,7 @@
 
 import { vi, expect } from "vitest";
 import React, { ReactNode } from "react";
+import { restoreNavigator, stubNavigator } from "./navigator";
 
 // ==============================================================================
 // Browser API Mocking Utilities
@@ -54,20 +55,15 @@ export function mockBrowserAPIs() {
     clearMeasures: vi.fn(),
   };
 
-  // Navigator API mocking
-  Object.defineProperty(navigator, "hardwareConcurrency", {
-    writable: true,
-    value: 8,
-  });
-
-  Object.defineProperty(navigator, "connection", {
-    writable: true,
-    value: {
-      effectiveType: "4g",
-      downlink: 10,
-      rtt: 100,
-      saveData: false,
-    },
+  // Navigator API mocking. Through stubNavigator, which cleanupBrowserAPIs
+  // undoes: defined without configurable and never restored, these outlived
+  // the context tests and broke later files (probe.test.ts).
+  stubNavigator("hardwareConcurrency", 8);
+  stubNavigator("connection", {
+    effectiveType: "4g",
+    downlink: 10,
+    rtt: 100,
+    saveData: false,
   });
 
   // Window dimensions and events
@@ -141,6 +137,7 @@ export function mockBrowserAPIs() {
  * Clean up browser API mocks after tests
  */
 export function cleanupBrowserAPIs() {
+  restoreNavigator();
   if (!realGlobals) return;
   for (const [key, value] of Object.entries(realGlobals)) {
     (globalThis as Record<string, unknown>)[key] = value;

@@ -4,6 +4,7 @@ import { SlideInLeft, SlideInRight } from "@/components/ui/animated";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
+import { loadPdfModal } from "@/components/ui/pdf-modal-loader";
 import { useIntersectionObserver } from "@/lib/hooks/useIntersectionObserver";
 import { useBackground } from "@/contexts/background-context";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
@@ -21,19 +22,21 @@ const DualBrainAnimation = dynamic(
     ),
   {
     ssr: false,
+    // The component's own height: its primary brain's (200, 250 or 300 px
+    // by breakpoint). A square up to 512 px stood in for it, so the hero's
+    // brain column shrank when the component arrived and the content
+    // around it re-centred, a layout shift on every load.
     loading: () => (
-      <div className="w-full max-w-lg mx-auto aspect-square bg-transparent" />
+      <div className="w-full h-[200px] sm:h-[250px] lg:h-[300px]" />
     ),
   },
 );
 
-const PDFModal = dynamic(
-  () => import("@/components/ui/pdf-modal").then((mod) => mod.PDFModal),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
+// Fetched on intent and mounted only while open (pdf-reader-preload.ts).
+const PDFModal = dynamic(loadPdfModal, {
+  ssr: false,
+  loading: () => null,
+});
 
 export function Introduction() {
   const shouldReduceAnimations = useShouldReduceAnimations();
@@ -60,20 +63,48 @@ export function Introduction() {
 
   // Brain nodes state (removed debug logging for cleaner console)
 
-  // Generate background data on mount and track screen dimensions
+  // Generate background data on mount and track screen dimensions.
+  //
+  // Resize fires continuously while a window is dragged, and on phones every
+  // time the URL bar shows or hides during a scroll. Each event used to draw
+  // a new random background, re-rendering every background layer and visibly
+  // reshuffling it mid-scroll. Now the dimensions settle 150 ms after the last
+  // event, and the background is redrawn only when the grid itself changes: a
+  // different number of 64 px columns, or a height change beyond
+  // max(150 px, 20%), which the URL bar never reaches.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const updateDimensions = () => {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        setScreenDimensions({ width, height });
-        generateBackgroundData(width, height, 64);
-      };
+    if (typeof window === "undefined") return;
 
-      updateDimensions();
-      window.addEventListener("resize", updateDimensions);
-      return () => window.removeEventListener("resize", updateDimensions);
-    }
+    const CELL = 64;
+    let generatedFor = { width: 0, height: 0 };
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const update = (force: boolean) => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      setScreenDimensions({ width, height });
+      const columnsChanged =
+        Math.ceil(width / CELL) !== Math.ceil(generatedFor.width / CELL);
+      const heightChanged =
+        Math.abs(height - generatedFor.height) >
+        Math.max(150, generatedFor.height * 0.2);
+      if (force || columnsChanged || heightChanged) {
+        generatedFor = { width, height };
+        generateBackgroundData(width, height, CELL);
+      }
+    };
+
+    const onResize = () => {
+      if (settleTimer !== undefined) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => update(false), 150);
+    };
+
+    update(true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (settleTimer !== undefined) clearTimeout(settleTimer);
+    };
   }, [generateBackgroundData]);
 
   const handleResumeClick = () => {
@@ -145,14 +176,16 @@ export function Introduction() {
       </div>
 
       {/* PDF Modal */}
-      <PDFModal
-        isOpen={isOpen}
-        pdfUrl={pdfUrl}
-        title={title}
-        downloadFileName={downloadFileName}
-        shareSlug={shareSlug}
-        onClose={closePDF}
-      />
+      {isOpen && (
+        <PDFModal
+          isOpen={isOpen}
+          pdfUrl={pdfUrl}
+          title={title}
+          downloadFileName={downloadFileName}
+          shareSlug={shareSlug}
+          onClose={closePDF}
+        />
+      )}
     </section>
   );
 }

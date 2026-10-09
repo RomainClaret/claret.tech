@@ -16,10 +16,12 @@ export function useColorExtraction(
   const colorThiefRef = useRef<ColorThief | null>(null);
 
   useEffect(() => {
-    // Check precomputed colors first
-    if (precomputedColors[imageSrc as keyof typeof precomputedColors]) {
-      const precomputedColor =
-        precomputedColors[imageSrc as keyof typeof precomputedColors];
+    // Check precomputed colors first, by path: a logo URL may carry a ?v=
+    // version (conference-logos.ts), which the keys do not, and a miss
+    // loads ColorThief to extract the color at runtime.
+    const path = imageSrc.split("?")[0] as keyof typeof precomputedColors;
+    if (precomputedColors[path]) {
+      const precomputedColor = precomputedColors[path];
       setExtractedColor(precomputedColor);
       setIsLoading(false);
       return;

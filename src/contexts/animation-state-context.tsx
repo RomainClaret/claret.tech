@@ -49,79 +49,56 @@ export function AnimationStateProvider({ children }: { children: ReactNode }) {
   const shouldMonitorFps = isHydrated && typeof window !== "undefined";
   const fpsData = useFpsOnly(shouldMonitorFps);
 
-  // Initialize user animation preference state with hydration-safe defaults
-  const [userAnimationPreference, setUserAnimationPreference] = useState(() => {
-    // During SSR, always return true to avoid hydration mismatch
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    // On client, use browser-appropriate defaults
-    const browserDefault = !isSafari; // Safari = false (stopped), others = true (playing)
-
-    // Check if browser changed and clear preference if needed
-    if (shouldResetAnimationPreference(isSafari)) {
-      clearAnimationPreference();
-      return browserDefault;
-    }
-
-    // Check for existing preference
-    const preference = getAnimationPreference();
-    if (preference && preference.isUserPreference) {
-      return preference.value;
-    }
-
-    // If we have a stored preference but it's a browser default, validate it matches current browser
-    if (preference && !preference.isUserPreference) {
-      const currentBrowser = isSafari ? "safari" : "other";
-      if (preference.browser === currentBrowser) {
-        return preference.value;
-      } else {
-        // Browser changed but wasn't caught by shouldResetAnimationPreference
-        clearAnimationPreference();
-      }
-    }
-
-    // Use browser default
-    return browserDefault;
-  });
+  // Playing, as the HTML was rendered: the page is generated once for every
+  // visitor, so neither their stored choice nor their browser can go into
+  // the first render. Both are settled in the effect below.
+  const [userAnimationPreference, setUserAnimationPreference] = useState(true);
 
   // FPS auto-disable logic
-  const autoDisableState = useFpsAutoDisable(fpsData.fps || 60, isSafari, {
-    enabled: shouldMonitorFps && userAnimationPreference, // Only monitor when animations are enabled
-    onAutoDisable: () => {
-      // When auto-disabled, we don't change user preference, just the effective state
-      // This way when the user manually enables animations, their preference is preserved
+  const autoDisableState = useFpsAutoDisable(
+    { fps: fpsData.fps || 60, sample: fpsData.sample },
+    isSafari,
+    {
+      enabled: shouldMonitorFps && userAnimationPreference, // Only monitor when animations are enabled
+      onAutoDisable: () => {
+        // When auto-disabled, we don't change user preference, just the effective state
+        // This way when the user manually enables animations, their preference is preserved
+      },
     },
-  });
+  );
 
   // The actual animation state is user preference AND not auto-disabled
   const areAnimationsPlaying =
     userAnimationPreference && !autoDisableState.isAutoDisabled;
 
-  // Sync animation preference after hydration
+  // Once the browser is settled (the Safari provider's mount, which sets
+  // isHydrated with the detected browser): the stored choice, or the
+  // browser's default. Before that, a check for a changed browser would
+  // compare a Safari visitor's stored choice with the page's default and
+  // throw it away.
   useEffect(() => {
-    if (!isHydrated || typeof window === "undefined") return;
-
-    // On first hydration, set correct browser default if no user preference exists
+    if (!isHydrated) return;
+    if (shouldResetAnimationPreference(isSafari)) {
+      clearAnimationPreference();
+    }
     const preference = getAnimationPreference();
-    if (!preference || !preference.isUserPreference) {
-      const correctDefault = !isSafari;
-      if (userAnimationPreference !== correctDefault) {
-        setUserAnimationPreference(correctDefault);
-      }
+    const currentBrowser = isSafari ? "safari" : "other";
+    if (preference?.isUserPreference) {
+      setUserAnimationPreference(preference.value);
+    } else if (preference && preference.browser === currentBrowser) {
+      // A browser default stored by an older version of the site.
+      setUserAnimationPreference(preference.value);
+    } else {
+      if (preference) clearAnimationPreference();
+      setUserAnimationPreference(!isSafari); // Safari: stopped; others: playing
     }
-  }, [isHydrated, isSafari, userAnimationPreference]);
+  }, [isHydrated, isSafari]);
 
-  // Store animation preference when it changes
-  useEffect(() => {
-    // Only store after hydration to ensure consistency
-    if (isHydrated && typeof window !== "undefined") {
-      // Store as browser default (not user preference)
-      // Will be marked as user preference when user explicitly changes it
-      storeAnimationPreference(userAnimationPreference, isSafari, false);
-    }
-  }, [userAnimationPreference, isHydrated, isSafari]);
+  // Only a visitor's own choice is stored, by the controls below; the
+  // browser default is worked out again on every load. An effect here
+  // stored every change as "not the visitor's choice", overwriting what a
+  // control had just saved, so the next load reset the animations to the
+  // browser default.
 
   // Listen for terminal command events
   useEffect(() => {
@@ -151,6 +128,9 @@ export function AnimationStateProvider({ children }: { children: ReactNode }) {
       // Force enable through auto-disable system
       autoDisableState.forceEnableAnimations();
       setUserAnimationPreference(true);
+      // Saved as the visitor's choice like the others: unsaved, the sync
+      // effect above put a Safari visitor straight back to the default.
+      storeAnimationPreference(true, isSafari, true);
     };
 
     window.addEventListener("animation-play", handleAnimationPlay);

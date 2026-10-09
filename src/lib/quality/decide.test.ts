@@ -5,8 +5,11 @@ import {
   initialQualityState,
   isBlocked,
   QUALITY_TUNING,
+  rebaseOnTier,
+  restartWindow,
   type QualityDecisionState,
 } from "./decide";
+import { PLAUSIBLE_REFRESH_RATES } from "./refresh-rate";
 
 /**
  * These tests exist because the previous implementation had none, and shipped a
@@ -22,6 +25,7 @@ function feed(
   fps: number | ((state: QualityDecisionState) => number),
   seconds: number,
   startAt = 0,
+  measuredRefreshRate?: number,
 ): { state: QualityDecisionState; changes: QualityMode[]; toasts: number } {
   const changes: QualityMode[] = [];
   let toasts = 0;
@@ -33,6 +37,7 @@ function feed(
       fps: value,
       now: startAt + i * SECOND,
       hidden: false,
+      measuredRefreshRate,
     });
     current = decision.state;
     if (decision.next) changes.push(decision.next);
@@ -131,7 +136,7 @@ describe("decideQuality", () => {
       expect(changes).toContain(QualityMode.BATTERY_SAVER);
     });
 
-    it("ignores samples taken while the tab is hidden", () => {
+    it("ignores samples taken while the tab is hidden, and restarts", () => {
       const state = feed(
         initialQualityState(QualityMode.MAXIMUM),
         60,
@@ -145,7 +150,56 @@ describe("decideQuality", () => {
       });
 
       expect(decision.next).toBeNull();
-      expect(decision.state.samples).toEqual(state.samples);
+      // The window and the settle restart: what follows a hidden stretch is
+      // a page restarting, not the one the old samples describe.
+      expect(decision.state.samples).toEqual([]);
+      expect(decision.state.lastChangeAt).toBe(100 * SECOND);
+    });
+
+    it("does not fast-path to battery saver on the jank right after an overlay", () => {
+      // Every paused loop restarts and lazy chunks run when the splash or a
+      // modal goes away. Three slow seconds then took the fast path, and
+      // under 20 fps that is battery saver, with a toast, a 60 s block and
+      // the tier kept for the session.
+      let state = feed(initialQualityState(QualityMode.BALANCED), 60, 10).state;
+      state = decideQuality(state, {
+        fps: 60,
+        now: 100 * SECOND,
+        hidden: true,
+      }).state;
+
+      const after = [1, 2, 3].map(
+        (s) =>
+          (state = decideQuality(state, {
+            fps: 18,
+            now: (100 + s) * SECOND,
+            hidden: false,
+          }).state),
+      );
+
+      expect(after.at(-1)?.quality).toBe(QualityMode.BALANCED);
+    });
+
+    it("still acts on a drop that outlasts the settle after an overlay", () => {
+      let state = feed(initialQualityState(QualityMode.BALANCED), 60, 10).state;
+      state = decideQuality(state, {
+        fps: 60,
+        now: 100 * SECOND,
+        hidden: true,
+      }).state;
+
+      const next: (QualityMode | null)[] = [];
+      for (let s = 1; s <= 8; s++) {
+        const decision = decideQuality(state, {
+          fps: 18,
+          now: (100 + s) * SECOND,
+          hidden: false,
+        });
+        next.push(decision.next);
+        state = decision.state;
+      }
+
+      expect(next).toContain(QualityMode.BATTERY_SAVER);
     });
 
     it("ignores samples during the settling window after a change", () => {
@@ -284,6 +338,54 @@ describe("decideQuality", () => {
     });
   });
 
+  describe("60Hz and slower displays", () => {
+    // Samples inside the settle window are ignored, then the window fills,
+    // then an upgrade needs `upgradeSamples` agreeing verdicts in a row.
+    const firstVerdict =
+      QUALITY_TUNING.settleMs / SECOND + QUALITY_TUNING.minSamples - 1;
+    const upgradeDue = firstVerdict + QUALITY_TUNING.upgradeSamples - 1;
+
+    it("upgrades a measured 50Hz panel pinned at its rate", () => {
+      // The 58 floor sat above anything a 50Hz panel can render, so a
+      // measured rate this low could never upgrade at all. The estimator does
+      // not report 50Hz today (see refresh-rate.ts); this pins the gate for
+      // a measured rate, which is 95% of it and nothing more.
+      const { state, changes } = feed(
+        initialQualityState(QualityMode.LOW),
+        50,
+        upgradeDue + 1,
+        0,
+        50,
+      );
+
+      expect(changes).toEqual([QualityMode.BALANCED]);
+      // On the last confirming sample, not before.
+      expect(state.lastChangeAt).toBe(upgradeDue * SECOND);
+    });
+
+    it("upgrades a measured 60Hz panel that drops a frame most seconds", () => {
+      // 58 fps is 97% of vsync. The floor asked a 60Hz panel for 59, one
+      // frame more than the same rule asks of a 120Hz one.
+      const { changes } = feed(
+        initialQualityState(QualityMode.LOW),
+        58,
+        upgradeDue + 1,
+        0,
+        60,
+      );
+
+      expect(changes).toEqual([QualityMode.BALANCED]);
+    });
+
+    it("keeps the floor while the ceiling is only inferred", () => {
+      // Unmeasured, 58 could be a pinned 60Hz panel or a faster one held
+      // down by load: no evidence of headroom.
+      const { changes } = feed(initialQualityState(QualityMode.LOW), 58, 400);
+
+      expect(changes).toEqual([]);
+    });
+  });
+
   describe("asymmetry", () => {
     it("rescues a struggling visitor faster than it adds load", () => {
       expect(QUALITY_TUNING.downgradeSamples).toBeLessThan(
@@ -296,6 +398,18 @@ describe("decideQuality", () => {
       expect(QUALITY_TUNING.upgrade).toBeGreaterThan(
         QUALITY_TUNING.toBalanced + 10,
       );
+    });
+
+    it("keeps that headroom at every panel rate the estimator can measure", () => {
+      // A measured rate has no floor under its gate. Teaching the estimator a
+      // panel slower than 60Hz (50Hz gives a gate of 48) would bring the
+      // gate within 10 of the downgrade line, so that has to be decided here
+      // rather than slip in through the list of rates.
+      for (const rate of PLAUSIBLE_REFRESH_RATES) {
+        expect(
+          Math.round(QUALITY_TUNING.upgradeCeilingFraction * rate),
+        ).toBeGreaterThan(QUALITY_TUNING.toBalanced + 10);
+      }
     });
 
     it("drops straight to battery saver from any tier when things are dire", () => {
@@ -364,7 +478,7 @@ describe("decideQuality", () => {
       state = feed(state, 50, 10).state;
       // Degrade first.
       state = feed(state, 8, 20, 100 * SECOND).state;
-      expect(state.hasBeenDegraded).toBe(true);
+      expect(state.recoverTo).toBe(QualityMode.BALANCED);
 
       // Then recover, far enough ahead to clear both the backoff and the
       // toast rate limit.
@@ -373,6 +487,183 @@ describe("decideQuality", () => {
 
       expect(changes).toContain(QualityMode.MAXIMUM);
       expect(toasts).toBeGreaterThanOrEqual(1);
+    });
+
+    it("does not announce a retry of MAXIMUM as a recovery", () => {
+      // This machine holds BALANCED but not MAXIMUM. Each backoff retry
+      // (after 1, 5 and 30 minutes) used to say "full quality restored",
+      // then fall back silently: three toasts in the first hour.
+      const perTier: Record<QualityMode, number> = {
+        [QualityMode.BATTERY_SAVER]: 60,
+        [QualityMode.LOW]: 60,
+        [QualityMode.BALANCED]: 60,
+        [QualityMode.MAXIMUM]: 25,
+      };
+
+      const { changes, toasts } = feed(
+        initialQualityState(QualityMode.BALANCED),
+        (s) => perTier[s.quality],
+        3600,
+      );
+
+      expect(
+        changes.filter((tier) => tier === QualityMode.MAXIMUM).length,
+      ).toBeGreaterThan(1); // it did retry
+      expect(toasts).toBe(0);
+    });
+
+    it("announces a recovery once, after the drop it answers", () => {
+      let state = initialQualityState(QualityMode.BALANCED);
+      state = feed(state, 50, 10).state;
+      const drop = feed(state, 8, 20, 100 * SECOND); // to battery saver
+      expect(drop.toasts).toBe(1);
+
+      const later = 100 * SECOND + 2 * QUALITY_TUNING.toastIntervalMs;
+      const back = feed(drop.state, 60, 400, later);
+      expect(back.changes).toContain(QualityMode.MAXIMUM);
+      expect(back.toasts).toBe(1);
+      expect(back.state.recoverTo).toBeNull();
+    });
+
+    it("announces a recovery that lands soon after the drop, then never again", () => {
+      // The climb back from battery saver takes about 75 s, well inside the
+      // 5 minute toast limit. Rate limited, the recovery went unannounced
+      // and the debt stayed, so a routine retry later said "recovered".
+      let state = initialQualityState(QualityMode.BALANCED);
+      state = feed(state, 50, 10).state;
+      const drop = feed(state, 8, 20, 100 * SECOND); // to battery saver
+      expect(drop.toasts).toBe(1);
+
+      const back = feed(drop.state, 60, 200, 120 * SECOND);
+      expect(back.changes).toContain(QualityMode.MAXIMUM);
+      expect(back.toasts).toBe(1);
+
+      // Then a machine that cannot hold MAXIMUM: routine, silent retries.
+      const perTier: Record<QualityMode, number> = {
+        [QualityMode.BATTERY_SAVER]: 60,
+        [QualityMode.LOW]: 60,
+        [QualityMode.BALANCED]: 60,
+        [QualityMode.MAXIMUM]: 30,
+      };
+      const after = feed(
+        back.state,
+        (s) => perTier[s.quality],
+        3600,
+        320 * SECOND,
+      );
+      expect(after.changes).toContain(QualityMode.BALANCED);
+      expect(after.toasts).toBe(0);
+    });
+
+    /** Feed samples from `fps(state)`; return the tiers each toast came with. */
+    function toastsFor(
+      start: QualityDecisionState,
+      fps: (state: QualityDecisionState) => number,
+      seconds: number,
+      startAt: number,
+    ) {
+      const announced: QualityMode[] = [];
+      let state = start;
+      for (let i = 0; i < seconds; i++) {
+        const decision = decideQuality(state, {
+          fps: fps(state),
+          now: startAt + i * SECOND,
+          hidden: false,
+        });
+        state = decision.state;
+        if (decision.notify && decision.next) announced.push(decision.next);
+      }
+      return { announced, state };
+    }
+
+    it("announces the climb back to the tier the drop left, once", () => {
+      // Visitors start at BALANCED. Back there from battery saver is the
+      // recovery; a probe of MAXIMUM later is routine, and on this machine
+      // it fails. The debt used to wait for MAXIMUM, so the climb back was
+      // silent and the probe said "recovered" before falling back.
+      const perTier: Record<QualityMode, number> = {
+        [QualityMode.BATTERY_SAVER]: 60,
+        [QualityMode.LOW]: 60,
+        [QualityMode.BALANCED]: 60,
+        [QualityMode.MAXIMUM]: 30,
+      };
+      let state = feed(initialQualityState(QualityMode.BALANCED), 50, 10).state;
+      state = feed(state, 8, 20, 100 * SECOND).state; // drop, with its toast
+
+      const { announced } = toastsFor(
+        state,
+        (s) => perTier[s.quality],
+        3600,
+        120 * SECOND,
+      );
+
+      expect(announced).toEqual([QualityMode.BALANCED]);
+    });
+
+    it("owes a drop from MAXIMUM until MAXIMUM, not a partial climb", () => {
+      let state = feed(
+        initialQualityState(QualityMode.BALANCED),
+        60,
+        400,
+      ).state; // up to MAXIMUM
+      expect(state.quality).toBe(QualityMode.MAXIMUM);
+      state = feed(state, 8, 20, 400 * SECOND).state; // straight to battery
+      expect(state.recoverTo).toBe(QualityMode.MAXIMUM);
+
+      const { announced } = toastsFor(state, () => 60, 600, 420 * SECOND);
+
+      expect(announced).toEqual([QualityMode.MAXIMUM]);
+    });
+
+    it("never announces a downgrade as a recovery", () => {
+      // A debt to BALANCED while at MAXIMUM (restored with a tier picked by
+      // hand): falling to BALANCED lands at the tier owed, but downward.
+      const state: QualityDecisionState = {
+        ...initialQualityState(QualityMode.MAXIMUM),
+        recoverTo: QualityMode.BALANCED,
+      };
+
+      const { changes, toasts } = feed(state, 35, 30, 10 * SECOND);
+
+      expect(changes).toEqual([QualityMode.BALANCED]);
+      expect(toasts).toBe(0);
+    });
+
+    it("restarts the window but keeps the backoff", () => {
+      // Auto switched back on: what the window held is from before.
+      const state: QualityDecisionState = {
+        ...initialQualityState(QualityMode.MAXIMUM),
+        samples: [35, 35, 35, 35, 35],
+        consecutiveDown: 2,
+        recoverTo: QualityMode.MAXIMUM,
+        demotions: {
+          [QualityMode.MAXIMUM]: { count: 1, blockedUntil: 70_000 },
+        },
+      };
+
+      const restarted = restartWindow(state, QualityMode.MAXIMUM, 9000);
+
+      expect(restarted).toMatchObject({
+        quality: QualityMode.MAXIMUM,
+        samples: [],
+        consecutiveDown: 0,
+        consecutiveUp: 0,
+        lastChangeAt: 9000,
+        recoverTo: null,
+      });
+      expect(restarted.demotions).toBe(state.demotions);
+    });
+
+    it("forgets the debt when quality is set without the loop", () => {
+      const owed: QualityDecisionState = {
+        ...initialQualityState(QualityMode.BATTERY_SAVER),
+        recoverTo: QualityMode.BALANCED,
+      };
+
+      // A tier picked by hand, or restored from storage.
+      expect(rebaseOnTier(owed, QualityMode.LOW, 5000).recoverTo).toBeNull();
+      // Nothing to re-base on the same tier.
+      expect(rebaseOnTier(owed, QualityMode.BATTERY_SAVER, 5000)).toBe(owed);
     });
 
     it("rate limits notifications regardless of how often tiers move", () => {
@@ -405,6 +696,50 @@ describe("decideQuality", () => {
       decideQuality(state, { fps: 60, now: 5000, hidden: false });
 
       expect(JSON.stringify(state)).toBe(snapshot);
+    });
+  });
+
+  describe("fast path", () => {
+    // Start past the settling window so only the sampling rules are in play.
+    const settled = () => initialQualityState(QualityMode.BALANCED, 0);
+    const start = QUALITY_TUNING.settleMs;
+
+    it("rescues a plainly struggling machine after three samples", () => {
+      // The slow path waits for a full window and three confirming ticks,
+      // about ten seconds of stutter on a first visit.
+      const { changes } = feed(settled(), 15, 3, start);
+
+      expect(changes).toEqual([QualityMode.BATTERY_SAVER]);
+    });
+
+    it("lowers to LOW, not further, when the frame rate is between the lines", () => {
+      const { changes } = feed(settled(), 24, 3, start);
+
+      expect(changes).toEqual([QualityMode.LOW]);
+    });
+
+    it("waits for three samples in a row under the LOW line", () => {
+      // One good second in the middle is enough to defer to the slow path.
+      let calls = 0;
+      const { changes } = feed(
+        settled(),
+        () => [15, 45, 15][calls++] ?? 45,
+        3,
+        start,
+      );
+
+      expect(changes).toEqual([]);
+    });
+
+    it("never upgrades", () => {
+      const { changes } = feed(
+        initialQualityState(QualityMode.LOW, 0),
+        120,
+        3,
+        start,
+      );
+
+      expect(changes).toEqual([]);
     });
   });
 });

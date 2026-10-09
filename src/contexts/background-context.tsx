@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  ReactNode,
+} from "react";
 
 export interface GridNode {
   x: number; // Grid column
@@ -58,6 +66,12 @@ interface BackgroundContextType {
     height: number,
     gridSize: number,
   ) => void;
+  /** Generate one only if nothing has yet (see BackgroundProvider). */
+  ensureBackgroundData: (
+    width: number,
+    height: number,
+    gridSize: number,
+  ) => void;
 }
 
 const BackgroundContext = createContext<BackgroundContextType | undefined>(
@@ -104,13 +118,28 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     null,
   );
 
+  // Whether a background exists yet; read by ensureBackgroundData.
+  const generatedRef = useRef(false);
+
   const generateBackgroundData = useMemo(
     () => (width: number, height: number, gridSize: number) => {
       const cols = Math.ceil(width / gridSize);
       const rows = Math.ceil(height / gridSize);
 
-      // Generate random nodes (15-25)
-      const nodeCount = 15 + Math.floor(Math.random() * 11);
+      // A viewport with no area has nothing to draw on. Nothing is
+      // generated, so ensureBackgroundData still can once it has one.
+      if (cols < 1 || rows < 1) return;
+      generatedRef.current = true;
+
+      // Generate random nodes (15-25), one per cell, and no more than there
+      // are cells. 400% zoom on a laptop can leave fewer than 25, and the
+      // search for a free cell below then never returned: the tab froze.
+      // The cap takes no draw of its own, so where all the nodes fit, the
+      // background is the same as before.
+      const nodeCount = Math.min(
+        15 + Math.floor(Math.random() * 11),
+        cols * rows,
+      );
       const nodes: GridNode[] = [];
       const usedPositions = new Set<string>();
 
@@ -429,13 +458,28 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // The hero generates a background on mount (and again when the grid
+  // changes size). Every other route the splash plays on still needs one for
+  // the site grid; the splash asks for it through this, which does nothing
+  // where the hero got there first, so / is not given a second, different
+  // background under the first.
+  const ensureBackgroundData = useCallback(
+    (width: number, height: number, gridSize: number) => {
+      if (!generatedRef.current)
+        generateBackgroundData(width, height, gridSize);
+    },
+    [generateBackgroundData],
+  );
+
+  // A stable value, so its consumers (both grids, the hero) re-render when
+  // the background changes, not whenever this provider's parent does.
+  const value = useMemo(
+    () => ({ backgroundData, generateBackgroundData, ensureBackgroundData }),
+    [backgroundData, generateBackgroundData, ensureBackgroundData],
+  );
+
   return (
-    <BackgroundContext.Provider
-      value={{
-        backgroundData,
-        generateBackgroundData,
-      }}
-    >
+    <BackgroundContext.Provider value={value}>
       {children}
     </BackgroundContext.Provider>
   );

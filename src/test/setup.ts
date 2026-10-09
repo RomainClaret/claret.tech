@@ -450,7 +450,7 @@ beforeAll(() => {
   }
 });
 
-// Set up canvas mock IMMEDIATELY for animation-manager
+// Set up the canvas mock IMMEDIATELY, before any test creates a canvas
 const mockGetContext = vi.fn((type: string) => {
   if (type === "webgl2" || type === "webgl") {
     return {

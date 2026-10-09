@@ -1,6 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  getSnapshot as getMotionGate,
+  subscribe as subscribeMotionGate,
+} from "@/lib/utils/motion-gate";
+import { QUALITY_TUNING } from "@/lib/quality/decide";
+import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
 import { showToast } from "@/components/ui/toast";
 import { logWarning } from "@/lib/utils/dev-logger";
 
@@ -20,15 +26,21 @@ interface FpsAutoDisableOptions {
   onAutoDisable?: () => void;
 }
 
+/** One frame-rate reading, numbered (useFpsOnly's `sample`). */
+interface FpsReading {
+  fps: number;
+  sample: number;
+}
+
 const AUTO_DISABLE_STORAGE_KEY = "fps-auto-disable-state";
 const COOLDOWN_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Hook for automatically disabling animations when FPS drops below threshold
- * for a sustained period
+ * for a sustained period: `durationThreshold` samples in a row.
  */
 export function useFpsAutoDisable(
-  currentFps: number,
+  { fps: currentFps, sample }: FpsReading,
   isSafari: boolean = false,
   options: FpsAutoDisableOptions = {},
 ) {
@@ -41,55 +53,75 @@ export function useFpsAutoDisable(
     onAutoDisable,
   } = options;
 
-  const [state, setState] = useState<AutoDisableState>(() => {
-    if (typeof window === "undefined") {
-      return {
-        isAutoDisabled: false,
-        lastAutoDisableTime: 0,
-        consecutiveLowFpsCount: 0,
-        cooldownActive: false,
-      };
-    }
+  // Not disabled, as the HTML was rendered: the page is generated once for
+  // every visitor, so a disable stored for this session is restored after
+  // hydration, before the browser paints. Read while rendering, it gave the
+  // client's first render another state than the HTML.
+  const [state, setState] = useState<AutoDisableState>({
+    isAutoDisabled: false,
+    lastAutoDisableTime: 0,
+    consecutiveLowFpsCount: 0,
+    cooldownActive: false,
+  });
 
+  useIsomorphicLayoutEffect(() => {
     try {
-      const stored = localStorage.getItem(AUTO_DISABLE_STORAGE_KEY);
-      if (stored) {
-        const parsedState = JSON.parse(stored) as AutoDisableState;
-        const now = Date.now();
-        const cooldownActive =
+      // Per session. Kept in localStorage until 2026-10, a disable outlived
+      // the visit that triggered it: one slow visit (a busy CPU, battery
+      // saver) switched animations off on every later visit, with only a
+      // console command to get them back. Clearing the old entry returns them.
+      localStorage.removeItem(AUTO_DISABLE_STORAGE_KEY);
+      const stored = sessionStorage.getItem(AUTO_DISABLE_STORAGE_KEY);
+      if (!stored) return;
+      const parsedState = JSON.parse(stored) as AutoDisableState;
+      const now = Date.now();
+      setState({
+        ...parsedState,
+        consecutiveLowFpsCount: 0, // Reset on page load
+        cooldownActive:
           parsedState.lastAutoDisableTime > 0 &&
-          now - parsedState.lastAutoDisableTime < COOLDOWN_DURATION_MS;
-
-        return {
-          ...parsedState,
-          consecutiveLowFpsCount: 0, // Reset on page load
-          cooldownActive,
-        };
-      }
+          now - parsedState.lastAutoDisableTime < COOLDOWN_DURATION_MS,
+      });
     } catch (error) {
       logWarning(
         `Failed to load auto-disable state: ${error}`,
         "fps-auto-disable:load-state",
       );
     }
+  }, []);
 
-    return {
-      isAutoDisabled: false,
-      lastAutoDisableTime: 0,
-      consecutiveLowFpsCount: 0,
-      cooldownActive: false,
-    };
-  });
-
-  const lastCheckTimeRef = useRef<number>(Date.now());
+  // The last sample counted. Counting is per sample, not per run of the
+  // effect below: it was keyed on the frame rate, so a steady one never ran
+  // it again and the count stalled, and it only worked because the provider
+  // passed a new onAutoDisable on every render. An 800 ms clock check stood
+  // in for "a new sample", and miscounted when a render landed off the beat.
+  const countedSampleRef = useRef(sample);
   const toastShownRef = useRef<boolean>(false);
 
-  // Persist state to localStorage
+  // The running tier, and since when. The first seconds at a new tier are
+  // spent re-rendering for it, and the quality loop ignores them
+  // (settleMs): counted here, the frames the drop to battery itself cost
+  // could switch animations off before the battery tier had a chance.
+  const tierSinceRef = useRef({ tier: getMotionGate().tier, since: 0 });
+  useEffect(() => {
+    tierSinceRef.current = { tier: getMotionGate().tier, since: Date.now() };
+    return subscribeMotionGate(() => {
+      const { tier } = getMotionGate();
+      if (tier !== tierSinceRef.current.tier) {
+        tierSinceRef.current = { tier, since: Date.now() };
+      }
+    });
+  }, []);
+
+  // Persist state for this session
   const persistState = useCallback((newState: AutoDisableState) => {
     if (typeof window === "undefined") return;
 
     try {
-      localStorage.setItem(AUTO_DISABLE_STORAGE_KEY, JSON.stringify(newState));
+      sessionStorage.setItem(
+        AUTO_DISABLE_STORAGE_KEY,
+        JSON.stringify(newState),
+      );
     } catch (error) {
       logWarning(
         `Failed to persist auto-disable state: ${error}`,
@@ -145,20 +177,22 @@ export function useFpsAutoDisable(
     return Math.max(0, Math.ceil(remaining / (60 * 1000))); // Convert to minutes
   }, [state.cooldownActive, state.lastAutoDisableTime]);
 
-  // Main FPS monitoring effect
+  // Main FPS monitoring effect: once per new sample
   useEffect(() => {
     if (!enabled || currentFps <= 0) return;
+    if (sample === countedSampleRef.current) return;
+    countedSampleRef.current = sample;
 
     const now = Date.now();
-    const timeSinceLastCheck = now - lastCheckTimeRef.current;
-
-    // Only check every ~1 second (allow some tolerance)
-    if (timeSinceLastCheck < 800) return;
-
-    lastCheckTimeRef.current = now;
-
     const threshold = getThreshold();
-    const isLowFps = currentFps < threshold;
+    // A last resort: it only counts once the quality loop has already
+    // dropped to the battery tier, and that tier has settled. Above that,
+    // lowering the tier is the remedy, and switching motion off would
+    // pre-empt it.
+    const { tier, since } = tierSinceRef.current;
+    const atLastResort =
+      tier === "battery" && now - since >= QUALITY_TUNING.settleMs;
+    const isLowFps = atLastResort && currentFps < threshold;
     const cooldownActive = checkCooldown();
 
     setState((prevState) => {
@@ -237,6 +271,7 @@ export function useFpsAutoDisable(
   }, [
     enabled,
     currentFps,
+    sample,
     durationThreshold,
     getThreshold,
     checkCooldown,

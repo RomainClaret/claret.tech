@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface Language {
@@ -22,7 +22,7 @@ export function LanguageSpectrum({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   return (
-    <motion.div
+    <m.div
       className={cn("w-full max-w-2xl mx-auto", className)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -34,7 +34,7 @@ export function LanguageSpectrum({
           const isHovered = hoveredIndex === index;
 
           return (
-            <motion.div
+            <m.div
               key={lang.language}
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
@@ -53,7 +53,7 @@ export function LanguageSpectrum({
               <span className="text-sm opacity-80">{lang.flag}</span>
               <span>{lang.language}</span>
               {isHovered && (
-                <motion.span
+                <m.span
                   className="text-[10px] opacity-60 ml-1"
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
@@ -61,12 +61,12 @@ export function LanguageSpectrum({
                   transition={{ duration: 0.2 }}
                 >
                   ({lang.proficiency})
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
           );
         })}
       </div>
-    </motion.div>
+    </m.div>
   );
 }

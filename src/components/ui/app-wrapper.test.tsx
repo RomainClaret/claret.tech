@@ -18,7 +18,7 @@ vi.mock("@/data/portfolio", () => ({
 }));
 
 vi.mock("@/lib/terminal/terminal-context", () => ({
-  useTerminal: vi.fn(() => ({
+  useTerminalToggle: vi.fn(() => ({
     isOpen: false,
     setIsOpen: vi.fn(),
   })),
@@ -88,17 +88,24 @@ vi.mock("next/dynamic", () => ({
     // Return a mock component that we can control
     const MockComponent = ({
       onComplete,
+      onShow,
+      skip,
       isOpen,
       onClose,
     }: {
       onComplete?: () => void;
+      onShow?: () => void;
+      skip?: boolean;
       isOpen?: boolean;
       onClose?: () => void;
     }) => {
       // Handle splash screen
       if (importFn.toString().includes("splash-screen")) {
         return (
-          <div data-testid="splash-screen">
+          <div data-testid="splash-screen" data-skip={String(Boolean(skip))}>
+            <button onClick={() => onShow?.()} data-testid="splash-show">
+              Show Splash
+            </button>
             <button
               onClick={() => onComplete?.()}
               data-testid="splash-complete"
@@ -173,11 +180,17 @@ describe("AppWrapper", () => {
       );
 
       expect(screen.getByTestId("error-boundary")).toBeInTheDocument();
-      expect(screen.getByTestId("background-provider")).toBeInTheDocument();
       expect(
         screen.getByTestId("performance-monitor-provider"),
       ).toBeInTheDocument();
       expect(screen.getByTestId("projects-provider")).toBeInTheDocument();
+
+      // The background comes from the BackgroundProvider in the root layout;
+      // a second one here shadowed it. The mock above is still registered,
+      // so re-mounting one here fails this.
+      expect(
+        screen.queryByTestId("background-provider"),
+      ).not.toBeInTheDocument();
 
       // AnimationProvider was removed: nothing under it consumed useAnimation,
       // and app-wrapper was the only file importing the context at all. The
@@ -380,9 +393,144 @@ describe("AppWrapper", () => {
         splashCompleteButton.click();
       });
 
-      // Splash screen should still be there (it handles its own removal)
-      // but the completion callback should have been called
-      expect(splashCompleteButton).toBeInTheDocument();
+      // Once it has played, the splash is unmounted rather than kept hidden,
+      // so its Lottie player and parsed animation are released.
+      expect(screen.queryByTestId("splash-complete")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Splash backdrop", () => {
+    it("is in the server's HTML, so the first paint is the splash's", async () => {
+      const { renderToString } = await import("react-dom/server");
+
+      const html = renderToString(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+
+      // The splash loads with ssr: false: its own backdrop never reached
+      // the HTML, and the page showed for a moment before the splash.
+      expect(html).toContain("data-splash-backdrop");
+    });
+
+    it("gives way once the splash shows its own", async () => {
+      const { container } = render(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+      expect(container.querySelector("[data-splash-backdrop]")).not.toBeNull();
+
+      await act(async () => {
+        screen.getByTestId("splash-show").click();
+      });
+
+      expect(container.querySelector("[data-splash-backdrop]")).toBeNull();
+    });
+
+    it("never outlasts a splash that fails to show", () => {
+      vi.useFakeTimers();
+      try {
+        const { container } = render(
+          <AppWrapper>
+            <div>Test</div>
+          </AppWrapper>,
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(4000);
+        });
+
+        expect(container.querySelector("[data-splash-backdrop]")).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("A page on screen before the splash", () => {
+    // On a slow connection the 4 s timer, or the stylesheet's fallback
+    // (globals.css), uncovers the page before the splash shows. The splash
+    // is then told to skip itself: playing it covered a page the visitor
+    // was already reading.
+    const splashSkips = () =>
+      screen.getByTestId("splash-screen").getAttribute("data-skip");
+
+    const renderApp = () =>
+      render(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+
+    it("skips the splash when the timer shows the page first", () => {
+      vi.useFakeTimers();
+      try {
+        renderApp();
+        expect(splashSkips()).toBe("false");
+
+        act(() => {
+          vi.advanceTimersByTime(4000);
+        });
+
+        expect(splashSkips()).toBe("true");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("lets a splash that showed in time play", () => {
+      vi.useFakeTimers();
+      try {
+        renderApp();
+        act(() => {
+          screen.getByTestId("splash-show").click();
+        });
+
+        act(() => {
+          vi.advanceTimersByTime(4000);
+        });
+
+        expect(splashSkips()).toBe("false");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips the splash when the stylesheet's fallback hides the backdrop", () => {
+      const { container } = renderApp();
+      const backdrop = container.querySelector("[data-splash-backdrop]");
+      expect(backdrop).not.toBeNull();
+
+      // The animation that hides it (globals.css) has ended.
+      const ended = new Event("animationend");
+      Object.assign(ended, { animationName: "splash-backdrop-timeout" });
+      act(() => {
+        backdrop?.dispatchEvent(ended);
+      });
+
+      expect(splashSkips()).toBe("true");
+      expect(container.querySelector("[data-splash-backdrop]")).toBeNull();
+    });
+
+    it("skips the splash when the fallback hid the backdrop before hydration", () => {
+      const realComputedStyle = window.getComputedStyle.bind(window);
+      const computedStyle = vi
+        .spyOn(window, "getComputedStyle")
+        .mockImplementation((element, pseudo) =>
+          element instanceof HTMLElement &&
+          element.hasAttribute("data-splash-backdrop")
+            ? ({ visibility: "hidden" } as CSSStyleDeclaration)
+            : realComputedStyle(element, pseudo),
+        );
+      try {
+        renderApp();
+
+        expect(splashSkips()).toBe("true");
+      } finally {
+        computedStyle.mockRestore();
+      }
     });
   });
 
@@ -426,7 +574,6 @@ describe("AppWrapper", () => {
 
       // Check that all provider components are rendered
       expect(screen.getByTestId("error-boundary")).toBeInTheDocument();
-      expect(screen.getByTestId("background-provider")).toBeInTheDocument();
       expect(
         screen.getByTestId("performance-monitor-provider"),
       ).toBeInTheDocument();

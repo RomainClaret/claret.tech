@@ -15,8 +15,10 @@ import { NAV_OFFSET, scrollToSection } from "@/lib/utils/scroll-to-section";
  * auto-expand behavior) until the first real user interaction: scrolling via
  * wheel or touch, or a pointerdown outside the linked element. Listening to
  * wheel/touchmove/pointerdown rather than scroll means the hook's own smooth
- * scroll never cancels its own highlight. Non-matching hashes (e.g. #papers)
- * are ignored and left to the browser.
+ * scroll never cancels its own highlight. A hash that is not one of the
+ * targets (e.g. #papers), or no hash at all (Back to the bare URL), is left to
+ * the browser, but releases this hook's deep link and stops its scroll, so a
+ * card the visitor has left no longer pulls the page back.
  */
 export function useCardDeepLink(
   targetIds: string[],
@@ -50,14 +52,16 @@ export function useCardDeepLink(
         // Malformed percent-escapes (e.g. "#%") throw; use the raw hash.
         hash = rawHash;
       }
-      if (!hash) return;
       const targets = targetsKey ? targetsKey.split("\n") : [];
-      if (!targets.includes(hash)) {
-        // Another section's card, or a section itself. Each section runs its
-        // own instance, so release this one: its scroll supervision and settle
+      if (!hash || !targets.includes(hash)) {
+        // No hash at all (Back to the bare URL, or a link to "#"), another
+        // section's card, or a section itself. Each section runs its own
+        // instance, so release this one: its scroll supervision and settle
         // loop would otherwise keep pulling the page back to its own card.
         // Keyboard and Back/Forward navigation fire no wheel or pointerdown,
-        // so nothing else would release it.
+        // so nothing else would release it. On a mount with no hash this is a
+        // no-op: there is no scroll yet, and React bails out of setting null
+        // to null.
         scroll?.abort();
         setDeepLinkedId(null);
         return;

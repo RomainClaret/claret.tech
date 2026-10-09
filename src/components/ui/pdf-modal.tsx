@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 // Deep per-icon import; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import X from "lucide-react/dist/esm/icons/x";
 import { PDFViewer } from "./pdf-viewer";
+import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 
 interface PDFModalProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ export function PDFModal({
   downloadFileName,
   shareSlug,
 }: PDFModalProps) {
+  // Covers the page: decorative motion behind it pauses until it closes.
+  useOverlayLock(isOpen);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);

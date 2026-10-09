@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Pause, Play, List } from "lucide-react";
 
@@ -114,7 +114,7 @@ export function SkillManifesto({
   if (displayMode === "expanded") {
     return (
       <div className={cn("relative w-full max-w-3xl mx-auto", className)}>
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.2 }}
@@ -179,7 +179,7 @@ export function SkillManifesto({
 
           {/* Content */}
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={currentIndex}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -191,9 +191,9 @@ export function SkillManifesto({
                 {emoji && <span className="text-lg opacity-60">{emoji}</span>}
                 <p className="text-sm text-muted-foreground">{text}</p>
               </div>
-            </motion.div>
+            </m.div>
           </AnimatePresence>
-        </motion.div>
+        </m.div>
       </div>
     );
   }
@@ -260,7 +260,7 @@ export function SkillManifesto({
 
         {/* Main content - now centered below */}
         <AnimatePresence mode="wait">
-          <motion.div
+          <m.div
             key={currentIndex}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -277,7 +277,7 @@ export function SkillManifesto({
             <span className="text-muted-foreground group-hover:text-foreground/80 transition-colors text-center">
               {text}
             </span>
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import type { MotionValue, MotionTransition } from "@/test/mock-types";
@@ -66,7 +66,7 @@ export function ConditionalMotion({
   }
 
   // Render full Framer Motion for other browsers
-  const MotionComponent = motion[as] as React.ComponentType<
+  const MotionComponent = m[as] as React.ComponentType<
     React.HTMLAttributes<HTMLElement> & {
       animate?: MotionValue;
       initial?: MotionValue;

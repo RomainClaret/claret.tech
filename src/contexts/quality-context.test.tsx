@@ -1,7 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 import { QualityProvider, useQuality, QualityMode } from "./quality-context";
+import {
+  getSnapshot as getMotionGate,
+  resetMotionGateForTests,
+} from "@/lib/utils/motion-gate";
+import { memoryStorage } from "@/test/memory-storage";
 
 // Mock window.navigator
 const mockNavigator = {
@@ -179,6 +184,82 @@ describe("Quality Context", () => {
       // Safari gets LOW, others get BALANCED
       // This is tested in the browser detection tests above
       expect(true).toBe(true);
+    });
+  });
+
+  describe("Publishing and persistence", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    beforeEach(() => {
+      vi.stubGlobal("sessionStorage", memoryStorage());
+      resetMotionGateForTests();
+      delete document.documentElement.dataset.quality;
+    });
+
+    it("publishes the tier to CSS and to the motion gate", () => {
+      render(
+        <QualityProvider>
+          <TestComponent />
+        </QualityProvider>,
+      );
+
+      expect(document.documentElement.dataset.quality).toBe("balanced");
+      expect(getMotionGate().tier).toBe("balanced");
+    });
+
+    it("keeps an automatically chosen tier for this session only", () => {
+      // Kept across visits, one slow visit lowered the site on every visit
+      // after it.
+      render(
+        <QualityProvider>
+          <TestComponent />
+        </QualityProvider>,
+      );
+
+      expect(sessionStorage.getItem("quality-mode")).toBe("balanced");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith(
+        "quality-mode",
+        expect.anything(),
+      );
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("quality-mode");
+    });
+
+    it("ignores a tier an older version stored automatically", () => {
+      mockLocalStorage.getItem.mockImplementation((key: string) =>
+        key === "quality-mode" ? "battery" : null,
+      );
+
+      render(
+        <QualityProvider>
+          <TestComponent />
+        </QualityProvider>,
+      );
+
+      expect(screen.getByTestId("quality").textContent).toBe("balanced");
+    });
+
+    it("remembers a tier the visitor chose across visits", () => {
+      mockLocalStorage.getItem.mockImplementation((key: string) =>
+        key === "quality-auto"
+          ? "false"
+          : key === "quality-mode"
+            ? "maximum"
+            : null,
+      );
+
+      render(
+        <QualityProvider>
+          <TestComponent />
+        </QualityProvider>,
+      );
+
+      expect(screen.getByTestId("quality").textContent).toBe("maximum");
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "quality-mode",
+        "maximum",
+      );
     });
   });
 });

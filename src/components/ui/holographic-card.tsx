@@ -1,11 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode, RefObject, useState } from "react";
 import { useShouldReduceAnimations, useIsSafari } from "@/lib/hooks/useSafari";
 import { useInViewAnimation } from "@/lib/hooks/useInViewAnimation";
 import { useAnimationStateOptional } from "@/contexts/animation-state-context";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
 
 interface HolographicCardProps {
   children: ReactNode;
@@ -60,8 +61,15 @@ export function HolographicCard({
   // Optional so the card still renders outside the provider (tests, tools).
   const animationState = useAnimationStateOptional();
   const areAnimationsPlaying = animationState?.areAnimationsPlaying ?? true;
+  // Also rest while the page is covered (splash, modals) or the tab hidden,
+  // and at the battery tier, where decoration holds still.
+  const { suspended, tier } = useMotionGate();
   const glowAnimated =
-    !shouldReduceAnimations && isInView && areAnimationsPlaying;
+    !shouldReduceAnimations &&
+    isInView &&
+    areAnimationsPlaying &&
+    !suspended &&
+    tier !== "battery";
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -74,9 +82,13 @@ export function HolographicCard({
   };
 
   return (
-    <motion.div
+    <m.div
       ref={ref as RefObject<HTMLDivElement>}
       className={cn("relative group/card h-full", className)}
+      // Pauses every CSS loop marked .anim-decor inside the card while it is
+      // off-screen (src/styles/motion.css), from the same observer as the
+      // glow below.
+      data-anim={isInView ? "on" : "off"}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
@@ -84,7 +96,7 @@ export function HolographicCard({
       onMouseLeave={handleMouseLeave}
     >
       {/* Neural glow effect - simplified for Safari */}
-      <motion.div
+      <m.div
         className={cn(
           "absolute -inset-1 rounded-lg",
           shouldReduceAnimations ? "opacity-15" : "blur-xl",
@@ -107,7 +119,7 @@ export function HolographicCard({
 
       {/* Neural connection glow (when connected to highlighted node) */}
       {isConnected && (
-        <motion.div
+        <m.div
           className="absolute -inset-4 rounded-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -120,12 +132,12 @@ export function HolographicCard({
               filter: "blur(20px)",
             }}
           />
-        </motion.div>
+        </m.div>
       )}
 
       {/* Holographic background effect - simplified for Safari */}
       {!shouldReduceAnimations && (
-        <motion.div
+        <m.div
           className={cn(
             "absolute inset-0 rounded-lg transition-opacity",
             forceHover
@@ -143,7 +155,7 @@ export function HolographicCard({
               transform: "translateZ(-50px)",
             }}
           />
-        </motion.div>
+        </m.div>
       )}
 
       {/* Safari-optimized hover effect */}
@@ -162,7 +174,7 @@ export function HolographicCard({
 
       {/* Holographic shimmer - disabled on Safari */}
       {!shouldReduceAnimations && (
-        <motion.div
+        <m.div
           className={cn(
             "absolute inset-0 rounded-lg transition-opacity overflow-hidden",
             forceHover
@@ -175,7 +187,7 @@ export function HolographicCard({
               is invisible until hover/deep-link, yet this loop used to run
               on every card all the time. */}
           {(isHovered || forceHover) && areAnimationsPlaying ? (
-            <motion.div
+            <m.div
               className="absolute inset-0"
               style={{
                 background: `linear-gradient(115deg,
@@ -196,11 +208,11 @@ export function HolographicCard({
               }}
             />
           ) : null}
-        </motion.div>
+        </m.div>
       )}
 
       {/* Main card content */}
-      <motion.div
+      <m.div
         className={cn(
           "relative bg-card/95 dark:bg-card/90",
           // This is the only element in the tree that clips card content.
@@ -228,7 +240,7 @@ export function HolographicCard({
         }}
       >
         {/* Animated holographic border */}
-        <motion.div
+        <m.div
           className={cn(
             "absolute inset-0 rounded-lg p-[1px] -z-20 transition-opacity",
             forceHover
@@ -250,14 +262,14 @@ export function HolographicCard({
 
         {/* Neural activity indicator - simplified for Safari */}
         {isActive && (
-          <motion.div
+          <m.div
             className="absolute top-2 right-2 z-20"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200 }}
           >
             {/* Outer pulse ring - disabled animation on Safari */}
-            <motion.div
+            <m.div
               className="absolute w-6 h-6 rounded-full border-2"
               style={{
                 borderColor: `rgb(${glowColor})`,
@@ -282,7 +294,7 @@ export function HolographicCard({
               }}
             />
             {/* Inner dot - simplified for Safari */}
-            <motion.div
+            <m.div
               className="relative w-2 h-2 rounded-full"
               style={{
                 backgroundColor: `rgb(${glowColor})`,
@@ -306,7 +318,7 @@ export function HolographicCard({
                 ease: "easeInOut",
               }}
             />
-          </motion.div>
+          </m.div>
         )}
 
         {/* Light reflection effect */}
@@ -337,7 +349,7 @@ export function HolographicCard({
         )}
 
         {children}
-      </motion.div>
+      </m.div>
 
       <style jsx>{`
         @keyframes holographic {
@@ -349,6 +361,6 @@ export function HolographicCard({
           }
         }
       `}</style>
-    </motion.div>
+    </m.div>
   );
 }

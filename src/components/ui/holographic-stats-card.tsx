@@ -1,8 +1,16 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
+
+// The glow breathes only while the card is on screen, and otherwise rests at
+// the value the loop starts from.
+const GLOW_LOOP = { opacity: [0.1, 0.2, 0.1] };
+const GLOW_REST = { opacity: 0.1 };
+const GLOW_LOOP_TRANSITION = { duration: 3, repeat: Infinity };
+const GLOW_REST_TRANSITION = { duration: 0 };
 
 interface HolographicStatsCardProps {
   children: ReactNode;
@@ -19,8 +27,13 @@ export function HolographicStatsCard({
   insideBackgroundColor,
   delay = 0,
 }: HolographicStatsCardProps) {
+  // Not tied to the animation switch, which this glow never followed:
+  // Safari, where the switch starts off, keeps its look.
+  const { ref, active } = useAnimationGate({ respectPlaying: false });
+
   return (
-    <motion.div
+    <m.div
+      ref={ref}
       className={cn("relative group/statscard h-full", className)}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -28,18 +41,18 @@ export function HolographicStatsCard({
       whileHover={{ scale: 1.02 }}
     >
       {/* Neural glow effect */}
-      <motion.div
+      <m.div
         className="absolute -inset-1 rounded-lg blur-xl"
         style={{
           backgroundColor: `rgb(${glowColor})`,
         }}
         initial={{ opacity: 0.1 }}
-        animate={{ opacity: [0.1, 0.2, 0.1] }}
-        transition={{ duration: 3, repeat: Infinity }}
+        animate={active ? GLOW_LOOP : GLOW_REST}
+        transition={active ? GLOW_LOOP_TRANSITION : GLOW_REST_TRANSITION}
       />
 
       {/* Main card content */}
-      <motion.div
+      <m.div
         className={cn(
           "relative h-full p-3 sm:p-4 rounded-lg overflow-hidden",
           "bg-card/90",
@@ -65,9 +78,9 @@ export function HolographicStatsCard({
           }}
         />
 
-        {/* Rainbow holographic overlay */}
+        {/* Rainbow holographic overlay; its loop only runs on hover */}
         <div
-          className="absolute inset-0 opacity-0 group-hover/statscard:opacity-5 transition-opacity duration-500 rounded-lg"
+          className="absolute inset-0 opacity-0 group-hover/statscard:opacity-5 transition-opacity duration-500 rounded-lg anim-hover"
           style={{
             backgroundImage: `linear-gradient(45deg,
               rgba(255, 0, 0, 0.1) 0%,
@@ -122,7 +135,7 @@ export function HolographicStatsCard({
         <div className="relative z-10">{children}</div>
 
         {/* Border gradient */}
-        <motion.div
+        <m.div
           className="absolute inset-0 rounded-lg p-[1px] -z-10 opacity-0 group-hover/statscard:opacity-100 transition-opacity duration-300"
           style={{
             backgroundImage: `linear-gradient(135deg,
@@ -135,7 +148,7 @@ export function HolographicStatsCard({
             backgroundSize: "200% 200%",
           }}
         />
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }

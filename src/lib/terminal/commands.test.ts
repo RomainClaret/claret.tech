@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 
 // Set up global navigator mock BEFORE importing commands module
 if (typeof global !== "undefined" && !global.navigator) {
@@ -22,6 +30,7 @@ import {
   CommandResult,
 } from "./commands";
 import type { CommandsObject } from "@/test/mock-types";
+import { memoryStorage } from "@/test/memory-storage";
 
 /*
  * RESOLVED: TERMINAL COMMANDS IMPORT ISSUES FIXED ✅
@@ -97,6 +106,17 @@ vi.mock("@/data/sections/social", () => ({
     instagram: "https://instagram.com/test",
     reddit: "https://reddit.com/user/test",
   },
+}));
+
+// The tier the quality provider is running, as the status command reads it.
+const gate = vi.hoisted(() => ({ tier: "balanced" }));
+vi.mock("@/lib/utils/motion-gate", () => ({
+  getSnapshot: () => ({
+    hidden: false,
+    overlays: 0,
+    suspended: false,
+    tier: gate.tier,
+  }),
 }));
 
 vi.mock("@/components/ui/progress-bar", () => ({
@@ -1259,6 +1279,54 @@ describe("Terminal Commands", () => {
 
       expect(result.success).toBe(false);
       expect(result.output).toContain("'invalid' is not a valid subcommand");
+    });
+
+    describe("status", () => {
+      // Where the providers keep things now: an automatic tier and the
+      // auto-disable state in sessionStorage, a manual tier in localStorage.
+      beforeEach(() => {
+        vi.stubGlobal("localStorage", memoryStorage());
+        vi.stubGlobal("sessionStorage", memoryStorage());
+        gate.tier = "balanced";
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      const status = () =>
+        (commands.animations(["status"], mockContext) as CommandResult).output;
+
+      it("reports the tier that is running in auto mode", () => {
+        gate.tier = "low";
+        sessionStorage.setItem("quality-mode", "low");
+
+        expect(status()).toContain("Current: 🔅 Low");
+        expect(status()).toContain("Auto-Adjust: ✅ Enabled");
+      });
+
+      it("reports an auto-disable from this session, with the way out", () => {
+        sessionStorage.setItem(
+          "fps-auto-disable-state",
+          JSON.stringify({
+            isAutoDisabled: true,
+            lastAutoDisableTime: Date.now(),
+            consecutiveLowFpsCount: 5,
+            cooldownActive: false,
+          }),
+        );
+
+        expect(status()).toContain("Auto-Disabled: ⚠️  Yes");
+        expect(status()).toContain("animations force");
+      });
+
+      it("reports a tier chosen by hand as manual", () => {
+        gate.tier = "maximum";
+        localStorage.setItem("quality-auto", "false");
+        localStorage.setItem("quality-mode", "maximum");
+
+        expect(status()).toContain("Current: 🚀 Maximum");
+        expect(status()).toContain("Auto-Adjust: ❌ Disabled");
+      });
     });
   });
 

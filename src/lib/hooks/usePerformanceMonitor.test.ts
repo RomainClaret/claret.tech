@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { restoreNavigator, stubNavigator } from "@/test/navigator";
 import { renderHook, act } from "@testing-library/react";
 import { usePerformanceMonitor } from "./usePerformanceMonitor";
 
@@ -217,21 +218,13 @@ describe("usePerformanceMonitor", () => {
       writable: true,
     });
 
-    // Mock navigator properties
-    Object.defineProperty(navigator, "hardwareConcurrency", {
-      value: 8,
-      writable: true,
-    });
-
-    // Mock navigator.connection
-    Object.defineProperty(navigator, "connection", {
-      value: {
-        effectiveType: "4g",
-        downlink: 10,
-        rtt: 50,
-        saveData: false,
-      },
-      writable: true,
+    // Mock navigator properties (restored in afterEach)
+    stubNavigator("hardwareConcurrency", 8);
+    stubNavigator("connection", {
+      effectiveType: "4g",
+      downlink: 10,
+      rtt: 50,
+      saveData: false,
     });
 
     // Mock DOM classes for animation detection
@@ -260,6 +253,7 @@ describe("usePerformanceMonitor", () => {
     // touched anything: the stubs above are plain assignments.
     global.requestAnimationFrame = realRequestAnimationFrame;
     global.cancelAnimationFrame = realCancelAnimationFrame;
+    restoreNavigator();
 
     // Clean up any classes added during tests
     if (document.body) {
@@ -787,10 +781,7 @@ describe("usePerformanceMonitor", () => {
 
     it("handles missing navigator.connection gracefully", () => {
       // Remove connection property
-      Object.defineProperty(navigator, "connection", {
-        value: undefined,
-        writable: true,
-      });
+      stubNavigator("connection", undefined);
 
       const { result } = renderHook(() =>
         usePerformanceMonitor(true, { network: true, fps: true }),

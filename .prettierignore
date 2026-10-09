@@ -1,0 +1,3 @@
+# The splash's Lottie data is minified on purpose; formatting it would
+# expand each file fourfold (0.4 -> 1.6 MB of JSON to parse).
+public/animations/*.json

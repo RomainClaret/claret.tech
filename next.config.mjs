@@ -9,6 +9,13 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
+  // Inlined at build time. The homepage is generated once, when the site is
+  // built, and must hydrate with the same text: the footer shows this year
+  // first and corrects it once the page runs.
+  env: {
+    BUILD_YEAR: String(new Date().getFullYear()),
+  },
+
   // ESLint configuration for build
   eslint: {
     // Ignore test files during production builds
@@ -28,6 +35,12 @@ const nextConfig = {
 
   // Image optimization
   images: {
+    // The shortest time an optimized image is cached. Local /images already
+    // get a year from their headers below; this is for remote sources that
+    // allow only minutes (the GitHub avatar: max-age=300), which were
+    // re-fetched and re-optimized that often. A changed avatar shows within
+    // a day.
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         // Path-scoped: without a pathname these turn /_next/image into an open
@@ -91,9 +104,18 @@ const nextConfig = {
 
   // Custom webpack config for WebLLM support and optimizations
   webpack: (config, { isServer, dev, webpack }) => {
-    // Add WebLLM-specific aliases
     config.resolve.alias = {
       ...config.resolve.alias,
+      // lottie-react imports the full lottie-web player, which carries the
+      // canvas and HTML renderers and the expression engine. The splash only
+      // uses the SVG renderer without expressions, which is what the light
+      // build is: 137 KB smaller raw, and the splash frames render byte for
+      // byte the same (12 sampled frames of both animations at DPR 2).
+      // `$` makes the alias exact, so the light build's own path still
+      // resolves normally. lottie-web is a direct dependency so the target
+      // resolves from the project root: reached only through lottie-react,
+      // it did so only while npm happened to hoist it.
+      "lottie-web$": "lottie-web/build/player/lottie_light.js",
     };
 
     // Configure to prevent source map 404 errors

@@ -83,17 +83,21 @@ vi.mock("next/image", () => ({
 }));
 
 // Mock framer-motion
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({
-      children,
-      ...props
-    }: {
-      children?: React.ReactNode;
-      [key: string]: unknown;
-    }) => <div {...props}>{children}</div>,
-  },
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        ...props
+      }: {
+        children?: React.ReactNode;
+        [key: string]: unknown;
+      }) => <div {...props}>{children}</div>,
+    },
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock hooks + utils with side effects
 vi.mock("@/lib/hooks/useSafari", () => ({

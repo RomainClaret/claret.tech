@@ -12,7 +12,7 @@ export const footerNote = {
 
 export const splashScreen = {
   enabled: true,
-  animationFile: "/animations/graphNetworkWhiteAnimation.json",
+  animationFile: "/animations/graphNetworkWhiteAnimation.v2.json",
   duration: 1200,
 };
 

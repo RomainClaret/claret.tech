@@ -90,7 +90,8 @@ export function ProgressRing({
         <div
           className={cn(
             "absolute inset-0 rounded-full blur-xl",
-            !shouldReduceAnimations && "animate-pulse",
+            // anim-decor: pauses with its card while off-screen (motion.css)
+            !shouldReduceAnimations && "animate-pulse anim-decor",
           )}
           style={{
             backgroundColor: color,

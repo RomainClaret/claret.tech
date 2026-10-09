@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface UseInViewAnimationOptions {
   threshold?: number;
@@ -22,7 +23,8 @@ export function useInViewAnimation({
     if (!element || (triggerOnce && hasAnimated)) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = latestEntry(entries);
         const inView = entry.isIntersecting;
         setIsInView(inView);
 

@@ -19,6 +19,13 @@ import type { FitAddon as FitAddonType } from "@xterm/addon-fit";
 // implementation, or the Python client would land in the terminal chunk.
 import type { LineMode, PromptMode } from "@/lib/terminal/line-mode";
 
+/** The private path to the DPR monitor xterm 5.5.0 forgets to dispose. */
+interface XTermInternals {
+  _core?: {
+    _coreBrowserService?: { _screenDprMonitor?: { dispose?: () => void } };
+  };
+}
+
 interface TerminalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,6 +40,15 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTermType | null>(null);
   const fitAddonRef = useRef<FitAddonType | null>(null);
+  // What loadTerminal set up (its resize listener, input handler and the
+  // xterm instance), torn down on close and on unmount. Kept nowhere before,
+  // so each open-close cycle left a window resize listener holding the
+  // disposed terminal.
+  const terminalCleanupRef = useRef<(() => void) | null>(null);
+  // Bumped on every close, so a load still in flight when the terminal
+  // closes knows it is stale: it stops before touching any state, or tears
+  // down what it built.
+  const closeCountRef = useRef(0);
   const [hasInitialized, setHasInitialized] = useState(false);
 
   // Callback ref for header to ensure immediate attachment
@@ -237,14 +253,31 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
   useEffect(() => {
     isMountedRef.current = true;
+    const cleanups = terminalCleanupRef;
     return () => {
       isMountedRef.current = false;
+      // The latest teardown, read at unmount on purpose.
+      cleanups.current?.();
+      cleanups.current = null;
     };
   }, []);
 
+  // Whether the terminal has been open since it mounted. withLoadFallback
+  // can mount it closed (a retry that lands after the visitor closed the
+  // error box), and the close effect below then had nothing to tear down
+  // but still loaded the Python client's chunk, the one lazy loading keeps
+  // away from a terminal that never ran Python, to stop an interpreter that
+  // never started.
+  const hasOpenedRef = useRef(false);
+
   // Reset state when terminal closes
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) hasOpenedRef.current = true;
+    if (!isOpen && hasOpenedRef.current) {
+      closeCountRef.current++;
+      terminalCleanupRef.current?.();
+      terminalCleanupRef.current = null;
+
       // Clean up when terminal closes
       setHasInitialized(false);
       setIsLoading(true);
@@ -292,6 +325,15 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
   useEffect(() => {
     if (!isOpen || hasInitialized) return;
 
+    // Everything below works for this open. A close bumps the count, so a
+    // load that outlives it (closed, and perhaps reopened, while xterm was
+    // still downloading) knows it is stale and leaves the state to the open
+    // that follows. Left to finish, it marked that open initialized with an
+    // xterm it then disposed, and the reopened terminal stayed blank.
+    const closes = closeCountRef.current;
+    const isStale = () =>
+      closeCountRef.current !== closes || !isMountedRef.current;
+
     // Dynamically import xterm and its dependencies
     const loadTerminal = async () => {
       try {
@@ -304,6 +346,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
             import("@xterm/addon-fit"),
             import("@xterm/addon-web-links"),
           ]);
+        if (isStale()) return;
 
         // CSS will be imported via the Terminal component's lazy loading
 
@@ -363,24 +406,11 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           });
         };
 
-        // Try immediately after open
+        // xterm creates its helper textarea once, in open(): label it now,
+        // and once more shortly after as a fallback. A subtree observer used
+        // to re-run this query on every batch of output the terminal drew.
         fixAutofillWarning();
-
-        // Use MutationObserver to catch dynamically added elements
-        let observer: MutationObserver | null = null;
-        if (terminalRef.current) {
-          observer = new MutationObserver(() => {
-            fixAutofillWarning();
-          });
-
-          observer.observe(terminalRef.current, {
-            childList: true,
-            subtree: true,
-          });
-        }
-
-        // Also try after a delay as fallback
-        setTimeout(fixAutofillWarning, 500);
+        const autofillTimer = setTimeout(fixAutofillWarning, 500);
 
         // Store refs
         xtermRef.current = term;
@@ -1522,15 +1552,23 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
         // Cleanup
         return () => {
           window.removeEventListener("resize", handleResize);
-          observer?.disconnect();
+          clearTimeout(autofillTimer);
           onData.dispose();
+          // xterm 5.5.0 creates a ScreenDprMonitor for each terminal and
+          // never disposes it (CoreBrowserService does not register it), so
+          // every terminal opened left a window resize listener holding the
+          // whole disposed instance. Release it by hand; the optional chain
+          // makes this a no-op if a later xterm moves or fixes it.
+          (
+            term as unknown as XTermInternals
+          )._core?._coreBrowserService?._screenDprMonitor?.dispose?.();
           term.dispose();
           xtermRef.current = null;
           fitAddonRef.current = null;
         };
       } catch (error) {
         logError(error, "Terminal Load");
-        if (isMountedRef.current) {
+        if (!isStale()) {
           setIsLoading(false);
         }
       }
@@ -1539,13 +1577,23 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     // Wait for DOM to be ready with retry mechanism
     let retryCount = 0;
     const maxRetries = 10;
+    // The pending try, retries included, so a close cancels the whole chain.
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const tryLoadTerminal = () => {
       if (terminalRef.current && !hasInitialized) {
-        loadTerminal();
+        void loadTerminal().then((cleanup) => {
+          if (!cleanup) return;
+          // Closed or unmounted while loading: nothing is left to use it.
+          if (isStale()) {
+            cleanup();
+          } else {
+            terminalCleanupRef.current = cleanup;
+          }
+        });
       } else if (retryCount < maxRetries && !hasInitialized) {
         retryCount++;
-        setTimeout(tryLoadTerminal, 200);
+        timer = setTimeout(tryLoadTerminal, 200);
       } else if (!hasInitialized) {
         logError(
           "Failed to load terminal after maximum retries",
@@ -1555,7 +1603,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
       }
     };
 
-    const timer = setTimeout(tryLoadTerminal, 200);
+    timer = setTimeout(tryLoadTerminal, 200);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

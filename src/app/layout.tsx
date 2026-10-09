@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { cookies } from "next/headers";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "@/components/ui/theme-provider";
@@ -14,26 +13,39 @@ import { BackgroundProvider } from "@/contexts/background-context";
 import { SafariProvider } from "@/contexts/safari-context";
 import { AnimationStateProvider } from "@/contexts/animation-state-context";
 import { QualityProvider } from "@/contexts/quality-context";
-import { getSafariFromNextCookies } from "@/lib/utils/safari-detection";
 import { SVGProtectionWrapper } from "@/components/ui/svg-protection-wrapper";
 import { AnimatedFavicon } from "@/components/ui/animated-favicon";
 import { ToastContainer } from "@/components/ui/toast";
 import CookieNotice from "@/components/ui/cookie-notice";
 import { TestModeProvider } from "@/components/providers/test-mode-provider";
+import { MotionProvider } from "@/components/providers/motion-provider";
 import { LegalModalsProvider } from "@/components/ui/legal-modals-provider";
 import { PenguinSource } from "@/components/ui/penguin-source";
+import montserratRanges from "@/lib/fonts/montserrat-ranges.json";
+import { HEAD_BOOT_SCRIPT } from "@/lib/boot/head-boot";
 
+// The Latin part of Montserrat, every layout feature kept (41 KB): the only
+// font file a visit preloads. The full font (79 KB, every glyph of the
+// original TTF) covers the rest, declared in <head> below for those
+// characters only, so a page that shows one still gets Montserrat for it.
+// Both come from scripts/subset-montserrat.py. next/font takes literals
+// only: this range must equal "latin" in src/lib/fonts/montserrat-ranges.json
+// (layout-font.test.ts checks).
 const montserrat = localFont({
-  src: "../../public/fonts/Montserrat-Regular.ttf",
+  src: "../../public/fonts/Montserrat-Regular-latin.woff2",
   variable: "--font-montserrat",
   display: "swap",
+  declarations: [
+    {
+      prop: "unicode-range",
+      value:
+        "U+0000-017F,U+0192,U+0218-021B,U+02BB-02BC,U+02C6-02C7,U+02C9,U+02D8-02DD,U+2000-206F,U+20A0-20CF,U+2100-214F,U+2190-21FF,U+2200-22FF,U+FB00-FB06,U+FEFF,U+FFFD",
+    },
+  ],
 });
 
-const agustina = localFont({
-  src: "../../public/fonts/Agustina.woff",
-  variable: "--font-agustina",
-  display: "swap",
-});
+// The same family for everything outside that range, from the full font.
+const montserratRestFace = `@font-face{font-family:${montserrat.style.fontFamily.split(",")[0]};src:url("/fonts/Montserrat-Regular.woff2") format("woff2");font-display:swap;unicode-range:${montserratRanges.rest}}`;
 
 export const metadata: Metadata = {
   title: "Romain Claret - Evolving Artificial Intelligence",
@@ -118,29 +130,37 @@ export const metadata: Metadata = {
 // Generate comprehensive structured data for SEO
 const structuredData = generateStructuredData();
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const theme = cookieStore.get("theme")?.value || "light";
-
-  // Get Safari detection from server-side cookies to prevent hydration mismatch
-  const isSafariFromServer = getSafariFromNextCookies(cookieStore);
-
-  // Build className and data attributes for consistent server/client rendering
-  const htmlClassName = isSafariFromServer
-    ? theme // Safari: no animations class
-    : `${theme} enable-animations`; // Non-Safari: enable animations
-
+  // Generated once, at build time, for every visitor: nothing here may
+  // depend on the request. The visitor's theme and browser reach <html>
+  // through the head script below, before the first paint; the providers
+  // start from these same values and catch up after hydration, under the
+  // splash's backdrop. (Read from cookies on every request, they made each
+  // page view a function call: 200-350 ms before the first byte, about a
+  // second when the function was cold.)
   return (
     <html
       lang="en"
-      className={htmlClassName}
-      data-safari={isSafariFromServer.toString()}
+      className="light enable-animations"
+      data-safari="false"
+      // The head script below sets the theme class and the browser's
+      // attributes before React hydrates, from the visitor's storage and
+      // user agent: <html> legitimately differs from what was rendered.
+      suppressHydrationWarning
     >
       <head>
+        {/* First in <head>, so it runs before anything is drawn. */}
+        <script dangerouslySetInnerHTML={{ __html: HEAD_BOOT_SCRIPT }} />
+        {/* The splash's backdrop is in the HTML (app-wrapper.tsx); with
+            scripts off nothing would ever remove it. */}
+        <noscript>
+          <style>{"[data-splash-backdrop]{display:none}"}</style>
+        </noscript>
+        <style dangerouslySetInnerHTML={{ __html: montserratRestFace }} />
         <meta name="theme-color" content="#55198b" />
         <meta name="msapplication-TileColor" content="#8c43ce" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
@@ -246,21 +266,6 @@ export default async function RootLayout({
             `,
           }}
         />
-        {/* Resource hints for performance */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link rel="preconnect" href="https://github.com" />
-        <link rel="preconnect" href="https://medium.com" />
-        <link rel="preconnect" href="https://api.github.com" />
-        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-        <link rel="dns-prefetch" href="https://github.com" />
-        <link rel="dns-prefetch" href="https://medium.com" />
-        <link rel="dns-prefetch" href="https://api.github.com" />
-        <link rel="dns-prefetch" href="https://cdn-images-1.medium.com" />
         {/* Additional SEO meta tags */}
         <meta name="author" content="Romain Claret" />
         <meta name="generator" content="Next.js 15" />
@@ -294,7 +299,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${montserrat.variable} ${agustina.variable} font-sans`}
+        className={`${montserrat.variable} font-sans`}
         suppressHydrationWarning
       >
         {/* Easter egg: a penguin hidden in the HTML source (View Page Source) */}
@@ -314,35 +319,37 @@ export default async function RootLayout({
         </a>
 
         <TestModeProvider>
-          <ThemeProvider initialTheme={theme as "light" | "dark"}>
-            <SafariProvider initialSafari={isSafariFromServer}>
-              <AnimationStateProvider>
-                <QualityProvider>
-                  <BackgroundProvider>
-                    <TerminalProvider>
-                      <SVGProtectionWrapper>
-                        <LegalModalsProvider>
-                          <AppWrapper>
-                            <AnimatedFavicon />
-                            <Navigation />
-                            <main id="main-content" className="pt-16">
-                              {children}
-                            </main>
-                            <FloatingNav />
-                            <Footer />
-                          </AppWrapper>
-                          <ToastContainer />
-                          <CookieNotice />
-                        </LegalModalsProvider>
-                        {process.env.NODE_ENV === "production" &&
-                          process.env.VERCEL && <Analytics />}
-                      </SVGProtectionWrapper>
-                    </TerminalProvider>
-                  </BackgroundProvider>
-                </QualityProvider>
-              </AnimationStateProvider>
-            </SafariProvider>
-          </ThemeProvider>
+          <MotionProvider>
+            <ThemeProvider initialTheme="light">
+              <SafariProvider initialSafari={false}>
+                <AnimationStateProvider>
+                  <QualityProvider>
+                    <BackgroundProvider>
+                      <TerminalProvider>
+                        <SVGProtectionWrapper>
+                          <LegalModalsProvider>
+                            <AppWrapper>
+                              <AnimatedFavicon />
+                              <Navigation />
+                              <main id="main-content" className="pt-16">
+                                {children}
+                              </main>
+                              <FloatingNav />
+                              <Footer />
+                            </AppWrapper>
+                            <ToastContainer />
+                            <CookieNotice />
+                          </LegalModalsProvider>
+                          {process.env.NODE_ENV === "production" &&
+                            process.env.VERCEL && <Analytics />}
+                        </SVGProtectionWrapper>
+                      </TerminalProvider>
+                    </BackgroundProvider>
+                  </QualityProvider>
+                </AnimationStateProvider>
+              </SafariProvider>
+            </ThemeProvider>
+          </MotionProvider>
         </TestModeProvider>
       </body>
     </html>

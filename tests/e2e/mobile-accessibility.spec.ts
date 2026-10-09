@@ -181,11 +181,16 @@ test.describe("Mobile Accessibility", () => {
     expect(viewportMeta).toContain("width=device-width");
     expect(viewportMeta).toContain("initial-scale=1");
 
-    // Check that content doesn't require horizontal scrolling
-    const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
-    const viewportWidth = await page.evaluate(() => window.innerWidth);
-
-    // Allow small differences due to scrollbars
-    expect(bodyWidth - viewportWidth).toBeLessThan(20);
+    // Nothing may reach past the screen's edge. The width to compare with
+    // is the root's clientWidth: window.innerWidth grows to fit whatever
+    // overflows, so measured against it an overflow never showed. A
+    // research tooltip stuck out 14 px, hidden, and the page panned
+    // sideways, with the fixed navigation and site grid stretched to match.
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

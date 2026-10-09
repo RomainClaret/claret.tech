@@ -18,23 +18,8 @@ export interface BrowserInfo {
 }
 
 /**
- * Get Safari detection from cookie (for SSR compatibility)
- */
-function getSafariFromCookie(): boolean {
-  if (typeof document === "undefined") return false;
-
-  const cookieValue = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("safari-detected="))
-    ?.split("=")[1];
-
-  return cookieValue === "true";
-}
-
-/**
  * Synchronously detect browser information
  * This prevents the race condition where Safari detection starts as false
- * Now SSR-compatible using cookies from middleware
  */
 export function detectBrowser(): BrowserInfo {
   // Server-side: Try to get Safari detection from cookie
@@ -53,15 +38,9 @@ export function detectBrowser(): BrowserInfo {
 
   const userAgent = window.navigator.userAgent;
 
-  // First, try to get Safari detection from cookie (set by middleware)
-  const cookieSafari = getSafariFromCookie();
-
   // Detect Safari from user agent (but not Chrome, which also contains "Safari" in userAgent)
-  const userAgentSafari =
+  const isSafari =
     userAgent.includes("Safari") && !userAgent.includes("Chrome");
-
-  // Use cookie if available, otherwise fall back to user agent detection
-  const isSafari = cookieSafari || userAgentSafari;
 
   // Detect other browsers
   const isChrome = userAgent.includes("Chrome") && !userAgent.includes("Edg");

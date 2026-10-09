@@ -54,6 +54,14 @@ export const QUALITY_TUNING = {
   upgradeSamples: 8,
 
   /**
+   * The fast path for a machine that is plainly struggling: this many valid
+   * samples in a row under `toLow` act at once, without waiting for a full
+   * window and the confirming ticks. The slow path takes about ten seconds,
+   * which is most of a first visit spent stuttering. Downgrades only.
+   */
+  fastPathSamples: 3,
+
+  /**
    * Downgrade thresholds. Crossing one means the current tier is too
    * expensive for this machine.
    */
@@ -62,21 +70,23 @@ export const QUALITY_TUNING = {
   toBalanced: 40,
 
   /**
-   * One threshold for every upgrade, and it is high on purpose. Adding load is
-   * only safe with real headroom, so the frame rate has to be pinned near the
-   * vsync ceiling first. This is the number the old code got wrong: it
-   * upgraded at 50, one frame above a downgrade line of 45.
+   * The upgrade floor while the display's rate is unknown, and it is high on
+   * purpose. Adding load is only safe with real headroom, so the frame rate
+   * has to be pinned near the vsync ceiling first. This is the number the old
+   * code got wrong: it upgraded at 50, one frame above a downgrade line of 45.
    */
   upgrade: 58,
 
   /**
-   * Upgrading also requires being this close to the display's own ceiling.
+   * Upgrading also requires being this close to the display's own ceiling,
+   * and with a measured refresh rate this is the whole gate.
    *
    * An absolute number is a weak signal on a high refresh rate screen: a
    * 120Hz laptop clears 58 FPS trivially at any tier, so the threshold above
-   * would wave through every upgrade. Requiring a fraction of the fastest
-   * frame rate actually observed makes "pinned at vsync" mean the same thing
-   * at 60Hz and at 120Hz.
+   * would wave through every upgrade. Requiring a fraction of the ceiling
+   * makes "pinned at vsync" mean the same thing at 60Hz and at 120Hz. A
+   * measured ceiling needs no floor on top: at 60Hz the floor asked for 59,
+   * one frame more than this fraction does, and below 60 nothing could pass.
    */
   upgradeCeilingFraction: 0.95,
 
@@ -89,12 +99,16 @@ export const QUALITY_TUNING = {
 
   /**
    * How long a tier stays off limits after quality was auto-lowered from it.
-   * Escalating, then permanent for the session: at most a couple of attempts
-   * can ever happen, whatever the measurements do.
+   * Escalating, then permanent for the session: a tier that fails is retried
+   * at most three times (after 1, 5 and 30 minutes), whatever the
+   * measurements do.
    */
   backoffMs: [60_000, 5 * 60_000, 30 * 60_000],
 
-  /** Hard ceiling on automatic toasts, independent of how often tiers move. */
+  /**
+   * Hard ceiling on automatic toasts, independent of how often tiers move,
+   * for the session (the last toast's time is saved with the backoff).
+   */
   toastIntervalMs: 5 * 60_000,
 } as const;
 
@@ -115,8 +129,15 @@ export interface QualityDecisionState {
    * the display rather than to a hardcoded 60Hz assumption.
    */
   refreshCeiling: number;
-  /** True once auto has ever lowered quality. Drives the recovery notification. */
-  hasBeenDegraded: boolean;
+  /**
+   * The tier the visitor was on when told quality dropped (the battery
+   * saver toast); null when nothing is owed. Reaching it again, or anything
+   * above it, is the recovery they are told of, once. A flag paid only at
+   * MAXIMUM missed visitors who started at BALANCED: their climb back was
+   * silent, and a routine probe of MAXIMUM minutes later announced it, then
+   * often fell back without a word. Before that, any drop armed it.
+   */
+  recoverTo: QualityMode | null;
   lastToastAt: number;
 }
 
@@ -159,7 +180,7 @@ export function initialQualityState(
     lastChangeAt: now,
     refreshCeiling: 60,
     demotions: {},
-    hasBeenDegraded: false,
+    recoverTo: null,
     lastToastAt: 0,
   };
 }
@@ -245,7 +266,19 @@ export function decideQuality(
     reason,
   });
 
-  if (sample.hidden) return stay("tab hidden");
+  // Hidden, or covered by the splash or a modal: no sample means anything.
+  // The window also restarts, and the settle with it: when the page shows
+  // again every paused loop restarts and lazy chunks run, and the old
+  // samples describe a page from before. Without this, three slow seconds
+  // right after the splash took the fast path, straight to battery saver.
+  if (sample.hidden) {
+    return stay("tab hidden", {
+      samples: [],
+      consecutiveDown: 0,
+      consecutiveUp: 0,
+      lastChangeAt: sample.now,
+    });
+  }
 
   // Implausible readings are DISCARDED, never coerced. The caller used to do
   // `fps || 60`, which turned the single worst sample in the system into the
@@ -258,11 +291,11 @@ export function decideQuality(
 
   // A measured refresh rate is authoritative; otherwise fall back to the
   // fastest frame rate observed, which is all the loop used to have.
-  const refreshCeiling =
-    typeof sample.measuredRefreshRate === "number" &&
-    sample.measuredRefreshRate > 0
-      ? sample.measuredRefreshRate
-      : Math.max(state.refreshCeiling, sample.fps);
+  const measuredRate = sample.measuredRefreshRate;
+  const measured = typeof measuredRate === "number" && measuredRate > 0;
+  const refreshCeiling = measured
+    ? measuredRate
+    : Math.max(state.refreshCeiling, sample.fps);
 
   // A tier change makes the next few seconds unrepresentative, and the old
   // samples describe the old tier, so the window restarts.
@@ -276,15 +309,30 @@ export function decideQuality(
   }
 
   const samples = [...state.samples, sample.fps].slice(-t.windowSize);
+
+  const recent = samples.slice(-t.fastPathSamples);
+  if (
+    recent.length === t.fastPathSamples &&
+    recent.every((fps) => fps < t.toLow)
+  ) {
+    const smoothedRecent = median(recent);
+    // Infinity: the fast path never upgrades.
+    const target = suggestFor(smoothedRecent, state.quality, Infinity);
+    if (rank(target) < rank(state.quality)) {
+      return applyChange(state, target, sample.now, refreshCeiling, {
+        reason: `fast downgrade to ${target} at ${Math.round(smoothedRecent)} fps`,
+      });
+    }
+  }
+
   if (samples.length < t.minSamples) {
     return stay("filling the window", { samples, refreshCeiling });
   }
 
   const smoothed = median(samples);
-  const upgradeAt = Math.max(
-    t.upgrade,
-    Math.round(t.upgradeCeilingFraction * refreshCeiling),
-  );
+  // The floor stands in for headroom only while the ceiling is a guess.
+  const nearCeiling = Math.round(t.upgradeCeilingFraction * refreshCeiling);
+  const upgradeAt = measured ? nearCeiling : Math.max(t.upgrade, nearCeiling);
   const suggested = suggestFor(smoothed, state.quality, upgradeAt);
 
   if (suggested === state.quality) {
@@ -317,35 +365,98 @@ export function decideQuality(
     return stay(`${suggested} is backed off`, counted);
   }
 
+  return applyChange(state, suggested, sample.now, refreshCeiling, {
+    reason: `${isDowngrade ? "downgrade" : "upgrade"} to ${suggested} at ${Math.round(smoothed)} fps`,
+  });
+}
+
+/**
+ * Start the sample window over at `quality`. For a tier set without the loop
+ * (a manual pick, a tier restored from storage), and for the loop starting
+ * again after auto was off: what the window held describes the page before,
+ * possibly minutes ago. The backoff stays (a tier that failed still failed);
+ * no recovery is owed (a later "quality restored" would be about a drop the
+ * visitor has moved on from).
+ */
+export function restartWindow(
+  state: QualityDecisionState,
+  quality: QualityMode,
+  now: number,
+): QualityDecisionState {
+  return {
+    ...state,
+    quality,
+    samples: [],
+    consecutiveDown: 0,
+    consecutiveUp: 0,
+    lastChangeAt: now,
+    recoverTo: null,
+  };
+}
+
+/** restartWindow, if quality changed without the loop. */
+export function rebaseOnTier(
+  state: QualityDecisionState,
+  quality: QualityMode,
+  now: number,
+): QualityDecisionState {
+  return state.quality === quality ? state : restartWindow(state, quality, now);
+}
+
+/** Move to `next`: record a demotion when lowering, and decide on a toast. */
+function applyChange(
+  state: QualityDecisionState,
+  next: QualityMode,
+  now: number,
+  refreshCeiling: number,
+  { reason }: { reason: string },
+): QualityDecision {
+  const t = QUALITY_TUNING;
+  const isDowngrade = rank(next) < rank(state.quality);
   const demotions = isDowngrade
-    ? recordDemotion(state.demotions, state.quality, sample.now)
+    ? recordDemotion(state.demotions, state.quality, now)
     : state.demotions;
 
   // Notify only at the extremes: dropping to battery saver means the site
-  // visibly gave up, and returning to maximum after a degradation is the
-  // recovery worth reporting. Everything between is routine.
-  const isCriticallyBad = suggested === QualityMode.BATTERY_SAVER;
-  const isRecovery = suggested === QualityMode.MAXIMUM && state.hasBeenDegraded;
+  // visibly gave up, and getting back to where the visitor was when told so
+  // is the recovery worth reporting. Everything between is routine.
+  const isCriticallyBad = next === QualityMode.BATTERY_SAVER;
+  // Upward only: a drop that lands at or above the tier owed is not news of
+  // a recovery. With a debt restored from the session, a MAXIMUM picked by
+  // hand that fell to BALANCED announced "Performance recovered".
+  const isRecovery =
+    !isDowngrade &&
+    state.recoverTo !== null &&
+    rank(next) >= rank(state.recoverTo);
   const withinToastLimit =
-    sample.now - state.lastToastAt >= t.toastIntervalMs ||
-    state.lastToastAt === 0;
-  const notify = (isCriticallyBad || isRecovery) && withinToastLimit;
+    now - state.lastToastAt >= t.toastIntervalMs || state.lastToastAt === 0;
+  // The recovery answers a drop toast the visitor was shown, one for one, so
+  // it needs no rate limit of its own. Held back by it, the climb back that
+  // normally lands about 75 s after the drop went unannounced, and the debt
+  // stayed for a routine retry to pay minutes later.
+  const notify = (isCriticallyBad && withinToastLimit) || isRecovery;
 
   return {
     state: {
       ...state,
-      quality: suggested,
+      quality: next,
       samples: [],
       consecutiveDown: 0,
       consecutiveUp: 0,
-      lastChangeAt: sample.now,
+      lastChangeAt: now,
       refreshCeiling,
       demotions,
-      hasBeenDegraded: state.hasBeenDegraded || isDowngrade,
-      lastToastAt: notify ? sample.now : state.lastToastAt,
+      // Paid on getting back; owed from a drop toast, to the tier it left
+      // (or the one still owed, if quality fell again before getting back).
+      recoverTo: isRecovery
+        ? null
+        : isCriticallyBad && notify
+          ? (state.recoverTo ?? state.quality)
+          : state.recoverTo,
+      lastToastAt: notify ? now : state.lastToastAt,
     },
-    next: suggested,
+    next,
     notify,
-    reason: `${isDowngrade ? "downgrade" : "upgrade"} to ${suggested} at ${Math.round(smoothed)} fps`,
+    reason,
   };
 }

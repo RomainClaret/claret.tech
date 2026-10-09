@@ -21,11 +21,11 @@ The following libraries are licensed under the MIT License:
 - **[React DOM](https://github.com/facebook/react)** - DOM bindings for React
 - **[Framer Motion](https://github.com/framer/motion)** - Animation library for React
 - **[Tailwind Merge](https://github.com/dcastil/tailwind-merge)** - Utility for merging Tailwind CSS classes
-- **[TypeWriter Effect](https://github.com/tameemsafi/typewriterjs)** - Typewriter effect component
 - **[clsx](https://github.com/lukeed/clsx)** - Utility for constructing className strings
 - **[js-cookie](https://github.com/js-cookie/js-cookie)** - Simple API for handling cookies
 - **[ColorThief](https://github.com/lokesh/color-thief)** - Library for extracting colors from images
 - **[Lottie React](https://github.com/Gamote/lottie-react)** - React component for Lottie animations
+- **[Lottie Web](https://github.com/airbnb/lottie-web)** - Lottie player (its light build, which Lottie React is aliased to)
 - **[react-pdf](https://github.com/wojtekmaj/react-pdf)** - PDF viewer for React
 - **[xterm.js](https://github.com/xtermjs/xterm.js)** - Terminal emulator for the web
 - **[@xterm/addon-fit](https://github.com/xtermjs/xterm.js)** - Fit addon for xterm.js
@@ -53,7 +53,6 @@ The following fonts are licensed under the SIL Open Font License 1.1:
 
 - **[Inter](https://github.com/rsms/inter)** - Modern variable font family (via Google Fonts)
 - **[Montserrat](https://github.com/JulietaUla/Montserrat)** - Geometric sans-serif font family
-- **[Agustina](https://www.fontspace.com/agustina-font-f32851)** - Elegant script font
 
 ---
 

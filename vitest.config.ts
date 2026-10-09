@@ -60,10 +60,17 @@ export default defineConfig(({ mode: _mode }) => {
         "**/tests-examples/**",
         "**/e2e/**",
         "**/*.spec.ts",
+        // Claude Code's agent worktrees (gitignored): full copies of src/,
+        // which directory filters such as `vitest run src/contexts` match.
+        "**/.claude/**",
       ],
       coverage: {
         enabled: !isCI, // Disable in CI to save memory
         provider: "v8" as const,
+        // Absolute: the default ("./coverage") resolves against the cwd, so a
+        // run started from src/ wrote a 13 MB report to src/coverage, which no
+        // ignore rule covers (.gitignore has /coverage, anchored to the root).
+        reportsDirectory: path.resolve(__dirname, "coverage"),
         reporter: ["text", "json", "html"],
         exclude: [
           "node_modules/",

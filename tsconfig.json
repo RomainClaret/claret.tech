@@ -25,6 +25,7 @@
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": [
     "node_modules",
+    ".claude",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",

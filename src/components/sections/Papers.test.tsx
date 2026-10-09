@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -9,6 +10,7 @@ import {
 import { Papers } from "./Papers";
 import {
   STATIC_PUBLICATIONS,
+  exportToBibTeX,
   type Publication,
 } from "@/lib/api/fetch-publications";
 import {
@@ -269,15 +271,24 @@ vi.mock("@/components/icons", () => ({
 }));
 
 // Mock framer-motion
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({ children, _whileHover, _transition, ...props }: MotionDivProps) => (
-      <div data-testid="motion-div" {...props}>
-        {children}
-      </div>
-    ),
-  },
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        _whileHover,
+        _transition,
+        ...props
+      }: MotionDivProps) => (
+        <div data-testid="motion-div" {...props}>
+          {children}
+        </div>
+      ),
+    },
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock dynamic import - Next.js dynamic returns a component
 vi.mock("next/dynamic", () => ({
@@ -1266,6 +1277,116 @@ describe("Papers", () => {
       // Check for "New" badge in publication status
       // Since we check publication status based on venue/title, let's verify the paper is rendered
       expect(screen.getByText("Conference 2024")).toBeInTheDocument();
+    });
+  });
+
+  describe("BibTeX export", () => {
+    it("releases the downloaded file's blob once the download has read it", async () => {
+      const createObjectURL = vi.fn(() => "blob:bibtex");
+      const revokeObjectURL = vi.fn();
+      const saved = Object.getOwnPropertyDescriptors(URL);
+      Object.assign(URL, { createObjectURL, revokeObjectURL });
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+        () => {},
+      );
+      global.fetch = vi.fn((_url: RequestInfo | URL, init?: RequestInit) =>
+        Promise.resolve(
+          (init?.method === "POST"
+            ? { text: () => Promise.resolve("@article{x}") }
+            : {
+                json: () =>
+                  Promise.resolve({
+                    publications: mockPublications,
+                    totalCitations: 23,
+                    count: 2,
+                  }),
+              }) as Response,
+        ),
+      );
+      // Fake time that still moves on its own, so the fetches and waitFor
+      // run as usual and the 40 s can be skipped.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        render(<Papers />);
+
+        fireEvent.click(await screen.findByText("Export all as BibTeX"));
+        await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+        // Not at once: Safari may still be reading the URL after click().
+        expect(revokeObjectURL).not.toHaveBeenCalled();
+        await act(async () => {
+          vi.advanceTimersByTime(40_000);
+        });
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:bibtex");
+      } finally {
+        vi.useRealTimers();
+        // Put URL back as it was (jsdom implements neither).
+        for (const key of ["createObjectURL", "revokeObjectURL"] as const) {
+          if (saved[key]) Object.defineProperty(URL, key, saved[key]);
+          else delete (URL as Partial<typeof URL>)[key];
+        }
+      }
+    });
+
+    it("builds the file in the page, so a failed request cannot end up in it", async () => {
+      // The export posted the papers to /api/publications and saved whatever
+      // came back: the rate limiter's 429 or a 500 became the .bib file, and
+      // a network failure an unhandled rejection. All the route did was run
+      // exportToBibTeX, which the page has already.
+      const blobs: Blob[] = [];
+      const createObjectURL = vi.fn((blob: Blob) => {
+        blobs.push(blob);
+        return "blob:bibtex";
+      });
+      const saved = Object.getOwnPropertyDescriptors(URL);
+      Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+        () => {},
+      );
+      const fetchMock = vi.fn((_url: RequestInfo | URL, init?: RequestInit) =>
+        Promise.resolve(
+          (init?.method === "POST"
+            ? {
+                ok: false,
+                status: 429,
+                text: () => Promise.resolve('{"error":"Too many requests"}'),
+              }
+            : {
+                json: () =>
+                  Promise.resolve({
+                    publications: mockPublications,
+                    totalCitations: 23,
+                    count: 2,
+                  }),
+              }) as Response,
+        ),
+      );
+      global.fetch = fetchMock;
+      try {
+        render(<Papers />);
+        await screen.findByText("Neuroevolution Research Paper");
+
+        fireEvent.click(screen.getByText("Export all as BibTeX"));
+        await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+        const posts = fetchMock.mock.calls.filter(
+          ([, init]) => init?.method === "POST",
+        );
+        expect(posts).toHaveLength(0);
+        // jsdom's Blob has no text(); FileReader reads it.
+        const contents = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsText(blobs[0]);
+        });
+        expect(contents).toBe(exportToBibTeX(mockPublications));
+      } finally {
+        for (const key of ["createObjectURL", "revokeObjectURL"] as const) {
+          if (saved[key]) Object.defineProperty(URL, key, saved[key]);
+          else delete (URL as Partial<typeof URL>)[key];
+        }
+      }
     });
   });
 

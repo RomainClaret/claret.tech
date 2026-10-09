@@ -1,10 +1,97 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { LegalModal } from "@/components/ui/legal-modal";
-import { PrivacyContent } from "@/components/legal/privacy-content";
-import { TermsContent } from "@/components/legal/terms-content";
-import { LicenseContent } from "@/components/legal/license-content";
+import {
+  loadLegalTexts,
+  loadedLegalTexts,
+} from "@/components/legal/load-legal-texts";
+import { withLoadFallback } from "@/lib/utils/load-fallback";
+import { logError } from "@/lib/utils/dev-logger";
+import { reloadPage } from "@/lib/utils/reload-page";
+
+// Fetched on intent (load-legal-texts.ts); a modal only renders its text
+// while open. The placeholder holds the text area's minimum height.
+const textPlaceholder = () => <div className="min-h-[400px]" />;
+
+// A failed load of the texts' chunk (a renamed chunk after a deploy, a CSP or
+// a blocker). Logged in development; production stays silent, as dev-logger
+// is on the client.
+const reportLegalTextError = (error: unknown) =>
+  logError(error, "Legal texts chunk");
+
+// Shown in the modal when the text's chunk cannot be fetched. These
+// providers sit in the root layout, so an error here would otherwise reach
+// global-error and replace the whole site.
+export function LegalTextUnavailable({
+  retry,
+  retrying,
+}: {
+  retry: () => void;
+  retrying: boolean;
+}) {
+  return (
+    <div className="min-h-[400px] space-y-3 text-muted-foreground">
+      <p>Could not load this text. Check your connection and try again.</p>
+      <div className="flex flex-wrap gap-4">
+        <button
+          type="button"
+          onClick={retry}
+          disabled={retrying}
+          className="text-primary hover:underline disabled:opacity-60 disabled:no-underline"
+        >
+          {retrying ? "Trying again..." : "Try again"}
+        </button>
+        {/* Once a retry has failed too: a deploy may have replaced the
+            texts' chunk since this page loaded. */}
+        {!retrying && (
+          <button
+            type="button"
+            onClick={reloadPage}
+            className="text-primary hover:underline"
+          >
+            Reload page
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const PrivacyContent = dynamic(
+  withLoadFallback(
+    () => loadLegalTexts().then((mod) => mod.PrivacyContent),
+    LegalTextUnavailable,
+    {
+      onError: reportLegalTextError,
+      peek: () => loadedLegalTexts()?.PrivacyContent,
+    },
+  ),
+  { ssr: false, loading: textPlaceholder },
+);
+const TermsContent = dynamic(
+  withLoadFallback(
+    () => loadLegalTexts().then((mod) => mod.TermsContent),
+    LegalTextUnavailable,
+    {
+      onError: reportLegalTextError,
+      peek: () => loadedLegalTexts()?.TermsContent,
+    },
+  ),
+  { ssr: false, loading: textPlaceholder },
+);
+const LicenseContent = dynamic(
+  withLoadFallback(
+    () => loadLegalTexts().then((mod) => mod.LicenseContent),
+    LegalTextUnavailable,
+    {
+      onError: reportLegalTextError,
+      peek: () => loadedLegalTexts()?.LicenseContent,
+    },
+  ),
+  { ssr: false, loading: textPlaceholder },
+);
 
 interface LegalModalsContextType {
   openPrivacyModal: () => void;

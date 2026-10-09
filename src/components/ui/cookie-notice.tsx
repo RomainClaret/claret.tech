@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLegalModals } from "@/components/ui/legal-modals-provider";
+import { legalTextsIntent } from "@/components/legal/load-legal-texts";
 
 export default function CookieNotice() {
   const [showNotice, setShowNotice] = useState(false);
@@ -55,6 +56,7 @@ export default function CookieNotice() {
               understand site performance. No invasive tracking, no third-party
               advertising. View our{" "}
               <button
+                {...legalTextsIntent}
                 onClick={openPrivacyModal}
                 className="text-primary-purple hover:text-primary-pink underline transition-colors font-medium"
                 aria-label="Open Privacy Policy"
@@ -63,6 +65,7 @@ export default function CookieNotice() {
               </button>{" "}
               and{" "}
               <button
+                {...legalTextsIntent}
                 onClick={openTermsModal}
                 className="text-primary-purple hover:text-primary-pink underline transition-colors font-medium"
                 aria-label="Open Terms of Service"

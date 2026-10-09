@@ -107,13 +107,17 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock Framer Motion
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({ children, ...props }: MotionDivProps) => (
-      <div {...props}>{children}</div>
-    ),
-  },
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({ children, ...props }: MotionDivProps) => (
+        <div {...props}>{children}</div>
+      ),
+    },
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock Lucide icons
 vi.mock("lucide-react", () => ({

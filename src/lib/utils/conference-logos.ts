@@ -109,7 +109,8 @@ export function getConferenceLogo(
   for (const name of candidates) {
     // Check WebP first
     if (availableLogos.has(`${name}.webp`)) {
-      return `/images/${name}.webp`;
+      const version = LOGO_VERSIONS[`${name}.webp`];
+      return `/images/${name}.webp${version ? `?v=${version}` : ""}`;
     }
     // Fallback to PNG
     if (availableLogos.has(`${name}.png`)) {
@@ -123,6 +124,23 @@ export function getConferenceLogo(
 
   return null;
 }
+
+/**
+ * Logos whose file changed under the same name, with a version for the URL.
+ * /images is cached for a year as immutable, so a changed file under an old
+ * URL never reaches a returning visitor: these six were resized to 384 px
+ * tall (5958da5), and anyone who had the originals cached kept decoding
+ * them, 21 MB across the six. Bump an entry, or add one, whenever a logo's
+ * content changes.
+ */
+const LOGO_VERSIONS: Record<string, number> = {
+  "40th_annual_meeting_of_neuroscience_2010_logo.webp": 2,
+  "gecco_2024_logo.webp": 2,
+  "gecco_2026_logo.webp": 2,
+  "ppsn_2026_logo.webp": 2,
+  "ppsn_2026_logo_white.webp": 2,
+  "wcci_2026_logo.webp": 2,
+};
 
 // Pre-computed list of available conference logos
 // This helps avoid runtime file system checks

@@ -7,6 +7,7 @@ import {
   ReactNode,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import type { MonitoringOptions } from "@/lib/hooks/usePerformanceMonitor";
 
@@ -298,30 +299,53 @@ export function PerformanceMonitorProvider({
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [isMonitorActive, hidePerformanceMonitor]);
 
+  const value = useMemo(
+    () => ({
+      isMonitorActive,
+      showPerformanceMonitor,
+      hidePerformanceMonitor,
+      togglePerformanceMonitor,
+      monitoringOptions,
+      updateMonitoringOptions,
+      toggleMonitoringOption,
+      enableAllMonitoring,
+      disableAllMonitoring,
+      isDashboardOpen,
+      showDashboard,
+      hideDashboard,
+      toggleDashboard,
+      isGeneratingReport,
+      reportProgress,
+      generateReport,
+      isReportModalOpen,
+      showReportModal,
+      hideReportModal,
+    }),
+    [
+      isMonitorActive,
+      showPerformanceMonitor,
+      hidePerformanceMonitor,
+      togglePerformanceMonitor,
+      monitoringOptions,
+      updateMonitoringOptions,
+      toggleMonitoringOption,
+      enableAllMonitoring,
+      disableAllMonitoring,
+      isDashboardOpen,
+      showDashboard,
+      hideDashboard,
+      toggleDashboard,
+      isGeneratingReport,
+      reportProgress,
+      generateReport,
+      isReportModalOpen,
+      showReportModal,
+      hideReportModal,
+    ],
+  );
+
   return (
-    <PerformanceMonitorContext.Provider
-      value={{
-        isMonitorActive,
-        showPerformanceMonitor,
-        hidePerformanceMonitor,
-        togglePerformanceMonitor,
-        monitoringOptions,
-        updateMonitoringOptions,
-        toggleMonitoringOption,
-        enableAllMonitoring,
-        disableAllMonitoring,
-        isDashboardOpen,
-        showDashboard,
-        hideDashboard,
-        toggleDashboard,
-        isGeneratingReport,
-        reportProgress,
-        generateReport,
-        isReportModalOpen,
-        showReportModal,
-        hideReportModal,
-      }}
-    >
+    <PerformanceMonitorContext.Provider value={value}>
       {children}
     </PerformanceMonitorContext.Provider>
   );

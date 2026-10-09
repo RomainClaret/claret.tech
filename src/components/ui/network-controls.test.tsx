@@ -5,7 +5,7 @@ import { NetworkControls } from "./network-controls";
 // Mock framer-motion to avoid matchMedia issues
 vi.mock("framer-motion", async () => {
   const React = await vi.importActual<typeof import("react")>("react");
-  return {
+  const mocked = {
     motion: {
       div: React.forwardRef(
         (
@@ -28,6 +28,8 @@ vi.mock("framer-motion", async () => {
     },
     AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
   };
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  return { ...mocked, m: mocked.motion };
 });
 
 describe("NetworkControls", () => {

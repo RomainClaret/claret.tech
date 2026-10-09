@@ -15,7 +15,7 @@ import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { SkillManifesto } from "@/components/ui/skill-manifesto";
 import { LanguageSpectrum } from "@/components/ui/language-spectrum";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -123,7 +123,7 @@ export function Skills() {
                   delay={300 + index * 100}
                   className="h-full"
                 >
-                  <motion.div
+                  <m.div
                     className="relative h-full min-h-[400px]"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -139,7 +139,7 @@ export function Skills() {
                           {/* Header with animated icon */}
                           <div className="flex items-start gap-4 h-full">
                             <div className="relative group">
-                              <motion.div
+                              <m.div
                                 className="w-14 h-14 rounded-full flex items-center justify-center"
                                 style={{
                                   backgroundColor: `rgba(${activityColor}, 0.1)`,
@@ -151,24 +151,16 @@ export function Skills() {
                                   className="w-7 h-7"
                                   style={{ color: `rgb(${activityColor})` }}
                                 />
-                              </motion.div>
-                              {/* Breathing pulse effect */}
-                              <motion.div
-                                className="absolute inset-0 rounded-full pointer-events-none"
+                              </m.div>
+                              {/* Breathing pulse effect: a CSS loop
+                                  (motion.css) */}
+                              <div
+                                className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                                 style={{
                                   backgroundColor: `rgb(${activityColor})`,
                                   opacity: 0.1,
                                   willChange: "transform",
-                                }}
-                                initial={{ scale: 1 }}
-                                animate={{
-                                  scale: [1, 1.15, 1],
-                                }}
-                                transition={{
-                                  duration: 3,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                  delay: (300 + index * 100) / 1000 + 0.5,
+                                  animationDelay: `${(300 + index * 100) / 1000 + 0.5}s`,
                                 }}
                               />
                             </div>
@@ -231,14 +223,14 @@ export function Skills() {
                                   delay={400 + index * 100 + techIndex * 50}
                                   className="group/tech w-full"
                                 >
-                                  <motion.div
+                                  <m.div
                                     className="relative w-full"
                                     whileHover={{ scale: 1.05 }}
                                   >
                                     {/* Tech badge with holographic effects */}
                                     <div className="relative group/badge w-full">
                                       {/* Glow effect on hover */}
-                                      <motion.div
+                                      <m.div
                                         className="absolute -inset-1 rounded-lg opacity-0 group-hover/badge:opacity-40 blur-md transition-opacity duration-300"
                                         style={{
                                           backgroundColor: `rgb(${activityColor})`,
@@ -275,9 +267,10 @@ export function Skills() {
                                           }}
                                         />
 
-                                        {/* Rainbow holographic overlay */}
+                                        {/* Rainbow holographic overlay; its
+                                            loop only runs on hover */}
                                         <div
-                                          className="absolute inset-0 opacity-0 group-hover/badge:opacity-20 transition-opacity duration-500 rounded-lg"
+                                          className="absolute inset-0 opacity-0 group-hover/badge:opacity-20 transition-opacity duration-500 rounded-lg anim-hover"
                                           style={{
                                             backgroundImage: `linear-gradient(45deg,
                                               rgba(255, 0, 0, 0.1) 0%,
@@ -310,9 +303,11 @@ export function Skills() {
                                         </span>
                                       </div>
 
-                                      {/* Animated border */}
-                                      <motion.div
-                                        className="absolute inset-0 rounded-lg p-[1px] -z-10 opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300"
+                                      {/* Animated border: a CSS loop
+                                          (motion.css) that only runs on
+                                          hover, when the border shows */}
+                                      <div
+                                        className="absolute inset-0 rounded-lg p-[1px] -z-10 opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 anim-border-flow anim-hover"
                                         style={{
                                           backgroundImage: `linear-gradient(135deg,
                                             rgba(${activityColor}, 0.5) 0%,
@@ -323,20 +318,9 @@ export function Skills() {
                                           )`,
                                           backgroundSize: "200% 200%",
                                         }}
-                                        animate={{
-                                          backgroundPosition: [
-                                            "0% 0%",
-                                            "200% 200%",
-                                          ],
-                                        }}
-                                        transition={{
-                                          duration: 3,
-                                          repeat: Infinity,
-                                          ease: "linear",
-                                        }}
                                       />
                                     </div>
-                                  </motion.div>
+                                  </m.div>
                                 </ScaleIn>
                               );
                             })}
@@ -344,7 +328,7 @@ export function Skills() {
                         </div>
                       </div>
                     </HolographicCard>
-                  </motion.div>
+                  </m.div>
                 </SlideInUp>
               );
             })}
@@ -372,7 +356,7 @@ export function Skills() {
 
                 return (
                   <SlideInUp key={category} delay={500 + index * 100}>
-                    <motion.div
+                    <m.div
                       className="h-full"
                       whileHover={{ scale: 1.02 }}
                       transition={{
@@ -390,7 +374,7 @@ export function Skills() {
                         <div className="p-5 h-full">
                           <div className="flex items-center gap-2 mb-3 min-h-[60px]">
                             <div className="relative group">
-                              <motion.div
+                              <m.div
                                 className="w-10 h-10 rounded-full flex items-center justify-center"
                                 style={{
                                   backgroundColor: `rgba(${categoryColor}, 0.1)`,
@@ -401,24 +385,16 @@ export function Skills() {
                                   className="w-5 h-5"
                                   style={{ color: `rgb(${categoryColor})` }}
                                 />
-                              </motion.div>
-                              {/* Breathing pulse effect */}
-                              <motion.div
-                                className="absolute inset-0 rounded-full pointer-events-none"
+                              </m.div>
+                              {/* Breathing pulse effect: a CSS loop
+                                  (motion.css) */}
+                              <div
+                                className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                                 style={{
                                   backgroundColor: `rgb(${categoryColor})`,
                                   opacity: 0.1,
                                   willChange: "transform",
-                                }}
-                                initial={{ scale: 1 }}
-                                animate={{
-                                  scale: [1, 1.15, 1],
-                                }}
-                                transition={{
-                                  duration: 3,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                  delay: (500 + index * 100) / 1000 + 0.5,
+                                  animationDelay: `${(500 + index * 100) / 1000 + 0.5}s`,
                                 }}
                               />
                             </div>
@@ -469,7 +445,7 @@ export function Skills() {
 
                           <div className="space-y-2">
                             {panel.bullets.map((interest, idx) => (
-                              <motion.div
+                              <m.div
                                 key={idx}
                                 className="flex items-start gap-2 text-sm group/interest"
                                 initial={{ opacity: 0, x: -10 }}
@@ -488,12 +464,12 @@ export function Skills() {
                                 <span className="text-muted-foreground group-hover/interest:text-foreground transition-colors duration-300">
                                   {interest}
                                 </span>
-                              </motion.div>
+                              </m.div>
                             ))}
                           </div>
                         </div>
                       </HolographicCard>
-                    </motion.div>
+                    </m.div>
                   </SlideInUp>
                 );
               },

@@ -7,7 +7,14 @@
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { LegalModalsProvider, useLegalModals } from "./legal-modals-provider";
+import {
+  LegalModalsProvider,
+  LegalTextUnavailable,
+  useLegalModals,
+} from "./legal-modals-provider";
+import { reloadPage } from "@/lib/utils/reload-page";
+
+vi.mock("@/lib/utils/reload-page", () => ({ reloadPage: vi.fn() }));
 
 // Mock the legal modal component
 vi.mock("./legal-modal", () => ({
@@ -101,7 +108,7 @@ describe("LegalModalsProvider", () => {
   });
 
   describe("Privacy Policy Modal", () => {
-    it("opens privacy policy modal when openPrivacyModal is called", () => {
+    it("opens privacy policy modal when openPrivacyModal is called", async () => {
       render(
         <LegalModalsProvider>
           <TestComponent />
@@ -121,7 +128,8 @@ describe("LegalModalsProvider", () => {
         screen.getByTestId("legal-modal-privacy-policy"),
       ).toBeInTheDocument();
       expect(screen.getByText("Privacy Policy")).toBeInTheDocument();
-      expect(screen.getByTestId("privacy-content")).toBeInTheDocument();
+      // The text loads lazily (load-legal-texts.ts).
+      expect(await screen.findByTestId("privacy-content")).toBeInTheDocument();
     });
 
     it("closes privacy policy modal when close button is clicked", () => {
@@ -146,7 +154,7 @@ describe("LegalModalsProvider", () => {
   });
 
   describe("Terms of Service Modal", () => {
-    it("opens terms modal when openTermsModal is called", () => {
+    it("opens terms modal when openTermsModal is called", async () => {
       render(
         <LegalModalsProvider>
           <TestComponent />
@@ -166,7 +174,8 @@ describe("LegalModalsProvider", () => {
         screen.getByTestId("legal-modal-terms-of-service"),
       ).toBeInTheDocument();
       expect(screen.getByText("Terms of Service")).toBeInTheDocument();
-      expect(screen.getByTestId("terms-content")).toBeInTheDocument();
+      // The text loads lazily (load-legal-texts.ts).
+      expect(await screen.findByTestId("terms-content")).toBeInTheDocument();
     });
 
     it("closes terms modal when close button is clicked", () => {
@@ -191,7 +200,7 @@ describe("LegalModalsProvider", () => {
   });
 
   describe("GNU GPLv3 or later Modal", () => {
-    it("opens license modal when openLicenseModal is called", () => {
+    it("opens license modal when openLicenseModal is called", async () => {
       render(
         <LegalModalsProvider>
           <TestComponent />
@@ -211,7 +220,8 @@ describe("LegalModalsProvider", () => {
         screen.getByTestId("legal-modal-gnu-gplv3-or-later"),
       ).toBeInTheDocument();
       expect(screen.getByText("GNU GPLv3 or later")).toBeInTheDocument();
-      expect(screen.getByTestId("license-content")).toBeInTheDocument();
+      // The text loads lazily (load-legal-texts.ts).
+      expect(await screen.findByTestId("license-content")).toBeInTheDocument();
     });
 
     it("closes license modal when close button is clicked", () => {
@@ -376,7 +386,7 @@ describe("LegalModalsProvider", () => {
   });
 
   describe("Content Rendering", () => {
-    it("renders correct content components in each modal", () => {
+    it("renders correct content components in each modal", async () => {
       render(
         <LegalModalsProvider>
           <TestComponent />
@@ -385,17 +395,18 @@ describe("LegalModalsProvider", () => {
 
       // Open privacy modal and check content
       fireEvent.click(screen.getByTestId("open-privacy"));
-      expect(screen.getByTestId("privacy-content")).toBeInTheDocument();
+      // The text loads lazily (load-legal-texts.ts).
+      expect(await screen.findByTestId("privacy-content")).toBeInTheDocument();
       expect(screen.getByText("Privacy Policy Content")).toBeInTheDocument();
 
       // Open terms modal and check content
       fireEvent.click(screen.getByTestId("open-terms"));
-      expect(screen.getByTestId("terms-content")).toBeInTheDocument();
+      expect(await screen.findByTestId("terms-content")).toBeInTheDocument();
       expect(screen.getByText("Terms of Service Content")).toBeInTheDocument();
 
       // Open license modal and check content
       fireEvent.click(screen.getByTestId("open-license"));
-      expect(screen.getByTestId("license-content")).toBeInTheDocument();
+      expect(await screen.findByTestId("license-content")).toBeInTheDocument();
       expect(
         screen.getByText("GPL-3.0-or-later License Content"),
       ).toBeInTheDocument();
@@ -476,6 +487,24 @@ describe("LegalModalsProvider", () => {
       expect(firstRenderFunctions.openLicenseModal).toBe(
         secondRenderFunctions.openLicenseModal,
       );
+    });
+  });
+
+  describe("When the texts cannot be loaded", () => {
+    it("offers a reload once a retry has failed too", () => {
+      // A deploy can replace the texts' chunk under an open page; trying
+      // again then never works, only a reload does.
+      const { rerender } = render(
+        <LegalTextUnavailable retry={() => {}} retrying />,
+      );
+      expect(
+        screen.queryByRole("button", { name: "Reload page" }),
+      ).not.toBeInTheDocument();
+
+      rerender(<LegalTextUnavailable retry={() => {}} retrying={false} />);
+      fireEvent.click(screen.getByRole("button", { name: "Reload page" }));
+
+      expect(reloadPage).toHaveBeenCalledTimes(1);
     });
   });
 });

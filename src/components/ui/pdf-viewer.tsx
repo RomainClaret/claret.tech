@@ -20,9 +20,11 @@ import { Document, Page } from "@/lib/pdf-config";
 import { isSafePdfUrl } from "@/lib/utils/safe-pdf-url";
 import {
   fitScale,
-  widestPageWidth,
+  pageSizes,
+  widestOf,
   MIN_SCALE,
   MAX_SCALE,
+  type PageSize,
 } from "@/lib/utils/pdf-fit";
 import { logError } from "@/lib/utils/dev-logger";
 import { setupPDFConsoleFilter } from "@/lib/utils/pdf-console-filter";
@@ -52,9 +54,22 @@ export function handleTextLayerError(error: unknown): void {
 interface PDFDocumentProxyLike {
   numPages: number;
   getPage: (n: number) => Promise<{
-    getViewport: (p: { scale: number }) => { width: number };
+    getViewport: (p: { scale: number }) => { width: number; height?: number };
   }>;
 }
+
+/**
+ * How far beyond the reader's own height a page still gets its canvas: two
+ * screens above and two below. A canvas holds the page's pixels at the
+ * screen's density, about 22 MB for an A4 page fitted to a 1100 px reader at
+ * DPR 2, and drawing all 368 pages of the PhD thesis asked for 7.8 GB.
+ */
+const DRAW_MARGIN = "200% 0px";
+
+/** Pages drawn before their sizes are known: the first screen. */
+const FIRST_PAGES = 2;
+const firstScreenPages = (): ReadonlySet<number> =>
+  new Set(Array.from({ length: FIRST_PAGES }, (_, i) => i + 1));
 
 interface PDFViewerProps {
   url: string;
@@ -135,22 +150,87 @@ export function PDFViewer({
     setupPDFConsoleFilter();
   }, []);
 
-  // Width of the widest page in points, from the document metadata. Null
-  // until measured; 0 means the document could not be measured.
-  const [widestPage, setWidestPage] = useState<number | null>(null);
+  // Every page's size at scale 1, from the document metadata. Null until
+  // measured; empty when the document could not be measured.
+  const [sizes, setSizes] = useState<PageSize[] | null>(null);
+  // Width of the widest page in points. Null until measured; 0 means the
+  // document could not be measured.
+  const widestPage = useMemo(() => (sizes ? widestOf(sizes) : null), [sizes]);
+
+  // The pages near the viewport, which get a canvas; the rest keep only
+  // their text and link layers (renderMode "none"), so find-in-page,
+  // selection and links still reach every page. Each page's box is sized
+  // from `sizes`, so swapping a canvas in or out moves nothing.
+  // Starts with the first screen's pages, which are already drawn, so they
+  // stay drawn until the observer's first report replaces this.
+  const [nearPages, setNearPages] =
+    useState<ReadonlySet<number>>(firstScreenPages);
+
+  // Which document load is current. Measuring takes a getPage per page (368
+  // for the thesis); if the fallback fonts reload the document meanwhile,
+  // the old proxy is destroyed, its getPage calls reject, and pageSizes
+  // turns those into zero sizes: landing after the reload's reset, they
+  // replaced the first screen with 368 empty boxes until the new measuring
+  // finished. Bumped on unmount too, so nothing lands on a closed reader.
+  const loadIdRef = useRef(0);
+  useEffect(
+    () => () => {
+      loadIdRef.current++;
+    },
+    [],
+  );
 
   const onDocumentLoadSuccess = (pdf: PDFDocumentProxyLike) => {
+    // A reload starts over as a first load does. "Use fallback fonts"
+    // changes the Document's options, react-pdf reloads and every page box
+    // remounts, scrolled to the top; the observer below kept watching the
+    // old boxes until the sizes were measured again, a getPage per page,
+    // with the pages near the old position drawn and the first ones blank.
+    const load = ++loadIdRef.current;
+    setSizes(null);
+    setPageNumber(1);
+    setNearPages(firstScreenPages());
     setNumPages(pdf.numPages);
     setLoading(false);
     setError(null);
 
     // Page sizes come from the metadata rather than from rendered canvases,
-    // so the fit does not depend on render timing. Deliberately not awaited:
-    // the document paints immediately and the fit applies when this resolves.
-    widestPageWidth(pdf)
-      .then(setWidestPage)
-      .catch(() => setWidestPage(0));
+    // so the fit and the page boxes do not depend on render timing.
+    // Deliberately not awaited: the first pages paint immediately, and the
+    // fit and the rest of the pages follow when this resolves.
+    pageSizes(pdf)
+      .then((measured) => {
+        if (load === loadIdRef.current) setSizes(measured);
+      })
+      .catch(() => {
+        if (load === loadIdRef.current) setSizes([]);
+      });
   };
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!root || !numPages || !sizes) return;
+    const near = new Set<number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let changed = false;
+        for (const entry of entries) {
+          const page = Number((entry.target as HTMLElement).dataset.page);
+          if (entry.isIntersecting === near.has(page)) continue;
+          if (entry.isIntersecting) near.add(page);
+          else near.delete(page);
+          changed = true;
+        }
+        if (changed) setNearPages(new Set(near));
+      },
+      { root, rootMargin: DRAW_MARGIN },
+    );
+    for (let page = 1; page <= numPages; page++) {
+      const element = pageRefs.current[page];
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [numPages, sizes]);
 
   // Auto-fit so nothing needs sideways scrolling: scale 1.0 is the PDF's
   // native point size, which fits an A4 portrait page but overflows for 16:9
@@ -241,6 +321,17 @@ export function PDFViewer({
     setScale((prevScale) => Math.max(prevScale - 0.2, MIN_SCALE));
   };
 
+  // Pages that have a box to scroll to: every page once the sizes are known,
+  // the first screen's until then. Measuring takes a getPage per page (368
+  // for the thesis), and "next" past the first screen meanwhile scrolled to
+  // a page that did not exist yet: it did nothing, while the counter read
+  // "of 368". It stays disabled there until the sizes arrive.
+  const pagesInPlace = numPages
+    ? sizes
+      ? numPages
+      : Math.min(numPages, FIRST_PAGES)
+    : 0;
+
   // Handle page navigation
   const scrollToPage = (page: number) => {
     const pageElement = pageRefs.current[page];
@@ -257,7 +348,7 @@ export function PDFViewer({
   };
 
   const nextPage = () => {
-    if (numPages && pageNumber < numPages) {
+    if (pageNumber < pagesInPlace) {
       scrollToPage(pageNumber + 1);
     }
   };
@@ -366,7 +457,7 @@ export function PDFViewer({
 
           <button
             onClick={nextPage}
-            disabled={!numPages || pageNumber >= numPages}
+            disabled={pageNumber >= pagesInPlace}
             className="p-2 rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Next page"
           >
@@ -452,35 +543,58 @@ export function PDFViewer({
             loading=""
             options={pdfOptions}
           >
-            {/* Render all pages for natural scrolling */}
+            {/* Every page for natural scrolling, each in a box of its own
+                size; only those near the viewport draw a canvas. Until the
+                sizes are known, only the first screen's pages render. */}
             {numPages &&
-              Array.from(new Array(numPages), (el, index) => (
-                <div
-                  key={`page_${index + 1}`}
-                  // justify-center, not just mb-4: the Document box is as wide
-                  // as the widest page, so in a mixed-orientation document a
-                  // block-level wrapper leaves every portrait page flush left
-                  // with all the slack piled on the right.
-                  // max-w-none overrides react-pdf's own
-                  // .react-pdf__Page__canvas { max-width: 100% }, which
-                  // otherwise caps a zoomed page at the viewer width and
-                  // makes the zoom control stop having any effect.
-                  className="mb-4 flex justify-center [&_.react-pdf__Page__canvas]:max-w-none"
-                  ref={(el) => {
-                    if (el) pageRefs.current[index + 1] = el;
-                  }}
-                >
-                  <Page
-                    pageNumber={index + 1}
-                    scale={scale}
-                    className="shadow-lg"
-                    renderTextLayer={!disableFontFace}
-                    renderAnnotationLayer={true}
-                    onRenderTextLayerError={handleTextLayerError}
-                    onGetTextError={handleTextLayerError}
-                  />
-                </div>
-              ))}
+              Array.from({ length: pagesInPlace }, (_, index) => {
+                const page = index + 1;
+                const size = sizes?.[index];
+                const drawn = sizes ? nearPages.has(page) : true;
+                return (
+                  <div
+                    key={`page_${page}`}
+                    data-page={page}
+                    // justify-center, not just mb-4: the Document box is as
+                    // wide as the widest page, so in a mixed-orientation
+                    // document a block-level wrapper leaves every portrait
+                    // page flush left with all the slack piled on the right.
+                    // max-w-none overrides react-pdf's own
+                    // .react-pdf__Page__canvas { max-width: 100% }, which
+                    // otherwise caps a zoomed page at the viewer width and
+                    // makes the zoom control stop having any effect.
+                    className="mb-4 flex justify-center [&_.react-pdf__Page__canvas]:max-w-none"
+                    ref={(el) => {
+                      if (el) pageRefs.current[page] = el;
+                    }}
+                  >
+                    {/* The page's box: white, with the page's shadow, at
+                          the canvas's own size (react-pdf floors it). It holds
+                          the page's place whether or not it is drawn. */}
+                    <div
+                      className="bg-white shadow-lg"
+                      style={
+                        size && size.width > 0
+                          ? {
+                              width: Math.floor(size.width * scale),
+                              height: Math.floor(size.height * scale),
+                            }
+                          : undefined
+                      }
+                    >
+                      <Page
+                        pageNumber={page}
+                        scale={scale}
+                        renderMode={drawn ? "canvas" : "none"}
+                        renderTextLayer={!disableFontFace}
+                        renderAnnotationLayer={true}
+                        onRenderTextLayerError={handleTextLayerError}
+                        onGetTextError={handleTextLayerError}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
           </Document>
         </div>
       </div>

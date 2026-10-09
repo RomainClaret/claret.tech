@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useAnimation } from "framer-motion";
+import { m, useAnimation } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Publication } from "@/lib/api/fetch-publications";
 import { useEffect, useState } from "react";
@@ -110,7 +110,7 @@ export function ResearchNode({
   }
 
   return (
-    <motion.div
+    <m.div
       className="absolute"
       style={{
         left: node.x,
@@ -125,7 +125,7 @@ export function ResearchNode({
       onClick={() => onSelect(node)}
     >
       {/* Outer glow effect */}
-      <motion.div
+      <m.div
         className={cn(
           "absolute inset-0 rounded-full blur-xl transition-all duration-300",
         )}
@@ -145,7 +145,7 @@ export function ResearchNode({
 
       {/* Pulse effect for high-citation papers */}
       {node.citations && node.citations > 10 && (
-        <motion.div
+        <m.div
           className="absolute"
           style={{
             width: `${nodeSize * 1.5}px`,
@@ -164,11 +164,11 @@ export function ResearchNode({
               opacity: 0.5,
             }}
           />
-        </motion.div>
+        </m.div>
       )}
 
       {/* Glass morphism container */}
-      <motion.div
+      <m.div
         className={cn(
           "relative rounded-full cursor-pointer",
           "backdrop-blur-md bg-white/10 dark:bg-black/10",
@@ -228,10 +228,10 @@ export function ResearchNode({
             {node.citations}
           </div>
         )}
-      </motion.div>
+      </m.div>
 
       {/* Hover details */}
-      <motion.div
+      <m.div
         className={cn(
           "absolute left-1/2 -translate-x-1/2 pointer-events-none z-50",
           "bg-background/95 backdrop-blur-md",
@@ -280,7 +280,7 @@ export function ResearchNode({
             borderTop: "6px solid rgb(var(--border) / 0.5)",
           }}
         />
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }

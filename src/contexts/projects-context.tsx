@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, ReactNode } from "react";
 
 interface Repository {
   id: string;
@@ -59,15 +59,13 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [allProjects, setAllProjects] = useState<Repository[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const value = useMemo(
+    () => ({ allProjects, setAllProjects, isLoading, setIsLoading }),
+    [allProjects, isLoading],
+  );
+
   return (
-    <ProjectsContext.Provider
-      value={{
-        allProjects,
-        setAllProjects,
-        isLoading,
-        setIsLoading,
-      }}
-    >
+    <ProjectsContext.Provider value={value}>
       {children}
     </ProjectsContext.Provider>
   );

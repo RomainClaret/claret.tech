@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { GraduationCap } from "lucide-react";
 
@@ -32,7 +32,7 @@ export function MobileTimeline({
       <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border/30" />
 
       {/* Progress indicator */}
-      <motion.div
+      <m.div
         className="absolute left-8 top-0 w-0.5 bg-gradient-to-b from-primary via-purple-600 to-primary"
         initial={{ height: "0%" }}
         animate={{
@@ -48,7 +48,7 @@ export function MobileTimeline({
         const color = colors[index] || "rgb(139, 92, 246)";
 
         return (
-          <motion.div
+          <m.div
             key={index}
             className="absolute left-8 -translate-x-1/2"
             style={{
@@ -61,7 +61,7 @@ export function MobileTimeline({
             {/* Node container */}
             <div className="relative">
               {/* Glow effect */}
-              <motion.div
+              <m.div
                 className="absolute inset-0 rounded-full blur-md"
                 style={{
                   background: color,
@@ -78,7 +78,7 @@ export function MobileTimeline({
               />
 
               {/* Node */}
-              <motion.div
+              <m.div
                 className={cn(
                   "relative w-6 h-6 rounded-full",
                   "border-2 transition-all duration-300",
@@ -96,11 +96,11 @@ export function MobileTimeline({
                 {(isPast || isActive) && (
                   <GraduationCap className="w-3 h-3 text-white" />
                 )}
-              </motion.div>
+              </m.div>
 
               {/* Pulse effect for active node */}
               {isActive && (
-                <motion.div
+                <m.div
                   className="absolute inset-0 rounded-full border-2"
                   style={{
                     borderColor: color,
@@ -124,7 +124,7 @@ export function MobileTimeline({
 
               {/* Label (for active node) */}
               {isActive && labels[index] && (
-                <motion.div
+                <m.div
                   className="absolute left-10 top-1/2 -translate-y-1/2 whitespace-nowrap"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -133,10 +133,10 @@ export function MobileTimeline({
                   <div className="text-xs font-semibold text-foreground/80">
                     {labels[index]}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </div>
-          </motion.div>
+          </m.div>
         );
       })}
     </div>

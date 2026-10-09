@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 // Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import Activity from "lucide-react/dist/esm/icons/activity";
 import Zap from "lucide-react/dist/esm/icons/zap";
@@ -19,6 +19,7 @@ import Eye from "lucide-react/dist/esm/icons/eye";
 import Cpu from "lucide-react/dist/esm/icons/cpu";
 import { cn } from "@/lib/utils";
 import { usePerformanceMonitor } from "@/lib/hooks/usePerformanceMonitor";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface PerformanceMetric {
   label: string;
@@ -82,7 +83,7 @@ const getTrendIcon = (trend?: string) => {
 };
 
 const MetricCard = ({ metric }: { metric: PerformanceMetric }) => (
-  <motion.div
+  <m.div
     className={cn(
       "p-4 rounded-lg border border-border/50 transition-all duration-300",
       getStatusBg(metric.status),
@@ -117,11 +118,11 @@ const MetricCard = ({ metric }: { metric: PerformanceMetric }) => (
         {metric.description}
       </div>
     )}
-  </motion.div>
+  </m.div>
 );
 
 const BrowserCard = ({ browser }: { browser: BrowserPerformance }) => (
-  <motion.div
+  <m.div
     className={cn(
       "p-6 rounded-xl border transition-all duration-300",
       browser.isActive
@@ -169,7 +170,7 @@ const BrowserCard = ({ browser }: { browser: BrowserPerformance }) => (
         <MetricCard key={index} metric={metric} />
       ))}
     </div>
-  </motion.div>
+  </m.div>
 );
 
 const PerformanceChart = ({
@@ -191,7 +192,7 @@ const PerformanceChart = ({
             {item.label}
           </div>
           <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-            <motion.div
+            <m.div
               className="h-full rounded-full"
               style={{ backgroundColor: item.color }}
               initial={{ width: 0 }}
@@ -215,7 +216,7 @@ export function PerformanceDashboard() {
   useEffect(() => {
     // Only start monitoring when dashboard is visible
     const observer = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
+      (entries) => setIsVisible(latestEntry(entries).isIntersecting),
       { threshold: 0.1 },
     );
 
@@ -526,7 +527,7 @@ export function PerformanceDashboard() {
   return (
     <div id="performance-dashboard" className="space-y-8">
       {/* Header */}
-      <motion.div
+      <m.div
         className="text-center"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -537,10 +538,10 @@ export function PerformanceDashboard() {
         <p className="text-muted-foreground mt-2">
           Real-time cross-browser performance monitoring and metrics
         </p>
-      </motion.div>
+      </m.div>
 
       {/* Overall Status */}
-      <motion.div
+      <m.div
         className="grid grid-cols-1 md:grid-cols-4 gap-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -601,12 +602,12 @@ export function PerformanceDashboard() {
             {performanceData.getCpuStatus()}
           </div>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* Critical Issues Alert */}
       {performanceHistory.crossBrowserComparison.summary.criticalIssues.length >
         0 && (
-        <motion.div
+        <m.div
           className="p-4 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -628,11 +629,11 @@ export function PerformanceDashboard() {
               ),
             )}
           </ul>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Performance Charts */}
-      <motion.div
+      <m.div
         className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -646,10 +647,10 @@ export function PerformanceDashboard() {
           title="Core Web Vitals Performance"
           data={vitalChartData}
         />
-      </motion.div>
+      </m.div>
 
       {/* Browser Performance Cards */}
-      <motion.div
+      <m.div
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -658,10 +659,10 @@ export function PerformanceDashboard() {
         {browsers.map((browser, index) => (
           <BrowserCard key={index} browser={browser} />
         ))}
-      </motion.div>
+      </m.div>
 
       {/* Performance Recommendations */}
-      <motion.div
+      <m.div
         className="p-6 rounded-xl border border-border bg-card"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -693,10 +694,10 @@ export function PerformanceDashboard() {
             </div>
           )}
         </div>
-      </motion.div>
+      </m.div>
 
       {/* Real-time Metrics Footer */}
-      <motion.div
+      <m.div
         className="text-center text-xs text-muted-foreground"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -706,7 +707,7 @@ export function PerformanceDashboard() {
         {performanceData.browserInfo} •
         {performanceData.shouldReduceAnimations &&
           " Reduced animations enabled"}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

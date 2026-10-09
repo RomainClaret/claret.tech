@@ -129,6 +129,12 @@ describe("ThemeProvider", () => {
     // Clean up React components first
     cleanup();
 
+    // Drop the mock documentElement: the real one is a getter on
+    // Document.prototype, which shows through again once the own property
+    // is gone. Left in place it leaked into every later file in the worker
+    // (the motion gate and svg-protection tests then failed in batch).
+    delete (document as { documentElement?: unknown }).documentElement;
+
     // Clear all mocks and timers
     vi.clearAllMocks();
     vi.clearAllTimers();
@@ -186,8 +192,47 @@ describe("ThemeProvider", () => {
         expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
       });
 
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("dark");
+      // Applied to <html> at once; the cookie, which only a fallback reads
+      // now that no server does, is written by the visitor's own choice.
       expect(mockDocumentElement.classList.add).toHaveBeenCalledWith("dark");
+      expect(mockSetCookieTheme).not.toHaveBeenCalled();
+    });
+
+    it("never applies the HTML's theme over a stored one while it hydrates", () => {
+      // The page is generated with "light"; the head script has put the
+      // visitor's "dark" on <html> before the first paint. Applying the
+      // state first flashed the light theme for a frame.
+      mockLocalStorage.getItem.mockReturnValue("dark");
+
+      render(
+        <ThemeProvider initialTheme="light">
+          <TestComponent />
+        </ThemeProvider>,
+      );
+
+      expect(mockDocumentElement.classList.add).not.toHaveBeenCalledWith(
+        "light",
+      );
+      expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
+    });
+
+    it("takes the stored theme again when restored from the back/forward cache", () => {
+      mockLocalStorage.getItem.mockReturnValue("light");
+      render(
+        <ThemeProvider initialTheme="light">
+          <TestComponent />
+        </ThemeProvider>,
+      );
+
+      // Changed on another page meanwhile.
+      mockLocalStorage.getItem.mockReturnValue("dark");
+      act(() => {
+        const event = new Event("pageshow") as PageTransitionEvent;
+        Object.defineProperty(event, "persisted", { value: true });
+        window.dispatchEvent(event);
+      });
+
+      expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
     });
 
     it("ignores localStorage if same as initial theme", async () => {

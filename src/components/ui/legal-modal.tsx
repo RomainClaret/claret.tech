@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export function LegalModal({
   title,
   children,
 }: LegalModalProps) {
+  // Covers the page: decorative motion behind it pauses until it closes.
+  useOverlayLock(isOpen);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);

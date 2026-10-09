@@ -36,19 +36,23 @@ vi.mock("next/dynamic", () => ({
 }));
 
 // Mock framer-motion to prevent IPC crashes
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: "div",
-    span: "span",
-    section: "section",
-    h1: "h1",
-    p: "p",
-    // Simplified mocks to prevent IPC crashes
-  },
-  useAnimation: () => ({ start: vi.fn(), stop: vi.fn() }),
-  useInView: () => true,
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: "div",
+      span: "span",
+      section: "section",
+      h1: "h1",
+      p: "p",
+      // Simplified mocks to prevent IPC crashes
+    },
+    useAnimation: () => ({ start: vi.fn(), stop: vi.fn() }),
+    useInView: () => true,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock animated components
 vi.mock("@/components/ui/animated", () => ({
@@ -215,15 +219,70 @@ describe("Introduction", () => {
   });
 
   it("regenerates the background when the window is resized", () => {
-    render(<Introduction />);
+    vi.useFakeTimers();
+    try {
+      render(<Introduction />);
 
-    window.innerWidth = 1440;
-    window.innerHeight = 900;
-    act(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
+      window.innerWidth = 1440;
+      window.innerHeight = 900;
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+        vi.advanceTimersByTime(150);
+      });
 
-    expect(mockGenerateBackgroundData).toHaveBeenLastCalledWith(1440, 900, 64);
+      expect(mockGenerateBackgroundData).toHaveBeenLastCalledWith(
+        1440,
+        900,
+        64,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("regenerates once for a burst of resize events, after they settle", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Introduction />);
+      mockGenerateBackgroundData.mockClear();
+
+      act(() => {
+        for (const width of [1100, 1200, 1300, 1440]) {
+          window.innerWidth = width;
+          window.dispatchEvent(new Event("resize"));
+          vi.advanceTimersByTime(50);
+        }
+      });
+      expect(mockGenerateBackgroundData).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+      expect(mockGenerateBackgroundData).toHaveBeenCalledTimes(1);
+      expect(mockGenerateBackgroundData).toHaveBeenCalledWith(1440, 768, 64);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the background when a phone's URL bar resizes the window", () => {
+    // Showing or hiding the URL bar while scrolling changes innerHeight by
+    // about 56 px; redrawing on it reshuffled the background mid-scroll.
+    vi.useFakeTimers();
+    try {
+      render(<Introduction />);
+      mockGenerateBackgroundData.mockClear();
+
+      window.innerHeight = 768 - 56;
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(mockGenerateBackgroundData).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("removes its resize listener on unmount", () => {

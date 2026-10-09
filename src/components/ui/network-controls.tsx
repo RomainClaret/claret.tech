@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Network,
@@ -66,7 +66,7 @@ export function NetworkControls({
   };
 
   return (
-    <motion.div
+    <m.div
       className={cn(
         "relative z-10 bg-background/80 backdrop-blur-md rounded-lg shadow-xl border border-border/50",
         className,
@@ -170,7 +170,7 @@ export function NetworkControls({
       </div>
 
       {/* Filters Panel */}
-      <motion.div
+      <m.div
         className="border-t border-border/50 overflow-hidden"
         initial={false}
         animate={{
@@ -358,7 +358,7 @@ export function NetworkControls({
             </button>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }

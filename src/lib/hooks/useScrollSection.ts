@@ -7,7 +7,6 @@ interface ScrollSectionState {
   currentIndex: number;
   isAtTop: boolean;
   isAtBottom: boolean;
-  scrollProgress: number;
   previousSection: string | null;
   nextSection: string | null;
   isInitialized: boolean;
@@ -31,22 +30,10 @@ export function useScrollSection() {
     currentIndex: 0,
     isAtTop: true,
     isAtBottom: false,
-    scrollProgress: 0,
     previousSection: null,
     nextSection: "skills",
     isInitialized: false,
   });
-
-  const calculateScrollProgress = useCallback(() => {
-    const scrollHeight = document.documentElement.scrollHeight;
-    const clientHeight = document.documentElement.clientHeight;
-    const scrollTop = window.scrollY;
-
-    const maxScroll = scrollHeight - clientHeight;
-    const progress = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
-
-    return Math.min(100, Math.max(0, progress));
-  }, []);
 
   // Which of SECTIONS are actually in the document. The static list is the
   // homepage's layout; on a route like /pdf/<slug> none of them exist, and
@@ -80,24 +67,34 @@ export function useScrollSection() {
     const nextSection =
       currentIdx < SECTIONS.length - 1 ? SECTIONS[currentIdx + 1] : null;
 
-    // Calculate scroll progress
-    const scrollProgress = calculateScrollProgress();
-
-    setPresentSections(
-      SECTIONS.filter((id) => document.getElementById(id) !== null),
+    // Both are set only when they change. A fresh array and object on every
+    // scroll event re-rendered the floating navigation on each one; the
+    // scroll progress that also changed every time was read by nothing and
+    // is gone.
+    const present = SECTIONS.filter((id) => document.getElementById(id));
+    setPresentSections((prev) =>
+      prev.length === present.length && prev.every((id, i) => id === present[i])
+        ? prev
+        : present,
     );
 
-    setState({
+    const next: ScrollSectionState = {
       currentSection: currentSectionId,
       currentIndex: currentIdx,
       isAtTop,
       isAtBottom,
-      scrollProgress,
       previousSection,
       nextSection,
       isInitialized: true,
-    });
-  }, [calculateScrollProgress]);
+    };
+    setState((prev) =>
+      (Object.keys(next) as (keyof ScrollSectionState)[]).every(
+        (key) => prev[key] === next[key],
+      )
+        ? prev
+        : next,
+    );
+  }, []);
 
   const scrollToSection = useCallback((sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -135,8 +132,15 @@ export function useScrollSection() {
   }, [scrollToSection]);
 
   useEffect(() => {
+    // Once per frame however many scroll events arrive in it: each detection
+    // reads every section's offsetTop.
+    let frame = 0;
     const handleScroll = () => {
-      detectCurrentSection();
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        detectCurrentSection();
+      });
     };
 
     // Initial detection
@@ -149,6 +153,7 @@ export function useScrollSection() {
     window.addEventListener("resize", handleScroll, { passive: true });
 
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleScroll);
     };

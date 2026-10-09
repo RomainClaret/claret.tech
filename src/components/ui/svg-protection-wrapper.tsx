@@ -12,9 +12,15 @@ interface SVGProtectionWrapperProps {
  * Global SVG Protection Wrapper
  *
  * This component provides multiple layers of protection against undefined radius values:
- * 1. DOM Mutation Observer to catch dynamic changes
- * 2. Recursive validation of all circle elements
+ * 1. A MutationObserver that validates circles as they are inserted
+ * 2. A periodic validation of every circle on the page
  * 3. Automatic fallback injection for problematic elements
+ *
+ * Writes to `r` are not watched here: every one, from React or from
+ * framer-motion, goes through the Element.prototype.setAttribute guard in
+ * layout.tsx, which replaces a bad value before it reaches the DOM. Watching
+ * the attribute as well made a framer `r` animation (the constellation pulses)
+ * queue a whole-document circle scan on every frame.
  */
 export function SVGProtectionWrapper({
   children,
@@ -23,13 +29,16 @@ export function SVGProtectionWrapper({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Function to validate and fix circle radius attributes
+    // Function to validate and fix circle radius attributes, in one subtree
+    // (including the root itself when it is a circle)
     const validateAndFixCircles = (
       element: Element = document.documentElement,
     ) => {
       try {
-        // Find all circle elements
-        const circles = element.querySelectorAll("circle");
+        const circles: Element[] = Array.from(
+          element.querySelectorAll("circle"),
+        );
+        if (element.tagName === "circle") circles.push(element);
         let fixedCount = 0;
 
         circles.forEach((circle) => {
@@ -72,66 +81,57 @@ export function SVGProtectionWrapper({
     };
 
     // Run initial check after a short delay to catch SSR/hydration issues
-    setTimeout(initialCheck, 100);
+    const initialTimer = setTimeout(initialCheck, 100);
 
-    // Set up mutation observer to catch dynamic changes
+    // Validate inserted subtrees only, batched into one check per burst of
+    // mutations rather than a whole-document scan for each.
+    let pendingRoots: Element[] = [];
+    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
     const observer = new MutationObserver((mutations) => {
-      let needsValidation = false;
-
       mutations.forEach((mutation) => {
-        // Check if new nodes were added
-        if (mutation.type === "childList") {
-          mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
-              // Check if it's an SVG or contains SVG elements
-              if (
-                element.tagName === "circle" ||
-                element.tagName === "svg" ||
-                element.querySelector("circle")
-              ) {
-                needsValidation = true;
-              }
-            }
-          });
-        }
-
-        // Check if attributes were modified
-        if (
-          mutation.type === "attributes" &&
-          mutation.target.nodeType === Node.ELEMENT_NODE
-        ) {
-          const element = mutation.target as Element;
-          if (element.tagName === "circle" && mutation.attributeName === "r") {
-            needsValidation = true;
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return;
+          const element = node as Element;
+          // Check if it's an SVG or contains SVG elements
+          if (
+            element.tagName === "circle" ||
+            element.tagName === "svg" ||
+            element.querySelector("circle")
+          ) {
+            pendingRoots.push(element);
           }
-        }
+        });
       });
 
-      if (needsValidation) {
+      if (pendingRoots.length > 0 && pendingTimer === undefined) {
         // Small delay to allow React to finish rendering
-        setTimeout(() => {
-          validateAndFixCircles();
+        pendingTimer = setTimeout(() => {
+          pendingTimer = undefined;
+          const roots = pendingRoots;
+          pendingRoots = [];
+          roots.forEach((root) => {
+            if (root.isConnected) validateAndFixCircles(root);
+          });
         }, 10);
       }
     });
 
-    // Start observing
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["r"], // Only watch radius changes
     });
 
-    // Additional safety net: periodic validation
+    // Safety net for what the observer cannot see, such as an `r` removed
+    // outright. Skipped while the tab is hidden.
     const intervalId = setInterval(() => {
-      validateAndFixCircles();
+      if (!document.hidden) validateAndFixCircles();
     }, 5000); // Check every 5 seconds
 
     // Cleanup function
     return () => {
       observer.disconnect();
+      clearTimeout(initialTimer);
+      if (pendingTimer !== undefined) clearTimeout(pendingTimer);
       clearInterval(intervalId);
     };
   }, [fallbackRadius]);

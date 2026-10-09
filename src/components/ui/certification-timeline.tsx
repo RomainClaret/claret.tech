@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Award,
@@ -85,7 +85,7 @@ export function CertificationTimeline({
   });
 
   return (
-    <motion.div
+    <m.div
       className={cn("w-full", className)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -100,7 +100,7 @@ export function CertificationTimeline({
             const Icon = getCertIcon(cert.name);
 
             return (
-              <motion.div
+              <m.div
                 key={index}
                 className="relative"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -110,7 +110,7 @@ export function CertificationTimeline({
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 {/* Badge */}
-                <motion.div
+                <m.div
                   className={cn(
                     "relative px-3 py-2.5 rounded-lg border transition-all duration-300",
                     "backdrop-blur-sm cursor-default overflow-hidden",
@@ -123,7 +123,7 @@ export function CertificationTimeline({
                   whileHover={{ scale: 1.02 }}
                 >
                   {/* Background gradient effect */}
-                  <motion.div
+                  <m.div
                     className="absolute inset-0 opacity-0"
                     style={{
                       background: `linear-gradient(135deg, transparent, rgba(${color}, 0.1))`,
@@ -174,7 +174,7 @@ export function CertificationTimeline({
 
                   {/* Hover glow effect */}
                   {isHovered && (
-                    <motion.div
+                    <m.div
                       className="absolute inset-0 pointer-events-none"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -187,10 +187,10 @@ export function CertificationTimeline({
                           background: `radial-gradient(circle at center, rgba(${color}, 0.15), transparent)`,
                         }}
                       />
-                    </motion.div>
+                    </m.div>
                   )}
-                </motion.div>
-              </motion.div>
+                </m.div>
+              </m.div>
             );
           })}
         </div>
@@ -204,7 +204,7 @@ export function CertificationTimeline({
             const Icon = getCertIcon(cert.name);
 
             return (
-              <motion.div
+              <m.div
                 key={index}
                 className={cn(
                   "relative px-3 py-2.5 rounded-lg border",
@@ -239,7 +239,7 @@ export function CertificationTimeline({
                     {cert.issuer} • {cert.year}
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
@@ -253,7 +253,7 @@ export function CertificationTimeline({
             const Icon = getCertIcon(cert.name);
 
             return (
-              <motion.div
+              <m.div
                 key={index}
                 className={cn(
                   "relative px-3 py-2.5 rounded-lg border",
@@ -288,11 +288,11 @@ export function CertificationTimeline({
                     {cert.issuer} • {cert.year}
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, MotionValue } from "framer-motion";
+import { m, MotionValue } from "framer-motion";
 import { ResearchNodeData } from "./research-node";
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
@@ -190,7 +190,7 @@ export function SynapticConnection({
       </defs>
 
       {/* Background path (always visible) */}
-      <motion.path
+      <m.path
         d={pathData}
         fill="none"
         stroke={`url(#${gradientId})`}
@@ -217,7 +217,7 @@ export function SynapticConnection({
       />
 
       {/* Active/highlighted path */}
-      <motion.path
+      <m.path
         d={pathData}
         fill="none"
         stroke={`url(#${gradientId})`}
@@ -263,7 +263,7 @@ export function SynapticConnection({
 
       {/* Directional arrow */}
       {!bidirectional && (isActive || isHighlighted || autoActive) && (
-        <motion.polygon
+        <m.polygon
           points="-4,-2 4,0 -4,2"
           fill={endNode.color}
           opacity={0.8}
@@ -299,7 +299,7 @@ export function SynapticConnection({
         }
 
         return (
-          <motion.circle
+          <m.circle
             key={particle.id}
             r={3}
             fill={`url(#${gradientId})`}
@@ -317,7 +317,7 @@ export function SynapticConnection({
               dur="1s"
               repeatCount="indefinite"
             />
-          </motion.circle>
+          </m.circle>
         );
       })}
 
@@ -326,7 +326,7 @@ export function SynapticConnection({
         areAnimationsPlaying &&
         !prefersReducedMotion &&
         config.animate && (
-          <motion.path
+          <m.path
             d={pathData}
             fill="none"
             stroke={`url(#${gradientId})`}

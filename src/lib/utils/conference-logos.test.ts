@@ -19,7 +19,7 @@ describe("getConferenceLogo", () => {
     );
     expect(generateLogoFileNames(venue)).toContain("wcci_2026_logo");
     expect(getConferenceLogo(venue, AVAILABLE_CONFERENCE_LOGOS)).toBe(
-      "/images/wcci_2026_logo.webp",
+      "/images/wcci_2026_logo.webp?v=2",
     );
   });
 
@@ -32,22 +32,20 @@ describe("getConferenceLogo", () => {
     [
       "Genetic and Evolutionary Computation Conference (GECCO)",
       "2026",
-      "/images/gecco_2026_logo.webp",
+      "/images/gecco_2026_logo.webp?v=2",
     ],
     [
       "Parallel Problem Solving from Nature (PPSN)",
       "2026",
-      "/images/ppsn_2026_logo.webp",
+      "/images/ppsn_2026_logo.webp?v=2",
     ],
-    [
-      "International Conference on Pattern Recognition (ICPR)",
-      "2026",
-      "/images/icpr_2026_logo.webp",
-    ],
+    // A workshop paper: the venue names the workshop's acronym after the
+    // conference's, and the conference's logo is the one to find.
+    ["ICPR 2026 Workshops (BIOMAP)", "2026", "/images/icpr_2026_logo.webp"],
     [
       "Genetic and Evolutionary Computation Conference (GECCO)",
       "2024",
-      "/images/gecco_2024_logo.webp",
+      "/images/gecco_2024_logo.webp?v=2",
     ],
   ])("resolves %s (%s) to its logo", (venue, year, expected) => {
     expect(
@@ -62,7 +60,7 @@ describe("getConferenceLogo", () => {
         AVAILABLE_CONFERENCE_LOGOS,
         { theme: "dark" },
       ),
-    ).toBe("/images/ppsn_2026_logo_white.webp");
+    ).toBe("/images/ppsn_2026_logo_white.webp?v=2");
   });
 
   it("falls back to the normal logo in dark theme without a white variant", () => {
@@ -75,7 +73,7 @@ describe("getConferenceLogo", () => {
         AVAILABLE_CONFERENCE_LOGOS,
         { theme: "dark" },
       ),
-    ).toBe("/images/wcci_2026_logo.webp");
+    ).toBe("/images/wcci_2026_logo.webp?v=2");
   });
 
   it("never picks a _white variant in light theme", () => {
@@ -85,7 +83,7 @@ describe("getConferenceLogo", () => {
         AVAILABLE_CONFERENCE_LOGOS,
         { theme: "light" },
       ),
-    ).toBe("/images/ppsn_2026_logo.webp");
+    ).toBe("/images/ppsn_2026_logo.webp?v=2");
   });
 
   it("returns null for a venue with no matching logo", () => {

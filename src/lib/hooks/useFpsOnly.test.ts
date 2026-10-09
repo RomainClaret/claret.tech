@@ -1,6 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useFpsOnly } from "./useFpsOnly";
+import {
+  acquireOverlay,
+  resetMotionGateForTests,
+} from "@/lib/utils/motion-gate";
+
+// Spy on the estimator without changing it, to see how often it runs. Both
+// entry points count: observeFrameDelta estimates on every call.
+const estimateCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock("@/lib/quality/refresh-rate", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/quality/refresh-rate")>();
+  return {
+    ...actual,
+    estimateRefreshRate: (deltas: readonly number[]) => {
+      estimateCalls.count++;
+      return actual.estimateRefreshRate(deltas);
+    },
+    observeFrameDelta: (
+      ...args: Parameters<typeof actual.observeFrameDelta>
+    ) => {
+      estimateCalls.count++;
+      return actual.observeFrameDelta(...args);
+    },
+  };
+});
 
 describe("useFpsOnly", () => {
   let rafCallback: FrameRequestCallback | null = null;
@@ -48,6 +73,7 @@ describe("useFpsOnly", () => {
         fps: 60,
         isLowFps: false,
         refreshRate: null,
+        sample: 0, // no sample yet
       });
     });
 
@@ -318,7 +344,63 @@ describe("useFpsOnly", () => {
         fps: 60,
         isLowFps: false,
         refreshRate: null,
+        sample: 0, // no sample yet
       });
+    });
+  });
+
+  describe("One shared loop", () => {
+    afterEach(() => {
+      resetMotionGateForTests();
+    });
+
+    /** Drive N frames spaced by `deltaMs`. */
+    const runFrames = (count: number, deltaMs: number) => {
+      for (let i = 0; i < count; i++) {
+        act(() => {
+          currentTime += deltaMs;
+          if (rafCallback) rafCallback(currentTime);
+        });
+      }
+    };
+
+    it("requests one frame per frame however many components subscribe", () => {
+      // QualityProvider and AnimationStateProvider both read the frame rate.
+      // Each used to run its own loop: two frame requests per vsync.
+      const raf = vi.mocked(window.requestAnimationFrame);
+      raf.mockClear();
+      const first = renderHook(() => useFpsOnly(true));
+      const second = renderHook(() => useFpsOnly(true));
+
+      expect(raf).toHaveBeenCalledTimes(1);
+
+      runFrames(70, 16.67);
+      expect(first.result.current.fps).toBe(second.result.current.fps);
+    });
+
+    it("estimates the refresh rate once a second, not on every frame", () => {
+      renderHook(() => useFpsOnly(true));
+      estimateCalls.count = 0;
+
+      runFrames(240, 8.33); // two seconds at 120Hz
+
+      expect(estimateCalls.count).toBeLessThanOrEqual(2);
+    });
+
+    it("stops requesting frames while an overlay covers the page", () => {
+      renderHook(() => useFpsOnly(true));
+      const raf = vi.mocked(window.requestAnimationFrame);
+      const cancel = vi.spyOn(window, "cancelAnimationFrame");
+
+      let release = () => {};
+      act(() => {
+        release = acquireOverlay();
+      });
+      expect(cancel).toHaveBeenCalled();
+
+      raf.mockClear();
+      act(() => release());
+      expect(raf).toHaveBeenCalledTimes(1);
     });
   });
 });

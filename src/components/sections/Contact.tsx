@@ -8,7 +8,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { GitHubIcon, LinkedInIcon } from "@/components/icons";
 import { EducationStyleCard } from "@/components/ui/education-style-card";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 
 // Contact method colors
 const CONTACT_COLORS = {
@@ -16,9 +17,30 @@ const CONTACT_COLORS = {
   github: "139, 92, 246", // Purple
 };
 
+// The glows breathe only while the section is on screen; otherwise they hold
+// their resting opacity, which is also where the loop starts.
+const GLOW_LOOP = { opacity: [0.2, 0.4, 0.2] };
+const GLOW_REST = { opacity: 0.2 };
+const GLOW_LOOP_TRANSITION = { duration: 3, repeat: Infinity };
+const GLOW_REST_TRANSITION = { duration: 0 };
+
 export function Contact() {
+  // Not tied to the site's animation switch: these loops never were, and
+  // Safari, where the switch starts off, would otherwise lose them.
+  const { ref: motionRef, active: motionActive } = useAnimationGate({
+    respectPlaying: false,
+  });
+  const glowAnimate = motionActive ? GLOW_LOOP : GLOW_REST;
+  const glowTransition = motionActive
+    ? GLOW_LOOP_TRANSITION
+    : GLOW_REST_TRANSITION;
+
   return (
-    <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
+    <div
+      ref={motionRef}
+      data-anim={motionActive ? "on" : "off"}
+      className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative"
+    >
       <div className="lg:px-8">
         <FadeIn className="text-center mb-12">
           <h2 className="section-title-gradient">{contactInfo.title}</h2>
@@ -35,7 +57,7 @@ export function Contact() {
           {/* Left Column - Contact Options */}
           <div className="space-y-8">
             {/* Email Card */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, duration: 0.5 }}
@@ -44,18 +66,18 @@ export function Contact() {
                 href={`mailto:${contactInfo.emailAddress}`}
                 className="block"
               >
-                <motion.div
+                <m.div
                   className="relative"
                   whileHover={{ scale: 1.02 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
                   {/* Neural glow effect */}
-                  <motion.div
+                  <m.div
                     className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
                     style={{ backgroundColor: `rgb(${CONTACT_COLORS.email})` }}
                     initial={{ opacity: 0.2 }}
-                    animate={{ opacity: [0.2, 0.4, 0.2] }}
-                    transition={{ duration: 3, repeat: Infinity }}
+                    animate={glowAnimate}
+                    transition={glowTransition}
                   />
                   <EducationStyleCard
                     glowColor={CONTACT_COLORS.email}
@@ -64,7 +86,7 @@ export function Contact() {
                     <div className="p-6">
                       <div className="flex items-start gap-4">
                         <div className="relative">
-                          <motion.div
+                          <m.div
                             className="w-14 h-14 rounded-full flex items-center justify-center"
                             style={{
                               backgroundColor: `rgba(${CONTACT_COLORS.email}, 0.1)`,
@@ -76,21 +98,14 @@ export function Contact() {
                               className="w-7 h-7"
                               style={{ color: `rgb(${CONTACT_COLORS.email})` }}
                             />
-                          </motion.div>
-                          {/* Gentle breathing effect */}
-                          <motion.div
-                            className="absolute inset-0 rounded-full pointer-events-none"
+                          </m.div>
+                          {/* Gentle breathing effect: a CSS loop
+                              (motion.css) */}
+                          <div
+                            className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                             style={{
                               backgroundColor: `rgb(${CONTACT_COLORS.email})`,
                               opacity: 0.1,
-                            }}
-                            animate={{
-                              scale: [1, 1.15, 1],
-                            }}
-                            transition={{
-                              duration: 3,
-                              repeat: Infinity,
-                              ease: "easeInOut",
                             }}
                           />
                         </div>
@@ -105,12 +120,12 @@ export function Contact() {
                       </div>
                     </div>
                   </EducationStyleCard>
-                </motion.div>
+                </m.div>
               </Link>
-            </motion.div>
+            </m.div>
 
             {/* LinkedIn Card */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4, duration: 0.5 }}
@@ -121,20 +136,20 @@ export function Contact() {
                 rel="noopener noreferrer"
                 className="block"
               >
-                <motion.div
+                <m.div
                   className="relative"
                   whileHover={{ scale: 1.02 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
                   {/* Neural glow effect */}
-                  <motion.div
+                  <m.div
                     className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
                     style={{
                       backgroundColor: `rgb(10, 102, 194)`,
                     }}
                     initial={{ opacity: 0.2 }}
-                    animate={{ opacity: [0.2, 0.4, 0.2] }}
-                    transition={{ duration: 3, repeat: Infinity }}
+                    animate={glowAnimate}
+                    transition={glowTransition}
                   />
                   <EducationStyleCard
                     glowColor="10, 102, 194"
@@ -143,7 +158,7 @@ export function Contact() {
                     <div className="p-6">
                       <div className="flex items-start gap-4">
                         <div className="relative">
-                          <motion.div
+                          <m.div
                             className="w-14 h-14 rounded-full flex items-center justify-center"
                             style={{
                               backgroundColor: `rgba(10, 102, 194, 0.1)`,
@@ -156,21 +171,14 @@ export function Contact() {
                                 color: `rgb(10, 102, 194)`,
                               }}
                             />
-                          </motion.div>
-                          {/* Gentle breathing effect */}
-                          <motion.div
-                            className="absolute inset-0 rounded-full pointer-events-none"
+                          </m.div>
+                          {/* Gentle breathing effect: a CSS loop
+                              (motion.css) */}
+                          <div
+                            className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                             style={{
                               backgroundColor: `rgb(10, 102, 194)`,
                               opacity: 0.1,
-                            }}
-                            animate={{
-                              scale: [1, 1.15, 1],
-                            }}
-                            transition={{
-                              duration: 3,
-                              repeat: Infinity,
-                              ease: "easeInOut",
                             }}
                           />
                         </div>
@@ -183,32 +191,32 @@ export function Contact() {
                       </div>
                     </div>
                   </EducationStyleCard>
-                </motion.div>
+                </m.div>
               </Link>
-            </motion.div>
+            </m.div>
           </div>
 
           {/* Right Column - GitHub Avatar */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
             className="flex justify-center"
           >
-            <motion.div
+            <m.div
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className="relative"
             >
               {/* Neural glow effect */}
-              <motion.div
+              <m.div
                 className="absolute -inset-1 rounded-full opacity-0 blur-xl"
                 style={{
                   backgroundColor: `rgb(${CONTACT_COLORS.github})`,
                 }}
                 initial={{ opacity: 0.2 }}
-                animate={{ opacity: [0.2, 0.4, 0.2] }}
-                transition={{ duration: 3, repeat: Infinity }}
+                animate={glowAnimate}
+                transition={glowTransition}
               />
               <Link
                 href={
@@ -231,7 +239,6 @@ export function Contact() {
                         width={300}
                         height={300}
                         className="rounded-full"
-                        priority
                         placeholder="blur"
                         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAKAAoDASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAAQFB//EACYQAAIBAwMEAQUAAAAAAAAAAAECAwAEEQUSITFBUWEGExQiMoH/xAAVAQEBAAAAAAAAAAAAAAAAAAABAv/EABcRAQEBAQAAAAAAAAAAAAAAAAECEQD/2gAMAwEAAhEDEQA/ANLviNwkhABCkgHxU2N2VgysVI6EGrN2zSXEkhGCx61EuI8EkAYNZsYV//Z"
                       />
@@ -251,7 +258,7 @@ export function Contact() {
                 className="absolute -bottom-2 -right-2 block"
                 aria-label="GitHub Profile"
               >
-                <motion.div
+                <m.div
                   className="rounded-full p-3 shadow-xl cursor-pointer"
                   style={{ backgroundColor: `rgb(${CONTACT_COLORS.github})` }}
                   whileHover={{ scale: 1.1 }}
@@ -259,10 +266,10 @@ export function Contact() {
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 >
                   <GitHubIcon size={28} className="text-white" />
-                </motion.div>
+                </m.div>
               </Link>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         </div>
       </div>
     </div>

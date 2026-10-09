@@ -37,7 +37,7 @@ vi.mock("next/navigation", () => ({
 
 // Mock the external dependencies
 vi.mock("@/lib/terminal/terminal-context", () => ({
-  useTerminal: vi.fn(() => ({
+  useTerminalToggle: vi.fn(() => ({
     isOpen: false,
     toggleTerminal: vi.fn(),
   })),

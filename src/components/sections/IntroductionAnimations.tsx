@@ -30,7 +30,8 @@ export function IntroductionAnimations({
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden">
         <ShootingStars />
-        <GridBackground />
+        {/* Opaque: hides the site grid behind the hero (GridBackground). */}
+        <GridBackground covers />
         <NeuralBackground />
       </div>
 

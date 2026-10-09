@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Contrast } from "lucide-react";
+import { readStorage, writeStorage } from "@/lib/utils/safe-storage";
 
 export function HighContrastToggle() {
   const [isHighContrast, setIsHighContrast] = useState(false);
 
   useEffect(() => {
-    // Check localStorage on mount
-    const savedHighContrast = localStorage.getItem("highContrast") === "true";
+    // Check localStorage on mount. Guarded: where storage is blocked this
+    // threw in an effect, which takes the page down to the error boundary.
+    const savedHighContrast = readStorage("local", "highContrast") === "true";
     setIsHighContrast(savedHighContrast);
 
     if (savedHighContrast) {
@@ -22,10 +24,10 @@ export function HighContrastToggle() {
 
     if (newValue) {
       document.documentElement.classList.add("high-contrast");
-      localStorage.setItem("highContrast", "true");
+      writeStorage("local", "highContrast", "true");
     } else {
       document.documentElement.classList.remove("high-contrast");
-      localStorage.setItem("highContrast", "false");
+      writeStorage("local", "highContrast", "false");
     }
   };
 

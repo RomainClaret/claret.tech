@@ -70,25 +70,29 @@ vi.mock("@/lib/hooks/useSafari", () => ({
   useShouldReduceAnimations: () => true,
 }));
 
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({
-      children,
-      ...props
-    }: React.HTMLAttributes<HTMLDivElement> & {
-      children?: React.ReactNode;
-    }) => <div {...props}>{children}</div>,
-    button: ({
-      children,
-      ...props
-    }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-      children?: React.ReactNode;
-    }) => <button {...props}>{children}</button>,
-  },
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        ...props
+      }: React.HTMLAttributes<HTMLDivElement> & {
+        children?: React.ReactNode;
+      }) => <div {...props}>{children}</div>,
+      button: ({
+        children,
+        ...props
+      }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+        children?: React.ReactNode;
+      }) => <button {...props}>{children}</button>,
+    },
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 describe("Research", () => {
   beforeEach(() => {

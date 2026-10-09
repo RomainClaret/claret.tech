@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useBackground } from "@/contexts/background-context";
 import {
@@ -64,6 +64,7 @@ import { validateRadius } from "@/lib/utils/svg-validation";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useQuality, NEURAL_CANVAS_PROFILE } from "@/contexts/quality-context";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import { logWarning } from "@/lib/utils/dev-logger";
 
 // Interface for icon concepts
@@ -206,8 +207,12 @@ export function SkillsNeuralCloud({
   const config = getConfig(NEURAL_CANVAS_PROFILE);
   const [conceptNodes, setConceptNodes] = useState<ConceptNode[]>([]);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const animationFrameRef = useRef<number>();
+  // Attached to the desktop container, which is hidden below md: there it
+  // never intersects, so phones schedule no spikes for an invisible cloud.
+  const { ref: loopGateRef, active: loopActive } = useAnimationGate();
   const conceptNodesRef = useRef<ConceptNode[]>([]);
+  // Lets the node setup wake the spike scheduler for nodes it replaces.
+  const wakeSchedulerRef = useRef<(() => void) | null>(null);
   const [dimensions, setDimensions] = useState({ width: 1152, height: 768 });
   const spikeTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -329,6 +334,12 @@ export function SkillsNeuralCloud({
     );
 
     setConceptNodes(mappedConcepts);
+    // The scheduler reads the ref, which the sync effect updates only after
+    // the next render: with the nodes made twice on mount (the first size
+    // update), it kept a timer set for the first set, and the second set's
+    // earlier spikes waited for it and fired together. Hand them over now.
+    conceptNodesRef.current = mappedConcepts;
+    wakeSchedulerRef.current?.();
   }, [
     backgroundData,
     concepts,
@@ -338,25 +349,74 @@ export function SkillsNeuralCloud({
     gridCellSize,
   ]);
 
-  // Animation loop for spiking - only when animations are enabled
+  // Spike scheduler - only when animations are enabled and the cloud can be
+  // seen. A timer set for the next due spike rather than a check on every
+  // animation frame: requesting a frame per vsync forced the browser to
+  // produce (and, without a GPU, composite) a frame per vsync for nothing,
+  // since spikes are seconds apart.
   useEffect(() => {
     // Store ref values at effect start for cleanup
     const timeouts = spikeTimeoutsRef.current;
 
     if (
       !isVisible ||
+      !loopActive ||
       !areAnimationsPlaying ||
       prefersReducedMotion ||
       !config.animate
     )
       return;
 
-    const animate = () => {
-      // Check if nodes exist using ref
-      if (conceptNodesRef.current.length === 0) {
-        animationFrameRef.current = requestAnimationFrame(animate);
+    // Nodes that came due while the scheduler was stopped (scrolled away,
+    // under an overlay, a hidden tab, or not yet seen at all) get a fresh
+    // wait. Left overdue, after any stop longer than the longest interval
+    // they all spiked in the same tick: one synchronized flash, and a burst
+    // of updates, instead of the staggered rhythm.
+    const startedAt = Date.now();
+    const retimed = new Map<string, number>();
+    conceptNodesRef.current.forEach((node) => {
+      if (!node.isSpiking && node.nextSpikeTime <= startedAt) {
+        retimed.set(
+          node.nodeKey,
+          startedAt +
+            getRandomInterval(
+              DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+              DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+            ),
+        );
+      }
+    });
+    if (retimed.size) {
+      const retime = (node: ConceptNode): ConceptNode => {
+        const nextSpikeTime = retimed.get(node.nodeKey);
+        return nextSpikeTime === undefined ? node : { ...node, nextSpikeTime };
+      };
+      conceptNodesRef.current = conceptNodesRef.current.map(retime);
+      setConceptNodes((nodes) => nodes.map(retime));
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    // Wake when the earliest waiting node is due. With nothing to wait for
+    // (no nodes yet, or all of them mid-spike) set no timer: the node setup
+    // wakes the scheduler when nodes arrive, and a spike calls scheduleNext
+    // as it settles. A timer meanwhile only polled.
+    const scheduleNext = () => {
+      const waiting = conceptNodesRef.current.filter((n) => !n.isSpiking);
+      if (waiting.length === 0) {
+        timer = undefined;
         return;
       }
+      timer = setTimeout(
+        tick,
+        Math.max(
+          0,
+          Math.min(...waiting.map((n) => n.nextSpikeTime)) - Date.now(),
+        ),
+      );
+    };
+
+    const tick = () => {
       const now = Date.now();
 
       // Process nodes and schedule spike resets outside of state update
@@ -382,6 +442,15 @@ export function SkillsNeuralCloud({
             return node;
           });
         });
+        // Mirror it into the ref now rather than after React commits:
+        // scheduleNext below reads the ref, and a node still looking due
+        // there re-fired tick on a 0 ms timer until the commit, re-rendering
+        // the cloud and re-arming (stretching) the spike each time.
+        conceptNodesRef.current = conceptNodesRef.current.map((node) =>
+          nodesToSpike.includes(node.nodeKey)
+            ? { ...node, isSpiking: true }
+            : node,
+        );
       }
 
       // Schedule spike resets outside of the state update
@@ -394,46 +463,82 @@ export function SkillsNeuralCloud({
 
         // Schedule new timeout
         const timeout = setTimeout(() => {
-          setConceptNodes((nodes) =>
-            nodes.map((n) =>
-              n.nodeKey === nodeKey
-                ? {
-                    ...n,
-                    isSpiking: false,
-                    nextSpikeTime:
-                      Date.now() +
-                      getRandomInterval(
-                        DEFAULT_SPIKING_CONFIG.minInterval * 1000,
-                        DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
-                      ),
-                  }
-                : n,
-            ),
-          );
+          const nextSpikeTime =
+            Date.now() +
+            getRandomInterval(
+              DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+              DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+            );
+          const settle = (n: ConceptNode): ConceptNode =>
+            n.nodeKey === nodeKey
+              ? { ...n, isSpiking: false, nextSpikeTime }
+              : n;
+          setConceptNodes((nodes) => nodes.map(settle));
+          conceptNodesRef.current = conceptNodesRef.current.map(settle);
           // Remove timeout from ref map
           spikeTimeoutsRef.current.delete(nodeKey);
+          // This node waits again; wake for it if it is due before the
+          // timer currently set, rather than spiking late.
+          if (timer !== undefined) clearTimeout(timer);
+          scheduleNext();
         }, DEFAULT_SPIKING_CONFIG.spikeDuration);
 
         // Store timeout reference
         spikeTimeoutsRef.current.set(nodeKey, timeout);
       });
 
-      animationFrameRef.current = requestAnimationFrame(animate);
+      scheduleNext();
     };
 
-    animationFrameRef.current = requestAnimationFrame(animate);
+    scheduleNext();
+    wakeSchedulerRef.current = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      scheduleNext();
+    };
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      wakeSchedulerRef.current = null;
+      if (timer !== undefined) clearTimeout(timer);
       // Clear all spike timeouts on cleanup using stored ref value
       if (timeouts) {
         timeouts.forEach((timeout) => clearTimeout(timeout));
         timeouts.clear();
       }
+      // Those timeouts were the only way out of a spike, and the scheduler
+      // skips spiking nodes: settle the ones caught mid-spike, or they stay
+      // spiking for good. Leaving the viewport or an overlay opening runs
+      // this cleanup.
+      if (conceptNodesRef.current.some((node) => node.isSpiking)) {
+        const settled = new Map<string, number>();
+        conceptNodesRef.current.forEach((node) => {
+          if (node.isSpiking) {
+            settled.set(
+              node.nodeKey,
+              Date.now() +
+                getRandomInterval(
+                  DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+                  DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+                ),
+            );
+          }
+        });
+        const settle = (node: ConceptNode): ConceptNode => {
+          const nextSpikeTime = settled.get(node.nodeKey);
+          return nextSpikeTime === undefined
+            ? node
+            : { ...node, isSpiking: false, nextSpikeTime };
+        };
+        conceptNodesRef.current = conceptNodesRef.current.map(settle);
+        setConceptNodes((nodes) => nodes.map(settle));
+      }
     };
-  }, [isVisible, areAnimationsPlaying, prefersReducedMotion, config.animate]);
+  }, [
+    isVisible,
+    loopActive,
+    areAnimationsPlaying,
+    prefersReducedMotion,
+    config.animate,
+  ]);
 
   // Always render container to prevent hydration mismatch
   const shouldRenderContent = isVisible && conceptNodes.length > 0;
@@ -446,7 +551,7 @@ export function SkillsNeuralCloud({
       )}
     >
       {/* Desktop: Concepts positioned on grid nodes */}
-      <div className="hidden md:block relative w-full h-full">
+      <div ref={loopGateRef} className="hidden md:block relative w-full h-full">
         <svg
           width={dimensions.width}
           height={dimensions.height}
@@ -547,7 +652,7 @@ export function SkillsNeuralCloud({
                     areAnimationsPlaying &&
                     !prefersReducedMotion &&
                     config.animate && (
-                      <motion.circle
+                      <m.circle
                         cx={x}
                         cy={y}
                         r={20}
@@ -566,7 +671,7 @@ export function SkillsNeuralCloud({
 
                   {/* Concept badge container - motion only when animations are enabled */}
                   {areAnimationsPlaying && !prefersReducedMotion ? (
-                    <motion.g
+                    <m.g
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{
                         scale: isSpiking ? 1.3 : isHovered ? 1.1 : 1,
@@ -656,7 +761,7 @@ export function SkillsNeuralCloud({
                           {(node.content as TextConcept).text}
                         </text>
                       )}
-                    </motion.g>
+                    </m.g>
                   ) : (
                     <g style={{ opacity: 0.7 }}>
                       {/* Badge background */}

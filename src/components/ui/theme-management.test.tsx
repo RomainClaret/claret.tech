@@ -77,9 +77,11 @@ describe("Theme Management System", () => {
       },
     };
 
+    // Configurable, so afterEach can remove it again.
     Object.defineProperty(document, "documentElement", {
       value: mockDocumentElement,
       writable: true,
+      configurable: true,
     });
 
     // Mock window.matchMedia for system theme detection
@@ -100,6 +102,9 @@ describe("Theme Management System", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Drop the mock documentElement so Document.prototype's real getter shows
+    // through again; left in place it leaked into later files in the worker.
+    delete (document as { documentElement?: unknown }).documentElement;
   });
 
   describe("ThemeProvider", () => {

@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import { logError } from "@/lib/utils/dev-logger";
 
@@ -73,6 +74,24 @@ const MIN_SIZE = { width: 400, height: 200 };
 const TerminalContext = createContext<TerminalContextType | undefined>(
   undefined,
 );
+
+/** Whether the terminal is open, and the switches: all most callers need. */
+interface TerminalToggleContextType {
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+  toggleTerminal: () => void;
+}
+
+/*
+ * A separate context for the open state, so the navigation and AppWrapper
+ * re-render when the terminal opens or closes, not on every frame of a drag
+ * or resize: the full context changes with each position update (60-120 a
+ * second while dragging), and AppWrapper's re-render took the site grid with
+ * it.
+ */
+const TerminalToggleContext = createContext<
+  TerminalToggleContextType | undefined
+>(undefined);
 
 function loadStoredState(): Partial<TerminalState> {
   if (typeof window === "undefined") return {};
@@ -161,7 +180,9 @@ const hasChanged = (
 };
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
-  const storedState = loadStoredState();
+  // Read once: it was re-read and re-parsed from localStorage on every
+  // render, every frame of a drag included, though only the first is used.
+  const [storedState] = useState(loadStoredState);
 
   const [isOpen, setIsOpen] = useState(false);
   // Initialize with constrained values
@@ -343,9 +364,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, windowState, isDragging]); // position/size intentionally excluded to prevent loops
 
-  const toggleTerminal = () => {
+  const toggleTerminal = useCallback(() => {
     setIsOpen((prev) => !prev);
-  };
+  }, []);
+
+  const toggleValue = useMemo(
+    () => ({ isOpen, setIsOpen, toggleTerminal }),
+    [isOpen, toggleTerminal],
+  );
 
   const minimize = () => {
     if (windowState === "normal") {
@@ -393,10 +419,22 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <TerminalContext.Provider value={contextValue}>
-      {children}
-    </TerminalContext.Provider>
+    <TerminalToggleContext.Provider value={toggleValue}>
+      <TerminalContext.Provider value={contextValue}>
+        {children}
+      </TerminalContext.Provider>
+    </TerminalToggleContext.Provider>
   );
+}
+
+/** Open state and switches only; re-renders only when the terminal opens or
+ * closes. Use useTerminal() for the window's position, size and state. */
+export function useTerminalToggle() {
+  const context = useContext(TerminalToggleContext);
+  if (!context) {
+    throw new Error("useTerminalToggle must be used within a TerminalProvider");
+  }
+  return context;
 }
 
 export function useTerminal() {

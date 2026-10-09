@@ -20,7 +20,7 @@ import {
   calculateSignalDuration,
 } from "@/lib/utils/neural-animations";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
-import { useAnimationManager } from "@/lib/animation-manager";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
 import { validateRadius } from "@/lib/utils/svg-validation";
 import { generateStableId } from "@/lib/utils/stable-ids";
 import { useAnimationState } from "@/contexts/animation-state-context";
@@ -29,6 +29,7 @@ import {
   NEURAL_BACKGROUND_PROFILE,
   ComponentConfig,
 } from "@/contexts/quality-context";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface NeuralBackgroundProps {
   className?: string;
@@ -261,19 +262,20 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
   // Use deferred values for non-critical visual updates
   const deferredSpikingNodes = useDeferredValue(spikingNodes);
   const deferredActiveSignals = useDeferredValue(activeSignals);
-  const animationFrameRef = useRef<number>();
   const [isVisible, setIsVisible] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
-  const animationControl = useAnimationManager("neural-background", "low");
-  const [isAnimationActive, setIsAnimationActive] = useState(false);
+  // Splash, modals or a hidden tab: nothing on the page needs to move.
+  const { suspended } = useMotionGate();
   const pendingSignalRemovals = useRef<string[]>([]);
   const signalUpdateFrameRef = useRef<number>();
   const spikeTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const spikingNodesRef = useRef<Map<string, SpikingNode>>(new Map());
+  // Lets the node setup wake the spike scheduler for nodes it replaces.
+  const wakeSchedulerRef = useRef<(() => void) | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const { areAnimationsPlaying } = useAnimationState();
-  const { getConfig, qualityMetrics } = useQuality();
+  const { getConfig } = useQuality();
   const qualityConfig = getConfig(NEURAL_BACKGROUND_PROFILE);
 
   // Keep ref in sync with state
@@ -323,27 +325,15 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     return () => window.removeEventListener("resize", updateDimensions);
   }, []);
 
-  // Register with animation manager
-  useEffect(() => {
-    animationControl.register(
-      () => setIsAnimationActive(false), // onPause
-      () => setIsAnimationActive(true), // onResume
-    );
-  }, [animationControl]);
-
   // Intersection Observer for visibility-based pausing
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = latestEntry(entries);
         setIsVisible(entry.isIntersecting);
-        if (entry.isIntersecting) {
-          animationControl.requestStart();
-        } else {
-          animationControl.requestStop();
-        }
       },
       { threshold: 0.1 },
     );
@@ -353,7 +343,7 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     return () => {
       observer.disconnect();
     };
-  }, [animationControl]);
+  }, []);
 
   const gridCellSize = 64;
 
@@ -429,6 +419,12 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
       });
     });
     setSpikingNodes(nodes);
+    // The scheduler reads the ref, which the sync effect updates only after
+    // the next render: with the nodes made twice on mount (the first size
+    // update), it kept a timer set for the first set, and the second set's
+    // earlier spikes waited for it and fired together. Hand them over now.
+    spikingNodesRef.current = nodes;
+    wakeSchedulerRef.current?.();
   }, [patterns]); // Only depend on patterns, not animation state
 
   // Handle node spiking with batched updates
@@ -474,36 +470,76 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     [connections, gridCellSize],
   );
 
-  // Animation loop with FPS limiting
+  // Spike scheduler: a timer set for the next node due to spike. It used to
+  // check on every animation frame, which kept the browser producing a frame
+  // per vsync though spikes are seconds apart, and it ignored reduced motion
+  // and the quality tier's `animate`, so those never stopped the signals.
   useEffect(() => {
     // Store ref values at effect start for cleanup
     const timeouts = spikeTimeoutsRef.current;
 
-    // Quality-based FPS limiting using qualityMetrics.rafCalls
-    const targetFPS = qualityConfig.updateFrequency || qualityMetrics.rafCalls;
-    const frameInterval = 1000 / targetFPS;
-    let lastFrameTime = 0;
+    if (
+      !isVisible ||
+      suspended ||
+      prefersReducedMotion ||
+      !areAnimationsPlaying ||
+      !qualityConfig.animate
+    ) {
+      return;
+    }
 
-    const animate = (currentTime: number) => {
-      // Skip entirely if not visible
-      if (!isVisible) {
-        animationFrameRef.current = requestAnimationFrame(animate);
+    // Nodes that came due while the scheduler was stopped (scrolled away,
+    // under an overlay, a hidden tab, or not yet seen at all) get a fresh
+    // wait. Left overdue, after any stop longer than the longest interval
+    // they all spiked in the same tick: one synchronized flash, and a burst
+    // of updates, instead of the staggered rhythm.
+    const startedAt = Date.now();
+    const retimed = new Map<string, number>();
+    spikingNodesRef.current.forEach((node, key) => {
+      if (!node.isSpiking && node.nextSpikeTime <= startedAt) {
+        retimed.set(
+          key,
+          startedAt +
+            getRandomInterval(
+              DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+              DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+            ),
+        );
+      }
+    });
+    if (retimed.size) {
+      const retime = (nodes: Map<string, SpikingNode>) => {
+        const updated = new Map(nodes);
+        retimed.forEach((nextSpikeTime, key) => {
+          const node = updated.get(key);
+          if (node) updated.set(key, { ...node, nextSpikeTime });
+        });
+        return updated;
+      };
+      spikingNodesRef.current = retime(spikingNodesRef.current);
+      setSpikingNodes(retime);
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleNext = () => {
+      let due = Infinity;
+      spikingNodesRef.current.forEach((node) => {
+        if (!node.isSpiking && node.nextSpikeTime < due) {
+          due = node.nextSpikeTime;
+        }
+      });
+      // Nothing to wait for (no nodes yet, or all mid-spike): no timer. The
+      // node setup wakes the scheduler when nodes arrive, and a spike calls
+      // scheduleNext as it settles; a timer meanwhile only polled.
+      if (due === Infinity) {
+        timer = undefined;
         return;
       }
+      timer = setTimeout(tick, Math.max(0, due - Date.now()));
+    };
 
-      // FPS limiting - skip frame if too soon
-      if (currentTime - lastFrameTime < frameInterval) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      lastFrameTime = currentTime;
-
-      // Stop processing spikes if animations are not playing
-      if (!areAnimationsPlaying) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-        return;
-      }
-
+    const tick = () => {
       const now = Date.now();
       const nodesToSpike: { key: string; node: SpikingNode }[] = [];
 
@@ -527,6 +563,11 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
 
           return updatedNodes;
         });
+        // Mirror it into the ref now rather than after React renders, so the
+        // next schedule does not see these nodes as still due.
+        const mirrored = new Map(spikingNodesRef.current);
+        nodesToSpike.forEach(({ key, node }) => mirrored.set(key, node));
+        spikingNodesRef.current = mirrored;
       }
 
       // Handle spikes and schedule resets outside of state update
@@ -542,52 +583,95 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
 
         // Schedule spike reset
         const timeout = setTimeout(() => {
+          const nextSpikeTime =
+            Date.now() +
+            getRandomInterval(
+              DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+              DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+            );
+          const settle = (current: SpikingNode): SpikingNode => ({
+            ...current,
+            isSpiking: false,
+            nextSpikeTime,
+          });
           setSpikingNodes((n) => {
             const updated = new Map(n);
             const currentNode = updated.get(key);
-            if (currentNode) {
-              updated.set(key, {
-                ...currentNode,
-                isSpiking: false,
-                nextSpikeTime:
-                  Date.now() +
-                  getRandomInterval(
-                    DEFAULT_SPIKING_CONFIG.minInterval * 1000,
-                    DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
-                  ),
-              });
-            }
+            if (currentNode) updated.set(key, settle(currentNode));
             return updated;
           });
+          const mirroredNode = spikingNodesRef.current.get(key);
+          if (mirroredNode) {
+            const mirrored = new Map(spikingNodesRef.current);
+            mirrored.set(key, settle(mirroredNode));
+            spikingNodesRef.current = mirrored;
+          }
           spikeTimeoutsRef.current.delete(key);
+          // This node waits again; wake for it if it is due before the
+          // timer currently set.
+          if (timer !== undefined) clearTimeout(timer);
+          scheduleNext();
         }, DEFAULT_SPIKING_CONFIG.spikeDuration);
 
         spikeTimeoutsRef.current.set(key, timeout);
       });
 
-      animationFrameRef.current = requestAnimationFrame(animate);
+      scheduleNext();
     };
 
-    animationFrameRef.current = requestAnimationFrame(animate);
+    scheduleNext();
+    wakeSchedulerRef.current = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      scheduleNext();
+    };
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      wakeSchedulerRef.current = null;
+      if (timer !== undefined) clearTimeout(timer);
       // Clear all spike timeouts using stored ref value
       if (timeouts) {
         timeouts.forEach((timeout) => clearTimeout(timeout));
         timeouts.clear();
       }
+      // Those timeouts were the only way out of a spike, and the scheduler
+      // skips spiking nodes: settle the nodes caught mid-spike, or they stay
+      // spiking for good. Every pause (an overlay, a hidden tab, the splash
+      // ending) runs this cleanup.
+      const settled = new Map<string, SpikingNode>();
+      spikingNodesRef.current.forEach((node, key) => {
+        if (!node.isSpiking) return;
+        settled.set(key, {
+          ...node,
+          isSpiking: false,
+          nextSpikeTime:
+            Date.now() +
+            getRandomInterval(
+              DEFAULT_SPIKING_CONFIG.minInterval * 1000,
+              DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
+            ),
+        });
+      });
+      if (settled.size) {
+        spikingNodesRef.current = new Map([
+          ...spikingNodesRef.current,
+          ...settled,
+        ]);
+        setSpikingNodes((nodes) => {
+          const updated = new Map(nodes);
+          settled.forEach((node, key) => {
+            if (updated.has(key)) updated.set(key, node);
+          });
+          return updated;
+        });
+      }
     };
   }, [
     handleNodeSpike,
     isVisible,
+    suspended,
     prefersReducedMotion,
-    isAnimationActive,
     areAnimationsPlaying,
-    qualityConfig,
-    qualityMetrics,
+    qualityConfig.animate,
   ]);
 
   // Clean up completed signals with batching

@@ -14,11 +14,21 @@ import {
   RedditIcon,
 } from "@/components/icons";
 import { useLegalModals } from "@/components/ui/legal-modals-provider";
+import { legalTextsIntent } from "@/components/legal/load-legal-texts";
 import { logError } from "@/lib/utils/dev-logger";
 
 export function Footer() {
   const shouldReduceAnimations = useShouldReduceAnimations();
-  const currentYear = new Date().getFullYear();
+  // The year the page was built, which is what its HTML says: the page is
+  // generated once, at build time, and must hydrate with the same text.
+  // Corrected once it runs, so a page built in December says the new year
+  // in January.
+  const [currentYear, setCurrentYear] = useState(() =>
+    Number(process.env.BUILD_YEAR || new Date().getFullYear()),
+  );
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   const [lastCommitDate, setLastCommitDate] = useState<string>(
     footerNote.update,
   );
@@ -143,6 +153,7 @@ export function Footer() {
                   type="button"
                   role="button"
                   aria-label="View the GNU GPLv3 or later license"
+                  {...legalTextsIntent}
                   onClick={openLicenseModal}
                   className="text-primary hover:underline"
                   suppressHydrationWarning
@@ -177,6 +188,7 @@ export function Footer() {
                 type="button"
                 role="button"
                 aria-label="View Privacy Policy"
+                {...legalTextsIntent}
                 onClick={openPrivacyModal}
                 className="text-primary hover:underline"
                 suppressHydrationWarning
@@ -188,6 +200,7 @@ export function Footer() {
                 type="button"
                 role="button"
                 aria-label="View Terms of Service"
+                {...legalTextsIntent}
                 onClick={openTermsModal}
                 className="text-primary hover:underline"
                 suppressHydrationWarning

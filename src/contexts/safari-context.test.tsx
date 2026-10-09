@@ -15,7 +15,14 @@ vi.mock("@/lib/utils/safari-detection", () => ({
 
 // Import the mocked function
 import { detectSafari } from "@/lib/utils/safari-detection";
+import { renderToString } from "react-dom/server";
 const mockDetectSafari = vi.mocked(detectSafari);
+const detectedAs = (isSafari: boolean) =>
+  mockDetectSafari.mockReturnValue({
+    isSafari,
+    source: "userAgent",
+    timestamp: Date.now(),
+  });
 
 // Test component to access context
 function TestSafariComponent() {
@@ -79,6 +86,8 @@ describe("SafariContext", () => {
     });
 
     it("uses initial Safari prop from server", () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />
@@ -122,8 +131,44 @@ describe("SafariContext", () => {
     });
   });
 
+  describe("Static HTML", () => {
+    it("starts from the HTML's value and takes the browser's after mount", () => {
+      // The homepage is generated once for every browser, as not Safari;
+      // the browser is settled on the client only.
+      detectedAs(true);
+      render(
+        <SafariProvider initialSafari={false}>
+          <TestSafariComponent />
+        </SafariProvider>,
+      );
+
+      expect(screen.getByTestId("is-safari")).toHaveTextContent("true");
+      expect(mockBodySetAttribute).toHaveBeenLastCalledWith(
+        "data-safari",
+        "true",
+      );
+    });
+
+    it("never detects during render, where it would not match the HTML", () => {
+      // A render with no effects, as when the HTML is generated: detection
+      // there gave the client's first render another value than the HTML.
+      detectedAs(true);
+
+      const html = renderToString(
+        <SafariProvider>
+          <TestSafariComponent />
+        </SafariProvider>,
+      );
+
+      expect(mockDetectSafari).not.toHaveBeenCalled();
+      expect(html).toContain('data-testid="is-safari">false');
+    });
+  });
+
   describe("useSafariContext", () => {
     it("returns context values correctly", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />
@@ -163,6 +208,8 @@ describe("SafariContext", () => {
 
   describe("Safari Detection Logic", () => {
     it("detects Safari correctly from initial prop", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />
@@ -178,6 +225,8 @@ describe("SafariContext", () => {
     });
 
     it("sets shouldReduceAnimations for Safari", () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />
@@ -257,6 +306,8 @@ describe("SafariContext", () => {
     });
 
     it("prevents hydration mismatches by using initial prop", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       // Server provides initial Safari state
       render(
         <SafariProvider initialSafari={true}>
@@ -319,6 +370,8 @@ describe("SafariContext", () => {
     });
 
     it("removes enable-animations class for Safari browsers", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />
@@ -333,6 +386,8 @@ describe("SafariContext", () => {
     });
 
     it("handles different initial Safari prop values", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       // Test with Safari enabled via prop
       const { unmount } = render(
         <SafariProvider initialSafari={true}>
@@ -359,7 +414,8 @@ describe("SafariContext", () => {
       unmount();
       vi.clearAllMocks();
 
-      // Test with Safari disabled via prop
+      // Test with Safari disabled via prop, in a browser that is not Safari
+      detectedAs(false);
       render(
         <SafariProvider initialSafari={false}>
           <TestSafariComponent />
@@ -383,6 +439,8 @@ describe("SafariContext", () => {
     });
 
     it("handles context state correctly during hydration", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       // Test that context maintains correct state during hydration process
       render(
         <SafariProvider initialSafari={true}>
@@ -446,6 +504,8 @@ describe("SafariContext", () => {
     });
 
     it("maintains consistency between context and DOM state", async () => {
+      // Safari, as the browser itself says after mount.
+      detectedAs(true);
       render(
         <SafariProvider initialSafari={true}>
           <TestSafariComponent />

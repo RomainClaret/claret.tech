@@ -8,6 +8,8 @@ import { getUser, listUsernames } from "./users";
 import { contactInfo } from "@/data/sections/contact";
 import { socialMediaLinks } from "@/data/sections/social";
 import { generateASCIIProgressBar } from "@/components/ui/progress-bar";
+import { getSnapshot as getMotionGate } from "@/lib/utils/motion-gate";
+import { readStorage } from "@/lib/utils/safe-storage";
 
 export interface CommandContext {
   currentDirectory: string;
@@ -1477,20 +1479,25 @@ ${formatCommands(aiCommands)}
         };
 
       case "status":
-        // Get current quality and animation status from localStorage
+        // The tier that is running, from the motion gate, which
+        // QualityProvider keeps current. Storage would have to know where
+        // each mode keeps it: an automatic tier and the auto-disable state
+        // live in sessionStorage now, and this read localStorage, so it
+        // reported Balanced in auto mode and missed every auto-disable.
         const statusInfo = {
           isPlaying: false,
           isAutoDisabled: false,
           cooldownActive: false,
           remainingCooldown: 0,
-          quality: "balanced",
-          isQualityAuto: true,
+          quality: getMotionGate().tier as string,
+          isQualityAuto: readStorage("local", "quality-auto") !== "false",
         };
 
         if (typeof window !== "undefined") {
           try {
             // Get animation preference
-            const animationStored = localStorage.getItem(
+            const animationStored = readStorage(
+              "local",
               "background-animations-state",
             );
             if (animationStored) {
@@ -1499,20 +1506,9 @@ ${formatCommands(aiCommands)}
                 typeof parsed === "boolean" ? parsed : parsed.value;
             }
 
-            // Get quality preference
-            const qualityStored = localStorage.getItem("quality-mode");
-            if (qualityStored) {
-              statusInfo.quality = qualityStored;
-            }
-
-            // Get quality auto preference
-            const qualityAutoStored = localStorage.getItem("quality-auto");
-            if (qualityAutoStored) {
-              statusInfo.isQualityAuto = JSON.parse(qualityAutoStored);
-            }
-
-            // Get auto-disable state
-            const autoDisableStored = localStorage.getItem(
+            // Auto-disable state, kept for the session
+            const autoDisableStored = readStorage(
+              "session",
               "fps-auto-disable-state",
             );
             if (autoDisableStored) {

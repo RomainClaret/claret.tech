@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface ProgressBarProps {
@@ -56,7 +56,7 @@ export function ProgressBar({
       {/* Progress bar */}
       <div className="relative h-2 bg-muted rounded-full overflow-hidden">
         {animated ? (
-          <motion.div
+          <m.div
             className={cn("h-full rounded-full", getPhaseColor(progress))}
             initial={{ width: "0%" }}
             animate={{ width: `${Math.min(progress, 100)}%` }}
@@ -74,7 +74,7 @@ export function ProgressBar({
 
         {/* Shimmer effect for active progress */}
         {progress > 0 && progress < 100 && (
-          <motion.div
+          <m.div
             className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-white/20 to-transparent"
             animate={{
               x: ["-100%", "400%"],
@@ -182,7 +182,7 @@ export function MultiPhaseProgress({
               {/* Progress bar for active phase */}
               {isActive && (
                 <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-                  <motion.div
+                  <m.div
                     className="h-full bg-primary rounded-full"
                     initial={{ width: "0%" }}
                     animate={{ width: `${phase.progress}%` }}

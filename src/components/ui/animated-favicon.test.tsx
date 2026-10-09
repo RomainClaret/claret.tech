@@ -113,3 +113,72 @@ describe("AnimatedFavicon Integration", () => {
     ).toBeTruthy();
   });
 });
+
+describe("AnimatedFavicon loading", () => {
+  it("starts one loop when the theme changes while its scripts load", async () => {
+    const { act, render } = await import("@testing-library/react");
+    vi.resetModules();
+    const state = { theme: "light" };
+    vi.doMock("./theme-provider", () => ({ useTheme: () => state }));
+    vi.doMock("@/contexts/quality-context", () => ({
+      useQuality: () => ({ quality: "balanced" }),
+    }));
+    vi.doMock("@/contexts/animation-state-context", () => ({
+      useAnimationStateOptional: () => ({ areAnimationsPlaying: true }),
+    }));
+    const { AnimatedFavicon } = await import("./animated-favicon");
+
+    // The scripts never load on their own; the test lets them.
+    const scripts: HTMLScriptElement[] = [];
+    const append = document.head.appendChild.bind(document.head);
+    const appendSpy = vi
+      .spyOn(document.head, "appendChild")
+      .mockImplementation(<T extends Node>(node: T): T => {
+        if (node instanceof HTMLScriptElement) {
+          scripts.push(node);
+          return node;
+        }
+        return append(node);
+      });
+    let renderers = 0;
+    const win = window as unknown as Record<string, unknown>;
+    const toDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = () => "data:image/png;base64,";
+    vi.useFakeTimers();
+    try {
+      const view = render(<AnimatedFavicon />);
+      state.theme = "dark"; // switched while the first load is in flight
+      view.rerender(<AnimatedFavicon />);
+
+      win.generateHybrid2 = () => ({ length: 4 });
+      win.generateContinuousHybrid2 = () => ({
+        frames: { length: 4 },
+        finalState: [],
+        finalCascades: [],
+      });
+      win.OptimizedHybrid2Renderer = class {
+        constructor() {
+          renderers++;
+        }
+        drawFrame() {}
+      };
+      await act(async () => {
+        scripts.forEach((script) => script.onload?.(new Event("load")));
+        await Promise.resolve();
+      });
+
+      expect(renderers).toBe(1);
+      view.unmount();
+    } finally {
+      vi.useRealTimers();
+      appendSpy.mockRestore();
+      HTMLCanvasElement.prototype.toDataURL = toDataURL;
+      delete win.generateHybrid2;
+      delete win.generateContinuousHybrid2;
+      delete win.OptimizedHybrid2Renderer;
+      vi.doUnmock("./theme-provider");
+      vi.doUnmock("@/contexts/quality-context");
+      vi.doUnmock("@/contexts/animation-state-context");
+    }
+  });
+});

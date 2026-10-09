@@ -197,6 +197,32 @@ describe("ToastContainer", () => {
       expect(container).toBeDefined();
     });
 
+    it("keeps each toast's countdown when another toast arrives", () => {
+      // The container hands each toast a new onClose on every render, and the
+      // countdown used to start over each time, so toasts outlived their time.
+      const { queryAllByText } = render(<ToastContainer />);
+      const show = (id: string, message: string) =>
+        act(() => {
+          window.dispatchEvent(
+            new CustomEvent("showToast", {
+              detail: { id, message, type: "info", duration: 4000 },
+            }),
+          );
+        });
+
+      show("first", "First toast");
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      show("second", "Second toast");
+      act(() => {
+        vi.advanceTimersByTime(1000 + 300); // the first's 4 s, then its fade
+      });
+
+      expect(queryAllByText("First toast")).toHaveLength(0);
+      expect(queryAllByText("Second toast").length).toBeGreaterThan(0);
+    });
+
     it("generates IDs for events without them", () => {
       render(<ToastContainer />);
 

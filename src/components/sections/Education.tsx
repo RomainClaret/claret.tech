@@ -6,7 +6,7 @@ import { OptimizedImage } from "@/components/ui/optimized-image";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   ExternalLink,
   GraduationCap,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/interactive-timeline";
 import { CertificationTimeline } from "@/components/ui/certification-timeline";
 import { useState, useRef, useEffect } from "react";
+import { latestEntry } from "@/lib/utils/intersection";
 
 interface EducationCardProps {
   school: (typeof educationInfo.schools)[0];
@@ -63,7 +64,7 @@ function EducationCard({
   const skills = skillPresets[level];
 
   return (
-    <motion.div
+    <m.div
       ref={cardRef}
       className="relative h-full"
       whileHover={{ scale: 1.02 }}
@@ -207,7 +208,7 @@ function EducationCard({
           />
         </div>
       </HolographicCard>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -252,9 +253,17 @@ export function Education() {
     };
   }, []);
 
-  // Scroll-based activation
+  // Scroll-based activation, only while the section is on screen: the
+  // handler measures every card, and it used to run on every scroll event
+  // anywhere on the page. A card can only straddle the viewport's middle
+  // while the section intersects the viewport, so nothing is missed.
   useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    let frame = 0;
     const handleScroll = () => {
+      frame = 0;
       if (!sectionRef.current) return;
 
       const cards = sectionRef.current.querySelectorAll(
@@ -282,11 +291,48 @@ export function Education() {
 
       setActiveNodeId(closestIndex !== -1 ? `node-${closestIndex}` : null);
     };
+    // Once per frame however many scroll events arrive in it.
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(handleScroll);
+    };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
+    let listening = false;
+    const listen = (on: boolean) => {
+      if (on === listening) return;
+      listening = on;
+      if (on) {
+        window.addEventListener("scroll", onScroll, { passive: true });
+        handleScroll();
+      } else {
+        window.removeEventListener("scroll", onScroll);
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    };
 
-    return () => window.removeEventListener("scroll", handleScroll);
+    let observer: IntersectionObserver | undefined;
+    try {
+      observer = new IntersectionObserver((entries) => {
+        const entry = latestEntry(entries);
+        listen(entry.isIntersecting);
+        // Off screen no card can be at the middle; say so once.
+        if (!entry.isIntersecting) setActiveNodeId(null);
+      });
+    } catch {
+      observer = undefined;
+    }
+    // No usable observer (an old browser, a stub in tests): listen always,
+    // as before.
+    if (!observer || typeof observer.observe !== "function") {
+      listen(true);
+      return () => listen(false);
+    }
+    observer.observe(section);
+
+    return () => {
+      observer.disconnect();
+      listen(false);
+    };
   }, []);
 
   if (!educationInfo.display) {

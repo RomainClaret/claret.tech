@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { m } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useQuality, NEURAL_SIGNAL_PROFILE } from "@/contexts/quality-context";
 
@@ -23,6 +23,13 @@ export function NeuralSignal({
   className,
 }: NeuralSignalProps) {
   const [pathLength, setPathLength] = useState(0);
+  // When the particles' SMIL animations start, on their SVG's own clock.
+  // A begin offset counts from that SVG's start, not from the moment the
+  // element is inserted: added to a grid that had been running for seconds,
+  // "0s" was long past, so every particle was frozen at the end of the path,
+  // fully opaque, instead of travelling along it.
+  const [particleStart, setParticleStart] = useState(0);
+  const groupRef = useRef<SVGGElement>(null);
   const [uniqueId] = useState(
     () => `signal-${Math.random().toString(36).substr(2, 9)}`,
   );
@@ -39,6 +46,12 @@ export function NeuralSignal({
     tempPath.setAttribute("d", path);
     const length = tempPath.getTotalLength();
     setPathLength(length);
+    // Read with the length: the particles render on the next commit, a frame
+    // from now, so they start that much into their animation at most.
+    const svg = groupRef.current?.ownerSVGElement;
+    setParticleStart(
+      typeof svg?.getCurrentTime === "function" ? svg.getCurrentTime() : 0,
+    );
   }, [path]);
 
   // Handle static signal completion callback
@@ -69,8 +82,11 @@ export function NeuralSignal({
     );
   }
 
-  // For animated signals, wait for path length calculation
-  if (pathLength === 0) return null;
+  // For animated signals, wait for path length calculation. The empty group
+  // lets the effect find the SVG whose clock the particles run on.
+  if (pathLength === 0) {
+    return <g ref={groupRef} className="pointer-events-none" />;
+  }
 
   // Apply effects based on quality level
   const hasGlow = config.effects?.includes("glow");
@@ -81,7 +97,10 @@ export function NeuralSignal({
   const signalOpacity = config.opacity || 0.8;
 
   return (
-    <g className={cn("pointer-events-none signal-animation", className)}>
+    <g
+      ref={groupRef}
+      className={cn("pointer-events-none signal-animation", className)}
+    >
       <defs>
         {hasRainbow ? (
           <linearGradient id={`signal-gradient-${uniqueId}`}>
@@ -142,7 +161,7 @@ export function NeuralSignal({
       </defs>
 
       {/* Signal trail */}
-      <motion.path
+      <m.path
         d={path}
         fill="none"
         stroke={`url(#signal-gradient-${uniqueId})`}
@@ -185,7 +204,7 @@ export function NeuralSignal({
               dur={`${duration + i * 0.1}s`}
               repeatCount="1"
               fill="freeze"
-              begin={`${i * 0.05}s`}
+              begin={`${particleStart + i * 0.05}s`}
             >
               <mpath href={`#path-${uniqueId}`} />
             </animateMotion>
@@ -199,6 +218,7 @@ export function NeuralSignal({
               attributeName="opacity"
               values={`0;${signalOpacity};${signalOpacity};0`}
               dur={`${duration + i * 0.1}s`}
+              begin={`${particleStart}s`}
               repeatCount="1"
             />
           </circle>

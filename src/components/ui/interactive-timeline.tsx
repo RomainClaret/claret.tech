@@ -1,10 +1,40 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import { m } from "framer-motion";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useQuality, NEURAL_CANVAS_PROFILE } from "@/contexts/quality-context";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
+
+/** Per-node randomness for the idle loops, drawn once per node. */
+interface NodeJitter {
+  lineDuration: number;
+  driftX: number;
+  driftY: number;
+  pulseDuration: number;
+  driftXDuration: number;
+  driftYDuration: number;
+  glowDuration: number;
+}
+
+function drawJitter(): NodeJitter {
+  return {
+    lineDuration: 5 + Math.random() * 5,
+    driftX: Math.random() * 5 - 2.5,
+    driftY: Math.random() * 5 - 2.5,
+    pulseDuration: 2 + Math.random() * 2,
+    driftXDuration: 2 + Math.random() * 3,
+    driftYDuration: 2 + Math.random() * 3,
+    glowDuration: 2 + Math.random() * 2,
+  };
+}
 
 export interface TimelineNode {
   id: string;
@@ -23,12 +53,32 @@ export function InteractiveTimeline({
   activeNodeId,
   onNodeHover,
 }: InteractiveTimelineProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(48);
   const prefersReducedMotion = useReducedMotion();
   const { areAnimationsPlaying } = useAnimationState();
   const { getConfig } = useQuality();
   const config = getConfig(NEURAL_CANVAS_PROFILE);
+  // The endless idle loops run only while the timeline is on screen (and
+  // animations are allowed); hover transitions keep their own condition.
+  const { ref: loopGateRef, active: loopGateActive } = useAnimationGate();
+  const loopsOn = loopGateActive && config.animate;
+  const setContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      containerRef.current = element;
+      loopGateRef(element);
+    },
+    [loopGateRef],
+  );
+
+  // Drawn once per node. Drawing these during render handed framer new
+  // targets on every re-render, so each hover restarted every loop.
+  const nodeIds = nodes.map((node) => node.id).join("|");
+  const jitter = useMemo(() => {
+    const byId = new Map<string, NodeJitter>();
+    for (const id of nodeIds.split("|")) byId.set(id, drawJitter());
+    return byId;
+  }, [nodeIds]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -37,7 +87,7 @@ export function InteractiveTimeline({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-12 h-full ml-4 sm:ml-8">
+    <div ref={setContainer} className="relative w-12 h-full ml-4 sm:ml-8">
       {/* Dynamic Connections (Axons/Dendrites) */}
       <svg
         width={width}
@@ -51,7 +101,7 @@ export function InteractiveTimeline({
 
           // Draw a subtle background connection with fluctuating opacity
           return (
-            <motion.line
+            <m.line
               key={`conn-${node.id}`}
               x1={width / 2}
               y1={node.y}
@@ -61,18 +111,11 @@ export function InteractiveTimeline({
               strokeWidth="1"
               initial={{ opacity: 0.3 }}
               animate={
-                areAnimationsPlaying && !prefersReducedMotion && config.animate
-                  ? { opacity: [0.3, 0.4, 0.3] }
-                  : { opacity: 0.3 }
+                loopsOn ? { opacity: [0.3, 0.4, 0.3] } : { opacity: 0.3 }
               }
               transition={{
-                duration: 5 + Math.random() * 5,
-                repeat:
-                  areAnimationsPlaying &&
-                  !prefersReducedMotion &&
-                  config.animate
-                    ? Infinity
-                    : 0,
+                duration: jitter.get(node.id)?.lineDuration ?? 7.5,
+                repeat: loopsOn ? Infinity : 0,
                 repeatType: "mirror",
               }}
             />
@@ -87,7 +130,7 @@ export function InteractiveTimeline({
           if (!nextNode) return null;
 
           return (
-            <motion.line
+            <m.line
               key={`pulse-${node.id}`}
               x1={width / 2}
               y1={node.y}
@@ -149,7 +192,7 @@ export function InteractiveTimeline({
             onMouseLeave={() => onNodeHover(null)}
           >
             {/* Connector to Card (Organic Tendril) */}
-            <motion.div
+            <m.div
               className="absolute left-full top-1/2 h-0.5 w-8 sm:w-16 bg-gray-700 opacity-50"
               initial={{ scaleX: 0, originX: 0 }}
               animate={{ scaleX: activeNodeId === node.id ? 1 : 0 }}
@@ -164,16 +207,16 @@ export function InteractiveTimeline({
             />
 
             {/* Node (Synapse) */}
-            <motion.div
+            <m.div
               className="relative w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-background border-2"
               style={{ borderColor: node.color }}
               animate={
-                areAnimationsPlaying && !prefersReducedMotion && config.animate
+                loopsOn
                   ? {
                       scale:
                         activeNodeId === node.id ? [1, 1.6, 1] : [1, 1.05, 1],
-                      x: [0, Math.random() * 5 - 2.5, 0],
-                      y: [0, Math.random() * 5 - 2.5, 0],
+                      x: [0, jitter.get(node.id)?.driftX ?? 0, 0],
+                      y: [0, jitter.get(node.id)?.driftY ?? 0, 0],
                     }
                   : {
                       scale: activeNodeId === node.id ? 1.6 : 1,
@@ -182,19 +225,21 @@ export function InteractiveTimeline({
                     }
               }
               transition={
-                areAnimationsPlaying && !prefersReducedMotion && config.animate
+                loopsOn
                   ? {
                       duration:
-                        activeNodeId === node.id ? 0.5 : 2 + Math.random() * 2,
+                        activeNodeId === node.id
+                          ? 0.5
+                          : (jitter.get(node.id)?.pulseDuration ?? 3),
                       repeat: Infinity,
                       repeatType: "mirror",
                       x: {
-                        duration: 2 + Math.random() * 3,
+                        duration: jitter.get(node.id)?.driftXDuration ?? 3.5,
                         repeat: Infinity,
                         repeatType: "mirror",
                       },
                       y: {
-                        duration: 2 + Math.random() * 3,
+                        duration: jitter.get(node.id)?.driftYDuration ?? 3.5,
                         repeat: Infinity,
                         repeatType: "mirror",
                       },
@@ -207,11 +252,11 @@ export function InteractiveTimeline({
             />
 
             {/* Synapse Glow */}
-            <motion.div
+            <m.div
               className="absolute inset-0 rounded-full blur-md"
               style={{ backgroundColor: node.color }}
               animate={
-                areAnimationsPlaying && !prefersReducedMotion && config.animate
+                loopsOn
                   ? {
                       opacity:
                         activeNodeId === node.id
@@ -228,10 +273,12 @@ export function InteractiveTimeline({
                     }
               }
               transition={
-                areAnimationsPlaying && !prefersReducedMotion && config.animate
+                loopsOn
                   ? {
                       duration:
-                        activeNodeId === node.id ? 0.5 : 2 + Math.random() * 2,
+                        activeNodeId === node.id
+                          ? 0.5
+                          : (jitter.get(node.id)?.glowDuration ?? 3),
                       repeat: Infinity,
                       repeatType: "mirror",
                     }

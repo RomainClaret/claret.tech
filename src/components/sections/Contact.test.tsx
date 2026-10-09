@@ -136,17 +136,21 @@ vi.mock("next/image", () => ({
 }));
 
 // Mock Framer Motion
-vi.mock("framer-motion", () => ({
-  motion: {
-    div: ({
-      children,
-      ...props
-    }: {
-      children: React.ReactNode;
-      [key: string]: unknown;
-    }) => <div {...props}>{children}</div>,
-  },
-}));
+vi.mock("framer-motion", () => {
+  // `m` is the slim motion API the app renders inside LazyMotion.
+  const mocked = {
+    motion: {
+      div: ({
+        children,
+        ...props
+      }: {
+        children: React.ReactNode;
+        [key: string]: unknown;
+      }) => <div {...props}>{children}</div>,
+    },
+  };
+  return { ...mocked, m: mocked.motion };
+});
 
 // Mock portfolio data
 vi.mock("@/data/portfolio", () => ({
@@ -420,7 +424,8 @@ describe("Contact Component", () => {
 
       const avatar = screen.getByTestId("next-image");
 
-      expect(avatar).toHaveAttribute("priority");
+      // Footer of a long page: loaded lazily, not raced against the hero.
+      expect(avatar).not.toHaveAttribute("priority");
       expect(avatar).toHaveAttribute("placeholder", "blur");
       expect(avatar).toHaveAttribute("blurDataURL");
     });

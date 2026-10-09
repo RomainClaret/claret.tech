@@ -24,7 +24,7 @@ import { ProjectFilter } from "@/components/ui/project-filter";
 import { useProjects } from "@/contexts/projects-context";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { getProjectColor, getLanguageIcon } from "@/lib/utils/language-colors";
 import { projectsSection } from "@/data/portfolio";
 import { logError } from "@/lib/utils/dev-logger";
@@ -370,7 +370,7 @@ export function Projects() {
         {/* Featured Project Hero */}
         {pinnedProjects.length > 0 && (
           <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-10">
-            <motion.div
+            <m.div
               className="relative"
               whileHover={{ scale: 1.01 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -418,7 +418,7 @@ export function Projects() {
                         <div className="text-center mb-4 sm:mb-6">
                           <div className="flex items-center justify-center gap-3 mb-3">
                             <div className="relative">
-                              <motion.div
+                              <m.div
                                 className="w-14 h-14 rounded-full flex items-center justify-center"
                                 style={{
                                   backgroundColor: `rgba(${projectColor}, 0.1)`,
@@ -436,21 +436,14 @@ export function Projects() {
                                     />
                                   );
                                 })()}
-                              </motion.div>
-                              <motion.div
-                                className="absolute inset-0 rounded-full pointer-events-none"
+                              </m.div>
+                              {/* Breathing effect: a CSS loop (motion.css) */}
+                              <div
+                                className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-120"
                                 style={{
                                   backgroundColor: `rgb(${projectColor})`,
                                   opacity: 0.1,
                                   willChange: "transform",
-                                }}
-                                animate={{
-                                  scale: [1, 1.2, 1],
-                                }}
-                                transition={{
-                                  duration: 3,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
                                 }}
                               />
                             </div>
@@ -466,7 +459,7 @@ export function Projects() {
                         {/* Visual Representation */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
                           <ScaleIn delay={300}>
-                            <motion.div
+                            <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
                               transition={{
@@ -484,10 +477,10 @@ export function Projects() {
                               <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
                                 Stars
                               </p>
-                            </motion.div>
+                            </m.div>
                           </ScaleIn>
                           <ScaleIn delay={350}>
-                            <motion.div
+                            <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
                               transition={{
@@ -505,10 +498,10 @@ export function Projects() {
                               <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
                                 Forks
                               </p>
-                            </motion.div>
+                            </m.div>
                           </ScaleIn>
                           <ScaleIn delay={400}>
-                            <motion.div
+                            <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
                               transition={{
@@ -532,10 +525,10 @@ export function Projects() {
                               <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
                                 Primary Language
                               </p>
-                            </motion.div>
+                            </m.div>
                           </ScaleIn>
                           <ScaleIn delay={450}>
-                            <motion.div
+                            <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
                               transition={{
@@ -555,7 +548,7 @@ export function Projects() {
                               <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
                                 Repository Size
                               </p>
-                            </motion.div>
+                            </m.div>
                           </ScaleIn>
                         </div>
 
@@ -575,7 +568,7 @@ export function Projects() {
                   </>
                 );
               })()}
-            </motion.div>
+            </m.div>
           </SlideInUp>
         )}
 
@@ -721,7 +714,7 @@ export function Projects() {
                 className="group"
               >
                 {layoutMode === "grid" ? (
-                  <motion.div
+                  <m.div
                     className="relative h-full cursor-pointer"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -744,7 +737,7 @@ export function Projects() {
                         {/* Project Header */}
                         <div className="flex items-start gap-3 mb-2 sm:mb-3">
                           <div className="relative">
-                            <motion.div
+                            <m.div
                               className="w-10 h-10 rounded-full flex items-center justify-center"
                               style={{
                                 backgroundColor: `rgba(${getProjectColor(
@@ -770,10 +763,10 @@ export function Projects() {
                                   />
                                 );
                               })()}
-                            </motion.div>
-                            {/* Breathing effect */}
-                            <motion.div
-                              className="absolute inset-0 rounded-full pointer-events-none"
+                            </m.div>
+                            {/* Breathing effect: a CSS loop (motion.css) */}
+                            <div
+                              className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                               style={{
                                 backgroundColor: `rgb(${getProjectColor(
                                   project.primaryLanguage?.color,
@@ -781,14 +774,6 @@ export function Projects() {
                                 )})`,
                                 opacity: 0.1,
                                 willChange: "transform",
-                              }}
-                              animate={{
-                                scale: [1, 1.15, 1],
-                              }}
-                              transition={{
-                                duration: 3,
-                                repeat: Infinity,
-                                ease: "easeInOut",
                               }}
                             />
                           </div>
@@ -1025,9 +1010,9 @@ export function Projects() {
                         </div>
                       </FadeIn>
                     )}
-                  </motion.div>
+                  </m.div>
                 ) : (
-                  <motion.div
+                  <m.div
                     className="relative"
                     whileHover={{ scale: 1.01 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -1092,7 +1077,7 @@ export function Projects() {
                         </div>
                       </Link>
                     </HolographicCard>
-                  </motion.div>
+                  </m.div>
                 )}
               </SlideInUp>
             ))}

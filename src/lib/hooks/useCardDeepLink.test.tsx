@@ -187,6 +187,35 @@ describe("useCardDeepLink", () => {
     expect(window.pageYOffset).toBe(9000 - 64);
   });
 
+  it("releases its card when the hash is cleared, as Back to the bare URL does", () => {
+    // Back from /#card to /, or a link to "#", leaves an empty hash. That is
+    // not one of the targets either, and it fires no wheel or pointerdown, so
+    // the release has to come from the hash: without it the settle loop
+    // dragged the page back to the card after the browser restored the top.
+    placeCard("research-card", 5000);
+    window.location.hash = "#research-card";
+    const { result } = renderHook(() => useCardDeepLink(["research-card"]));
+    expect(result.current.deepLinkedId).toBe("research-card");
+
+    act(() => {
+      window.location.hash = "";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      // The browser restores the scroll position of the earlier entry.
+      Object.defineProperty(window, "pageYOffset", {
+        value: 0,
+        configurable: true,
+      });
+    });
+    scrollCalls = [];
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(result.current.deepLinkedId).toBeNull();
+    expect(scrollCalls.map((call) => call.top)).not.toContain(5000 - 64);
+    expect(window.pageYOffset).toBe(0);
+  });
+
   it("ignores a hash that is not one of its targets", () => {
     placeCard("something-else", 500);
     window.location.hash = "#something-else";

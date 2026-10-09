@@ -416,7 +416,7 @@ export interface MockGraph {
   clusters: Map<string, string[]>;
 }
 
-// Animation Manager types for animation-manager tests
+// Window stand-in for browser-detection tests
 export interface MockWindow {
   addEventListener: Mock;
   removeEventListener: Mock;

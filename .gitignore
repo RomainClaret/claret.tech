@@ -158,3 +158,6 @@ test-results.json
 # the names their old URLs use. Output, not source - the canonical file next to
 # them is what gets edited.
 public/pdfs/RomainClaret_CV.pdf
+
+# Local performance measurements (scripts/perf/measure.mjs)
+/perf-results/

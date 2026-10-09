@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useAnimationState } from "@/contexts/animation-state-context";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import { getTechIcon } from "@/components/icons";
 
 interface Interest {
@@ -172,6 +172,16 @@ const getDesktopPosition = (
 };
 
 // Measure actual text dimensions using canvas
+// One 2D context for every measurement; a canvas and context were created
+// for each label each time the labels were laid out.
+let measureContext: CanvasRenderingContext2D | null | undefined;
+const getMeasureContext = () => {
+  if (measureContext === undefined) {
+    measureContext = document.createElement("canvas").getContext("2d");
+  }
+  return measureContext;
+};
+
 const measureText = (
   text: string,
   fontSize: number,
@@ -185,8 +195,7 @@ const measureText = (
     };
   }
 
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+  const ctx = getMeasureContext();
   if (!ctx) {
     return {
       width: text.length * fontSize * 0.6,
@@ -331,10 +340,13 @@ export function InterestConstellation({
   // `containerSize.width || 1000`, so a genuine 0 was silently rewritten to
   // 1000 and the layout was computed from a made-up width forever after.
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
-  const svgContainerRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
   const { areAnimationsPlaying } = useAnimationState();
+  // The endless loops (orb pulses, label bob) run only while the orbit is on
+  // screen (and motion is allowed: the gate covers reduced motion too). Its container is hidden below md, where it never intersects, so
+  // phones run none of them. framer writes SVG attributes on every frame for
+  // these, which kept the main thread busy wherever the visitor was.
+  const { ref: loopGateRef, active: loopsActive } = useAnimationGate();
 
   // Override usePartialArc for tablet screens (where layout is single column)
   const shouldUsePartialArc = usePartialArc || screenSize === "tablet";
@@ -497,7 +509,7 @@ export function InterestConstellation({
     <div ref={rootRef} className={cn("relative w-full", className)}>
       {/* Desktop and Tablet: Orbital constellation */}
       <div
-        ref={svgContainerRef}
+        ref={loopGateRef}
         className="hidden md:block relative pointer-events-none"
         style={{ zIndex: 10 }}
       >
@@ -601,7 +613,7 @@ export function InterestConstellation({
               return (
                 <g key={`interest-group-${index}`}>
                   {/* Connection line from nearest brain node to orb */}
-                  <motion.line
+                  <m.line
                     x1={connectionPoint.x}
                     y1={connectionPoint.y}
                     x2={position.x}
@@ -630,7 +642,7 @@ export function InterestConstellation({
                   />
 
                   {/* Connection line from orb to label */}
-                  <motion.line
+                  <m.line
                     x1={position.x}
                     y1={position.y}
                     x2={position.x + (labelPos.x - position.x) * 0.5}
@@ -652,7 +664,7 @@ export function InterestConstellation({
                   />
 
                   {/* Orb glow */}
-                  <motion.circle
+                  <m.circle
                     cx={position.x}
                     cy={position.y}
                     r={15}
@@ -671,7 +683,7 @@ export function InterestConstellation({
                   />
 
                   {/* Main orb */}
-                  <motion.g
+                  <m.g
                     initial={{
                       scale: areAnimationsPlaying ? 0 : 1,
                       opacity: areAnimationsPlaying ? 0 : 1,
@@ -721,9 +733,9 @@ export function InterestConstellation({
                       );
                     })()}
 
-                    {/* Pulse animation */}
-                    {!prefersReducedMotion && areAnimationsPlaying && (
-                      <motion.circle
+                    {/* Pulse animation (invisible at rest: opacity 0) */}
+                    {loopsActive && (
+                      <m.circle
                         cx={position.x}
                         cy={position.y}
                         r={10}
@@ -742,7 +754,7 @@ export function InterestConstellation({
                         }}
                       />
                     )}
-                  </motion.g>
+                  </m.g>
 
                   {/* Text background rectangle when hovered */}
                   {isActive && (
@@ -788,7 +800,7 @@ export function InterestConstellation({
                         const boxY = labelPos.y - boxHeight / 2;
 
                         return (
-                          <motion.rect
+                          <m.rect
                             x={boxX}
                             y={boxY}
                             width={boxWidth}
@@ -805,10 +817,11 @@ export function InterestConstellation({
                             animate={{
                               opacity: 1,
                               scale: 1,
-                              y:
-                                areAnimationsPlaying && !prefersReducedMotion
-                                  ? [0, -2, 0]
-                                  : 0,
+                              // On the label's own gate, so the box bobs with
+                              // the text it frames and rests with it (off
+                              // screen, under an overlay, at the battery tier)
+                              // instead of looping a frame at a time apart.
+                              y: loopsActive ? [0, -2, 0] : 0,
                             }}
                             transition={{
                               opacity: {
@@ -818,13 +831,8 @@ export function InterestConstellation({
                                 duration: areAnimationsPlaying ? 0.15 : 0,
                               },
                               y: {
-                                duration: areAnimationsPlaying
-                                  ? 4 + index * 0.3
-                                  : 0, // No duration when animations off
-                                repeat:
-                                  areAnimationsPlaying && !prefersReducedMotion
-                                    ? Infinity
-                                    : 0, // Only repeat if animations enabled
+                                duration: loopsActive ? 4 + index * 0.3 : 0,
+                                repeat: loopsActive ? Infinity : 0,
                                 ease: "easeInOut",
                                 delay: 0, // Start immediately, same as text
                               },
@@ -839,7 +847,7 @@ export function InterestConstellation({
                   )}
 
                   {/* Text label */}
-                  <motion.text
+                  <m.text
                     x={labelPos.x}
                     y={labelPos.y}
                     textAnchor={labelPos.textAnchor}
@@ -857,10 +865,9 @@ export function InterestConstellation({
                     animate={{
                       opacity: isActive ? 1 : 0.95, // Always show labels
                       scale: 1, // Always full scale
-                      y:
-                        areAnimationsPlaying && !prefersReducedMotion
-                          ? [0, -2, 0]
-                          : 0, // Only animate movement if animations enabled
+                      // Bob only while the orbit is on screen and animations
+                      // are allowed; otherwise rest at 0.
+                      y: loopsActive ? [0, -2, 0] : 0,
                     }}
                     transition={{
                       opacity: {
@@ -872,11 +879,8 @@ export function InterestConstellation({
                         duration: areAnimationsPlaying ? 0.5 : 0, // No duration when animations off
                       },
                       y: {
-                        duration: areAnimationsPlaying ? 4 + index * 0.3 : 0, // No duration when animations off
-                        repeat:
-                          areAnimationsPlaying && !prefersReducedMotion
-                            ? Infinity
-                            : 0, // Only repeat if animations enabled
+                        duration: loopsActive ? 4 + index * 0.3 : 0,
+                        repeat: loopsActive ? Infinity : 0,
                         ease: "easeInOut",
                       },
                     }}
@@ -888,7 +892,7 @@ export function InterestConstellation({
                     }}
                   >
                     {interest.interestName}
-                  </motion.text>
+                  </m.text>
 
                   {/* Hit area - rendered last so it's on top */}
                   <g
@@ -953,7 +957,7 @@ export function InterestConstellation({
 
       {/* Mobile: Compact list with icons and text */}
       <div className="md:hidden">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{
@@ -967,7 +971,7 @@ export function InterestConstellation({
               const color = getInterestColor(interest.interestName);
 
               return (
-                <motion.div
+                <m.div
                   key={`mobile-interest-${index}`}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -992,10 +996,10 @@ export function InterestConstellation({
                   >
                     {interest.interestName}
                   </span>
-                </motion.div>
+                </m.div>
               );
             })}
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

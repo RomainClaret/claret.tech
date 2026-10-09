@@ -29,8 +29,11 @@ on:
 permissions:
   contents: read
 
+# Each push to main in a group of its own, as in ci.yml: a push is diffed
+# against the previous head, so a cancelled or replaced run there would leave
+# the changes in between untested.
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: e2e-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -73,19 +76,27 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2  # Only need 2 commits for comparison
-          
+          # The commit history, for the diff base below, but not the old
+          # contents of files: the diff compares trees.
+          fetch-depth: 0
+          filter: blob:none
+
+      # HEAD~1 covered only the last commit of a push, so the e2e suites for
+      # files an earlier commit touched were skipped.
       - name: Get base commit
         id: base_commit
+        env:
+          # A manual run diffs the last commit (HEAD~1, what the script does
+          # for a pull request), as it did before the script: force_all_tests
+          # is how a manual run asks for every suite. Passed as is, it got
+          # the "check everything" base meant for the deploy calling ci.yml,
+          # and every suite ran whatever the input said.
+          EVENT: ${{ github.event_name == 'workflow_dispatch' && 'pull_request' || github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            echo "base=$(git rev-parse HEAD~1)" >> $GITHUB_OUTPUT
-            echo "Using HEAD~1 as base: $(git rev-parse HEAD~1)"
-          else
-            echo "base=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-            echo "No parent commit found, using HEAD as base: $(git rev-parse HEAD)"
-          fi
-          
+          base=$(bash .github/scripts/diff-base.sh)
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4
         id: filter
         with:
@@ -117,6 +128,7 @@ jobs:
               - 'tests/e2e/utils/**'
             performance:
               - 'tests/e2e/performance.spec.ts'
+              - 'tests/e2e/static-shell.spec.ts'
               - 'src/**/*performance*.{ts,tsx}'
               - 'src/**/*optimization*.{ts,tsx}'
               - 'src/**/*lazy*.{ts,tsx}'
@@ -140,7 +152,7 @@ jobs:
               - 'tests/e2e/utils/**'
             lighthouse:
               - 'tests/e2e/lighthouse.spec.ts'
-              - 'next.config.js'
+              - 'next.config.*'
               - 'src/app/**'
               - 'src/**/optimization*.{ts,tsx}'
               # Shared helpers every spec imports. Without this a fix to
@@ -154,7 +166,7 @@ jobs:
               - 'src/**/*mobile*.{ts,tsx}'
               - 'src/**/*responsive*.{ts,tsx}'
               - 'src/**/*breakpoint*.{ts,tsx}'
-              - 'tailwind.config.js'
+              - 'tailwind.config.*'
               # Shared helpers every spec imports. Without this a fix to
               # tests/e2e/utils/ skips the very suite it was written for:
               # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
@@ -164,7 +176,8 @@ jobs:
               - 'src/**'
               - 'public/**'
               - 'styles/**'
-              - '*.config.js'
+              # next.config.mjs, tailwind.config.ts, playwright.config.ts...
+              - '*.config.{js,mjs,ts}'
             dependencies:
               - 'package.json'
               - 'package-lock.json'
@@ -172,6 +185,7 @@ jobs:
               - 'pnpm-lock.yaml'
             workflows:
               - '.github/workflows/**'
+              - '.github/scripts/**'
 
   # Navigation tests across browsers
   navigation-tests:
@@ -477,7 +491,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Performance Tests
-        run: npx playwright test tests/e2e/performance.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
+        # static-shell: the homepage is generated at build time; its first
+        # paint, its hydration, its no-script page, its page when the bundle
+        # never runs, and no splash over a page already on screen, on this
+        # same build.
+        run: npx playwright test tests/e2e/performance.spec.ts tests/e2e/static-shell.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -839,6 +857,13 @@ jobs:
           echo "Mobile Tests: ${{ needs.mobile-tests.result }}"
           echo "Lighthouse Tests: ${{ needs.lighthouse-performance.result }}"
           echo ""
+
+          # A failed detection leaves every output empty, which reads below
+          # as "no relevant changes".
+          if [[ "${{ needs.detect-changes.result }}" == "failure" ]]; then
+            echo "❌ Change detection failed"
+            exit 1
+          fi
           
           # Validate that at least some tests ran
           TESTS_RAN=false

@@ -29,10 +29,13 @@ import { useEffect, useState } from "react";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
+import { pdfReaderIntent } from "@/lib/pdf-reader-preload";
+import { loadPdfModal } from "@/components/ui/pdf-modal-loader";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
+import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import dynamic from "next/dynamic";
 
 // Hidden cards are dropped once, here, so the hero, the grid, the stats and
@@ -64,14 +67,12 @@ const isLocalPdf = (url: string) => url.startsWith("/") && url.endsWith(".pdf");
 
 const pdfFileName = (url: string) => url.split("/").pop() || "document.pdf";
 
-// Lazy load PDF Modal, same as Papers.
-const PDFModal = dynamic(
-  () => import("@/components/ui/pdf-modal").then((mod) => mod.PDFModal),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
+// Fetched on intent and mounted only while open (pdf-reader-preload.ts),
+// same as Papers.
+const PDFModal = dynamic(loadPdfModal, {
+  ssr: false,
+  loading: () => null,
+});
 
 const statusConfig = {
   active: {
@@ -133,7 +134,7 @@ function ResearchCard({
   const nodeColor = project.color || "139, 92, 246";
 
   return (
-    <motion.div
+    <m.div
       className="relative h-full"
       whileHover={{ scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -170,7 +171,7 @@ function ResearchCard({
             {/* Header */}
             <div className="flex items-start gap-3 mb-4">
               <div className="relative">
-                <motion.div
+                <m.div
                   className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: `rgba(${nodeColor}, 0.1)` }}
                   whileHover={{ scale: 1.1 }}
@@ -179,22 +180,14 @@ function ResearchCard({
                     className="w-6 h-6"
                     style={{ color: `rgb(${nodeColor})` }}
                   />
-                </motion.div>
-                {/* Gentle breathing effect */}
-                <motion.div
-                  className="absolute inset-0 rounded-full pointer-events-none"
+                </m.div>
+                {/* Gentle breathing effect: a CSS loop (motion.css) */}
+                <div
+                  className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                   style={{
                     backgroundColor: `rgb(${nodeColor})`,
                     opacity: 0.1,
                     willChange: "transform",
-                  }}
-                  animate={{
-                    scale: [1, 1.15, 1],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
                   }}
                 />
               </div>
@@ -231,7 +224,7 @@ function ResearchCard({
             {/* Expandable Content */}
             <AnimatePresence>
               {isActive && (
-                <motion.div
+                <m.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -314,6 +307,7 @@ function ResearchCard({
                                   key={i}
                                   type="button"
                                   className={linkClass}
+                                  {...pdfReaderIntent}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onOpenPDF(
@@ -351,7 +345,7 @@ function ResearchCard({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -383,12 +377,17 @@ function ResearchCard({
           </div>
         </HolographicCard>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 
 export function Research() {
   const shouldReduceAnimations = useShouldReduceAnimations();
+  // The hero glow and the timeline pulse only run while on screen. Not tied
+  // to the animation switch, which they never followed: Safari, where it
+  // starts off, keeps its look.
+  const heroGlowGate = useAnimationGate({ respectPlaying: false });
+  const timelineGate = useAnimationGate({ respectPlaying: false });
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
   const [isPhdExpanded, setIsPhdExpanded] = useState(false);
@@ -474,7 +473,7 @@ export function Research() {
         {/* Research Journey - Expandable Description */}
         {researchSection.journeyDescription && (
           <SlideInUp delay={100} className="mb-8 sm:mb-12">
-            <motion.div
+            <m.div
               className="relative max-w-4xl mx-auto"
               whileHover={{ scale: 1.005 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -496,7 +495,7 @@ export function Research() {
                 <div className="p-6 sm:p-8 text-center">
                   <div className="flex justify-center mb-4">
                     <div className="relative">
-                      <motion.div
+                      <m.div
                         className="w-16 h-16 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: "rgba(245, 158, 11, 0.1)" }}
                         whileHover={{ scale: 1.1, rotate: 15 }}
@@ -510,18 +509,14 @@ export function Research() {
                           className="w-8 h-8"
                           style={{ color: "rgb(245, 158, 11)" }}
                         />
-                      </motion.div>
-                      <motion.div
-                        className="absolute inset-0 rounded-full pointer-events-none"
+                      </m.div>
+                      {/* Breathing effect: a CSS loop (motion.css), 4 s */}
+                      <div
+                        className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-120"
                         style={{
                           backgroundColor: "rgb(245, 158, 11)",
                           opacity: 0.1,
-                        }}
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          ease: "easeInOut",
+                          animationDuration: "4s",
                         }}
                       />
                     </div>
@@ -531,14 +526,14 @@ export function Research() {
                     My Research Journey
                   </h3>
 
-                  {/* Keyed motion.div rather than AnimatePresence mode="wait".
+                  {/* Keyed m.div rather than AnimatePresence mode="wait".
                       With mode="wait" the incoming child only mounts once the
                       outgoing one finishes exiting, and when exit animations do
                       not run the swap stalls: the button label flips but the
-                      text never changes. Keying a plain motion.div makes React
+                      text never changes. Keying a plain m.div makes React
                       swap the node outright and framer just fades the new one
                       in, which cannot get stuck. */}
-                  <motion.div
+                  <m.div
                     key={isJourneyExpanded ? "full" : "short"}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -549,10 +544,10 @@ export function Research() {
                         ? researchSection.journeyDescription
                         : researchSection.journeyShortDescription}
                     </p>
-                  </motion.div>
+                  </m.div>
 
                   <div className="flex justify-center mt-6">
-                    <motion.button
+                    <m.button
                       onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
                       className="group flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300"
                       style={{
@@ -577,11 +572,11 @@ export function Research() {
                         )}
                         style={{ color: "rgb(245, 158, 11)" }}
                       />
-                    </motion.button>
+                    </m.button>
                   </div>
                 </div>
               </HolographicCard>
-            </motion.div>
+            </m.div>
           </SlideInUp>
         )}
 
@@ -653,7 +648,7 @@ export function Research() {
             hang past this card's bottom edge, and at equal z-index the grid
             wins on DOM order and paints over the escaping text. */}
         <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-20">
-          <motion.div
+          <m.div
             id={heroAnchor}
             className={cn(
               "relative",
@@ -689,15 +684,25 @@ export function Research() {
               </div>
             </div>
 
-            {/* Neural glow effect for hero */}
-            <motion.div
+            {/* Neural glow effect for hero; rests at its starting opacity
+                while off-screen */}
+            <m.div
+              ref={heroGlowGate.ref}
               className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
               style={{
                 backgroundColor: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
               }}
               initial={{ opacity: 0.3 }}
-              animate={{ opacity: [0.3, 0.5, 0.3] }}
-              transition={{ duration: 3, repeat: Infinity }}
+              animate={
+                heroGlowGate.active
+                  ? { opacity: [0.3, 0.5, 0.3] }
+                  : { opacity: 0.3 }
+              }
+              transition={
+                heroGlowGate.active
+                  ? { duration: 3, repeat: Infinity }
+                  : { duration: 0 }
+              }
             />
 
             <HolographicCard
@@ -720,14 +725,14 @@ export function Research() {
 
                 {/* Expandable Description with Toggle */}
                 <div className="text-center mb-6 sm:mb-8 max-w-3xl mx-auto">
-                  {/* Keyed motion.div rather than AnimatePresence mode="wait".
+                  {/* Keyed m.div rather than AnimatePresence mode="wait".
                       With mode="wait" the incoming child only mounts once the
                       outgoing one finishes exiting, and when exit animations do
                       not run the swap stalls: the button label flips but the
-                      text never changes. Keying a plain motion.div makes React
+                      text never changes. Keying a plain m.div makes React
                       swap the node outright and framer just fades the new one
                       in, which cannot get stuck. */}
-                  <motion.div
+                  <m.div
                     key={isPhdExpanded ? "full" : "short"}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -738,11 +743,11 @@ export function Research() {
                         ? visibleProjects[0].description
                         : visibleProjects[0].shortDescription}
                     </p>
-                  </motion.div>
+                  </m.div>
 
                   {/* Toggle Button */}
                   <div className="flex justify-center mt-4">
-                    <motion.button
+                    <m.button
                       onClick={() => setIsPhdExpanded(!isPhdExpanded)}
                       className="group flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300"
                       style={{
@@ -771,7 +776,7 @@ export function Research() {
                           color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
                         }}
                       />
-                    </motion.button>
+                    </m.button>
                   </div>
                 </div>
 
@@ -788,7 +793,7 @@ export function Research() {
 
                     return (
                       <ScaleIn key={i} delay={300 + i * 50} className="h-full">
-                        <motion.div
+                        <m.div
                           className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
                           whileHover={{ scale: 1.05 }}
                           transition={{
@@ -814,15 +819,28 @@ export function Research() {
 
                           {/* Hover tooltip with expanded description. Escapes
                                 the card via allowContentOverflow above; without
-                                it the card clips this and the text is cut off. */}
-                          <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64">
+                                it the card clips this and the text is cut off.
+                                Centered under its card in the four-column
+                                grid. In the two-column phone grid it lines up
+                                with the card's outer edge instead: centered,
+                                the right column's 256 px box ended about
+                                14 px past the screen, which, hidden or not,
+                                made the page pan sideways and stretched the
+                                fixed navigation and site grid to match. */}
+                          <div
+                            className={cn(
+                              "absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64",
+                              i % 2 === 0 ? "left-0" : "right-0",
+                              "md:left-1/2 md:right-auto md:-translate-x-1/2",
+                            )}
+                          >
                             <div className="bg-popover text-popover-foreground rounded-lg shadow-xl border p-3">
                               <p className="text-xs leading-relaxed">
                                 {expandedDescriptions[i]}
                               </p>
                             </div>
                           </div>
-                        </motion.div>
+                        </m.div>
                       </ScaleIn>
                     );
                   })}
@@ -877,6 +895,7 @@ export function Research() {
                             key={i}
                             type="button"
                             className={heroLinkClass}
+                            {...pdfReaderIntent}
                             onClick={() =>
                               openPDF(
                                 link.url,
@@ -908,20 +927,24 @@ export function Research() {
                 )}
               </div>
             </HolographicCard>
-          </motion.div>
+          </m.div>
         </SlideInUp>
 
         {/* Timeline Container for Other Research Projects */}
         <div className="relative">
           {/* Unified Timeline for Desktop - single continuous element */}
-          <div className="absolute left-1/2 -top-8 sm:-top-16 bottom-0 w-0.5 -translate-x-1/2 hidden md:block -z-10">
+          <div
+            ref={timelineGate.ref}
+            data-anim={timelineGate.active ? "on" : "off"}
+            className="absolute left-1/2 -top-8 sm:-top-16 bottom-0 w-0.5 -translate-x-1/2 hidden md:block -z-10"
+          >
             {/* Continuous gradient from Current Focus to end */}
             <div className="absolute inset-0 bg-gradient-to-b from-primary/30 via-primary/20 to-transparent" />
             {/* Subtle pulse animation for visual continuity */}
             <div
               className={cn(
                 "absolute inset-0 bg-gradient-to-b from-primary/40 via-primary/25 to-transparent opacity-50",
-                !shouldReduceAnimations && "animate-pulse",
+                !shouldReduceAnimations && "animate-pulse anim-decor",
               )}
             />
           </div>
@@ -958,14 +981,16 @@ export function Research() {
       </div>
 
       {/* PDF Modal */}
-      <PDFModal
-        isOpen={isOpen}
-        onClose={closePDF}
-        pdfUrl={pdfUrl}
-        title={title}
-        downloadFileName={downloadFileName}
-        shareSlug={shareSlug}
-      />
+      {isOpen && (
+        <PDFModal
+          isOpen={isOpen}
+          onClose={closePDF}
+          pdfUrl={pdfUrl}
+          title={title}
+          downloadFileName={downloadFileName}
+          shareSlug={shareSlug}
+        />
+      )}
     </div>
   );
 }

@@ -1,97 +1,40 @@
 // Service Worker for claret.tech
-const CACHE_NAME = "claret-tech-v5";
-// The raw /fonts/ files are no longer referenced by any CSS (next/font
-// serves hashed copies from /_next/static/media), so precaching them was
-// 335KB of dead weight on first install.
-const urlsToCache = ["/site.webmanifest"];
+// v6: drops the v5 cache and its cache-first copies. That alone does not
+// deliver a file changed under the same name: a miss here fetches through
+// the browser's HTTP cache, which keeps /images and /animations for a year
+// as immutable. Changed content needs a new URL (docs/performance.md).
+const CACHE_NAME = "claret-tech-v6";
+// Nothing is precached: the worker serves only images, fonts and
+// animations, cache-first as they are fetched. It used to precache the raw
+// /fonts/ files (335 KB no CSS referenced any more) and then the web
+// manifest, which it never serves: one dead entry and one wasted request on
+// every install.
 
-// Install event - cache resources
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      // Cache resources individually with better error handling
-      const cachePromises = urlsToCache.map(async (url) => {
-        try {
-          const response = await fetch(url);
-          if (response.ok) {
-            await cache.put(url, response);
-          } else {
-            // Silently skip resources that don't exist or return errors
-            // This prevents console spam for missing optional resources
-          }
-        } catch {
-          // Silently skip network failures
-          // This prevents console spam during offline installs
-        }
-      });
+// The site's own images, fonts and animations, served cache-first. Nothing
+// else is intercepted: pages, script chunks, the image optimizer, /api and
+// the Pyodide runtime go straight to the network and the HTTP cache, which
+// already caches the hashed assets for good. Routing them through this
+// worker only added a round trip to each request, and its offline fallback
+// for pages never had a page in its cache to fall back to.
+const CACHED_PATHS = ["/images/", "/fonts/", "/animations/"];
 
-      await Promise.allSettled(cachePromises);
-    }),
-  );
-});
-
-// Fetch event - network-first for HTML, cache-first for assets
 self.addEventListener("fetch", (event) => {
-  const pathname = new URL(event.request.url).pathname;
+  const request = event.request;
+  if (request.method !== "GET") return;
 
-  // Never intercept API requests: their data (publications, blog feeds) must
-  // always come from the network so content updates are visible immediately.
-  if (pathname.startsWith("/api/")) {
-    return;
-  }
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (!CACHED_PATHS.some((path) => url.pathname.startsWith(path))) return;
 
-  // Never intercept the Pyodide runtime. A dedicated worker inherits this
-  // service worker, so without the bypass every wasm/stdlib request would be
-  // proxied through a JS fetch round-trip that this handler then declines to
-  // cache. Letting it through means the immutable HTTP cache does the work and
-  // WebAssembly.instantiateStreaming keeps its Content-Type.
-  if (pathname.startsWith("/pyodide/")) {
-    return;
-  }
-
-  // Network-first for navigation requests (HTML pages)
-  // This ensures users always get fresh HTML with correct JS chunk hashes
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        // Only fall back to cache if network fails (offline)
-        return caches.match(event.request);
-      }),
-    );
-    return;
-  }
-
-  // Cache-first for static assets (fonts, images, animations)
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Cache hit - return response
-      if (response) {
-        return response;
-      }
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
 
-      // Clone the request
-      const fetchRequest = event.request.clone();
-
-      return fetch(fetchRequest).then((response) => {
-        // Check if valid response
-        if (!response || response.status !== 200 || response.type !== "basic") {
-          return response;
+      return fetch(request).then((response) => {
+        if (response && response.status === 200 && response.type === "basic") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         }
-
-        // Clone the response
-        const responseToCache = response.clone();
-
-        // Cache images, fonts, and animations
-        if (
-          event.request.url.includes("/images/") ||
-          event.request.url.includes("/fonts/") ||
-          event.request.url.includes("/animations/")
-        ) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-
         return response;
       });
     }),
@@ -100,17 +43,24 @@ self.addEventListener("fetch", (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-
+  // Only this site's own old caches. Cache Storage belongs to the whole
+  // origin: WebLLM keeps the AI terminal's model in it (webllm/model, about
+  // 1 GB, with webllm/config and webllm/wasm), and deleting every name but
+  // the current one made each new worker throw that away, so a returning
+  // visitor downloaded the model again.
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        }),
-      );
-    }),
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter(
+              (cacheName) =>
+                cacheName.startsWith("claret-tech-") &&
+                cacheName !== CACHE_NAME,
+            )
+            .map((cacheName) => caches.delete(cacheName)),
+        ),
+      ),
   );
 });

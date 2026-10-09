@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Theme, setTheme as setCookieTheme } from "@/lib/theme-cookie";
+import { readStoredTheme } from "@/lib/boot/head-boot";
 import { logWarning } from "@/lib/utils/dev-logger";
 
 interface ThemeContextValue {
@@ -20,11 +21,19 @@ export function useTheme() {
 
 interface ThemeProviderProps {
   children: React.ReactNode;
-  initialTheme: Theme;
+  /** The theme the HTML was rendered with; hydration starts from it. */
+  initialTheme?: Theme;
 }
 
-export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
+export function ThemeProvider({
+  children,
+  initialTheme = "light",
+}: ThemeProviderProps) {
+  // The visitor's theme is on <html> before the first paint (the head script,
+  // lib/boot/head-boot.ts); the state starts from the HTML's and follows on
+  // mount.
   const [theme, setThemeState] = useState<Theme>(initialTheme);
+  const appliedOnMountRef = useRef(false);
 
   const setTheme = (newTheme: Theme) => {
     setCookieTheme(newTheme);
@@ -43,34 +52,38 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     root.classList.add(newTheme);
   };
 
+  // On mount: the stored theme, applied to <html> at once, then to the state.
+  // Applying the state first would strip the class the head script set,
+  // for a frame, whenever the stored theme is not the HTML's.
   useEffect(() => {
-    // Apply theme on mount and when it changes
+    const sync = () => {
+      const stored = readStoredTheme(initialTheme);
+      const root = window.document.documentElement;
+      root.classList.remove("light", "dark");
+      root.classList.add(stored);
+      setThemeState(stored);
+    };
+    sync();
+    // A page restored from the back/forward cache keeps the theme it was
+    // left with, and another page may have changed it since.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) sync();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
+
+  // Then the state's own changes.
+  useEffect(() => {
+    if (!appliedOnMountRef.current) {
+      appliedOnMountRef.current = true;
+      return;
+    }
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
   }, [theme]);
-
-  useEffect(() => {
-    // Sync with localStorage on mount only
-    try {
-      const storedTheme = localStorage.getItem("theme") as Theme;
-      if (storedTheme && (storedTheme === "light" || storedTheme === "dark")) {
-        // If localStorage has a valid theme different from initial, use it
-        if (storedTheme !== theme) {
-          setTheme(storedTheme);
-        }
-      }
-    } catch {
-      // Only log in non-test environments to avoid test stderr pollution
-      if (typeof process === "undefined" || process.env.NODE_ENV !== "test") {
-        logWarning(
-          "Failed to read theme from localStorage",
-          "theme-provider-read",
-        );
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run once on mount to avoid overwriting user preference
-  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
