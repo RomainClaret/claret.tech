@@ -1,7 +1,7 @@
 "use client";
 
 import { papersSection, socialMediaLinks } from "@/data/portfolio";
-import { FadeIn, SlideInUp } from "@/components/ui/animated";
+import { SlideInUp } from "@/components/ui/animated";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import { OptimizedImage } from "@/components/ui/optimized-image";
@@ -42,6 +42,7 @@ import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { logError } from "@/lib/utils/dev-logger";
+import { accentStyle } from "@/components/ui/accent-text";
 
 // Fetched on intent and mounted only while open (pdf-reader-preload.ts).
 const PDFModal = dynamic(loadPdfModal, {
@@ -174,9 +175,9 @@ function detectPublicationStatus(
 // and identical across all cards so they read as actions, not tags.
 const READ_PDF_VARIANTS = {
   paper: { color: "37, 99, 235", Icon: BookOpen, label: "Read Paper" }, // Blue
-  poster: { color: "234, 88, 12", Icon: FileText, label: "Read Poster" }, // Orange
+  poster: { color: "194, 65, 12", Icon: FileText, label: "Read Poster" }, // Orange 700: white reads at 5.2:1
   presentation: {
-    color: "5, 150, 105", // Emerald
+    color: "4, 120, 87", // Emerald 700: white reads at 5.5:1
     Icon: Presentation,
     label: "Read Presentation",
   },
@@ -287,7 +288,6 @@ const HIGHLIGHTED_AUTHOR = "Romain Claret";
 
 interface PaperCardProps {
   paper: (typeof papersSection.papersCards)[0];
-  index: number;
   onOpenPDF: (url: string, title: string, fileName: string) => void;
   shouldReduceAnimations: boolean;
   isDeepLinked?: boolean;
@@ -296,7 +296,6 @@ interface PaperCardProps {
 // Static paper card with neural design
 function PaperCard({
   paper,
-  index,
   onOpenPDF,
   shouldReduceAnimations,
   isDeepLinked = false,
@@ -311,7 +310,13 @@ function PaperCard({
 
   const handleBibTeXClick = async () => {
     if (!paper.bibtex) return;
-    await navigator.clipboard.writeText(paper.bibtex);
+    try {
+      await navigator.clipboard.writeText(paper.bibtex);
+    } catch {
+      // Denied, or unavailable over plain http. Say nothing rather than show
+      // a success mark for a copy that did not happen.
+      return;
+    }
     setBibtexCopied(true);
     setTimeout(() => setBibtexCopied(false), 2000);
   };
@@ -362,7 +367,7 @@ function PaperCard({
           key={link.url}
           {...pdfReaderIntent}
           onClick={(e) => handleLinkClick(e, link)}
-          className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+          className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
         >
           <span className="truncate">{link.name}</span>
           <Download
@@ -381,7 +386,7 @@ function PaperCard({
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+        className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
       >
         <span className="truncate">{link.name}</span>
         <ExternalLink className="w-3 h-3 flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -398,7 +403,7 @@ function PaperCard({
       : "paper";
 
   return (
-    <SlideInUp delay={index * 100} className="h-full">
+    <SlideInUp className="h-full">
       <m.div
         className="relative h-full"
         whileHover={{ scale: 1.02 }}
@@ -458,10 +463,10 @@ function PaperCard({
                     </span>
                     {/* Publication status tag */}
                     <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      className="text-xs px-2 py-0.5 rounded-full font-medium accent-text"
                       style={{
+                        ...accentStyle(`rgb(${publicationStatus.color})`),
                         backgroundColor: `rgba(${publicationStatus.color}, 0.1)`,
-                        color: `rgb(${publicationStatus.color})`,
                         border: `1px solid rgba(${publicationStatus.color}, 0.3)`,
                       }}
                     >
@@ -599,7 +604,7 @@ function PaperCard({
                 {paper.bibtex && (
                   <button
                     onClick={handleBibTeXClick}
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200"
                     title="Copy BibTeX"
                   >
                     <span>BibTeX</span>
@@ -637,13 +642,11 @@ function truncateText(text: string, maxLength: number = 200): string {
 // Dynamic publication card
 function DynamicPaperCard({
   publication,
-  index,
   onOpenPDF,
   shouldReduceAnimations,
   isDeepLinked = false,
 }: {
   publication: Publication;
-  index: number;
   onOpenPDF: (url: string, title: string, fileName: string) => void;
   shouldReduceAnimations: boolean;
   isDeepLinked?: boolean;
@@ -681,16 +684,22 @@ function DynamicPaperCard({
   };
 
   const handleBibTeXClick = async () => {
-    // Prefer the curated verbatim entry; generate one only as a fallback.
-    await navigator.clipboard.writeText(
-      publication.bibtex ?? publicationToBibTeX(publication),
-    );
+    try {
+      // Prefer the curated verbatim entry; generate one only as a fallback.
+      await navigator.clipboard.writeText(
+        publication.bibtex ?? publicationToBibTeX(publication),
+      );
+    } catch {
+      // Denied, or unavailable over plain http. Say nothing rather than show
+      // a success mark for a copy that did not happen.
+      return;
+    }
     setBibtexCopied(true);
     setTimeout(() => setBibtexCopied(false), 2000);
   };
 
   return (
-    <SlideInUp delay={index * 100} className="h-full">
+    <SlideInUp className="h-full">
       <m.div
         className="relative h-full"
         whileHover={{ scale: 1.02 }}
@@ -756,10 +765,10 @@ function DynamicPaperCard({
                     </span>
                     {/* Publication status tag */}
                     <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      className="text-xs px-2 py-0.5 rounded-full font-medium accent-text"
                       style={{
+                        ...accentStyle(`rgb(${publicationStatus.color})`),
                         backgroundColor: `rgba(${publicationStatus.color}, 0.1)`,
-                        color: `rgb(${publicationStatus.color})`,
                         border: `1px solid rgba(${publicationStatus.color}, 0.3)`,
                       }}
                     >
@@ -948,7 +957,7 @@ function DynamicPaperCard({
                     href={publication.paperUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
                   >
                     <span>Paper</span>
                     <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -958,7 +967,7 @@ function DynamicPaperCard({
                   <button
                     {...pdfReaderIntent}
                     onClick={handlePDFClick}
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
                   >
                     <span>Poster</span>
                     <Download
@@ -972,7 +981,7 @@ function DynamicPaperCard({
                 {publication.bibtex && (
                   <button
                     onClick={handleBibTeXClick}
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200"
                     title="Copy BibTeX"
                   >
                     <span>BibTeX</span>
@@ -988,7 +997,7 @@ function DynamicPaperCard({
                     href={publication.codeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
                   >
                     <span>Code</span>
                     <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -1000,7 +1009,7 @@ function DynamicPaperCard({
                     href={publication.semanticScholarUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/10 hover:bg-primary rounded-lg transition-all duration-200 group"
+                    className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
                   >
                     <span>Details</span>
                     <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -1118,7 +1127,7 @@ export function Papers() {
     <div className="relative">
       <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
         <div className="lg:px-8 w-full">
-          <FadeIn className="text-center mb-12">
+          <div className="text-center mb-12">
             <h2 className="section-title-gradient">{papersSection.title}</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
               <span className="text-primary font-semibold">
@@ -1143,7 +1152,7 @@ export function Papers() {
                 </span>
               )}
             </div>
-          </FadeIn>
+          </div>
 
           {/* Filter pills */}
           <div className="flex justify-center gap-2 mb-8">
@@ -1185,17 +1194,17 @@ export function Papers() {
           {/* Dynamic Papers Grid */}
           {hasDynamicPapers && filteredDynamicPapers.length > 0 && (
             <div className="mb-16 w-full">
-              <FadeIn delay={200} className="text-center mb-8">
+              <div className="text-center mb-8">
                 <h3 className="text-2xl font-semibold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Peer-Reviewed Publications
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Journal articles and conference proceedings
                 </p>
-              </FadeIn>
+              </div>
               <div className="flex justify-center">
                 <div className="grid gap-6 md:grid-cols-2 grid-rows-auto grid-stretch max-w-[1000px]">
-                  {filteredDynamicPapers.map((publication, index) => (
+                  {filteredDynamicPapers.map((publication) => (
                     <div
                       key={publication.id}
                       id={publication.id}
@@ -1207,7 +1216,6 @@ export function Papers() {
                     >
                       <DynamicPaperCard
                         publication={publication}
-                        index={index}
                         onOpenPDF={openPDF}
                         shouldReduceAnimations={shouldReduceAnimations}
                         isDeepLinked={deepLinkedId === publication.id}
@@ -1222,17 +1230,14 @@ export function Papers() {
           {/* Static Papers Grid */}
           {filteredStaticPapers.length > 0 && (
             <div className="w-full">
-              <FadeIn
-                delay={hasDynamicPapers ? 400 : 200}
-                className="text-center mb-8"
-              >
+              <div className="text-center mb-8">
                 <h3 className="text-2xl font-semibold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Other Work
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Technical reports, white papers, and additional contributions
                 </p>
-              </FadeIn>
+              </div>
               <div className="flex justify-center">
                 <div className="flex flex-wrap justify-center gap-6 max-w-[1500px]">
                   {filteredStaticPapers.map((paper, index) => (
@@ -1247,7 +1252,6 @@ export function Papers() {
                     >
                       <PaperCard
                         paper={paper}
-                        index={index + filteredDynamicPapers.length}
                         onOpenPDF={openPDF}
                         shouldReduceAnimations={shouldReduceAnimations}
                         isDeepLinked={
@@ -1262,7 +1266,7 @@ export function Papers() {
           )}
 
           {/* Export and ORCID links */}
-          <FadeIn delay={600} className="text-center mt-12 space-y-4">
+          <div className="text-center mt-12 space-y-4">
             {hasDynamicPapers && (
               <button
                 onClick={() => {
@@ -1287,7 +1291,10 @@ export function Papers() {
                 className="inline-flex items-center gap-2 text-primary hover:underline transition-colors"
               >
                 <Download className="w-4 h-4" />
-                Export all as BibTeX
+                {/* Named for what it exports. "Export all" left out the
+                    Other Work cards, filed apart as not publications, each
+                    with its own BibTeX copy button. */}
+                Export peer-reviewed publications as BibTeX
               </button>
             )}
 
@@ -1302,7 +1309,7 @@ export function Papers() {
                 View all publications on ORCID
               </Link>
             </div>
-          </FadeIn>
+          </div>
 
           {/* PDF Modal */}
           {isOpen && (

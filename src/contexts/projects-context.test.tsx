@@ -642,19 +642,6 @@ describe("ProjectsContext", () => {
   });
 
   describe("Performance", () => {
-    it("renders efficiently", () => {
-      const startTime = Date.now();
-
-      render(
-        <ProjectsProvider>
-          <TestComponent />
-        </ProjectsProvider>,
-      );
-
-      const endTime = Date.now();
-      expect(endTime - startTime).toBeLessThan(50); // 50ms threshold
-    });
-
     it("handles rapid state changes efficiently", () => {
       const { result } = renderHook(() => useProjects(), {
         wrapper: ({ children }) => (

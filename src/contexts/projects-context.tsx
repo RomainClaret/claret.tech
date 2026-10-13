@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useMemo, useState, ReactNode } from "react";
 
-interface Repository {
+/** A GitHub repository as the Projects section shows it. */
+export interface Repository {
   id: string;
   name: string;
   description: string | null;

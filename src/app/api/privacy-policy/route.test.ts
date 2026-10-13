@@ -33,6 +33,12 @@ import { devError } from "@/lib/utils/dev-logger";
 import { renderMarkdownToHtml } from "@/lib/utils/markdown-server";
 import { ApiCache } from "@/lib/utils/api-cache";
 
+// A request with no client headers: the rate limiter keys it as
+// "unknown:unknown", as it did when these tests called GET() with nothing,
+// which TypeScript rejects (the handler takes the request).
+const anonymousRequest = () =>
+  ({ headers: new Headers() }) as unknown as Parameters<typeof GET>[0];
+
 const mockFs = vi.mocked(fs);
 const mockDevError = vi.mocked(devError);
 const mockRenderMarkdownToHtml = vi.mocked(renderMarkdownToHtml);
@@ -89,7 +95,7 @@ describe("Privacy Policy API Route", () => {
       mockFs.readFileSync.mockReturnValue(mockMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining("PRIVACY-POLICY.md"),
@@ -118,7 +124,7 @@ describe("Privacy Policy API Route", () => {
       mockFs.readFileSync.mockReturnValue("# Privacy Policy");
       mockRenderMarkdownToHtml.mockReturnValue("<h1>Privacy Policy</h1>");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.any(Object),
@@ -143,7 +149,7 @@ describe("Privacy Policy API Route", () => {
         html: mockHtml,
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File system should not be accessed when cache hits
       expect(mockFs.readFileSync).not.toHaveBeenCalled();
@@ -173,7 +179,7 @@ describe("Privacy Policy API Route", () => {
       mockFs.readFileSync.mockReturnValue(newMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(newHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File should be read when cache misses
       expect(mockFs.readFileSync).toHaveBeenCalled();
@@ -206,7 +212,7 @@ describe("Privacy Policy API Route", () => {
       // Mock fresh route import to avoid cached data
       vi.resetModules();
       const { GET: freshGET } = await import("./route");
-      await freshGET();
+      await freshGET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "PRIVACY-POLICY.md file not found at:",
@@ -225,7 +231,7 @@ describe("Privacy Policy API Route", () => {
     it("does not call markdown renderer when file not found", async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockRenderMarkdownToHtml).not.toHaveBeenCalled();
     });
@@ -238,7 +244,7 @@ describe("Privacy Policy API Route", () => {
         throw new Error("Permission denied");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "Failed to read PRIVACY-POLICY file:",
@@ -259,7 +265,7 @@ describe("Privacy Policy API Route", () => {
         throw new Error("Read error");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       const fallbackCall = (NextResponse.json as any).mock.calls[0][0];
       expect(fallbackCall.content).toContain("# Privacy Policy");
@@ -279,7 +285,7 @@ describe("Privacy Policy API Route", () => {
         throw new Error("Markdown rendering failed");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       // Should call devError and return fallback content
       expect(mockDevError).toHaveBeenCalledWith(
@@ -302,7 +308,7 @@ describe("Privacy Policy API Route", () => {
       mockFs.readFileSync.mockReturnValue("# Privacy Policy");
       mockRenderMarkdownToHtml.mockReturnValue("<h1>Privacy Policy</h1>");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining("PRIVACY-POLICY.md"),
@@ -323,7 +329,7 @@ describe("Privacy Policy API Route", () => {
       mockFs.readFileSync.mockReturnValue(mockMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -343,11 +349,11 @@ describe("Privacy Policy API Route", () => {
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
       // First call
-      await GET();
+      await GET(anonymousRequest());
 
       // Clear mocks and make second call to verify cache
       vi.clearAllMocks();
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./utils/fixtures";
 
 test.describe("Performance", () => {
   test("should meet Core Web Vitals thresholds", async ({ page }) => {

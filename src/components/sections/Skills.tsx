@@ -1,7 +1,7 @@
 "use client";
 
 import { skillsSection } from "@/data/portfolio";
-import { FadeIn, SlideInUp, ScaleIn } from "@/components/ui/animated";
+import { SlideInUp, ScaleIn } from "@/components/ui/animated";
 import { getTechIcon } from "@/components/icons";
 import {
   Microscope,
@@ -11,7 +11,6 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { SkillManifesto } from "@/components/ui/skill-manifesto";
 import { LanguageSpectrum } from "@/components/ui/language-spectrum";
@@ -82,7 +81,7 @@ export function Skills() {
   return (
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
       <div className="lg:px-8">
-        <FadeIn className="text-center mb-8 sm:mb-12">
+        <div className="text-center mb-8 sm:mb-12">
           {skillsSection.title && (
             <h2 className="section-title-gradient">{skillsSection.title}</h2>
           )}
@@ -93,11 +92,11 @@ export function Skills() {
             {" • "}
             {skillsSection.subtitle.normalText}
           </p>
-        </FadeIn>
+        </div>
 
         {/* Core Activities - With HolographicCards */}
         <div className="mb-16">
-          <SlideInUp delay={200} className="text-center mb-8">
+          <SlideInUp className="text-center mb-8">
             <h3 className="section-subtitle-gradient text-2xl md:text-3xl mb-4">
               {skillsSection.coreExpertiseSection.title}
             </h3>
@@ -118,11 +117,7 @@ export function Skills() {
               const activityColor = activityColors[activity.icon];
 
               return (
-                <SlideInUp
-                  key={index}
-                  delay={300 + index * 100}
-                  className="h-full"
-                >
+                <SlideInUp key={index} className="h-full">
                   <m.div
                     className="relative h-full min-h-[400px]"
                     whileHover={{ scale: 1.02 }}
@@ -146,8 +141,7 @@ export function Skills() {
                                 }}
                                 whileHover={{ scale: 1.1 }}
                               >
-                                <ProtectedLucideIcon
-                                  Icon={IconComponent}
+                                <IconComponent
                                   className="w-7 h-7"
                                   style={{ color: `rgb(${activityColor})` }}
                                 />
@@ -220,7 +214,6 @@ export function Skills() {
                               return (
                                 <ScaleIn
                                   key={techIndex}
-                                  delay={400 + index * 100 + techIndex * 50}
                                   className="group/tech w-full"
                                 >
                                   <m.div
@@ -337,7 +330,7 @@ export function Skills() {
 
         {/* Research Focus - Enhanced Design */}
         <div className="mb-16">
-          <SlideInUp delay={400} className="text-center mb-8">
+          <SlideInUp className="text-center mb-8">
             <h3 className="section-subtitle-gradient text-2xl md:text-3xl mb-2">
               {skillsSection.researchPhilosophySection.title}
             </h3>
@@ -355,7 +348,7 @@ export function Skills() {
                   ] || "107, 114, 128";
 
                 return (
-                  <SlideInUp key={category} delay={500 + index * 100}>
+                  <SlideInUp key={category}>
                     <m.div
                       className="h-full"
                       whileHover={{ scale: 1.02 }}

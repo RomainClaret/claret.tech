@@ -4,6 +4,10 @@ import { renderHook, act } from "@testing-library/react";
 import { ReactNode } from "react";
 import type { AnimationPreference } from "@/lib/utils/safari-detection";
 import {
+  resetMotionGateForTests,
+  setMotionTier,
+} from "@/lib/utils/motion-gate";
+import {
   setupContextTesting,
   renderHookWithErrorBoundary,
   expectHookError,
@@ -96,6 +100,8 @@ describe("AnimationStateContext", () => {
     vi.mocked(useFpsOnly).mockReturnValue({
       fps: 60,
       isLowFps: false,
+      refreshRate: null,
+      sample: 0,
     });
 
     const { useFpsAutoDisable } = await import("@/lib/hooks/useFpsAutoDisable");
@@ -382,6 +388,8 @@ describe("AnimationStateContext", () => {
       vi.mocked(useFpsOnly).mockReturnValue({
         fps: 45,
         isLowFps: true,
+        refreshRate: null,
+        sample: 0,
       });
 
       const { result } = renderHook(() => useAnimationState(), {
@@ -391,11 +399,14 @@ describe("AnimationStateContext", () => {
       expect(result.current.currentFps).toBe(45);
     });
 
-    it("defaults to 60 FPS when useFpsOnly returns null", async () => {
+    // It never returns null; a reading of 0 (`fps || 60`) shows as 60.
+    it("falls back to 60 FPS when useFpsOnly reports 0", async () => {
       const { useFpsOnly } = await import("@/lib/hooks/useFpsOnly");
       vi.mocked(useFpsOnly).mockReturnValue({
-        fps: 0, // Use 0 to simulate null case
+        fps: 0,
         isLowFps: false,
+        refreshRate: null,
+        sample: 0,
       });
 
       const { result } = renderHook(() => useAnimationState(), {
@@ -490,7 +501,11 @@ describe("AnimationStateContext", () => {
   });
 
   describe("FPS Monitoring", () => {
-    it("enables FPS monitoring when hydrated and in browser", async () => {
+    afterEach(() => {
+      resetMotionGateForTests();
+    });
+
+    it("enables FPS monitoring when hydrated, at the battery tier", async () => {
       const { useSafariContext } = await import("@/contexts/safari-context");
       const { useFpsOnly } = await import("@/lib/hooks/useFpsOnly");
 
@@ -499,12 +514,24 @@ describe("AnimationStateContext", () => {
         isHydrated: true,
         shouldReduceAnimations: false,
       });
+      setMotionTier("battery");
 
       renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
       });
 
       expect(vi.mocked(useFpsOnly)).toHaveBeenCalledWith(true);
+    });
+
+    it("leaves FPS monitoring off above the battery tier", async () => {
+      // Auto-disable, the only reader here, counts at battery saver only.
+      const { useFpsOnly } = await import("@/lib/hooks/useFpsOnly");
+
+      renderHook(() => useAnimationState(), {
+        wrapper: createWrapper(),
+      });
+
+      expect(vi.mocked(useFpsOnly)).not.toHaveBeenCalledWith(true);
     });
 
     it("disables FPS monitoring during SSR", async () => {
@@ -606,7 +633,8 @@ describe("AnimationStateContext", () => {
       expect(first.result.current.areAnimationsPlaying).toBe(false); // Safari's default
 
       // setupContextTesting stubs window's listeners: call the one the
-      // provider registered for the terminal's "animation force".
+      // provider registered for the terminal's "animations force" (its
+      // "animation-force" event).
       const force = vi
         .mocked(window.addEventListener)
         .mock.calls.find(([type]) => type === "animation-force")?.[1] as

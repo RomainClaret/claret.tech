@@ -8,19 +8,27 @@ import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useMotionGate } from "@/lib/hooks/useMotionGate";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useQuality, NEURAL_CANVAS_PROFILE } from "@/contexts/quality-context";
+import { withLoadFallback } from "@/lib/utils/load-fallback";
+import { logError } from "@/lib/utils/dev-logger";
 
+// Fills the box it is given; each use below gives it the canvas's size.
+const CanvasPlaceholder = () => (
+  <div className="w-full h-full bg-transparent animate-pulse" />
+);
+
+// When the canvas's chunk cannot be fetched, each brain's box keeps its
+// placeholder: React.lazy threw while rendering, and the page's error
+// boundary (error.tsx) replaced everything under the navigation.
 const BrainNetworkVisualization = dynamic(
-  () =>
-    import("@/components/ui/brain-network-visualization").then(
-      (mod) => mod.BrainNetworkVisualization,
-    ),
-  {
-    ssr: false,
-    // Fills the box it is given; each use below gives it the canvas's size.
-    loading: () => (
-      <div className="w-full h-full bg-transparent animate-pulse" />
-    ),
-  },
+  withLoadFallback(
+    () =>
+      import("@/components/ui/brain-network-visualization").then(
+        (mod) => mod.BrainNetworkVisualization,
+      ),
+    CanvasPlaceholder,
+    { onError: (error) => logError(error, "Brain canvas chunk") },
+  ),
+  { ssr: false, loading: CanvasPlaceholder },
 );
 
 interface DualBrainAnimationProps {

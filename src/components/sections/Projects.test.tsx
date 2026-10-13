@@ -1,8 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { resetMotionGateForTests } from "@/lib/utils/motion-gate";
 import { Projects } from "./Projects";
 import type {
-  FadeInProps,
   SlideInUpProps,
   ScaleInProps,
   MotionDivProps,
@@ -32,11 +38,6 @@ vi.mock("@/contexts/projects-context", () => ({
 
 // Mock UI components
 vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children, ...props }: FadeInProps) => (
-    <div data-testid="fade-in" {...props}>
-      {children}
-    </div>
-  ),
   SlideInUp: ({ children, ...props }: SlideInUpProps) => (
     <div data-testid="slide-in-up" {...props}>
       {children}
@@ -386,8 +387,9 @@ describe("Projects Component", () => {
 
       await waitFor(() => {
         // Featured project should show specific stats
-        expect(screen.getAllByText("120")).toHaveLength(2); // Stars (featured + card)
-        expect(screen.getAllByText("15")).toHaveLength(2); // Forks (featured + card)
+        // The spotlight's alone: its project is not repeated as a card.
+        expect(screen.getAllByText("120")).toHaveLength(1); // Stars
+        expect(screen.getAllByText("15")).toHaveLength(1); // Forks
         expect(screen.getAllByText("TypeScript").length).toBeGreaterThan(0); // Primary language
         expect(screen.getAllByText("2KB").length).toBeGreaterThan(0); // Repository size
       });
@@ -533,6 +535,131 @@ describe("Projects Component", () => {
 
       // Layout should change (tested via CSS classes in actual implementation)
       expect(layoutButtons[0]).toBeInTheDocument();
+    });
+  });
+
+  describe("Featured spotlight", () => {
+    const pinnedResponse = () => ({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          pinnedItems: {
+            edges: mockPinnedProjects.map((p) => ({ node: p })),
+          },
+        },
+      }),
+    });
+    /** A grid card, by the button on its name. */
+    const card = (name: string) => screen.queryByRole("button", { name });
+
+    it("is not repeated in the grid under it", async () => {
+      // The most starred pinned repo was the spotlight and, right under it,
+      // the grid's first card again, in both views.
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce(
+        pinnedResponse(),
+      );
+      render(<Projects />);
+
+      await screen.findByText("Featured Project");
+      expect(screen.getAllByText("awesome-project")).toHaveLength(1);
+      expect(card("awesome-project")).toBeNull();
+      expect(card("cool-library")).toBeInTheDocument();
+    });
+
+    it("steps aside for a search, and its project joins the grid", async () => {
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce(
+        pinnedResponse(),
+      );
+      render(<Projects />);
+      await screen.findByText("Featured Project");
+
+      fireEvent.change(screen.getByRole("searchbox"), {
+        target: { value: "awesome" },
+      });
+
+      expect(screen.queryByText("Featured Project")).toBeNull();
+      expect(card("awesome-project")).toBeInTheDocument();
+    });
+
+    it("steps aside for a tech filter too", async () => {
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce(
+        pinnedResponse(),
+      );
+      render(<Projects />);
+      await screen.findByText("Featured Project");
+
+      fireEvent.click(screen.getByTestId("filter-TypeScript"));
+
+      expect(screen.queryByText("Featured Project")).toBeNull();
+      expect(card("awesome-project")).toBeInTheDocument();
+    });
+
+    it("is not a card in the All view either", async () => {
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce(
+        pinnedResponse(),
+      );
+      mockProjectsContext.allProjects = mockAllProjects as never;
+      render(<Projects />);
+      await screen.findByText("Featured Project");
+
+      fireEvent.click(screen.getByRole("button", { name: "All Projects" }));
+
+      expect(screen.getByText("Featured Project")).toBeInTheDocument();
+      expect(card("awesome-project")).toBeNull();
+      expect(card("cool-library")).toBeInTheDocument();
+    });
+
+    it("sits under the controls, so hiding it moves nothing above them", async () => {
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce(
+        pinnedResponse(),
+      );
+      render(<Projects />);
+      const spotlight = await screen.findByText("Featured Project");
+
+      const search = screen.getByRole("searchbox");
+      expect(
+        search.compareDocumentPosition(spotlight) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+
+  describe("Toggle state", () => {
+    it("says which view and which layout are on", async () => {
+      // The four toggles showed their state by colour alone: a screen reader
+      // heard four plain buttons, none of them on.
+      (global.fetch as unknown as MockedFetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            pinnedItems: {
+              edges: mockPinnedProjects.map((p) => ({ node: p })),
+            },
+          },
+        }),
+      });
+      mockProjectsContext.allProjects = mockAllProjects as never;
+
+      render(<Projects />);
+      const featured = await screen.findByRole("button", { name: "Featured" });
+      const all = screen.getByRole("button", { name: "All Projects" });
+      const grid = screen.getByRole("button", { name: "Grid view" });
+      const list = screen.getByRole("button", { name: "List view" });
+
+      expect(featured).toHaveAttribute("aria-pressed", "true");
+      expect(all).toHaveAttribute("aria-pressed", "false");
+      expect(grid).toHaveAttribute("aria-pressed", "true");
+      expect(list).toHaveAttribute("aria-pressed", "false");
+
+      fireEvent.click(list);
+      fireEvent.click(all);
+
+      expect(list).toHaveAttribute("aria-pressed", "true");
+      expect(grid).toHaveAttribute("aria-pressed", "false");
+      expect(all).toHaveAttribute("aria-pressed", "true");
+      expect(featured).toHaveAttribute("aria-pressed", "false");
     });
   });
 
@@ -757,17 +884,18 @@ describe("Projects Component", () => {
         ).toBeGreaterThan(0);
 
         // Stars and forks
-        expect(screen.getAllByText("120")).toHaveLength(2); // Featured + card
+        expect(screen.getAllByText("120")).toHaveLength(1); // the spotlight
         expect(screen.getAllByText("45")).toHaveLength(1);
-        expect(screen.getAllByText("15")).toHaveLength(2); // Featured + card
+        expect(screen.getAllByText("15")).toHaveLength(1); // the spotlight
         expect(screen.getAllByText("8")).toHaveLength(1);
       });
     });
 
     it("handles projects without descriptions", async () => {
+      // On a card: the spotlight (the most starred, index 0) is not one.
       const projectsWithoutDesc = [
-        { ...mockPinnedProjects[0], description: null },
-        mockPinnedProjects[1],
+        mockPinnedProjects[0],
+        { ...mockPinnedProjects[1], description: null },
       ];
 
       (global.fetch as unknown as MockedFetch).mockResolvedValueOnce({
@@ -998,6 +1126,135 @@ describe("Projects Component", () => {
         );
         expect(screen.getAllByText("cool-library").length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe("Project details", () => {
+    // A card's details open in one dialog above the page. They opened in a
+    // panel inside the grid item, which made the card grow with blank
+    // space, painted under the next row's card, and passed its links'
+    // clicks to that card. Keyboard users could not open it at all.
+    beforeEach(() => {
+      vi.spyOn(window, "scrollTo").mockImplementation(() => {}); // jsdom lacks it
+      (global.fetch as unknown as MockedFetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            pinnedItems: {
+              edges: mockPinnedProjects.map((p) => ({ node: p })),
+            },
+          },
+        }),
+      });
+    });
+    afterEach(() => {
+      resetMotionGateForTests();
+      document.body.style.overflow = "";
+    });
+
+    it("opens from a real button named after the repository", async () => {
+      render(<Projects />);
+
+      const button = await screen.findByRole("button", {
+        name: "cool-library",
+      });
+
+      expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    });
+
+    it("opens a dialog outside the card from a click anywhere on it", async () => {
+      const { container } = render(<Projects />);
+      await screen.findByText("A cool library for developers");
+
+      fireEvent.click(screen.getByText("A cool library for developers"));
+
+      const dialog = screen.getByRole("dialog", { name: "cool-library" });
+      expect(container).not.toContainElement(dialog);
+      const card = screen
+        .getAllByTestId("slide-in-up")
+        .find((item) => within(item).queryByText("cool-library"))!;
+      expect(within(card).queryByText("View on GitHub")).toBeNull();
+    });
+
+    it("opens from its focused button and gives the focus back on Escape", async () => {
+      // Enter and Space on a button are the browser's own click, which
+      // jsdom does not synthesize; the e2e test presses the keys. fireEvent
+      // throughout: userEvent.setup() replaces navigator.clipboard with a
+      // getter, and the setup file's next reassignment of it throws.
+      render(<Projects />);
+      const button = await screen.findByRole("button", {
+        name: "cool-library",
+      });
+      button.focus();
+
+      fireEvent.click(button);
+      expect(
+        screen.getByRole("dialog", { name: "cool-library" }),
+      ).toHaveFocus();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(button).toHaveFocus();
+    });
+
+    it("shows no empty Activity or Topics block for a pinned repository", async () => {
+      render(<Projects />);
+      await screen.findByText("A cool library for developers");
+
+      fireEvent.click(screen.getByText("A cool library for developers"));
+
+      expect(screen.queryByRole("heading", { name: /Activity/ })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /Topics/ })).toBeNull();
+    });
+
+    it("closes from its close button", async () => {
+      render(<Projects />);
+      await screen.findByText("A cool library for developers");
+      fireEvent.click(screen.getByText("A cool library for developers"));
+
+      fireEvent.click(screen.getByRole("button", { name: "Close details" }));
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("shows the full record of a repository in the All view", async () => {
+      mockProjectsContext.allProjects = mockAllProjects as never;
+      render(<Projects />);
+      fireEvent.click(await screen.findByText("All Projects"));
+
+      fireEvent.click(await screen.findByText("A useful Python tool"));
+
+      const dialog = screen.getByRole("dialog", { name: "python-tool" });
+      expect(within(dialog).getByText("90.0%")).toBeInTheDocument();
+      expect(within(dialog).getByText("Nov 20, 2023")).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("link", { name: /Live Demo/ }),
+      ).toHaveAttribute("href", "https://python-tool.example.com");
+    });
+
+    it("shows a pinned repository's full record once all are loaded", async () => {
+      mockProjectsContext.allProjects = mockAllProjects as never;
+      render(<Projects />);
+      await screen.findByText("A cool library for developers");
+
+      fireEvent.click(screen.getByText("A cool library for developers"));
+
+      const dialog = screen.getByRole("dialog", { name: "cool-library" });
+      expect(within(dialog).getByText("react")).toBeInTheDocument();
+      expect(within(dialog).getByText("Dec 15, 2023")).toBeInTheDocument();
+    });
+
+    it("keeps list rows as links to GitHub", async () => {
+      render(<Projects />);
+      await screen.findByText("A cool library for developers");
+
+      fireEvent.click(screen.getByLabelText("List view"));
+
+      expect(
+        screen.getByRole("link", { name: /cool-library/ }),
+      ).toHaveAttribute("href", "https://github.com/user/cool-library");
+      expect(screen.queryByRole("button", { name: "cool-library" })).toBeNull();
     });
   });
 });

@@ -1,4 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import {
   dismissToasts,
   ensureElementNotBlockedByToast,
@@ -26,34 +27,34 @@ const isCI = !!process.env.CI;
  * Not a test-mode backdoor: prefers-reduced-motion is a real setting real
  * visitors have, and the app honors it through useShouldReduceAnimations and
  * the reduced-motion block in globals.css. What it removes here is a confound
- * that has nothing to do with the terminal.
+ * that has nothing to do with the terminal: the animations' cost on a starved
+ * main thread.
  *
  * The webkit shard failed for weeks because clicks on the terminal toggle
- * timed out, and the cause turned out to be main-thread saturation rather than
- * anything about the toggle. Reproduced with chromium under CPU throttling,
- * measuring how long a setTimeout(0) waits its turn:
+ * timed out, and the cause turned out to be main-thread saturation rather
+ * than anything about the toggle. Measured again on 2026-10-12 with chromium
+ * under CPU throttling: from the toggle's click to the terminal on screen,
+ * and how late a setTimeout(0) fires (median).
  *
- *   plain,  20x   event-loop lag 2031ms   click times out, terminal never opens
- *   test mode, 20x               1827ms   ok
- *   reduced motion, 20x          1079ms   ok
+ *           motion                          reduced motion
+ *     4x    650-750ms, lag 21-24ms           400ms, lag 4ms
+ *    20x    30.9s, once not within 30s,      2.4s, lag 5ms
+ *           lag 130-165ms
  *
- * Halving the lag is what buys the click back. With reduced motion and the 25s
- * budget below, the click lands up to about 16x and not beyond:
+ * Until Playwright 1.64 none of that applied here: `reducedMotion` was not a
+ * test option, so the line below did nothing and the suite ran with motion
+ * from 2026-08-04 on. What brought the webkit shard back that day was the
+ * 25s click budget below; it failed again on 2026-08-08, waiting 5s for
+ * terminal output. The check in beforeEach keeps the option honest.
  *
- *      8x   ok,  7973ms       16x   ok, 24903ms
- *     12x   ok, 20233ms       20x   times out, 3 runs of 3
+ * This widens the range the suite survives; it does not remove the cliff.
+ * Past some throttle the page never becomes interactive, which is a real
+ * property of the site on slow hardware, not a timeout that wants raising. If
+ * this shard starts failing again, that is the thing to fix, and no test
+ * change will substitute for it.
  *
- * Be honest about what that means: this widens the range the suite survives,
- * from roughly 6x to roughly 16x. It does not remove the cliff. Past it the
- * page never becomes interactive at all - at 20x a 30s click budget and a 20s
- * settle both still fail - which is a real property of the site on slow
- * hardware, not a timeout that wants raising. If this shard starts failing
- * again, that is the thing to fix, and no test change will substitute for it.
- *
- * The animation cost that causes it is a real property of the site and is
- * guarded separately by the frame-budget test in performance.spec.ts. It is
- * not this file's job to re-test it, and letting it decide whether the
- * terminal suite runs cost five CI round trips.
+ * The animation cost itself is guarded separately by the frame-budget test in
+ * performance.spec.ts. It is not this file's job to re-test it.
  */
 test.describe("Terminal", () => {
   test.use({ reducedMotion: "reduce" });
@@ -84,6 +85,45 @@ test.describe("Terminal", () => {
     return terminal;
   };
 
+  /**
+   * The points of `panel` the terminal does not cover (2 px clear of its
+   * edge, where hit testing rounds) that hit something else, each named with
+   * what is there and the <body> child it belongs to.
+   */
+  const coveredPoints = (panel: Locator) =>
+    panel.evaluate((element) => {
+      const terminal = document
+        .querySelector('[data-testid="terminal"]')
+        ?.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const inset = Math.min(16, box.width / 4, box.height / 4);
+      const points = [
+        [box.left + inset, box.top + inset],
+        [box.right - inset, box.top + inset],
+        [box.left + inset, box.bottom - inset],
+        [box.right - inset, box.bottom - inset],
+        [box.left + box.width / 2, box.top + inset],
+      ].filter(
+        ([x, y]) =>
+          !terminal ||
+          x < terminal.left - 2 ||
+          x > terminal.right + 2 ||
+          y < terminal.top - 2 ||
+          y > terminal.bottom + 2,
+      );
+      if (points.length === 0) throw new Error("The terminal covers it all");
+      return points.flatMap(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        if (element.contains(hit)) return [];
+        const layer = hit?.closest("body > *");
+        return [
+          `(${Math.round(x)}, ${Math.round(y)}): ${hit?.tagName ?? "nothing"}` +
+            ` ${hit?.getAttribute("class") ?? ""}, in ${layer?.tagName ?? "?"}` +
+            ` ${layer?.getAttribute("class") ?? ""}`,
+        ];
+      });
+    });
+
   test.beforeEach(async ({ page, browserName, isMobile }) => {
     // Skip all terminal tests on mobile - terminal is desktop-only feature
     if (isMobile) {
@@ -108,6 +148,14 @@ test.describe("Terminal", () => {
     });
 
     await page.goto("/");
+    // The page this file is written for (see above). Asked for with an option
+    // the runner did not know, it ran with motion for two months.
+    expect(
+      await page.evaluate(
+        () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+      "the page prefers reduced motion",
+    ).toBe(true);
 
     // Firefox needs significantly more time to load and be interactive
     const loadTimeout = browserName === "firefox" ? 12000 : 8000;
@@ -1444,6 +1492,296 @@ test.describe("Terminal", () => {
     expect(await screen(page)).not.toContain(
       "notacommand987: command not found",
     );
+  });
+
+  test("lets Escape close what it opened, one panel at a time", async ({
+    page,
+  }) => {
+    // xterm cancelled Escape at its textarea, so the dashboard's "Press ESC
+    // to close" and the monitor's "ESC to close" did nothing while the
+    // terminal had focus, which is how both are opened.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+
+    await runCommand(page, "fps", /FPS monitor activated/);
+    const monitor = page.locator('[data-performance-monitor-active="true"]');
+    await expect(monitor).toBeVisible({ timeout: 15_000 });
+    await runCommand(page, "performance", /Performance dashboard opened/);
+    const dashboard = page.getByText("Terminal Access Only");
+    await expect(dashboard).toBeVisible({ timeout: 15_000 });
+    const input = page.locator(".xterm-helper-textarea").first();
+
+    await page.keyboard.press("Escape");
+    await expect(dashboard).toHaveCount(0);
+    await expect(monitor).toBeVisible();
+    await expect(input).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(monitor).toHaveCount(0);
+    await expect(input).toBeFocused();
+  });
+
+  test("opens the dashboard above the PDF reader, and leaves the reader its Escape", async ({
+    page,
+  }) => {
+    // Rendered in place at the reader's z-index, the dashboard painted
+    // under a reader already open (a portal puts the reader at the end of
+    // <body>); and an Escape typed in the reader closed the dashboard too.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+
+    // The reader, opened beside the terminal, which stays above it. A
+    // dispatched click: the terminal may cover the button.
+    await page
+      .getByRole("button", { name: /View Resume/ })
+      .first()
+      .dispatchEvent("click");
+    const reader = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(reader).toBeVisible({ timeout: 15_000 });
+
+    await runCommand(page, "performance", /Performance dashboard opened/);
+    const dashboard = page.getByRole("dialog", {
+      name: "Performance dashboard",
+    });
+    await expect(dashboard).toBeVisible();
+    // Once its entrance has settled: mid-spring, a point near its corner
+    // could fall on the terminal's edge.
+    await expect
+      .poll(() =>
+        dashboard.evaluate((panel) => getComputedStyle(panel).transform),
+      )
+      .toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+
+    // A point of the dashboard the terminal does not cover is its own. Each
+    // one that is not names what covers it.
+    expect(await coveredPoints(dashboard)).toEqual([]);
+
+    // Typed in the reader, Escape is the reader's alone.
+    await reader.focus();
+    await page.keyboard.press("Escape");
+    await expect(reader).toHaveCount(0);
+    await expect(dashboard).toBeVisible();
+  });
+
+  test("shows the performance monitor above the PDF reader", async ({
+    page,
+  }) => {
+    // Rendered in place at the reader's z-index, the monitor painted under a
+    // reader already open, as the dashboard had: every point of it was the
+    // reader's.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+    await page
+      .getByRole("button", { name: /View Resume/ })
+      .first()
+      .dispatchEvent("click");
+    await expect(
+      page.locator('[role="dialog"][aria-modal="true"]'),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await runCommand(page, "fps", /FPS monitor activated/);
+    const monitor = page.locator('[data-performance-monitor-active="true"]');
+    await expect(monitor).toBeVisible();
+    expect(await coveredPoints(monitor)).toEqual([]);
+  });
+
+  test.describe("at 1280 by 720", () => {
+    test.use({ viewport: { width: 1280, height: 720 } });
+
+    test("takes a click at the centre of the dashboard's close button", async ({
+      page,
+    }) => {
+      // Its "Press ESC to close" hint floated at the window's top right,
+      // after the panel: below 1920 px wide it lay over the header's minimize
+      // and close buttons, and at 1280 a click at the close button's centre
+      // landed on the hint.
+      await expectTerminalVisible(page);
+      await waitForTerminalReady(page);
+      await runCommand(page, "performance", /Performance dashboard opened/);
+      const dashboard = page.getByRole("dialog", {
+        name: "Performance dashboard",
+      });
+      await expect(dashboard).toBeVisible();
+
+      // Once the hint has finished appearing.
+      const hint = page.getByText(/Press\s*ESC\s*to close/);
+      await expect
+        .poll(() =>
+          hint.evaluate((element) => {
+            const style = getComputedStyle(element);
+            return (
+              style.opacity === "1" &&
+              ["none", "matrix(1, 0, 0, 1, 0, 0)"].includes(style.transform)
+            );
+          }),
+        )
+        .toBe(true);
+
+      const close = page.getByRole("button", {
+        name: "Close performance dashboard",
+      });
+      const box = await close.boundingBox();
+      if (!box) throw new Error("The close button has no box");
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(dashboard).toHaveCount(0);
+    });
+  });
+
+  test("moves between the monitor's views with the arrow keys", async ({
+    page,
+  }) => {
+    // Its views were seven toggle buttons: seven Tab stops, no arrows.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+    await runCommand(page, "fps", /FPS monitor activated/);
+    const details = page.getByRole("button", { name: "Performance details" });
+    await details.focus();
+    await page.keyboard.press("Space");
+    await expect(details).toHaveAttribute("aria-expanded", "true");
+
+    // One Tab stop for the views: the selected one (in macOS WebKit too,
+    // whose Tab skips plain buttons).
+    const selected = page.getByRole("tab", { selected: true });
+    for (let i = 0; i < 3; i++) {
+      if (await selected.evaluate((tab) => tab === document.activeElement)) {
+        break;
+      }
+      await page.keyboard.press("Tab");
+    }
+    await expect(selected).toBeFocused();
+    await expect(selected).toHaveAccessibleName(/^Overview/);
+
+    await page.keyboard.press("ArrowRight");
+    await expect(selected).toHaveAccessibleName(/^Web Vitals/);
+    await expect(selected).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(selected).toHaveAccessibleName(/^System/);
+    await page.keyboard.press("Home");
+    await expect(selected).toHaveAccessibleName(/^Overview/);
+    await expect(page.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      (await selected.getAttribute("id"))!,
+    );
+
+    const results = await new AxeBuilder({ page })
+      .include('[data-performance-monitor-active="true"]')
+      .withTags(["wcag2a", "wcag2aa"])
+      .analyze();
+    expect(
+      results.violations
+        .filter((violation) => violation.id.startsWith("aria"))
+        .map((violation) => violation.id),
+    ).toEqual([]);
+  });
+
+  test("keeps the performance tools readable", async ({ page }) => {
+    // Their text failed contrast in over 300 places: the monitor's gray-500
+    // on gray-900, the dashboard's -500 scores on light cards, the report's
+    // success text and badges. Contrast is enforced since (accessibility
+    // spec); these open from the terminal only.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+    const failures = async (selector: string) => {
+      // Faded in: axe measures a dialog mid-fade at its partial opacity.
+      await expect
+        .poll(() =>
+          page
+            .locator(selector)
+            .first()
+            .evaluate((element) => {
+              let opacity = 1;
+              for (
+                let node: Element | null = element;
+                node;
+                node = node.parentElement
+              ) {
+                opacity *= parseFloat(getComputedStyle(node).opacity);
+              }
+              return opacity;
+            }),
+        )
+        .toBe(1);
+      // And its colours settled: right after an arrow key, transition-colors
+      // had moved the new tab's background but not its text (#9ca3af on
+      // #1e40af, 3.43:1, WebKit), and with motion the scan read each change
+      // at its start, never a selected tab's own colours.
+      await page
+        .locator(selector)
+        .first()
+        .evaluate(async (element) => {
+          const running = document.getAnimations().filter((animation) => {
+            const target = (animation.effect as KeyframeEffect | null)?.target;
+            return (
+              animation.playState === "running" &&
+              target instanceof Element &&
+              element.contains(target) &&
+              // An endless one (a pulse) never finishes.
+              animation.effect?.getComputedTiming().endTime !== Infinity
+            );
+          });
+          await Promise.all(
+            running.map((animation) => animation.finished.catch(() => {})),
+          );
+        });
+      const results = await new AxeBuilder({ page })
+        .include(selector)
+        .withRules(["color-contrast"])
+        .analyze();
+      return results.violations.flatMap((violation) =>
+        violation.nodes.map(
+          (node) =>
+            `${node.target.join(" ")}: ${node.any[0]?.data?.contrastRatio}`,
+        ),
+      );
+    };
+
+    await runCommand(page, "fps", /FPS monitor activated/);
+    const details = page.getByRole("button", { name: "Performance details" });
+    await expect(details).toBeVisible();
+    await details.focus();
+    await page.keyboard.press("Space");
+    await page.getByRole("tab", { selected: true }).focus();
+    for (let view = 0; view < 7; view++) {
+      expect(
+        await failures('[data-performance-monitor-active="true"]'),
+        await page.getByRole("tab", { selected: true }).innerText(),
+      ).toEqual([]);
+      await page.keyboard.press("ArrowRight");
+    }
+
+    await runCommand(page, "performance", /Performance dashboard opened/);
+    // The terminal says so a moment before the dialog mounts.
+    await expect(
+      page.getByRole("dialog", { name: "Performance dashboard" }),
+    ).toBeVisible();
+    expect(
+      await failures('[role="dialog"][aria-label="Performance dashboard"]'),
+    ).toEqual([]);
+    await runCommand(page, "performance close", /closed/);
+
+    // Answered, not refused: a parallel run of this file once spent the API's
+    // rate limit before this request, which got a 429 (each test is its own
+    // client now, see utils/fixtures.ts).
+    const reportAnswer = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/performance-report" &&
+        response.request().method() === "POST",
+    );
+    await runCommand(
+      page,
+      "performance report",
+      /Generating performance report/,
+    );
+    await expect(
+      page.getByRole("dialog", { name: "Performance report" }),
+    ).toBeVisible();
+    expect((await reportAnswer).status(), "the report API's answer").toBe(200);
+    await expect(page.getByText("Report Generated Successfully")).toBeVisible({
+      timeout: 30_000,
+    });
+    expect(
+      await failures('[role="dialog"][aria-label="Performance report"]'),
+    ).toEqual([]);
   });
 
   test("should display colored output", async ({ page }) => {

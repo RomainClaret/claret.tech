@@ -348,15 +348,6 @@ describe("Home Page", () => {
   });
 
   describe("Performance Considerations", () => {
-    it("renders efficiently with mocked components", () => {
-      const startTime = Date.now();
-      render(<Home />);
-      const endTime = Date.now();
-
-      // With mocked components, rendering should be very fast
-      expect(endTime - startTime).toBeLessThan(100); // 100ms threshold
-    });
-
     it("maintains consistent section count", () => {
       const { container } = render(<Home />);
 

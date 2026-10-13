@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
+import { createPortal } from "react-dom";
 import { m, AnimatePresence } from "framer-motion";
 // Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import X from "lucide-react/dist/esm/icons/x";
@@ -84,12 +86,23 @@ export function PerformanceReportModal({
     _outputFormat: "ui",
   });
 
-  // Auto-generate report when modal opens
+  // Generates the report once each time it opens. It started a run whenever
+  // none was in flight and no report had come back, so a failed request
+  // (offline, the API's rate limit) started over every 2.2 s for as long as
+  // the dialog stayed open, each time with a new request, and its error
+  // never stayed up to be read. `performance report`, typed again, retries.
+  const requested = useRef(false);
   useEffect(() => {
-    if (isOpen && !reportGenerator.isGenerating && !reportData) {
-      reportGenerator.generateReport();
+    if (!isOpen) {
+      requested.current = false;
+      return;
     }
-  }, [isOpen, reportGenerator.isGenerating, reportData, reportGenerator]);
+    if (requested.current || reportData || reportGenerator.isGenerating) {
+      return;
+    }
+    requested.current = true;
+    reportGenerator.generateReport();
+  }, [isOpen, reportData, reportGenerator]);
 
   // Listen for report generation trigger
   useEffect(() => {
@@ -113,12 +126,23 @@ export function PerformanceReportModal({
     };
   }, [isOpen, reportGenerator]);
 
-  // Handle escape key
-  useEffect(() => {
+  // Escape in place before the browser paints the report: loaded lazily, a
+  // passive effect ran later, and an Escape pressed in between reached the
+  // performance monitor and closed it.
+  useIsomorphicLayoutEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
+      if (e.key !== "Escape" || !isOpen) return;
+      // Typed inside a modal dialog (the PDF reader), it is that dialog's:
+      // this panel, opened before it, listens first and closed with it.
+      if (
+        e.target instanceof Element &&
+        e.target.closest('[aria-modal="true"]')
+      ) {
+        return;
       }
+      // Used: the performance monitor, listening on window, leaves it.
+      e.preventDefault();
+      onClose();
     };
 
     if (isOpen) {
@@ -175,7 +199,9 @@ export function PerformanceReportModal({
     URL.revokeObjectURL(url);
   };
 
-  return (
+  // At the end of <body>, above a PDF reader already open (see
+  // PerformanceModal).
+  return createPortal(
     <AnimatePresence>
       <m.div
         className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -191,10 +217,14 @@ export function PerformanceReportModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
+          aria-hidden="true"
         />
 
-        {/* Modal */}
+        {/* A dialog, but not a modal one: it opens from the terminal, which
+            stays above it and keeps the focus. */}
         <m.div
+          role="dialog"
+          aria-label="Performance report"
           className={cn(
             "relative bg-background border border-border shadow-2xl",
             "w-[90vw] h-[90vh] max-w-4xl max-h-[90vh]",
@@ -223,23 +253,29 @@ export function PerformanceReportModal({
               {reportData && (
                 <div className="flex items-center gap-1">
                   <button
+                    type="button"
                     onClick={() => downloadReport("json")}
                     className="p-2 hover:bg-muted rounded-md transition-colors text-xs"
                     title="Download JSON"
+                    aria-label="Download JSON"
                   >
                     JSON
                   </button>
                   <button
+                    type="button"
                     onClick={() => downloadReport("html")}
                     className="p-2 hover:bg-muted rounded-md transition-colors text-xs"
                     title="Download HTML"
+                    aria-label="Download HTML"
                   >
                     HTML
                   </button>
                   <button
+                    type="button"
                     onClick={() => downloadReport("csv")}
                     className="p-2 hover:bg-muted rounded-md transition-colors text-xs"
                     title="Download CSV"
+                    aria-label="Download CSV"
                   >
                     CSV
                   </button>
@@ -248,22 +284,30 @@ export function PerformanceReportModal({
 
               {/* Close Button */}
               <button
+                type="button"
                 onClick={onClose}
                 className="p-2 hover:bg-destructive hover:text-destructive-foreground rounded-md transition-colors"
                 title="Close (ESC)"
+                aria-label="Close performance report"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-auto p-6">
+          {/* Content: a Tab stop of its own, as nothing in it takes focus. */}
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Report details"
+            className="flex-1 overflow-auto p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          >
             <reportGenerator.ProgressUI />
           </div>
         </m.div>
       </m.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, type ComponentProps } from "react";
+import { type ComponentProps } from "react";
+import { createPortal } from "react-dom";
 import type { PDFModal } from "./pdf-modal";
 import { loadPdfReader, loadedPdfReader } from "@/lib/pdf-reader-preload";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
+import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import { logError } from "@/lib/utils/dev-logger";
 import { reloadPage } from "@/lib/utils/reload-page";
 
@@ -30,52 +32,14 @@ function PdfReaderUnavailable({
   // screen reader users were left behind an aria-modal dialog. The dialog
   // itself takes focus: "Try again" is disabled while its first try runs.
   useOverlayLock(isOpen);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const dialogRef = useModalDialog<HTMLDivElement>(isOpen, onClose, {
+    lockScroll: true,
+  });
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onCloseRef.current();
-        return;
-      }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), [href]",
-      );
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      // Wrap at either end, and also from the dialog itself (where focus
-      // starts) or from outside it (where focus goes when "Try again" is
-      // disabled under it): there the browser's next stop is the page
-      // behind the aria-modal dialog.
-      const active = document.activeElement;
-      const adrift =
-        active === dialogRef.current || !dialogRef.current.contains(active);
-      if (adrift || active === (e.shiftKey ? first : last)) {
-        e.preventDefault();
-        (e.shiftKey ? last : first)?.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-      previous?.focus({ preventScroll: true });
-      window.scrollTo({ top: scrollY, behavior: "auto" });
-    };
-  }, [isOpen]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // At the end of <body>, as the reader it stands in for: in place, the
+  // cookie notice painted over it.
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div
         className="absolute inset-0 bg-background/80 backdrop-blur-sm"
         onClick={onClose}
@@ -130,7 +94,8 @@ function PdfReaderUnavailable({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

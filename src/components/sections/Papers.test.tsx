@@ -8,13 +8,13 @@ import {
   within,
 } from "@testing-library/react";
 import { Papers } from "./Papers";
+import { papersSection } from "@/data/portfolio";
 import {
   STATIC_PUBLICATIONS,
   exportToBibTeX,
   type Publication,
 } from "@/lib/api/fetch-publications";
 import {
-  FadeInProps,
   SlideInUpProps,
   NextImageProps,
   NextLinkProps,
@@ -156,13 +156,8 @@ vi.mock("@/lib/hooks/useColorExtraction", () => ({
 
 // Mock animated components
 vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children, className }: FadeInProps) => (
-    <div data-testid="fade-in" className={className}>
-      {children}
-    </div>
-  ),
-  SlideInUp: ({ children, delay, className }: SlideInUpProps) => (
-    <div data-testid="slide-in-up" data-delay={delay} className={className}>
+  SlideInUp: ({ children, className }: SlideInUpProps) => (
+    <div data-testid="slide-in-up" className={className}>
       {children}
     </div>
   ),
@@ -782,7 +777,7 @@ describe("Papers", () => {
 
     it("copies the BibTeX entry to clipboard for dynamic papers", async () => {
       // Mock clipboard API
-      const mockWriteText = vi.fn(() => Promise.resolve());
+      const mockWriteText = vi.fn((_text: string) => Promise.resolve());
       Object.assign(navigator, {
         clipboard: {
           writeText: mockWriteText,
@@ -839,6 +834,75 @@ describe("Papers", () => {
       expect(copied).toBe(
         "@inproceedings{test-doi-1,\n  title={Paper with DOI},\n  doi={10.1234/example.doi},\n}",
       );
+    });
+
+    // Clipboard access can be denied, or missing over plain http. The copy
+    // then fails quietly: no success mark for a copy that did not happen,
+    // and no unhandled rejection from the click.
+    async function clickBibTeXWithClipboardDenied(button: () => HTMLElement) {
+      const writeText = vi.fn(() => Promise.reject(new Error("denied")));
+      Object.assign(navigator, { clipboard: { writeText } });
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandled.push(reason);
+      process.on("unhandledRejection", onUnhandled);
+      try {
+        const target = button();
+        fireEvent.click(target);
+        await waitFor(() => expect(writeText).toHaveBeenCalled());
+        // Long enough for an unhandled rejection to be reported.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(within(target).queryByTestId("check-icon")).toBeNull();
+        expect(unhandled).toEqual([]);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
+    }
+
+    it("copies nothing quietly when a publication's BibTeX is refused by the clipboard", async () => {
+      const publications: Publication[] = [
+        {
+          id: "test-refused-1",
+          title: "Paper whose BibTeX is refused",
+          authors: ["Author A"],
+          venue: "Conference 2023",
+          year: "2023",
+          citations: 1,
+          abstract: "Abstract",
+          bibtex: "@inproceedings{test-refused-1}",
+          source: "static" as const,
+        },
+      ];
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({ publications, totalCitations: 1, count: 1 }),
+        } as Response),
+      );
+      render(<Papers />);
+      await waitFor(() => {
+        expect(
+          screen.getByText("Paper whose BibTeX is refused"),
+        ).toBeInTheDocument();
+      });
+
+      await clickBibTeXWithClipboardDenied(
+        () => screen.getAllByText("BibTeX")[0].closest("button")!,
+      );
+    });
+
+    it("copies nothing quietly when an Other Work card's BibTeX is refused by the clipboard", async () => {
+      const card = papersSection.papersCards[0] as { bibtex?: string };
+      card.bibtex = "@misc{claret2016blockchain}";
+      try {
+        render(<Papers />);
+        const cardRoot = document.getElementById("claret2016blockchain")!;
+
+        await clickBibTeXWithClipboardDenied(
+          () => within(cardRoot).getByText("BibTeX").closest("button")!,
+        );
+      } finally {
+        delete card.bibtex;
+      }
     });
 
     it("shows Code instead of Details when a publication has a code repository", async () => {
@@ -1179,20 +1243,6 @@ describe("Papers", () => {
   });
 
   describe("Animation and Performance", () => {
-    it("applies animation delays to cards", () => {
-      render(<Papers />);
-
-      const slideInElements = screen.getAllByTestId("slide-in-up");
-
-      // Cards should have staggered delays
-      const delays = slideInElements.map((el) =>
-        parseInt(el.getAttribute("data-delay") || "0"),
-      );
-
-      // Delays should be incremental
-      expect(delays.some((delay) => delay > 0)).toBe(true);
-    });
-
     it("reduces animations when requested", async () => {
       const { useShouldReduceAnimations } = await import(
         "@/lib/hooks/useSafari"
@@ -1289,19 +1339,16 @@ describe("Papers", () => {
       vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
         () => {},
       );
-      global.fetch = vi.fn((_url: RequestInfo | URL, init?: RequestInit) =>
-        Promise.resolve(
-          (init?.method === "POST"
-            ? { text: () => Promise.resolve("@article{x}") }
-            : {
-                json: () =>
-                  Promise.resolve({
-                    publications: mockPublications,
-                    totalCitations: 23,
-                    count: 2,
-                  }),
-              }) as Response,
-        ),
+      // Only the list: the export no longer posts the papers anywhere.
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: mockPublications,
+              totalCitations: 23,
+              count: 2,
+            }),
+        } as unknown as Response),
       );
       // Fake time that still moves on its own, so the fetches and waitFor
       // run as usual and the 40 s can be skipped.
@@ -1309,7 +1356,11 @@ describe("Papers", () => {
       try {
         render(<Papers />);
 
-        fireEvent.click(await screen.findByText("Export all as BibTeX"));
+        fireEvent.click(
+          await screen.findByText(
+            "Export peer-reviewed publications as BibTeX",
+          ),
+        );
         await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
 
         // Not at once: Safari may still be reading the URL after click().
@@ -1358,7 +1409,7 @@ describe("Papers", () => {
                     totalCitations: 23,
                     count: 2,
                   }),
-              }) as Response,
+              }) as unknown as Response,
         ),
       );
       global.fetch = fetchMock;
@@ -1366,7 +1417,12 @@ describe("Papers", () => {
         render(<Papers />);
         await screen.findByText("Neuroevolution Research Paper");
 
-        fireEvent.click(screen.getByText("Export all as BibTeX"));
+        // Named for what it exports: the peer-reviewed publications, not the
+        // Other Work cards (each has its own BibTeX copy button). It read
+        // "Export all as BibTeX".
+        fireEvent.click(
+          screen.getByText("Export peer-reviewed publications as BibTeX"),
+        );
         await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
 
         const posts = fetchMock.mock.calls.filter(

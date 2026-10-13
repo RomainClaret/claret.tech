@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PerformanceMonitor } from "./performance-monitor";
 import { usePerformanceMonitorContext } from "@/contexts/performance-monitor-context";
@@ -89,7 +89,9 @@ describe("PerformanceMonitor", () => {
     getMemoryStatus: vi.fn(() => "good"),
     getNetworkQuality: vi.fn(() => "excellent"),
     getCpuGrade: vi.fn(() => "A"),
+    getCpuStatus: vi.fn(() => "Normal"),
     getGpuGrade: vi.fn(() => "A+"),
+    getGpuTierLabel: vi.fn(() => "High-end"),
     getThermalState: vi.fn(() => "normal"),
     getRecommendations: vi.fn(() => []),
   };
@@ -196,7 +198,117 @@ describe("PerformanceMonitor", () => {
     });
   });
 
+  describe("Controls from the keyboard", () => {
+    it("opens its details with a real, stated button", () => {
+      // The expand control was a div: no keyboard, no name, no state.
+      render(<PerformanceMonitor />);
+
+      const details = screen.getByRole("button", {
+        name: "Performance details",
+      });
+      expect(details).toHaveAttribute("type", "button");
+      expect(details).toHaveAttribute("aria-expanded", "false");
+
+      fireEvent.click(details);
+
+      expect(details).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByLabelText("WebVitals")).toBeInTheDocument();
+    });
+
+    it("names its close button by what it does", () => {
+      // Its name was "×".
+      render(<PerformanceMonitor />);
+
+      const close = screen.getByRole("button", {
+        name: "Close performance monitor",
+      });
+      expect(close).toHaveAttribute("type", "button");
+      expect(close).toHaveAttribute("title", "Close performance monitor (ESC)");
+    });
+
+    it("shows its views as tabs: one selected, one Tab stop", () => {
+      // They were seven toggle buttons, seven Tab stops, no arrow keys.
+      render(<PerformanceMonitor />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Performance details" }),
+      );
+
+      const tablist = screen.getByRole("tablist", { name: "Monitor views" });
+      const tabs = within(tablist).getAllByRole("tab");
+      expect(tabs).toHaveLength(7);
+      const selected = screen.getByRole("tab", { selected: true });
+      expect(selected).toHaveAccessibleName(/^Overview/);
+      expect(tabs.filter((tab) => tab.tabIndex === 0)).toEqual([selected]);
+      const panel = screen.getByRole("tabpanel");
+      expect(panel).toHaveAttribute("aria-labelledby", selected.id);
+      expect(selected).toHaveAttribute("aria-controls", panel.id);
+    });
+
+    it("moves between its views with the arrow keys, Home and End", () => {
+      render(<PerformanceMonitor />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Performance details" }),
+      );
+      const selected = () => screen.getByRole("tab", { selected: true });
+
+      fireEvent.keyDown(selected(), { key: "ArrowRight" });
+      expect(selected()).toHaveAccessibleName(/^Web Vitals/);
+      expect(document.activeElement).toBe(selected());
+
+      fireEvent.keyDown(selected(), { key: "End" });
+      expect(selected()).toHaveAccessibleName(/^System/);
+      fireEvent.keyDown(selected(), { key: "ArrowRight" });
+      expect(selected()).toHaveAccessibleName(/^Overview/);
+      fireEvent.keyDown(selected(), { key: "ArrowLeft" });
+      expect(selected()).toHaveAccessibleName(/^System/);
+      fireEvent.keyDown(selected(), { key: "Home" });
+      expect(selected()).toHaveAccessibleName(/^Overview/);
+      expect(document.activeElement).toBe(selected());
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        selected().id,
+      );
+
+      fireEvent.click(screen.getByRole("tab", { name: /^Memory/ }));
+      expect(selected()).toHaveAccessibleName(/^Memory/);
+    });
+  });
+
+  describe("Tab counts", () => {
+    it("shows a count of 0 in its badge, not as a bare 0", () => {
+      // `{tab.count && …}` rendered the 0 itself, outside the badge.
+      mockUsePerformanceMonitor.mockReturnValue({
+        ...defaultPerformanceData,
+        resourceCount: 0,
+      });
+      render(<PerformanceMonitor />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Performance details" }),
+      );
+
+      const resources = screen.getByRole("tab", { name: /^Resources/ });
+      expect(within(resources).getByText("0").tagName).toBe("SPAN");
+      const bare = [...resources.childNodes].filter(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent === "0",
+      );
+      expect(bare).toHaveLength(0);
+    });
+  });
+
   describe("Component Rendering", () => {
+    it("opens at the end of the page's body, above a dialog already open", () => {
+      // Rendered in place at the PDF reader's z-index, it painted under a
+      // reader already open, which a portal puts at the end of <body>.
+      const { container } = render(<PerformanceMonitor />);
+
+      const monitor = document.querySelector<HTMLElement>(
+        '[data-performance-monitor-active="true"]',
+      );
+      expect(monitor).not.toBeNull();
+      expect(container).not.toContainElement(monitor);
+      expect(document.body.lastElementChild).toContainElement(monitor);
+    });
+
     it("renders without crashing", () => {
       render(<PerformanceMonitor />);
       expect(screen.getByText("60 FPS")).toBeInTheDocument(); // FPS display

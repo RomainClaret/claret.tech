@@ -103,6 +103,7 @@ jobs:
             config:
               - 'next.config.*'
               - 'tsconfig.json'
+              - 'tsconfig.test.json'
               - '.eslintrc.json'
               - '.eslintignore'
               - '.prettierignore'
@@ -140,11 +141,13 @@ jobs:
     timeout-minutes: 10
     needs: detect-changes
     # Config too: lint, format and type-check read .eslintrc.json,
-    # .prettierignore and tsconfig.json.
+    # .prettierignore, tsconfig.json and tsconfig.test.json. And the tests:
+    # type-check covers them (tests/e2e is outside has-code-changes).
     if: |
       always() && !cancelled() &&
       (needs.detect-changes.outputs.has-code-changes == 'true' ||
-       needs.detect-changes.outputs.config == 'true')
+       needs.detect-changes.outputs.config == 'true' ||
+       needs.detect-changes.outputs.tests == 'true')
     strategy:
       matrix:
         check: [lint, format, type-check]

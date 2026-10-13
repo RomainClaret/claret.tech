@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { latestEntry } from "@/lib/utils/intersection";
+import { accentStyle } from "@/components/ui/accent-text";
 
 interface BlogCardHolographicProps {
   title: string;
@@ -247,10 +248,10 @@ export function BlogCardHolographic({
                   </span>
                   {/* Article status tag */}
                   <span
-                    className="text-xs px-2 py-0.5 rounded-full font-medium"
+                    className="text-xs px-2 py-0.5 rounded-full font-medium accent-text"
                     style={{
+                      ...accentStyle(`rgb(${articleStatus.color})`),
                       backgroundColor: `rgba(${articleStatus.color}, 0.1)`,
-                      color: `rgb(${articleStatus.color})`,
                       border: `1px solid rgba(${articleStatus.color}, 0.3)`,
                     }}
                   >
@@ -375,10 +376,10 @@ export function BlogCardHolographic({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border"
+              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border accent-text"
               style={{
                 backgroundColor: `rgba(${nodeColor}, 0.15)`,
-                color: `rgb(${nodeColor})`,
+                ...accentStyle(`rgb(${nodeColor})`),
                 borderColor: `rgba(${nodeColor}, 0.3)`,
               }}
             >
@@ -403,10 +404,10 @@ export function BlogCardHolographic({
                   });
                 }
               }}
-              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border"
+              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border accent-text"
               style={{
                 backgroundColor: `rgba(${nodeColor}, 0.15)`,
-                color: `rgb(${nodeColor})`,
+                ...accentStyle(`rgb(${nodeColor})`),
                 borderColor: `rgba(${nodeColor}, 0.3)`,
               }}
               aria-label="Share blog post"
@@ -424,10 +425,10 @@ export function BlogCardHolographic({
               href={`https://medium.com/@romainclaret`}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border"
+              className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border accent-text"
               style={{
                 backgroundColor: `rgba(${nodeColor}, 0.15)`,
-                color: `rgb(${nodeColor})`,
+                ...accentStyle(`rgb(${nodeColor})`),
                 borderColor: `rgba(${nodeColor}, 0.3)`,
               }}
             >

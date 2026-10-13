@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   usePerformanceMonitor,
   type MonitoringOptions,
@@ -230,6 +231,23 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     },
   ] as const;
 
+  // The views are a tablist: one Tab stop, the arrow keys move between
+  // them, Home and End go to the ends, and each choice shows at once.
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const handleTabKeyDown = (event: KeyboardEvent, index: number) => {
+    const count = tabs.length;
+    const next = {
+      ArrowRight: (index + 1) % count,
+      ArrowLeft: (index - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    setActiveTab(tabs[next].id as TabType);
+    tabRefs.current[next]?.focus();
+  };
+
   const startPerformanceTest = () => {
     setIsTestRunning(true);
     setTestStartTime(Date.now());
@@ -253,7 +271,10 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     return Math.floor((Date.now() - testStartTime) / 1000);
   };
 
-  return (
+  // At the end of <body>, as the dashboard is: rendered in place, at the
+  // same z-index, it painted under a PDF reader already open, which a portal
+  // puts later in the document.
+  return createPortal(
     <div
       className={cn(
         "fixed top-4 right-4 z-[9999] bg-black/90 backdrop-blur-sm border border-gray-600 rounded-lg font-mono text-xs select-none",
@@ -265,6 +286,8 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     >
       {/* Compact View */}
       <div className="flex items-center justify-between">
+        {/* The readout is the mouse's larger target; the keyboard's is the
+            "Performance details" button beside the close button. */}
         <div
           className="flex items-center gap-2 cursor-pointer flex-1"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -293,19 +316,24 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <div
-            className="text-gray-400 text-[10px] cursor-pointer hover:text-gray-200 px-1"
+          <button
+            type="button"
             onClick={() => setIsExpanded(!isExpanded)}
+            aria-expanded={isExpanded}
+            aria-label="Performance details"
+            className="text-gray-400 text-[10px] cursor-pointer hover:text-gray-200 px-1"
           >
             {isExpanded ? "−" : "+"}
-          </div>
+          </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               hidePerformanceMonitor();
             }}
             className="text-gray-400 hover:text-red-400 text-[10px] px-1 transition-colors"
             title="Close performance monitor (ESC)"
+            aria-label="Close performance monitor"
           >
             ×
           </button>
@@ -316,11 +344,25 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
       {isExpanded && (
         <div className="p-4 max-h-[70vh] overflow-y-auto">
           {/* Tab Navigation */}
-          <div className="flex flex-wrap gap-1 mb-4 border-b border-gray-700 pb-2">
-            {tabs.map((tab) => (
+          <div
+            role="tablist"
+            aria-label="Monitor views"
+            className="flex flex-wrap gap-1 mb-4 border-b border-gray-700 pb-2"
+          >
+            {tabs.map((tab, index) => (
               <button
                 key={tab.id}
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
+                id={`performance-monitor-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls="performance-monitor-panel"
+                tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id as TabType)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
                 className={cn(
                   "px-2 py-1 text-[10px] rounded transition-colors",
                   activeTab === tab.id
@@ -329,10 +371,9 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 )}
               >
                 {tab.label}
-                {tab.count && (
-                  <span className="ml-1 text-[9px] opacity-75">
-                    {tab.count}
-                  </span>
+                {/* Not `tab.count &&`: a count of 0 rendered the 0 itself. */}
+                {tab.count !== null && tab.count !== "" && (
+                  <span className="ml-1 text-[9px]">{tab.count}</span>
                 )}
               </button>
             ))}
@@ -379,7 +420,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                       className="w-3 h-3 rounded"
                     />
                     <span
-                      className={enabled ? "text-gray-200" : "text-gray-500"}
+                      className={enabled ? "text-gray-200" : "text-gray-400"}
                     >
                       {key.charAt(0).toUpperCase() + key.slice(1)}
                     </span>
@@ -389,8 +430,15 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div className="space-y-3">
+          {/* Tab Content: the shown view, labelled by its tab. A Tab stop
+              of its own, so the keyboard reaches a view with no controls. */}
+          <div
+            role="tabpanel"
+            id="performance-monitor-panel"
+            aria-labelledby={`performance-monitor-tab-${activeTab}`}
+            tabIndex={0}
+            className="space-y-3 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          >
             {activeTab === "overview" && (
               <div className="space-y-3">
                 {/* Current Status */}
@@ -507,9 +555,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                       </div>
                     )}
 
-                    {cooldownActive && (
+                    {/* The cooldown also runs while animations are off; a
+                        pause is the part after "animations force". */}
+                    {cooldownActive && !isAutoDisabled && (
                       <div className="flex justify-between">
-                        <span className="text-blue-400">Cooldown:</span>
+                        <span className="text-blue-400">
+                          Auto-disable paused:
+                        </span>
                         <span className="text-blue-300">
                           {remainingCooldownMinutes}m
                         </span>
@@ -600,7 +652,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                       >
                         <div>
                           <div className="text-gray-300">{label}</div>
-                          <div className="text-[9px] text-gray-500">
+                          <div className="text-[9px] text-gray-400">
                             {target}
                           </div>
                         </div>
@@ -717,7 +769,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     >
                       {connectionType || "Unknown"}
                     </div>
-                    <div className="text-[9px] text-gray-500">
+                    <div className="text-[9px] text-gray-400">
                       {getNetworkQuality()}
                     </div>
                   </div>
@@ -1140,7 +1192,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
           </div>
 
           {/* Footer */}
-          <div className="pt-3 mt-3 border-t border-gray-700 text-gray-500 text-[9px] text-center">
+          <div className="pt-3 mt-3 border-t border-gray-700 text-gray-400 text-[9px] text-center">
             {process.env.NODE_ENV === "development"
               ? "Dev Mode"
               : "Terminal: fps"}{" "}
@@ -1148,6 +1200,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -14,11 +14,6 @@ vi.mock("@/data/portfolio", () => ({
   footerNote: { update: "2026-01-01" },
   socialMediaLinks: { display: false },
 }));
-vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
 vi.mock("@/lib/hooks/useSafari", () => ({
   useShouldReduceAnimations: () => false,
 }));

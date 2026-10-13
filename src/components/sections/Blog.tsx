@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FadeIn } from "@/components/ui/animated";
 import { BlogCardHolographic } from "@/components/ui/blog-card-holographic";
 import { blogSection } from "@/data/portfolio";
 import {
@@ -216,7 +215,7 @@ export function Blog() {
   return (
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
       <div className="lg:px-8">
-        <FadeIn className="text-center mb-12">
+        <div className="text-center mb-12">
           <h2 className="section-title-gradient">{blogSection.title}</h2>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
             <span className="text-primary font-semibold">
@@ -225,7 +224,7 @@ export function Blog() {
             {" • "}
             {blogSection.subtitle.normalText}
           </p>
-        </FadeIn>
+        </div>
 
         {loading ? (
           <div className="flex justify-center">
@@ -368,7 +367,7 @@ export function Blog() {
         {/* View all posts links */}
         {!displayStaticBlogs &&
           (allArticles.length > 6 || kudosArticles.length > 0) && (
-            <FadeIn className="text-center mt-12 space-y-4">
+            <div className="text-center mt-12 space-y-4">
               {mediumPosts.length > 0 && (
                 <div>
                   <a
@@ -419,7 +418,7 @@ export function Blog() {
                   </a>
                 </div>
               )}
-            </FadeIn>
+            </div>
           )}
       </div>
     </div>

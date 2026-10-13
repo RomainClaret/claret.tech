@@ -6,7 +6,6 @@ import {
   calculateTotalResearchYears,
   getFormattedResearchYears,
 } from "./experience-calculator";
-import { researchSection } from "@/data/sections/research";
 
 describe("experience-calculator", () => {
   beforeEach(() => {

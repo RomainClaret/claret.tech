@@ -61,10 +61,24 @@ const renderCookieNoticeAndWait = async (acknowledged = false) => {
   return result;
 };
 
+// The notice watches its own height; the global observer mocks are reset
+// between tests, so this file brings an inert one of its own.
+class InertObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+const OriginalResizeObserver = globalThis.ResizeObserver;
+
 describe("CookieNotice", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    globalThis.ResizeObserver =
+      InertObserver as unknown as typeof ResizeObserver;
 
     // Mock localStorage
     Object.defineProperty(window, "localStorage", {
@@ -88,6 +102,8 @@ describe("CookieNotice", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    globalThis.ResizeObserver = OriginalResizeObserver;
+    document.documentElement.style.removeProperty("--cookie-notice-height");
   });
 
   describe("Initial Display", () => {
@@ -329,6 +345,37 @@ describe("CookieNotice", () => {
   });
 
   describe("Accessibility", () => {
+    it("comes first in the page, as a region named for the site's cookies", async () => {
+      // GOV.UK's placement, before the skip links: keyboard and screen
+      // reader users meet it first, and once it is gone the next Tab goes
+      // on to the skip link. Last in <body>, it came after the whole page,
+      // and after "Got it!" WebKit sent the next Tab to the browser itself.
+      await renderCookieNoticeAndWait();
+
+      const region = screen.getByRole("region", {
+        name: "Cookies on claret.tech",
+      });
+      expect(document.body.firstElementChild).toContainElement(region);
+      expect(region).toHaveAttribute("data-nosnippet");
+    });
+
+    it("takes its place in the page away when it goes", async () => {
+      const first = await renderCookieNoticeAndWait();
+      const placed = document.body.firstElementChild;
+
+      fireEvent.click(screen.getByRole("button", { name: /Got it/ }));
+
+      expect(placed?.isConnected).toBe(false);
+      first.unmount();
+
+      // And when it unmounts while still showing.
+      const second = await renderCookieNoticeAndWait();
+      const again = document.body.firstElementChild;
+      expect(again).toContainElement(screen.getByText(/Cookie Selection/));
+      second.unmount();
+      expect(again?.isConnected).toBe(false);
+    });
+
     it("provides proper aria-labels for buttons", async () => {
       await renderCookieNoticeAndWait();
       expect(
@@ -340,6 +387,30 @@ describe("CookieNotice", () => {
       expect(
         screen.getByRole("button", { name: /Accept cookie notice/ }),
       ).toBeInTheDocument();
+    });
+
+    it("names its button by its visible text first", async () => {
+      // "Got it!" was named "Accept cookie notice" (WCAG 2.5.3, label in
+      // name): a voice command saying what is on screen missed it.
+      await renderCookieNoticeAndWait();
+
+      const accept = screen.getByRole("button", { name: /^Got it!/ });
+      expect(accept).toHaveTextContent("Got it!");
+    });
+
+    it("has the page keep clear of it while it shows", async () => {
+      // Fixed at the bottom, it covered the footer's legal links.
+      await renderCookieNoticeAndWait();
+      const root = document.documentElement;
+      expect(root.style.getPropertyValue("--cookie-notice-height")).toMatch(
+        /^\d+(\.\d+)?px$/,
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Accept cookie notice/ }),
+      );
+
+      expect(root.style.getPropertyValue("--cookie-notice-height")).toBe("");
     });
 
     it("uses button elements for interactive content", async () => {

@@ -3,20 +3,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Contact } from "./Contact";
 
 // Mock external components and utilities
-vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <div data-testid="fade-in" {...props}>
-      {children}
-    </div>
-  ),
-}));
-
 vi.mock("@/components/ui/education-style-card", () => ({
   EducationStyleCard: ({
     children,
@@ -29,20 +15,6 @@ vi.mock("@/components/ui/education-style-card", () => ({
       {children}
     </div>
   ),
-}));
-
-vi.mock("@/components/ui/protected-lucide-icon", () => ({
-  ProtectedLucideIcon: ({
-    Icon,
-    ...props
-  }: {
-    Icon?: React.ComponentType<unknown>;
-    [key: string]: unknown;
-  }) => {
-    if (!Icon) return <div data-testid="protected-icon" {...props} />;
-    const IconComponent = Icon;
-    return <IconComponent {...props} />;
-  },
 }));
 
 // Mock icons
@@ -200,12 +172,6 @@ describe("Contact Component", () => {
 
       expect(screen.getByText("Send me an email")).toBeInTheDocument();
       expect(screen.getByText("Connect on LinkedIn")).toBeInTheDocument();
-    });
-
-    it("wraps content in animation components", () => {
-      render(<Contact />);
-
-      expect(screen.getByTestId("fade-in")).toBeInTheDocument();
     });
 
     it("renders education style cards for each contact method", () => {

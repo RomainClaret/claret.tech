@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
+import { createPortal } from "react-dom";
 import { m, AnimatePresence, LazyMotion, domMax } from "framer-motion";
 // Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import X from "lucide-react/dist/esm/icons/x";
@@ -8,6 +10,7 @@ import Minimize2 from "lucide-react/dist/esm/icons/minimize-2";
 import Maximize2 from "lucide-react/dist/esm/icons/maximize-2";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { cn } from "@/lib/utils";
+import { lockPageScroll } from "@/lib/utils/scroll-lock";
 
 interface PerformanceModalProps {
   isOpen: boolean;
@@ -22,23 +25,35 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
-  // Handle escape key
-  useEffect(() => {
+  // Escape, and the scroll lock, in place before the browser paints the
+  // dashboard: loaded lazily, a passive effect ran later, and an Escape
+  // pressed in between reached the performance monitor and closed it.
+  useIsomorphicLayoutEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
+      if (e.key !== "Escape" || !isOpen) return;
+      // Typed inside a modal dialog (the PDF reader), it is that dialog's:
+      // this panel, opened before it, listens first and closed with it.
+      if (
+        e.target instanceof Element &&
+        e.target.closest('[aria-modal="true"]')
+      ) {
+        return;
       }
+      // Used: the performance monitor, listening on window, leaves it.
+      e.preventDefault();
+      onClose();
     };
 
+    // The page's scroll stays locked while the dashboard is open, counted
+    // with the dialogs': closing it over the PDF reader keeps the reader's.
+    const release = isOpen ? lockPageScroll() : null;
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = "hidden";
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
+      release?.();
     };
   }, [isOpen, onClose]);
 
@@ -52,7 +67,10 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  // At the end of <body>, as the site's dialogs are: rendered in place, at
+  // the same z-index, it painted under a PDF reader already open, which a
+  // portal puts later in the document.
+  return createPortal(
     // The one draggable element on the site: drag is in domMax, which the
     // app-wide LazyMotion (domAnimation) leaves out of the first load.
     <LazyMotion features={domMax}>
@@ -71,10 +89,15 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
+            aria-hidden="true"
           />
 
-          {/* Modal */}
+          {/* A dialog, but not a modal one: it opens from the terminal, which
+              stays above it and keeps the focus, and aria-modal would hide a
+              terminal that is still there. */}
           <m.div
+            role="dialog"
+            aria-label="Performance dashboard"
             className={cn(
               "relative bg-background border border-border shadow-2xl",
               "flex flex-col overflow-hidden",
@@ -122,26 +145,45 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* In the header, beside the buttons: floated at the window's
+                    top right, below 1920 px wide it lay over them, and at
+                    1280 it took a click at the close button's centre. */}
+                {!isMinimized && (
+                  <span className="mr-2 text-xs text-muted-foreground">
+                    Press{" "}
+                    <kbd className="rounded bg-muted px-1 py-0.5">ESC</kbd> to
+                    close
+                  </span>
+                )}
+
                 {/* Minimize/Maximize Button */}
                 <button
+                  type="button"
                   onClick={() => setIsMinimized(!isMinimized)}
                   className="p-2 hover:bg-muted rounded-md transition-colors"
                   title={isMinimized ? "Maximize" : "Minimize"}
+                  aria-label={
+                    isMinimized
+                      ? "Maximize performance dashboard"
+                      : "Minimize performance dashboard"
+                  }
                 >
                   {isMinimized ? (
-                    <Maximize2 className="w-4 h-4" />
+                    <Maximize2 className="w-4 h-4" aria-hidden="true" />
                   ) : (
-                    <Minimize2 className="w-4 h-4" />
+                    <Minimize2 className="w-4 h-4" aria-hidden="true" />
                   )}
                 </button>
 
                 {/* Close Button */}
                 <button
+                  type="button"
                   onClick={onClose}
                   className="p-2 hover:bg-destructive hover:text-destructive-foreground rounded-md transition-colors"
                   title="Close (ESC)"
+                  aria-label="Close performance dashboard"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -149,8 +191,13 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
             {/* Content */}
             <AnimatePresence>
               {!isMinimized && (
+                // A Tab stop of its own: nothing in the dashboard takes
+                // focus, so the keyboard could not scroll it.
                 <m.div
-                  className="flex-1 overflow-auto"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Dashboard metrics"
+                  className="flex-1 overflow-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -172,21 +219,9 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
               </div>
             )}
           </m.div>
-
-          {/* Instructions overlay (when open) */}
-          {!isMinimized && (
-            <m.div
-              className="absolute top-4 right-4 bg-black/80 text-white px-3 py-2 rounded-md text-sm"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              Press <kbd className="px-1 py-0.5 bg-white/20 rounded">ESC</kbd>{" "}
-              to close
-            </m.div>
-          )}
         </m.div>
       </AnimatePresence>
-    </LazyMotion>
+    </LazyMotion>,
+    document.body,
   );
 }

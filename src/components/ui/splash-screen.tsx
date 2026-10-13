@@ -16,6 +16,7 @@ import {
 } from "@/lib/utils/safari-detection";
 import { logError, logWarning } from "@/lib/utils/dev-logger";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
+import { lockPageScroll } from "@/lib/utils/scroll-lock";
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -166,6 +167,10 @@ export function SplashScreen({
       return;
     }
 
+    // No scrolling under the splash. Released as it leaves, to whatever the
+    // page had: it wrote "auto" there, which then stayed on the body.
+    const releaseScroll = lockPageScroll();
+
     // Reset progress to 0
     setIsReady(false);
 
@@ -223,15 +228,11 @@ export function SplashScreen({
       // Wait for exit animation to complete
       setTimeout(() => {
         setIsVisible(false);
-        // Ensure body scroll is enabled after splash
-        document.body.style.overflow = "auto";
+        releaseScroll();
         // Notify parent that splash screen is complete
         onComplete?.();
       }, 600);
     }, splashScreen.duration + 100); // Add small buffer to ensure progress reaches 100%
-
-    // Prevent scroll during splash
-    document.body.style.overflow = "hidden";
 
     return () => {
       clearTimeout(showTimer);
@@ -240,7 +241,7 @@ export function SplashScreen({
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      document.body.style.overflow = "auto";
+      releaseScroll();
     };
   }, [isMounted, onComplete, skip]);
 

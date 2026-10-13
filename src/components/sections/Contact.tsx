@@ -1,9 +1,7 @@
 "use client";
 
 import { contactInfo, socialMediaLinks } from "@/data/portfolio";
-import { FadeIn } from "@/components/ui/animated";
 import { Mail } from "lucide-react";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import Link from "next/link";
 import Image from "next/image";
 import { GitHubIcon, LinkedInIcon } from "@/components/icons";
@@ -42,7 +40,7 @@ export function Contact() {
       className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative"
     >
       <div className="lg:px-8">
-        <FadeIn className="text-center mb-12">
+        <div className="text-center mb-12">
           <h2 className="section-title-gradient">{contactInfo.title}</h2>
           <p className="text-lg text-muted-foreground">
             <span className="text-primary font-semibold">
@@ -51,7 +49,7 @@ export function Contact() {
             {" • "}
             {contactInfo.subtitle.normalText}
           </p>
-        </FadeIn>
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Column - Contact Options */}
@@ -93,8 +91,7 @@ export function Contact() {
                             }}
                             whileHover={{ scale: 1.1 }}
                           >
-                            <ProtectedLucideIcon
-                              Icon={Mail}
+                            <Mail
                               className="w-7 h-7"
                               style={{ color: `rgb(${CONTACT_COLORS.email})` }}
                             />

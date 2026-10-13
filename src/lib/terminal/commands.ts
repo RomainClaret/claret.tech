@@ -7,7 +7,6 @@ import type { LineMode } from "./line-mode";
 import { getUser, listUsernames } from "./users";
 import { contactInfo } from "@/data/sections/contact";
 import { socialMediaLinks } from "@/data/sections/social";
-import { generateASCIIProgressBar } from "@/components/ui/progress-bar";
 import { getSnapshot as getMotionGate } from "@/lib/utils/motion-gate";
 import { readStorage } from "@/lib/utils/safe-storage";
 
@@ -320,8 +319,8 @@ ${formatCommands(aiCommands)}
         };
 
       case "hide":
-        // Stop heavy monitoring and hide overlay
-        window.dispatchEvent(new CustomEvent("terminal-performance-close"));
+        // Stop heavy monitoring and hide everything it showed
+        window.dispatchEvent(new CustomEvent("terminal-performance-hide"));
         return {
           output:
             "🔇 Performance monitoring stopped\n" +
@@ -344,59 +343,19 @@ ${formatCommands(aiCommands)}
 
       case "close":
         window.dispatchEvent(new CustomEvent("terminal-performance-close"));
-        return { output: "Performance dashboard closed", success: true };
+        return {
+          output: "Performance dashboard and report closed",
+          success: true,
+        };
 
       case "report":
         // Start report generation process
         window.dispatchEvent(new CustomEvent("terminal-performance-report"));
 
-        // Set up progress monitoring
-        let progressOutput = "Generating performance report...\n";
-
-        // Listen for progress updates
-        const progressListener = (event: CustomEvent) => {
-          const { phase, progress } = event.detail || {};
-          progressOutput = `${phase}\n${generateASCIIProgressBar(progress)}\n`;
-        };
-
-        const completeListener = () => {
-          progressOutput =
-            "✅ Performance report generated successfully!\nUse 'performance' to view the full dashboard.";
-          window.removeEventListener(
-            "performance-report-progress",
-            progressListener as EventListener,
-          );
-          window.removeEventListener(
-            "performance-report-complete",
-            completeListener,
-          );
-        };
-
-        const errorListener = () => {
-          progressOutput =
-            "❌ Failed to generate performance report. Please try again.";
-          window.removeEventListener(
-            "performance-report-progress",
-            progressListener as EventListener,
-          );
-          window.removeEventListener("performance-report-error", errorListener);
-        };
-
-        window.addEventListener(
-          "performance-report-progress",
-          progressListener as EventListener,
-        );
-        window.addEventListener(
-          "performance-report-complete",
-          completeListener,
-        );
-        window.addEventListener("performance-report-error", errorListener);
-
+        // The modal shows the report's progress; the command only starts it.
         return {
-          output: progressOutput,
+          output: "Generating performance report...\n",
           success: true,
-          isAsync: true,
-          progressCallback: () => progressOutput,
         };
 
       case "help":
@@ -406,7 +365,7 @@ ${formatCommands(aiCommands)}
   performance hide       🔇 Disable all monitoring + hide overlay  
   performance status     📊 Check monitoring status (no performance impact)
   performance            📈 Open full performance dashboard
-  performance close      ❌ Close the dashboard
+  performance close      ❌ Close the dashboard and the report
   performance report     📋 Generate performance report
   performance help       ❓ Show this help
   
@@ -1166,7 +1125,7 @@ ${formatCommands(aiCommands)}
         "\x1b[1mANIMATION CONTROL\x1b[0m",
         "    play        🎬 Start background animations",
         "    stop        ⏸️  Stop background animations",
-        "    force       💪 Force-enable animations (overrides auto-disable protection)",
+        "    force       💪 Animations back on, auto-disable paused for 30 minutes",
         "",
         "\x1b[1mSTATUS & INFO\x1b[0m",
         "    status      📊 Show current quality mode and animation state",
@@ -1178,9 +1137,10 @@ ${formatCommands(aiCommands)}
         "    Maximum:    Rainbow gradients, particles, blur effects, thick strokes",
         "",
         "\x1b[1mAUTO-DISABLE PROTECTION\x1b[0m",
-        "    Animations automatically disable when FPS drops below 15 for 10+ seconds",
-        "    to protect device performance. Use 'force' to override this protection.",
-        "    A 30-minute cooldown prevents repeated auto-disables.",
+        "    At the battery saver tier, animations switch off when the frame rate",
+        "    stays below 25 fps (20 in Safari) for 5 seconds. 'force', or 'play'",
+        "    after it, switches them back on and pauses this for 30 minutes.",
+        "    A tier you pick yourself stays as picked; 'auto' hands it back.",
         "",
         "\x1b[1mEXAMPLES\x1b[0m",
         "    animations balanced     Switch to balanced quality mode",
@@ -1188,7 +1148,7 @@ ${formatCommands(aiCommands)}
         "    animations play         Start animations",
         "    animations stop         Stop animations",
         "    animations status       Show current quality and animation state",
-        "    animations force        Override auto-disable protection",
+        "    animations force        Animations back on, auto-disable paused 30 min",
       ],
 
       chat: [
@@ -1240,7 +1200,7 @@ ${formatCommands(aiCommands)}
         "    status      Check monitoring status (no performance impact)",
         "    (none)      Open performance dashboard",
         "    open        Open performance dashboard",
-        "    close       Close the dashboard",
+        "    close       Close the dashboard and the report",
         "    report      Generate performance report",
         "    help        Show performance command help",
         "",
@@ -1279,7 +1239,7 @@ ${formatCommands(aiCommands)}
         "    performance hide        Stop monitoring + release resources",
         "    performance status      Check monitoring status",
         "    performance             Open dashboard",
-        "    performance close       Close dashboard",
+        "    performance close       Close dashboard and report",
         "    performance report      Generate performance report",
       ],
 
@@ -1373,7 +1333,7 @@ ${formatCommands(aiCommands)}
 \x1b[1mAnimation Control:\x1b[0m
   play        Start background animations
   stop        Stop background animations
-  force       Force-enable animations (overrides auto-disable)
+  force       Animations back on, auto-disable paused for 30 minutes
   
 \x1b[1mStatus:\x1b[0m
   status      Show current quality and animation state`,
@@ -1474,7 +1434,7 @@ ${formatCommands(aiCommands)}
         }
         return {
           output:
-            "💪 Animations force-enabled! Auto-disable protection bypassed.",
+            "💪 Animations back on. Auto-disable is paused for 30 minutes.",
           success: true,
         };
 
@@ -1514,10 +1474,11 @@ ${formatCommands(aiCommands)}
             if (autoDisableStored) {
               const autoState = JSON.parse(autoDisableStored);
               statusInfo.isAutoDisabled = autoState.isAutoDisabled;
+              // From the clock alone: the stored flag can outlive the
+              // pause (a closed tab never runs the hook's timer that ends it).
               statusInfo.cooldownActive =
-                autoState.cooldownActive ||
-                (autoState.lastAutoDisableTime > 0 &&
-                  Date.now() - autoState.lastAutoDisableTime < 30 * 60 * 1000);
+                autoState.lastAutoDisableTime > 0 &&
+                Date.now() - autoState.lastAutoDisableTime < 30 * 60 * 1000;
 
               if (
                 statusInfo.cooldownActive &&
@@ -1548,6 +1509,8 @@ ${formatCommands(aiCommands)}
             maximum: "🚀",
           }[statusInfo.quality] || "⚖️";
 
+        // Each starts with the tier's name: printing the name before it read
+        // "Balanced (Balanced (key animations))".
         const qualityDesc =
           {
             battery: "Battery saver (minimal effects)",
@@ -1559,7 +1522,7 @@ ${formatCommands(aiCommands)}
         let output = `\x1b[1mQuality & Animation Status:\x1b[0m
 
 \x1b[1mQuality Mode:\x1b[0m
-  Current: ${qualityIcon} ${statusInfo.quality.charAt(0).toUpperCase() + statusInfo.quality.slice(1)} (${qualityDesc})
+  Current: ${qualityIcon} ${qualityDesc}
   Auto-Adjust: ${statusInfo.isQualityAuto ? "✅ Enabled" : "❌ Disabled"}
 
 \x1b[1mAnimation State:\x1b[0m
@@ -1567,8 +1530,10 @@ ${formatCommands(aiCommands)}
   Auto-Disabled: ${statusInfo.isAutoDisabled ? "⚠️  Yes (performance protection)" : "✅ No"}
   Effective State: ${effectiveState ? "🎬 Playing" : "⏸️  Stopped"}`;
 
-        if (statusInfo.cooldownActive) {
-          output += `\n  Cooldown: 🕐 ${statusInfo.remainingCooldown} minutes remaining`;
+        // The cooldown also runs while animations are auto-disabled; a pause
+        // is the part of it after "force", with animations back on.
+        if (statusInfo.cooldownActive && !statusInfo.isAutoDisabled) {
+          output += `\n  Auto-disable paused: 🕐 ${statusInfo.remainingCooldown} minutes left`;
         }
 
         output += `\n\n\x1b[1mQuality Commands:\x1b[0m
@@ -1582,8 +1547,8 @@ ${formatCommands(aiCommands)}
   animations play       - Enable animations
   animations stop       - Disable animations`;
 
-        if (statusInfo.isAutoDisabled || statusInfo.cooldownActive) {
-          output += `\n  animations force      - Override auto-disable protection`;
+        if (statusInfo.isAutoDisabled) {
+          output += `\n  animations force      - Animations back on, auto-disable paused 30 min`;
         }
 
         return {

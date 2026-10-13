@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { FadeIn, SlideInUp, ScaleIn } from "@/components/ui/animated";
+import { SlideInUp, ScaleIn } from "@/components/ui/animated";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -14,14 +14,14 @@ import {
   Grid,
   List,
   Calendar,
-  Code2,
   Sparkles,
   Zap,
   FileCode2,
   Activity,
 } from "lucide-react";
 import { ProjectFilter } from "@/components/ui/project-filter";
-import { useProjects } from "@/contexts/projects-context";
+import { ProjectDetailsDialog } from "@/components/ui/project-details-dialog";
+import { useProjects, type Repository } from "@/contexts/projects-context";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { m } from "framer-motion";
@@ -42,48 +42,6 @@ interface PinnedRepository {
   primaryLanguage: {
     name: string;
     color: string;
-  } | null;
-}
-
-interface Repository {
-  id: string;
-  name: string;
-  description: string | null;
-  url: string;
-  homepageUrl: string | null;
-  stargazerCount: number;
-  forkCount: number;
-  primaryLanguage: {
-    name: string;
-    color: string;
-  } | null;
-  languages?: {
-    edges: Array<{
-      node: {
-        name: string;
-        color: string;
-      };
-      size: number;
-    }>;
-  };
-  topics?: {
-    edges: Array<{
-      node: {
-        topic: {
-          name: string;
-        };
-      };
-    }>;
-  };
-  createdAt: string;
-  updatedAt: string;
-  pushedAt: string;
-  isPrivate: boolean;
-  isArchived: boolean;
-  diskUsage: number;
-  isFork: boolean;
-  parent?: {
-    nameWithOwner: string;
   } | null;
 }
 
@@ -121,7 +79,13 @@ export function Projects() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("featured");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
-  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  // The repository whose details are open, and the card's button, where
+  // focus goes back on close.
+  const [details, setDetails] = useState<{
+    project: Repository;
+    trigger: HTMLElement | null;
+  } | null>(null);
+  const closeDetails = useCallback(() => setDetails(null), []);
 
   // Fetch pinned projects
   useEffect(() => {
@@ -265,6 +229,31 @@ export function Projects() {
     return filtered;
   }, [currentProjects, selectedTech, searchQuery]);
 
+  // The featured project: a spotlight over the grid by default, and then
+  // not repeated as the grid's first card. While a search or a filter is on
+  // it steps aside, and the project is listed with the rest if it matches.
+  const spotlight = useMemo(() => {
+    if (pinnedProjects.length === 0) return null;
+    const chosen = projectsSection.featuredProject;
+    if (chosen && chosen !== "auto") {
+      return pinnedProjects.find((p) => p.name === chosen) ?? pinnedProjects[0];
+    }
+    // Auto: the project with the most stars.
+    return [...pinnedProjects].sort(
+      (a, b) => b.stargazers.totalCount - a.stargazers.totalCount,
+    )[0];
+  }, [pinnedProjects]);
+  const hero = searchQuery || selectedTech ? null : spotlight;
+  const gridProjects = useMemo(
+    () =>
+      hero
+        ? filteredProjects.filter(
+            (project) => project.id !== hero.id && project.url !== hero.url,
+          )
+        : filteredProjects,
+    [filteredProjects, hero],
+  );
+
   // Calculate statistics for all projects only
   const stats = useMemo(() => {
     // Use all projects if available, otherwise fall back to pinned projects
@@ -309,7 +298,7 @@ export function Projects() {
   return (
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
       <div className="lg:px-8">
-        <FadeIn className="text-center mb-8 sm:mb-12">
+        <div className="text-center mb-8 sm:mb-12">
           <h2 className="section-title-gradient">{projectsSection.title}</h2>
           <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto">
             <span className="text-primary font-semibold">
@@ -318,7 +307,7 @@ export function Projects() {
             {" • "}
             {projectsSection.subtitle.normalText}
           </p>
-        </FadeIn>
+        </div>
 
         {/* Statistics */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 mb-8 sm:mb-12">
@@ -335,7 +324,7 @@ export function Projects() {
 
           <HolographicStatsCard glowColor="250, 204, 21" delay={0.15}>
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-yellow-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-yellow-700 dark:text-yellow-400 mb-0.5 sm:mb-1">
                 {stats.totalStars}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -346,7 +335,7 @@ export function Projects() {
 
           <HolographicStatsCard glowColor="34, 197, 94" delay={0.2}>
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400 mb-0.5 sm:mb-1">
                 {stats.totalForks}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -357,7 +346,7 @@ export function Projects() {
 
           <HolographicStatsCard glowColor="139, 92, 246" delay={0.25}>
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-purple-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-700 dark:text-purple-400 mb-0.5 sm:mb-1">
                 {stats.languageCount}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -367,9 +356,112 @@ export function Projects() {
           </HolographicStatsCard>
         </div>
 
+        {/* Controls: above the spotlight, which a search or a filter
+            hides, so nothing above them moves as they are used. */}
+        <div className="mb-8 space-y-4">
+          {/* View Mode Toggle */}
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={viewMode === "featured"}
+                onClick={() => setViewMode("featured")}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium transition-all duration-200",
+                  viewMode === "featured"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+              >
+                <Sparkles
+                  className="w-4 h-4 inline-block mr-2"
+                  aria-hidden="true"
+                />
+                Featured
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "all"}
+                onClick={() => setViewMode("all")}
+                className={cn(
+                  "px-4 py-2 rounded-lg font-medium transition-all duration-200",
+                  viewMode === "all"
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+              >
+                <Grid
+                  className="w-4 h-4 inline-block mr-2"
+                  aria-hidden="true"
+                />
+                All Projects
+              </button>
+            </div>
+
+            {/* Layout Toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={layoutMode === "grid"}
+                onClick={() => setLayoutMode("grid")}
+                className={cn(
+                  "p-2 rounded-lg transition-all duration-200",
+                  layoutMode === "grid"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+                aria-label="Grid view"
+              >
+                <Grid className="w-4 h-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={layoutMode === "list"}
+                onClick={() => setLayoutMode("list")}
+                className={cn(
+                  "p-2 rounded-lg transition-all duration-200",
+                  layoutMode === "list"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
+                )}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <label htmlFor="project-search" className="sr-only">
+              Search projects
+            </label>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              id="project-search"
+              name="project-search"
+              type="search"
+              autoComplete="off"
+              placeholder="Search projects by name, description, or topics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+            />
+          </div>
+
+          {/* Technology Filter */}
+          {uniqueTechnologies.length > 0 && (
+            <ProjectFilter
+              technologies={uniqueTechnologies}
+              selectedTech={selectedTech}
+              onSelectTech={setSelectedTech}
+            />
+          )}
+        </div>
+
         {/* Featured Project Hero */}
-        {pinnedProjects.length > 0 && (
-          <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-10">
+        {hero && (
+          <SlideInUp className="mb-8 sm:mb-16 relative z-10">
             <m.div
               className="relative"
               whileHover={{ scale: 1.01 }}
@@ -384,28 +476,8 @@ export function Projects() {
                 </span>
               </div>
 
-              {/* Get the featured project based on configuration */}
               {(() => {
-                let featuredProject: PinnedRepository;
-
-                // Check if manual selection is configured
-                if (
-                  projectsSection.featuredProject &&
-                  projectsSection.featuredProject !== "auto" &&
-                  projectsSection.featuredProject !== null
-                ) {
-                  // Try to find the manually specified project
-                  const manualProject = pinnedProjects.find(
-                    (p) => p.name === projectsSection.featuredProject,
-                  );
-                  featuredProject = manualProject || pinnedProjects[0];
-                } else {
-                  // Auto mode: select project with most stars
-                  featuredProject = [...pinnedProjects].sort(
-                    (a, b) => b.stargazers.totalCount - a.stargazers.totalCount,
-                  )[0];
-                }
-
+                const featuredProject = hero;
                 const projectColor = getProjectColor(
                   featuredProject.primaryLanguage?.color,
                   featuredProject.primaryLanguage?.name,
@@ -458,7 +530,7 @@ export function Projects() {
 
                         {/* Visual Representation */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                          <ScaleIn delay={300}>
+                          <ScaleIn>
                             <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
@@ -479,7 +551,7 @@ export function Projects() {
                               </p>
                             </m.div>
                           </ScaleIn>
-                          <ScaleIn delay={350}>
+                          <ScaleIn>
                             <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
@@ -500,7 +572,7 @@ export function Projects() {
                               </p>
                             </m.div>
                           </ScaleIn>
-                          <ScaleIn delay={400}>
+                          <ScaleIn>
                             <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
@@ -527,7 +599,7 @@ export function Projects() {
                               </p>
                             </m.div>
                           </ScaleIn>
-                          <ScaleIn delay={450}>
+                          <ScaleIn>
                             <m.div
                               className="bg-card rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[100px] sm:min-h-[120px] flex flex-col justify-between"
                               whileHover={{ scale: 1.05 }}
@@ -572,94 +644,6 @@ export function Projects() {
           </SlideInUp>
         )}
 
-        {/* Controls */}
-        <FadeIn delay={200} className="mb-8 space-y-4">
-          {/* View Mode Toggle */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode("featured")}
-                className={cn(
-                  "px-4 py-2 rounded-lg font-medium transition-all duration-200",
-                  viewMode === "featured"
-                    ? "bg-primary text-primary-foreground shadow-lg"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-              >
-                <Sparkles className="w-4 h-4 inline-block mr-2" />
-                Featured
-              </button>
-              <button
-                onClick={() => setViewMode("all")}
-                className={cn(
-                  "px-4 py-2 rounded-lg font-medium transition-all duration-200",
-                  viewMode === "all"
-                    ? "bg-primary text-primary-foreground shadow-lg"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-              >
-                <Grid className="w-4 h-4 inline-block mr-2" />
-                All Projects
-              </button>
-            </div>
-
-            {/* Layout Toggle */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setLayoutMode("grid")}
-                className={cn(
-                  "p-2 rounded-lg transition-all duration-200",
-                  layoutMode === "grid"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-                aria-label="Grid view"
-              >
-                <Grid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setLayoutMode("list")}
-                className={cn(
-                  "p-2 rounded-lg transition-all duration-200",
-                  layoutMode === "list"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-                aria-label="List view"
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative">
-            <label htmlFor="project-search" className="sr-only">
-              Search projects
-            </label>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <input
-              id="project-search"
-              name="project-search"
-              type="search"
-              autoComplete="off"
-              placeholder="Search projects by name, description, or topics..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-            />
-          </div>
-
-          {/* Technology Filter */}
-          {uniqueTechnologies.length > 0 && (
-            <ProjectFilter
-              technologies={uniqueTechnologies}
-              selectedTech={selectedTech}
-              onSelectTech={setSelectedTech}
-            />
-          )}
-        </FadeIn>
-
         {/* Loading indicator for all projects */}
         {(loadingAll ||
           (viewMode === "all" &&
@@ -699,7 +683,7 @@ export function Projects() {
               </button>
             </p>
           </div>
-        ) : (
+        ) : gridProjects.length === 0 ? null : (
           <div
             className={cn(
               layoutMode === "grid"
@@ -707,23 +691,36 @@ export function Projects() {
                 : "space-y-4",
             )}
           >
-            {filteredProjects.map((project, index) => (
-              <SlideInUp
-                key={project.id}
-                delay={Math.min(index * 50, 300)}
-                className="group"
-              >
+            {gridProjects.map((project) => (
+              <SlideInUp key={project.id} className="group">
                 {layoutMode === "grid" ? (
                   <m.div
                     className="relative h-full cursor-pointer"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    onClick={() =>
-                      setExpandedProject(
-                        expandedProject === project.id ? null : project.id,
-                      )
-                    }
-                    style={{ willChange: "transform" }}
+                    // A click anywhere on the card opens its details, as the
+                    // button on its name does (Enter and Space come from
+                    // there). No will-change: it made every card a stacking
+                    // context and a layer of its own.
+                    onClick={(event) => {
+                      const card = event.currentTarget;
+                      const trigger = card.querySelector<HTMLElement>(
+                        '[aria-haspopup="dialog"]',
+                      );
+                      // A drag that selected text is not asking for details.
+                      const selection = window.getSelection();
+                      const selecting =
+                        !!selection &&
+                        !selection.isCollapsed &&
+                        card.contains(selection.anchorNode);
+                      if (
+                        selecting &&
+                        !trigger?.contains(event.target as Node)
+                      ) {
+                        return;
+                      }
+                      setDetails({ project, trigger });
+                    }}
                   >
                     <HolographicCard
                       glowColor={getProjectColor(
@@ -731,7 +728,6 @@ export function Projects() {
                         project.primaryLanguage?.name,
                       )}
                       className="h-full"
-                      isActive={expandedProject === project.id}
                     >
                       <div className="h-full p-3 sm:p-4 md:p-6 flex flex-col">
                         {/* Project Header */}
@@ -777,20 +773,42 @@ export function Projects() {
                               }}
                             />
                           </div>
+                          {/* No min-w-0 and no break-words: a long name breaks
+                              at its hyphens. With them it broke inside a word
+                              on phones ("optimizatio", "n-studies"); a name
+                              with no hyphen is clipped by the card, and the
+                              dialog shows it whole. */}
                           <div className="flex-1">
-                            <h3 className="text-base sm:text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
-                              {project.name}
+                            <h3 className="text-base sm:text-lg md:text-xl font-bold mb-1">
+                              <button
+                                type="button"
+                                aria-haspopup="dialog"
+                                className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                              >
+                                <span className="bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                                  {project.name}
+                                </span>
+                              </button>
                             </h3>
-                            <span className="text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span
+                              aria-hidden="true"
+                              className="text-xs text-primary opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                            >
                               Click to explore
                             </span>
                           </div>
                         </div>
 
-                        {/* Description */}
-                        <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 flex-grow line-clamp-2 sm:line-clamp-3">
-                          {project.description || "No description available."}
-                        </p>
+                        {/* Description. The wrapper takes the row's spare
+                            height: on the clamped paragraph, flex-grow
+                            stretched it past its clamp next to a taller
+                            card, and the lines after the ellipsis showed in
+                            the extra height (5 under a 2-line clamp). */}
+                        <div className="flex-grow mb-3 sm:mb-4">
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-3">
+                            {project.description || "No description available."}
+                          </p>
+                        </div>
 
                         {/* Topics - Hidden on mobile for space */}
                         {project.topics && project.topics.edges.length > 0 && (
@@ -869,147 +887,6 @@ export function Projects() {
                         </div>
                       </div>
                     </HolographicCard>
-
-                    {/* Expanded Details */}
-                    {expandedProject === project.id && (
-                      <FadeIn className="mt-4 bg-card rounded-xl p-6 border border-border">
-                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                          {project.description ||
-                            "No detailed description available."}
-                        </p>
-
-                        {/* Topics/Tags */}
-                        {project.topics && project.topics.edges.length > 0 && (
-                          <div className="mb-4">
-                            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                              <Sparkles className="w-4 h-4 text-primary" />
-                              Topics
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {project.topics.edges.map((edge, i) => (
-                                <span
-                                  key={i}
-                                  className="px-2.5 py-1 text-xs rounded-lg font-medium"
-                                  style={{
-                                    backgroundColor: `rgba(${getProjectColor(
-                                      project.primaryLanguage?.color,
-                                      project.primaryLanguage?.name,
-                                    )}, 0.1)`,
-                                    color: `rgb(${getProjectColor(
-                                      project.primaryLanguage?.color,
-                                      project.primaryLanguage?.name,
-                                    )})`,
-                                    border: `1px solid rgba(${getProjectColor(
-                                      project.primaryLanguage?.color,
-                                      project.primaryLanguage?.name,
-                                    )}, 0.3)`,
-                                  }}
-                                >
-                                  {edge.node.topic.name}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Language Breakdown */}
-                        {project.languages &&
-                          project.languages.edges.length > 1 && (
-                            <div className="mb-4">
-                              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                <Code2 className="w-4 h-4 text-primary" />
-                                Languages
-                              </h4>
-                              <div className="flex flex-wrap gap-3">
-                                {project.languages.edges.map((edge, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex items-center gap-1.5 text-sm"
-                                  >
-                                    <span
-                                      className="w-3 h-3 rounded-full"
-                                      style={{
-                                        backgroundColor:
-                                          edge.node.color || "#666",
-                                      }}
-                                    />
-                                    <span className="text-muted-foreground">
-                                      {edge.node.name}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                        {/* Activity Info */}
-                        <div className="mb-4">
-                          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-primary" />
-                            Activity
-                          </h4>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            {project.createdAt && (
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Created:{" "}
-                                </span>
-                                <span className="font-medium">
-                                  {new Date(
-                                    project.createdAt,
-                                  ).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                            )}
-                            {project.pushedAt && (
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Last push:{" "}
-                                </span>
-                                <span className="font-medium">
-                                  {new Date(
-                                    project.pushedAt,
-                                  ).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Links */}
-                        <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
-                          <Link
-                            href={project.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline transition-colors font-medium"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            View on GitHub
-                          </Link>
-                          {project.homepageUrl && (
-                            <Link
-                              href={project.homepageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline transition-colors font-medium"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              Live Demo
-                            </Link>
-                          )}
-                        </div>
-                      </FadeIn>
-                    )}
                   </m.div>
                 ) : (
                   <m.div
@@ -1084,8 +961,26 @@ export function Projects() {
           </div>
         )}
 
+        {/* Rendered once, outside every card: React events bubble through
+            a portal along the component tree, so inside a card's onClick
+            wrapper every click in the dialog would reach the card. A pinned
+            repository shows its full record once all are loaded. */}
+        {details && (
+          <ProjectDetailsDialog
+            project={
+              allProjects.find(
+                (candidate) =>
+                  candidate.id === details.project.id ||
+                  candidate.url === details.project.url,
+              ) ?? details.project
+            }
+            returnFocus={details.trigger}
+            onClose={closeDetails}
+          />
+        )}
+
         {/* GitHub Profile Link */}
-        <FadeIn delay={300} className="text-center mt-12">
+        <div className="text-center mt-12">
           <Link
             href={`https://github.com/${process.env.NEXT_PUBLIC_GH_USERNAME || "RomainClaret"}`}
             target="_blank"
@@ -1095,7 +990,7 @@ export function Projects() {
             <i className="fab fa-github text-xl" aria-hidden="true" />
             Follow me on GitHub for more
           </Link>
-        </FadeIn>
+        </div>
       </div>
     </div>
   );

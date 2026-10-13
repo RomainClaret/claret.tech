@@ -43,7 +43,7 @@ export function FloatingNav() {
   const showLatestButton = isInitialized && currentIndex < sections.length - 1;
 
   return (
-    <div className="fixed bottom-8 right-8 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-[calc(2rem_+_var(--cookie-notice-height,0px))] right-8 z-40 flex flex-col items-end gap-3">
       {/* Section Dots Indicator */}
       <div className="relative mb-2 group">
         <div className="flex flex-col items-center gap-1.5">

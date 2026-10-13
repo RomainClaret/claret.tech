@@ -75,6 +75,11 @@ export default defineConfig(({ mode: _mode }) => {
         exclude: [
           "node_modules/",
           ".next/",
+          // Vendored and served as is (Pyodide, the pdf.js worker): v8 read
+          // each one for the report and printed an ENOENT per missing
+          // source map. The one tested file, sw.js, runs through
+          // `new Function`, which v8 cannot attribute to it anyway.
+          "public/",
           "src/test/",
           "**/*.d.ts",
           "**/*.config.*",

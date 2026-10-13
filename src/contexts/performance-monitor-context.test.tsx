@@ -1,7 +1,14 @@
 // Performance Monitor Context Tests - Uses Error Boundary Utilities
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { ReactNode } from "react";
+import {
+  renderHook,
+  act,
+  render,
+  screen,
+  fireEvent,
+} from "@testing-library/react";
+import { ReactNode, useEffect, useState } from "react";
+import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import {
   PerformanceMonitorProvider,
   usePerformanceMonitorContext,
@@ -624,6 +631,50 @@ describe("PerformanceMonitorContext", () => {
       expect(result.current.isDashboardOpen).toBe(false);
     });
 
+    it("closes the report too on the terminal's close command", () => {
+      // Nothing in the terminal closed the report: "performance close" left
+      // it open, still generating.
+      const { result } = renderHook(() => usePerformanceMonitorContext(), {
+        wrapper: createWrapper(),
+      });
+      act(() => {
+        result.current.showDashboard();
+        result.current.generateReport();
+      });
+      expect(result.current.isReportModalOpen).toBe(true);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent("terminal-performance-close"));
+      });
+
+      expect(result.current.isDashboardOpen).toBe(false);
+      expect(result.current.isReportModalOpen).toBe(false);
+      expect(result.current.isGeneratingReport).toBe(false);
+    });
+
+    it("hides everything and stops monitoring on the terminal's hide command", () => {
+      // "performance hide" printed "Performance monitoring stopped" and
+      // "Overlay hidden" but closed the dashboard alone.
+      const { result } = renderHook(() => usePerformanceMonitorContext(), {
+        wrapper: createWrapper(),
+      });
+      act(() => {
+        result.current.showPerformanceMonitor();
+        result.current.enableAllMonitoring();
+        result.current.showDashboard();
+      });
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent("terminal-performance-hide"));
+      });
+
+      expect(result.current.isMonitorActive).toBe(false);
+      expect(result.current.isDashboardOpen).toBe(false);
+      expect(result.current.monitoringOptions.cpu).toBe(false);
+      expect(result.current.monitoringOptions.memory).toBe(false);
+      expect(result.current.monitoringOptions.webVitals).toBe(false);
+    });
+
     it("responds to terminal performance report command", () => {
       const { result } = renderHook(() => usePerformanceMonitorContext(), {
         wrapper: createWrapper(),
@@ -791,5 +842,47 @@ describe("PerformanceMonitorContext", () => {
       // This test confirms the error message is correct, validating the error handling logic
       // without causing uncaught exception propagation in the test environment
     });
+  });
+});
+
+// Outside the describe above, whose beforeEach swaps window's listeners for
+// a Map: this needs the real bubbling from the dialog to window.
+describe("Escape with a dialog open over the performance monitor", () => {
+  function Dialog({ onClose }: { onClose: () => void }) {
+    const ref = useModalDialog(true, onClose);
+    return <div ref={ref} role="dialog" aria-label="Paper" tabIndex={-1} />;
+  }
+
+  function Page() {
+    const { isMonitorActive, showPerformanceMonitor } =
+      usePerformanceMonitorContext();
+    const [open, setOpen] = useState(true);
+    useEffect(() => showPerformanceMonitor(), [showPerformanceMonitor]);
+    return (
+      <>
+        <output data-testid="monitor">{isMonitorActive ? "on" : "off"}</output>
+        {open && <Dialog onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
+
+  it("closes the dialog alone, and the next Escape the monitor", () => {
+    // The monitor listens on window, after the dialog's document listener:
+    // one Escape closed the dialog and hid the monitor with it.
+    render(
+      <PerformanceMonitorProvider>
+        <Page />
+      </PerformanceMonitorProvider>,
+    );
+    expect(screen.getByTestId("monitor")).toHaveTextContent("on");
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("monitor")).toHaveTextContent("on");
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    expect(screen.getByTestId("monitor")).toHaveTextContent("off");
   });
 });

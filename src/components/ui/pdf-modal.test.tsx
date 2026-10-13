@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { PDFModal } from "./pdf-modal";
 
-// Mock PDFViewer component
+// Mock PDFViewer component: a control of its toolbar, and a link of the
+// document as pdf.js renders it, in a section with tabindex 1000.
 vi.mock("./pdf-viewer", () => ({
   PDFViewer: vi.fn(({ url, title, downloadFileName, inModal }) => (
     <div
@@ -13,9 +14,16 @@ vi.mock("./pdf-viewer", () => ({
       data-in-modal={inModal}
     >
       PDF Viewer Content
+      <button type="button">Zoom in</button>
+      <section tabIndex={1000}>
+        <a href="https://doi.org/10.1000/1">DOI</a>
+      </section>
     </div>
   )),
 }));
+
+const tab = (shiftKey = false) =>
+  fireEvent.keyDown(document, { key: "Tab", shiftKey });
 
 // Mock the deep per-icon import used by pdf-modal (see pdf-modal.tsx)
 vi.mock("lucide-react/dist/esm/icons/x", () => ({
@@ -73,7 +81,7 @@ describe("PDFModal", () => {
         <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      const backdrop = container.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-sm");
       expect(backdrop).toBeInTheDocument();
     });
 
@@ -125,7 +133,7 @@ describe("PDFModal", () => {
         <PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />,
       );
 
-      const backdrop = container.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-sm");
       if (backdrop) {
         fireEvent.click(backdrop);
       }
@@ -156,73 +164,67 @@ describe("PDFModal", () => {
   });
 
   describe("Focus Management", () => {
-    it("focuses close button when modal opens", async () => {
+    it("takes the focus when it opens", () => {
+      // On the dialog itself, as the site's other dialogs: a screen reader
+      // names the document, and the first Tab goes to the close button.
       render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
 
-      // Advance timers by the setTimeout delay (100ms) from the component
-      vi.advanceTimersByTime(100);
-
-      // Use real timers for waitFor to allow React to process updates
-      vi.useRealTimers();
-
-      await waitFor(
-        () => {
-          const closeButton = screen.getByLabelText("Close PDF viewer");
-          // Verify close button exists and can be focused instead of checking actual focus
-          expect(closeButton).toBeInTheDocument();
-          expect(closeButton).not.toBeDisabled();
-          expect(closeButton.tabIndex).toBeGreaterThanOrEqual(-1);
-        },
-        { timeout: 1000 },
+      expect(document.activeElement).toBe(screen.getByRole("dialog"));
+      tab();
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("Close PDF viewer"),
       );
-
-      // Return to fake timers for cleanup
-      vi.useFakeTimers();
     });
 
-    it("restores focus to previous element when modal closes", () => {
+    it("gives the focus back when it closes", () => {
       const triggerButton = document.getElementById("trigger-button");
       triggerButton?.focus();
 
       const { rerender } = render(
         <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
-
-      // Close the modal
       rerender(
         <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      // Verify trigger button exists and can be focused instead of checking actual focus
-      expect(triggerButton).toBeInTheDocument();
-      expect(triggerButton).not.toBeDisabled();
-      expect(triggerButton?.tabIndex).toBeGreaterThanOrEqual(-1);
+      expect(document.activeElement).toBe(triggerButton);
     });
 
-    it("traps focus within modal", () => {
+    it("moves Tab on from a control in the middle, one stop per link", () => {
+      // macOS WebKit's own Tab skips buttons and links, so a trap that only
+      // wrapped at the first and last control let it out of the reader from
+      // anywhere in between. pdf.js's section around each link is not a
+      // stop of its own.
       render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
+      screen.getByRole("button", { name: "Zoom in" }).focus();
 
-      const closeButton = screen.getByLabelText("Close PDF viewer");
-      closeButton.focus();
+      tab();
 
-      // Tab should cycle within modal
-      fireEvent.keyDown(document, { key: "Tab" });
-
-      // Focus should stay within modal (implementation dependent)
-      expect(document.activeElement).toBeTruthy();
+      expect(document.activeElement).toBe(
+        screen.getByRole("link", { name: "DOI" }),
+      );
     });
 
-    it("handles shift+tab for reverse focus trap", () => {
+    it("wraps Tab from the last link to the close button", () => {
       render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
+      screen.getByRole("link", { name: "DOI" }).focus();
 
-      const closeButton = screen.getByLabelText("Close PDF viewer");
-      closeButton.focus();
+      tab();
 
-      // Shift+Tab should cycle backwards within modal
-      fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("Close PDF viewer"),
+      );
+    });
 
-      // Focus should stay within modal
-      expect(document.activeElement).toBeTruthy();
+    it("wraps Shift+Tab from the close button to the last link", () => {
+      render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
+      screen.getByLabelText("Close PDF viewer").focus();
+
+      tab(true);
+
+      expect(document.activeElement).toBe(
+        screen.getByRole("link", { name: "DOI" }),
+      );
     });
   });
 
@@ -248,62 +250,89 @@ describe("PDFModal", () => {
       expect(document.body.style.overflow).toBe("");
     });
 
-    it("clears the inline overflow override on close", () => {
+    it("puts back the inline overflow the page had on close", () => {
+      // The page's one scroll lock restores what it found (scroll-lock.ts),
+      // rather than writing its own idea of unlocked.
       document.body.style.overflow = "scroll";
 
       const { rerender } = render(
         <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
+      expect(document.body.style.overflow).toBe("hidden");
 
       rerender(
         <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      expect(document.body.style.overflow).toBe("");
+      expect(document.body.style.overflow).toBe("scroll");
+      document.body.style.overflow = "";
+    });
+  });
+
+  describe("Scroll position", () => {
+    it("puts the page back instantly when it closes", () => {
+      // "auto" follows globals.css's html { scroll-behavior: smooth }, and
+      // the page glided back to where it was; the comment by the call has
+      // always said instant.
+      const scrollTo = vi
+        .spyOn(window, "scrollTo")
+        .mockImplementation(() => {});
+      Object.defineProperty(window, "scrollY", {
+        configurable: true,
+        value: 1200,
+      });
+      try {
+        const { rerender } = render(
+          <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
+        );
+        rerender(
+          <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
+        );
+
+        expect(scrollTo).toHaveBeenCalledWith({
+          top: 1200,
+          behavior: "instant",
+        });
+      } finally {
+        Object.defineProperty(window, "scrollY", {
+          configurable: true,
+          value: 0,
+        });
+        scrollTo.mockRestore();
+      }
     });
   });
 
   describe("Event Listeners", () => {
-    it("adds event listeners when modal opens", () => {
-      const addEventListenerSpy = vi.spyOn(document, "addEventListener");
-
-      render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        "keydown",
-        expect.any(Function),
-      );
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(2); // Escape and focus trap
-    });
-
-    it("removes event listeners when modal closes", () => {
-      const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
-
+    it("listens for Escape only while open", () => {
+      const onClose = vi.fn();
       const { rerender } = render(
-        <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
+        <PDFModal isOpen={false} onClose={onClose} pdfUrl="/test.pdf" />,
       );
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).not.toHaveBeenCalled();
+
+      rerender(<PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />);
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
 
       rerender(
-        <PDFModal isOpen={false} onClose={vi.fn()} pdfUrl="/test.pdf" />,
+        <PDFModal isOpen={false} onClose={onClose} pdfUrl="/test.pdf" />,
       );
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        "keydown",
-        expect.any(Function),
-      );
-      expect(removeEventListenerSpy).toHaveBeenCalledTimes(2);
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("removes event listeners on unmount", () => {
-      const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
-
+    it("stops listening when it unmounts", () => {
+      const onClose = vi.fn();
       const { unmount } = render(
-        <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
+        <PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />,
       );
 
       unmount();
+      fireEvent.keyDown(document, { key: "Escape" });
 
-      expect(removeEventListenerSpy).toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 
@@ -321,7 +350,9 @@ describe("PDFModal", () => {
       const modal = screen.getByRole("dialog");
       expect(modal).toHaveAttribute("aria-modal", "true");
       expect(modal).toHaveAttribute("aria-label", "Test Document");
-      expect(modal).toHaveAttribute("aria-describedby", "pdf-viewer-content");
+      // Not described by its content: that was the toolbar and the text of
+      // every page, read out in full as the description on open.
+      expect(modal).not.toHaveAttribute("aria-describedby");
     });
 
     it("uses default aria-label when title not provided", () => {
@@ -336,7 +367,7 @@ describe("PDFModal", () => {
         <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
       );
 
-      const backdrop = container.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-sm");
       expect(backdrop).toHaveAttribute("aria-hidden", "true");
     });
 

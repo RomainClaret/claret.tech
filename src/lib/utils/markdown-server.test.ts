@@ -394,7 +394,10 @@ Final paragraph.`;
 
       expect(result).toContain("<h2>Header</h2>");
       expect(result.length).toBeGreaterThan(0);
-      expect(duration).toBeLessThan(100); // Should process in under 100ms
+      // A generous ceiling, as sanitize.test.ts's: not a measure of speed,
+      // which a loaded machine moves, but of a return to work that grows
+      // faster than the input. 100 ms was a stopwatch.
+      expect(duration).toBeLessThan(2000);
     });
   });
 });

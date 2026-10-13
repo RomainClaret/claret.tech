@@ -35,9 +35,6 @@ vi.mock("@/components/ui/pdf-modal", () => ({
 }));
 
 vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
   SlideInUp: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),

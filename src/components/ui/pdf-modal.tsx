@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 // Deep per-icon import; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
 import X from "lucide-react/dist/esm/icons/x";
 import { PDFViewer } from "./pdf-viewer";
+import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 
 interface PDFModalProps {
@@ -26,81 +27,22 @@ export function PDFModal({
 }: PDFModalProps) {
   // Covers the page: decorative motion behind it pauses until it closes.
   useOverlayLock(isOpen);
-  const modalRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const previousActiveElement = useRef<HTMLElement | null>(null);
-
-  // Handle escape key and focus management
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    const handleFocusTrap = (e: KeyboardEvent) => {
-      if (e.key !== "Tab" || !modalRef.current) return;
-
-      const focusableElements = modalRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      const firstElement = focusableElements[0] as HTMLElement;
-      const lastElement = focusableElements[
-        focusableElements.length - 1
-      ] as HTMLElement;
-
-      if (e.shiftKey && document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement?.focus();
-      } else if (!e.shiftKey && document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement?.focus();
-      }
-    };
-
-    // Scroll position at open time; null when this effect run never opened
-    // the modal (so its cleanup must not touch scroll or focus).
-    let scrollY: number | null = null;
-
-    if (isOpen) {
-      // Store the currently focused element and where the page was scrolled.
-      previousActiveElement.current = document.activeElement as HTMLElement;
-      scrollY = window.scrollY;
-
-      document.addEventListener("keydown", handleEscape);
-      document.addEventListener("keydown", handleFocusTrap);
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = "hidden";
-
-      // Focus the close button when modal opens
-      setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 100);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.removeEventListener("keydown", handleFocusTrap);
-      if (scrollY === null) return;
-
-      // Back to the stylesheet default rather than forcing "auto".
-      document.body.style.overflow = "";
-
-      // Restore focus WITHOUT letting the browser scroll the focused element
-      // into view: clicks do not reliably set focus (Safari never focuses
-      // clicked buttons), so this element can be far from where the user was.
-      previousActiveElement.current?.focus({ preventScroll: true });
-
-      // Pin the page back exactly where it was when the reader opened;
-      // instant so the global smooth scroll-behavior cannot animate it.
-      window.scrollTo({ top: scrollY, behavior: "auto" });
-    };
-  }, [isOpen, onClose]);
+  // Focus, Tab, Escape, the page's scroll and its place, as the site's other
+  // dialogs. Its own trap only wrapped at the first and last control, so
+  // macOS WebKit's Tab, which skips buttons and links, left the reader at
+  // the first press and walked the page behind it.
+  const dialogRef = useModalDialog<HTMLDivElement>(isOpen, onClose, {
+    lockScroll: true,
+  });
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // At the end of <body>, above everything but the terminal, as the other
+  // dialogs: rendered in its section, it sat under the page's relative
+  // z-10, and the cookie notice (z-50 at the page's root) painted over its
+  // bottom and took its clicks, the bottom quarter of a phone's screen.
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-background/80 backdrop-blur-sm"
@@ -110,16 +52,15 @@ export function PDFModal({
 
       {/* Modal */}
       <div
-        ref={modalRef}
-        className="relative w-full h-full max-w-6xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="relative w-full h-full max-w-6xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col outline-none"
         role="dialog"
         aria-modal="true"
         aria-label={title || "PDF viewer"}
-        aria-describedby="pdf-viewer-content"
       >
         {/* Close button */}
         <button
-          ref={closeButtonRef}
           onClick={onClose}
           className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-background/80 hover:bg-muted transition-colors"
           aria-label="Close PDF viewer"
@@ -138,6 +79,7 @@ export function PDFModal({
           />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -5,6 +5,7 @@ import {
   getCachedColors,
 } from "@/lib/utils/medium-scraper";
 import { logError } from "@/lib/utils/dev-logger";
+import { fetchMediumFeed } from "@/lib/utils/medium-feed";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 interface MediumPost {
@@ -17,7 +18,8 @@ interface MediumPost {
   guid: string;
   categories: string[];
   enrichedImage?: string;
-  enrichedColor?: string;
+  // null when the article's page gave no colour (fetchMediumArticle)
+  enrichedColor?: string | null;
 }
 
 async function handler(request: NextRequest) {
@@ -96,20 +98,11 @@ async function handler(request: NextRequest) {
       // Continue processing even if cache cleaning fails
     }
 
-    // Using rss2json.com to convert RSS to JSON
-    const response = await fetch(
-      `https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@${mediumUsername}`,
-      {
-        // Cache for 1 hour
-        next: { revalidate: 3600 },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch Medium posts");
-    }
-
-    const data = await response.json();
+    // Medium's RSS as JSON (rss2json), cached for an hour
+    const data = await fetchMediumFeed<{
+      items?: MediumPost[];
+      cachedColors?: unknown;
+    }>(mediumUsername);
 
     // Enrich posts with scraped images and colors
     if (data.items && Array.isArray(data.items)) {

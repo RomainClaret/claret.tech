@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { LottieRefCurrentProps } from "lottie-react";
+import { withLoadFallback } from "@/lib/utils/load-fallback";
+import { logError } from "@/lib/utils/dev-logger";
 
 interface DisplayLottieProps {
   animationData: object;
@@ -15,16 +17,27 @@ interface DisplayLottieProps {
   style?: React.CSSProperties;
 }
 
-// Dynamic imports for heavy libraries
-const Lottie = dynamic(() => import("lottie-react"), {
-  ssr: false,
-  loading: () => (
-    <div
-      className="animate-pulse bg-transparent"
-      style={{ width: "100%", height: "200px" }}
-    />
+// The player's box while its code loads, and for good if that cannot be
+// fetched.
+const PlayerPlaceholder = () => (
+  <div
+    className="animate-pulse bg-transparent"
+    style={{ width: "100%", height: "200px" }}
+  />
+);
+
+// Dynamic imports for heavy libraries. When the player's chunk cannot be
+// fetched, the animation's box stays empty and the splash plays on: React.lazy
+// threw while rendering, and the error boundary around the whole site, the
+// splash's nearest, replaced the page with its error screen.
+const Lottie = dynamic(
+  withLoadFallback(
+    () => import("lottie-react").then((mod) => mod.default),
+    PlayerPlaceholder,
+    { onError: (error) => logError(error, "Lottie chunk") },
   ),
-});
+  { ssr: false, loading: PlayerPlaceholder },
+);
 
 export function DisplayLottie({
   animationData,

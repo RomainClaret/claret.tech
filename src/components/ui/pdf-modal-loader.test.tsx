@@ -79,6 +79,24 @@ describe("the reader-unavailable dialog", () => {
     );
   });
 
+  it("moves Tab on from the link in the middle", async () => {
+    // The trap only wrapped at its ends and left the rest to the browser,
+    // and WebKit's own Tab skips links: from "Open the PDF", Safari's Tab
+    // walked out of the dialog. jsdom moves nothing by itself either.
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {}); // jsdom lacks it
+    const Modal = await loadPdfModal();
+    await act(async () => {
+      render(
+        <Modal isOpen onClose={() => {}} pdfUrl="/pdfs/x.pdf" title="Thesis" />,
+      );
+    });
+    screen.getByRole("link", { name: "Open the PDF" }).focus();
+
+    fireEvent.keyDown(document, { key: "Tab" });
+
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+  });
+
   it("offers a reload once its own retry has failed too", async () => {
     // A deploy can replace the reader's chunk under an open page; trying
     // again then never works, only a reload does.

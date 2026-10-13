@@ -173,11 +173,12 @@ export function ProgressRing({
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {showPercentage && (
           <div
+            // The ring shows its colour; the figure on the ring's own glow
+            // reads in the text colour (its colour read at 2.3 to 3.7:1).
             className={cn(
-              "font-bold tabular-nums leading-none",
+              "font-bold tabular-nums leading-none text-foreground",
               size <= 60 ? "text-[10px]" : "text-sm",
             )}
-            style={{ color }}
           >
             {Math.round(animatedProgress)}%
           </div>
@@ -185,7 +186,8 @@ export function ProgressRing({
         {label && (
           <div
             className={cn(
-              "text-muted-foreground leading-none",
+              // On the ring's own glow, where muted text read at 3:1.
+              "text-foreground leading-none",
               size <= 60 ? "text-[6px] mt-0.5" : "text-[10px] mt-1",
             )}
           >

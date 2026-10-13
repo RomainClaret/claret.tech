@@ -9,6 +9,7 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { PerformanceReportModal } from "./PerformanceReportModal";
+import { useLayoutEffect } from "react";
 
 // Mock all the external dependencies
 vi.mock("framer-motion", () => {
@@ -127,6 +128,33 @@ Object.defineProperty(global, "Blob", {
 });
 
 describe("PerformanceReportModal", () => {
+  it("listens for Escape from the moment it is on the page, before it paints", () => {
+    // Loaded lazily, its passive effects ran after the browser had painted
+    // it: an Escape pressed in between reached the performance monitor's
+    // listener on window and closed the monitor instead. A later sibling's
+    // layout effect runs after this one's and before any passive effect.
+    const onClose = vi.fn();
+    const closedAtMount: boolean[] = [];
+    function Probe() {
+      useLayoutEffect(() => {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+        closedAtMount.push(onClose.mock.calls.length > 0);
+      }, []);
+      return null;
+    }
+
+    render(
+      <>
+        <PerformanceReportModal isOpen={true} onClose={onClose} />
+        <Probe />
+      </>,
+    );
+
+    expect(closedAtMount[0]).toBe(true);
+  });
+
   let mockOnClose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -185,6 +213,28 @@ describe("PerformanceReportModal", () => {
 
       expect(mockGenerateReport).not.toHaveBeenCalled();
     });
+
+    it("does not start over by itself after a run that brought no report", () => {
+      // A failed request (offline, the API's rate limit) ended the run with
+      // no report, and the dialog started another at once: every 2.2 s for
+      // as long as it stayed open, and the error never stayed up.
+      const { rerender } = render(
+        <PerformanceReportModal isOpen={true} onClose={mockOnClose} />,
+      );
+      expect(mockGenerateReport).toHaveBeenCalledTimes(1);
+
+      mockIsGenerating = true;
+      rerender(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+      mockIsGenerating = false;
+      rerender(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+
+      expect(mockGenerateReport).toHaveBeenCalledTimes(1);
+
+      // Opened again, it tries again.
+      rerender(<PerformanceReportModal isOpen={false} onClose={mockOnClose} />);
+      rerender(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+      expect(mockGenerateReport).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("Event Handling", () => {
@@ -215,8 +265,40 @@ describe("PerformanceReportModal", () => {
     it("closes modal when Escape key is pressed", () => {
       render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
 
-      fireEvent.keyDown(document, { key: "Escape" });
+      // Marked as used, so the performance monitor under it stays.
+      expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
       expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens at the end of the page's body, above a dialog already open", () => {
+      // Rendered in place at the same z-index, it painted under a PDF reader
+      // already open, which a portal puts at the end of <body>.
+      const { container } = render(
+        <PerformanceReportModal isOpen={true} onClose={vi.fn()} />,
+      );
+
+      const dialog = screen.getByRole("dialog", { name: "Performance report" });
+      expect(container).not.toContainElement(dialog);
+      expect(document.body.lastElementChild).toContainElement(dialog);
+    });
+
+    it("leaves an Escape typed in a modal dialog to that dialog", () => {
+      // Open first, it listens first: the reader's Escape closed it too.
+      const onClose = vi.fn();
+      render(<PerformanceReportModal isOpen={true} onClose={onClose} />);
+      const reader = document.createElement("div");
+      reader.setAttribute("aria-modal", "true");
+      const button = document.createElement("button");
+      reader.append(button);
+      document.body.append(reader);
+
+      expect(fireEvent.keyDown(button, { key: "Escape" })).toBe(true);
+      expect(onClose).not.toHaveBeenCalled();
+
+      // From the terminal, or the page, it is still the panel's.
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      reader.remove();
     });
 
     it("does not close modal for other keys", () => {
@@ -411,6 +493,75 @@ describe("PerformanceReportModal", () => {
     });
   });
 
+  describe("As a dialog", () => {
+    const reportData = {
+      summary: {
+        overallScore: 80,
+        grade: "Good",
+        primaryIssues: [],
+        strengths: [],
+      },
+      metrics: {
+        performance: {
+          fps: { value: 60, status: "Good", target: 60 },
+          memory: { value: 40, status: "Good", target: 50 },
+          cpu: { status: "Good", target: 50 },
+        },
+        vitals: {
+          lcp: { status: "Good", target: 2500 },
+          fcp: { status: "Good", target: 1800 },
+          cls: { status: "Good", target: 0.1 },
+          inp: { status: "Good", target: 200 },
+          ttfb: { status: "Good", target: 600 },
+        },
+      },
+      recommendations: [],
+      browserOptimizations: {
+        currentBrowser: "Chrome",
+        optimizations: [],
+        browserSpecificIssues: [],
+      },
+    };
+
+    it("is a named dialog, not a modal one", () => {
+      // Opened from the terminal, which stays usable above it.
+      render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+
+      const dialog = screen.getByRole("dialog", { name: "Performance report" });
+      expect(dialog).not.toHaveAttribute("aria-modal");
+      const backdrop = screen
+        .getAllByTestId("motion-div")
+        .find((div) => div.className?.includes("backdrop-blur-sm"));
+      expect(backdrop).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("names its buttons by what they do", () => {
+      render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+      act(() => {
+        storedCallback?.(reportData);
+      });
+
+      const close = screen.getByRole("button", {
+        name: "Close performance report",
+      });
+      expect(close).toHaveAttribute("type", "button");
+      expect(close).toHaveAttribute("title", "Close (ESC)");
+      for (const format of ["JSON", "HTML", "CSV"]) {
+        expect(
+          screen.getByRole("button", { name: `Download ${format}` }),
+        ).toHaveAttribute("type", "button");
+      }
+    });
+
+    it("lets the keyboard reach its details, to scroll them", () => {
+      render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+
+      const details = screen.getByRole("region", { name: "Report details" });
+      expect(details).toHaveAttribute("tabindex", "0");
+      expect(details).toContainElement(screen.getByTestId("progress-ui"));
+    });
+  });
+
   describe("Styling and Layout", () => {
     it("applies correct modal styling classes", () => {
       render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
@@ -451,11 +602,12 @@ describe("PerformanceReportModal", () => {
     });
 
     it("applies correct content area styling", () => {
-      const { container } = render(
-        <PerformanceReportModal isOpen={true} onClose={mockOnClose} />,
-      );
+      render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
 
-      const contentArea = container.querySelector(".flex-1.overflow-auto.p-6");
+      // At the end of <body>, outside the render container.
+      const contentArea = document.body.querySelector(
+        ".flex-1.overflow-auto.p-6",
+      );
       expect(contentArea).toBeInTheDocument();
     });
   });

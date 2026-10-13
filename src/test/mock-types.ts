@@ -17,11 +17,6 @@ export interface SlideInUpProps extends BaseMockProps {
   direction?: "up" | "down" | "left" | "right";
 }
 
-export interface FadeInProps extends BaseMockProps {
-  delay?: number;
-  duration?: number;
-}
-
 export interface MotionDivProps extends BaseMockProps {
   initial?: object;
   animate?: object;
@@ -209,21 +204,6 @@ export interface ConditionalMotionProps extends BaseMockProps {
   disable?: boolean;
 }
 
-export interface ProtectedLucideIconProps extends BaseMockProps {
-  Icon?: React.ComponentType<IconProps>;
-  fallback?: ReactNode;
-}
-
-export interface SlideInLeftProps extends BaseMockProps {
-  delay?: number;
-  duration?: number;
-}
-
-export interface SlideInRightProps extends BaseMockProps {
-  delay?: number;
-  duration?: number;
-}
-
 // Project-specific component props
 export interface ScaleInProps extends BaseMockProps {
   delay?: number;
@@ -267,6 +247,7 @@ export interface UtilityFunction {
 
 // Test-specific mock types
 export interface MockedFetch {
+  mockResolvedValue: (value: MockedFetchResponse) => MockedFetch;
   mockResolvedValueOnce: (value: MockedFetchResponse) => MockedFetch;
   mockRejectedValueOnce: (error: Error) => MockedFetch;
   mockImplementation: (fn: (...args: unknown[]) => unknown) => MockedFetch;

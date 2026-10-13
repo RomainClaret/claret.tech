@@ -328,27 +328,34 @@ export function PerformanceReportGenerator({
 
     setIsGenerating(true);
     setError(null);
-    setCurrentPhase(0);
+    // The phase in progress, for the catch: `currentPhase` there was the
+    // value this callback had closed over (0), not the phase that failed.
+    let phase = 0;
+    const enter = (next: number) => {
+      phase = next;
+      setCurrentPhase(next);
+    };
+    enter(0);
 
     try {
       // Phase 0: Initialize
       updatePhaseProgress(0, 50, "active");
       await new Promise((resolve) => setTimeout(resolve, 300));
       updatePhaseProgress(0, 100, "completed");
-      setCurrentPhase(1);
+      enter(1);
 
       // Phase 1: Collect browser metrics
-      setCurrentPhase(1);
+      enter(1);
       const performanceMetrics = await collectBrowserMetrics();
-      setCurrentPhase(2);
+      enter(2);
 
       // Phase 2: Collect Core Web Vitals
       const vitals = await collectWebVitals();
-      setCurrentPhase(3);
+      enter(3);
 
       // Phase 3: Analyze resources
       const resources = await analyzeResources();
-      setCurrentPhase(4);
+      enter(4);
 
       // Phase 4: Generate recommendations
       updatePhaseProgress(4, 50, "active");
@@ -396,12 +403,25 @@ export function PerformanceReportGenerator({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to generate report: ${response.statusText}`);
+        // In the API's words ({ error, retryAfter }), or the status when the
+        // answer is not the API's: statusText is empty over HTTP/2, which
+        // production serves, and the message ended at "report: ".
+        const answer: { error?: unknown; retryAfter?: unknown } | null =
+          await response.json().catch(() => null);
+        const reason =
+          typeof answer?.error === "string"
+            ? answer.error
+            : `HTTP ${response.status}`;
+        const retry =
+          typeof answer?.retryAfter === "number"
+            ? ` Retry in ${answer.retryAfter} s.`
+            : "";
+        throw new Error(`Failed to generate report: ${reason}.${retry}`);
       }
 
       const result = await response.json();
       updatePhaseProgress(4, 100, "completed");
-      setCurrentPhase(5);
+      enter(5);
 
       // Phase 5: Finalize
       updatePhaseProgress(5, 50, "active");
@@ -417,7 +437,7 @@ export function PerformanceReportGenerator({
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
       setError(errorMessage);
-      updatePhaseProgress(currentPhase, 0, "error");
+      updatePhaseProgress(phase, 0, "error");
 
       if (onError) {
         onError(errorMessage);
@@ -428,7 +448,6 @@ export function PerformanceReportGenerator({
   }, [
     isGenerating,
     performanceData,
-    currentPhase,
     updatePhaseProgress,
     collectBrowserMetrics,
     collectWebVitals,
@@ -585,18 +604,20 @@ export function PerformanceReportGenerator({
 
           {error && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <h4 className="text-red-500 font-semibold mb-2">Error</h4>
-              <p className="text-sm text-red-400">{error}</p>
+              <h4 className="text-red-700 dark:text-red-400 font-semibold mb-2">
+                Error
+              </h4>
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 
           {report && (
             <div className="space-y-4">
               <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <h4 className="text-green-500 font-semibold mb-2">
+                <h4 className="text-green-700 dark:text-green-400 font-semibold mb-2">
                   Report Generated Successfully
                 </h4>
-                <p className="text-sm text-green-400">
+                <p className="text-sm text-green-700 dark:text-green-300">
                   Overall Score: {report.summary.overallScore}/100 (
                   {report.summary.grade})
                 </p>
@@ -632,10 +653,10 @@ export function PerformanceReportGenerator({
                       <span
                         className={`inline-block px-2 py-1 rounded text-white text-xs ${
                           rec.priority === "High"
-                            ? "bg-red-500"
+                            ? "bg-red-700"
                             : rec.priority === "Medium"
-                              ? "bg-yellow-500"
-                              : "bg-blue-500"
+                              ? "bg-yellow-700"
+                              : "bg-blue-700"
                         }`}
                       >
                         {rec.priority}

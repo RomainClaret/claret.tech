@@ -29,6 +29,12 @@ vi.mock("@/lib/utils/api-cache", () => ({
 import { devError } from "@/lib/utils/dev-logger";
 import { ApiCache } from "@/lib/utils/api-cache";
 
+// A request with no client headers: the rate limiter keys it as
+// "unknown:unknown", as it did when these tests called GET() with nothing,
+// which TypeScript rejects (the handler takes the request).
+const anonymousRequest = () =>
+  ({ headers: new Headers() }) as unknown as Parameters<typeof GET>[0];
+
 const mockFs = vi.mocked(fs);
 const mockDevError = vi.mocked(devError);
 const mockApiCache = vi.mocked(ApiCache);
@@ -84,7 +90,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining("LICENSE"),
@@ -108,7 +114,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue("GPL-3.0-or-later License Content");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.any(Object),
@@ -129,7 +135,7 @@ This program is free software...`;
       // Mock cache hit
       mockApiCache.get.mockReturnValue(mockLicenseText);
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File system should not be accessed when cache hits
       expect(mockFs.readFileSync).not.toHaveBeenCalled();
@@ -153,7 +159,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(newLicense);
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File should be read when cache misses
       expect(mockFs.readFileSync).toHaveBeenCalled();
@@ -177,7 +183,7 @@ This program is free software...`;
     it("returns 404 when LICENSE file does not exist", async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "LICENSE file not found at:",
@@ -196,7 +202,7 @@ This program is free software...`;
     it("includes fallback content in 404 response", async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      await GET();
+      await GET(anonymousRequest());
 
       const notFoundCall = (NextResponse.json as any).mock.calls[0][0];
       expect(notFoundCall.content).toContain("GPL-3.0-or-later");
@@ -214,7 +220,7 @@ This program is free software...`;
         throw new Error("Permission denied");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "Failed to read LICENSE file:",
@@ -235,7 +241,7 @@ This program is free software...`;
         throw new Error("Read error");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       const fallbackCall = (NextResponse.json as any).mock.calls[0][0];
       expect(fallbackCall.content).toContain("GNU GENERAL PUBLIC LICENSE");
@@ -257,7 +263,7 @@ This program is free software...`;
         throw new Error("File system error");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(expect.any(Object), {
         status: 200,
@@ -270,7 +276,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue("GPL-3.0-or-later License Content");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringMatching(/.*LICENSE$/),
@@ -285,7 +291,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue("License content");
 
-      await GET();
+      await GET(anonymousRequest());
 
       // Verify the path includes the current working directory
       const expectedPath = expect.stringMatching(/LICENSE$/);
@@ -301,7 +307,7 @@ This program is free software...`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         { content: mockLicenseText },
@@ -316,11 +322,11 @@ This program is free software...`;
       mockFs.readFileSync.mockReturnValue(mockLicenseText);
 
       // First call
-      await GET();
+      await GET(anonymousRequest());
 
       // Clear mocks and make second call to verify cache
       vi.clearAllMocks();
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         { content: mockLicenseText },
@@ -346,7 +352,7 @@ software and other kinds of works.`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(standardGPL);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         { content: standardGPL },
@@ -367,7 +373,7 @@ Regular paragraph.`;
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(formattedLicense);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         { content: formattedLicense },

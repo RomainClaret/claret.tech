@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Code2,
   Database,
@@ -48,7 +47,6 @@ import {
   Rocket,
   Bug,
 } from "lucide-react";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 
 // Mapping of Font Awesome class names to Lucide icons
 export const techIconMap: Record<string, LucideIcon> = {
@@ -127,13 +125,4 @@ export const techIconMap: Record<string, LucideIcon> = {
 // Get icon component by Font Awesome class name, with fallback
 export function getTechIcon(fontAwesomeClass: string): LucideIcon {
   return techIconMap[fontAwesomeClass] || Code2;
-}
-
-// Get protected icon component by Font Awesome class name, with fallback
-export function getProtectedTechIcon(
-  fontAwesomeClass: string,
-  props: Record<string, unknown> = {},
-): React.ReactElement {
-  const IconComponent = techIconMap[fontAwesomeClass] || Code2;
-  return <ProtectedLucideIcon Icon={IconComponent} {...props} />;
 }

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
 
 /**
@@ -102,9 +102,20 @@ test.describe("Mobile Accessibility", () => {
     // decorative 12x6 nodes. WCAG's own floor is 24x24 with exceptions, not 44
     // on everything. Tightening this without narrowing the selector would mean
     // 163 failures that no standard asks anyone to fix.
-    const interactiveElements = await page
+    // Not what is visually hidden until focused (the skip links: sr-only,
+    // 1x1 and clipped), which is no touch target. The test-mode CSS made
+    // them position: relative, which undid the clip and left them on screen
+    // at 168x19 in these tests.
+    const interactiveElements: Locator[] = [];
+    for (const element of await page
       .locator('button:visible, a:visible, [role="button"]:visible')
-      .all();
+      .all()) {
+      if (
+        !(await element.evaluate((el) => el.matches(".sr-only:not(:focus)")))
+      ) {
+        interactiveElements.push(element);
+      }
+    }
     expect(
       interactiveElements.length,
       "no visible interactive elements matched: the page did not render",
@@ -133,37 +144,68 @@ test.describe("Mobile Accessibility", () => {
     }
   });
 
-  test("should support mobile keyboard navigation", async ({ page }) => {
+  test("should support mobile keyboard navigation", async ({
+    page,
+    browserName,
+  }) => {
     test.slow(); // Triple the timeout for mobile tests
 
     await dismissToasts(page, { timeout: 3000 });
 
-    // Test tab navigation through mobile menu
     const menuButton = page.getByTestId("mobile-menu-button");
     await expect(menuButton).toBeVisible();
     await menuButton.focus();
-
-    // Check focus is visible
-    const hasFocus = await menuButton.evaluate((el) => {
-      return document.activeElement === el;
-    });
-    expect(hasFocus).toBe(true);
-
-    // Open menu with keyboard (Enter or Space)
-    await page.keyboard.press("Enter");
+    await expect(menuButton).toBeFocused();
 
     // enter on the focused button must really open the menu; passing
     // silently when it stays closed hid a dead keyboard path
+    await page.keyboard.press("Enter");
     await expect(menuButton).toHaveAttribute("aria-expanded", "true");
 
-    // Tab through navigation links
-    await page.keyboard.press("Tab");
+    // Safari's Tab reaches only text fields and pop-up menus unless "Press
+    // Tab to highlight each item" is on; Option+Tab reaches links and
+    // buttons. Playwright's macOS WebKit keeps that default (its Linux
+    // WebKit does not), so plain Tab there skips the whole menu. Chromium
+    // on Linux does not move focus on Alt+Tab at all, so it keeps Tab.
+    const nextItem = browserName === "webkit" ? "Alt+Tab" : "Tab";
 
-    // Check that focus moved to a navigation link
-    const focusedElement = await page.evaluate(() => {
-      return document.activeElement?.tagName.toLowerCase();
-    });
-    expect(["a", "button"].includes(focusedElement || "")).toBe(true);
+    // The panel follows its button in the DOM, so the next stop is the first
+    // section link. Checking only for "an a or a button" passed when focus
+    // landed on a button in the Research section, far outside the menu.
+    await page.keyboard.press(nextItem);
+    await expect(
+      page.getByTestId("mobile-navigation-menu").getByRole("link").first(),
+    ).toBeFocused();
+
+    // Escape closes the menu and hands focus back to its button
+    await page.keyboard.press("Escape");
+    await expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    await expect(menuButton).toBeFocused();
+  });
+
+  test("should close the mobile menu when focus leaves it", async ({
+    page,
+    browserName,
+  }) => {
+    test.slow(); // Triple the timeout for mobile tests
+
+    await dismissToasts(page, { timeout: 3000 });
+    await openMobileMenuForAccessibility(page);
+
+    // a disclosure does not trap focus, but the floating panel must not stay
+    // open over the page control that focus moves to, hiding it
+    const nextItem = browserName === "webkit" ? "Alt+Tab" : "Tab";
+    const lastItem = page
+      .getByTestId("mobile-navigation-menu")
+      .getByRole("button", { name: "Contact me" });
+    await lastItem.focus();
+    await page.keyboard.press(nextItem);
+
+    await expect(page.getByTestId("mobile-menu-button")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await expect(page.getByTestId("mobile-navigation-menu")).toHaveCount(0);
   });
 
   test("should have proper mobile viewport configuration", async ({ page }) => {

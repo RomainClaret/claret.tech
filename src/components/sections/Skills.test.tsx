@@ -8,13 +8,11 @@ import {
 } from "@testing-library/react";
 import { Skills } from "./Skills";
 import type {
-  FadeInProps,
   SlideInUpProps,
   ScaleInProps,
   HolographicCardProps,
   SkillManifestoProps,
   LanguageSpectrumProps,
-  ProtectedLucideIconProps,
   TechIconProps,
   LucideIconProps,
   MotionDivProps,
@@ -22,11 +20,6 @@ import type {
 
 // Mock external components and utilities
 vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children, ...props }: FadeInProps) => (
-    <div data-testid="fade-in" {...props}>
-      {children}
-    </div>
-  ),
   SlideInUp: ({ children, ...props }: SlideInUpProps) => (
     <div data-testid="slide-in-up" {...props}>
       {children}
@@ -65,14 +58,6 @@ vi.mock("@/components/ui/language-spectrum", () => ({
       )) || null}
     </div>
   ),
-}));
-
-vi.mock("@/components/ui/protected-lucide-icon", () => ({
-  ProtectedLucideIcon: ({ Icon, ...props }: ProtectedLucideIconProps) => {
-    if (!Icon) return <div data-testid="protected-icon" {...props} />;
-    // Forward the Icon component with its original testid
-    return <Icon {...props} />;
-  },
 }));
 
 // Mock icons
@@ -578,7 +563,6 @@ describe("Skills Component", () => {
     it("wraps content in animation components", () => {
       render(<Skills />);
 
-      expect(screen.getAllByTestId("fade-in")).toHaveLength(1);
       expect(screen.getAllByTestId("slide-in-up").length).toBeGreaterThan(1);
       expect(screen.getAllByTestId("scale-in").length).toBeGreaterThan(1);
     });

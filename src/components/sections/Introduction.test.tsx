@@ -4,11 +4,8 @@ import { Introduction } from "./Introduction";
 import {
   DynamicImportFn,
   DynamicImportOptions,
-  SlideInLeftProps,
-  SlideInRightProps,
   TypeWriterProps,
   ConditionalMotionProps,
-  ProtectedLucideIconProps,
   IconProps,
 } from "@/test/mock-types";
 
@@ -54,20 +51,6 @@ vi.mock("framer-motion", () => {
   return { ...mocked, m: mocked.motion };
 });
 
-// Mock animated components
-vi.mock("@/components/ui/animated", () => ({
-  SlideInLeft: ({ children, ...props }: SlideInLeftProps) => (
-    <div data-testid="slide-in-left" {...props}>
-      {children}
-    </div>
-  ),
-  SlideInRight: ({ children, ...props }: SlideInRightProps) => (
-    <div data-testid="slide-in-right" {...props}>
-      {children}
-    </div>
-  ),
-}));
-
 // Mock UI components
 vi.mock("@/components/ui/TypeWriter", () => ({
   TypeWriter: ({ text }: TypeWriterProps) => (
@@ -111,14 +94,6 @@ vi.mock("@/components/ui/conditional-motion", () => ({
   ConditionalMotion: ({ children }: ConditionalMotionProps) => (
     <div data-testid="conditional-motion">{children}</div>
   ),
-}));
-
-vi.mock("@/components/ui/protected-lucide-icon", () => ({
-  ProtectedLucideIcon: ({ Icon, ...props }: ProtectedLucideIconProps) => {
-    if (!Icon) return <div data-testid="protected-icon" {...props} />;
-    const IconComponent = Icon;
-    return <IconComponent {...props} />;
-  },
 }));
 
 // Mock Lucide icons

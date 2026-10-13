@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { FadeIn } from "@/components/ui/animated";
 
 interface ProjectFilterProps {
   technologies: string[];
@@ -15,7 +14,7 @@ export function ProjectFilter({
   onSelectTech,
 }: ProjectFilterProps) {
   return (
-    <FadeIn className="flex flex-wrap gap-2 justify-center mb-8">
+    <div className="flex flex-wrap gap-2 justify-center mb-8">
       {/* All button */}
       <button
         onClick={() => onSelectTech(null)}
@@ -50,6 +49,6 @@ export function ProjectFilter({
           {tech}
         </button>
       ))}
-    </FadeIn>
+    </div>
   );
 }

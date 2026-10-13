@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 // Deep per-icon imports, NOT the "lucide-react" barrel: in LAZILY loaded
 // components, Next's default lucide barrel optimization emits requires of
 // __barrel_optimize__ proxy modules that no chunk defines, crashing the
@@ -27,6 +27,11 @@ import {
   type PageSize,
 } from "@/lib/utils/pdf-fit";
 import { logError } from "@/lib/utils/dev-logger";
+import {
+  fixLinkAnnotations,
+  watchLinkAnnotations,
+} from "@/lib/utils/pdf-links";
+import { createLinkNameBook } from "@/lib/utils/pdf-link-names";
 import { setupPDFConsoleFilter } from "@/lib/utils/pdf-console-filter";
 
 /**
@@ -145,6 +150,26 @@ export function PDFViewer({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<{ [key: number]: HTMLDivElement }>({});
 
+  // Links within the document are named by the text printed under them,
+  // page by page, once per document (pdf-link-names.ts); a page's names
+  // that arrive after its links are on screen go to the links in its box.
+  const [linkNames] = useState(() =>
+    createLinkNameBook({
+      onNamed: (page, nameOf) => {
+        const box = pageRefs.current[page];
+        if (box) fixLinkAnnotations(box, nameOf);
+      },
+    }),
+  );
+
+  // pdf.js puts each link's wrapper ahead of everything in the Tab order and
+  // leaves the link itself unnamed: one stop per link, each with a name.
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!root) return;
+    return watchLinkAnnotations(root, linkNames.nameOf);
+  }, [linkNames]);
+
   // Setup PDF console filter on mount
   useEffect(() => {
     setupPDFConsoleFilter();
@@ -169,9 +194,9 @@ export function PDFViewer({
   // Which document load is current. Measuring takes a getPage per page (368
   // for the thesis); if the fallback fonts reload the document meanwhile,
   // the old proxy is destroyed, its getPage calls reject, and pageSizes
-  // turns those into zero sizes: landing after the reload's reset, they
-  // replaced the first screen with 368 empty boxes until the new measuring
-  // finished. Bumped on unmount too, so nothing lands on a closed reader.
+  // turns those into zero sizes: landing after the reload, they collapsed
+  // every page box until the new measuring finished. Bumped on unmount too,
+  // so nothing lands on a closed reader.
   const loadIdRef = useRef(0);
   useEffect(
     () => () => {
@@ -180,16 +205,25 @@ export function PDFViewer({
     [],
   );
 
+  // The document the page boxes are laid out for.
+  const laidOutUrlRef = useRef<string | null>(null);
+
   const onDocumentLoadSuccess = (pdf: PDFDocumentProxyLike) => {
-    // A reload starts over as a first load does. "Use fallback fonts"
-    // changes the Document's options, react-pdf reloads and every page box
-    // remounts, scrolled to the top; the observer below kept watching the
-    // old boxes until the sizes were measured again, a getPage per page,
-    // with the pages near the old position drawn and the first ones blank.
+    // "Use fallback fonts" changes only the Document's options: react-pdf
+    // loads the same document again under the same page boxes and redraws
+    // them from it, so the boxes, their sizes and the drawn pages stay, and
+    // the reader stays where they were. 632715b reset them here, as if
+    // every box remounted at the top (the test mock's doing, not
+    // react-pdf's); the reset itself dropped every box past the first
+    // screen until the sizes were measured again, and WebKit then clamped a
+    // reader on page 200 to page 1. A different document starts over.
     const load = ++loadIdRef.current;
-    setSizes(null);
-    setPageNumber(1);
-    setNearPages(firstScreenPages());
+    if (laidOutUrlRef.current !== url) {
+      laidOutUrlRef.current = url;
+      linkNames.reset();
+      setSizes(null);
+      setNearPages(firstScreenPages());
+    }
     setNumPages(pdf.numPages);
     setLoading(false);
     setError(null);
@@ -232,6 +266,76 @@ export function PDFViewer({
     return () => observer.disconnect();
   }, [numPages, sizes]);
 
+  // The reader's place through a change of scale. A zoom or a fit rescales
+  // every page box under the same scroll offset, which moved the reader:
+  // zooming out on page 100 of the thesis showed page 115, and narrowing
+  // the window refitted it to page 170, in Chromium and WebKit alike. So
+  // every change of scale goes through rescale(), which notes the page most
+  // in view (the counter's page), how far into it the view's top is, and
+  // the horizontal centre; the layout effect below scrolls back to that
+  // place once the boxes have their new size, before the frame is painted.
+  const scaleRef = useRef(scale);
+  const placeRef = useRef<{
+    page: number;
+    /** Where the view's top is in the page, as a share of its height. */
+    into: number;
+    /** The view's horizontal centre, as a share of the column's width. */
+    centre: number;
+  } | null>(null);
+
+  const rescale = (next: number) => {
+    if (next === scaleRef.current) return;
+    const container = scrollContainerRef.current;
+    // A reader at the very top stays there. Anchored on page 1 from above
+    // the column's padding, the first fit at open left the view a few
+    // pixels down the first page.
+    placeRef.current = null;
+    if (container && container.scrollTop > 0) {
+      const view = container.getBoundingClientRect();
+      let best: { page: number; into: number } | null = null;
+      let most = 0;
+      for (const [page, element] of Object.entries(pageRefs.current)) {
+        if (!element.isConnected) continue;
+        const box = element.getBoundingClientRect();
+        const seen =
+          Math.min(view.top + container.clientHeight, box.bottom) -
+          Math.max(view.top, box.top);
+        if (seen > most && box.height > 0) {
+          most = seen;
+          best = {
+            page: Number(page),
+            into: (view.top - box.top) / box.height,
+          };
+        }
+      }
+      placeRef.current = best && {
+        ...best,
+        centre:
+          container.scrollWidth > container.clientWidth
+            ? (container.scrollLeft + container.clientWidth / 2) /
+              container.scrollWidth
+            : 0.5,
+      };
+    }
+    scaleRef.current = next;
+    setScale(next);
+  };
+
+  useLayoutEffect(() => {
+    const place = placeRef.current;
+    placeRef.current = null;
+    const container = scrollContainerRef.current;
+    const element = place && pageRefs.current[place.page];
+    if (!place || !container || !element?.isConnected) return;
+    const view = container.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    container.scrollTop += box.top - view.top + place.into * box.height;
+    if (container.scrollWidth > container.clientWidth) {
+      container.scrollLeft =
+        place.centre * container.scrollWidth - container.clientWidth / 2;
+    }
+  }, [scale]);
+
   // Auto-fit so nothing needs sideways scrolling: scale 1.0 is the PDF's
   // native point size, which fits an A4 portrait page but overflows for 16:9
   // slides and for the landscape pages that turn up partway through an
@@ -258,7 +362,7 @@ export function PDFViewer({
     const applyFit = () => {
       const available = container.clientWidth - 32; // p-4 padding
       if (available <= 0) return;
-      setScale(fitScale(widestPage, available, 1));
+      rescale(fitScale(widestPage, available, 1));
     };
 
     applyFit();
@@ -308,17 +412,23 @@ export function PDFViewer({
     logError(error, "PDF Viewer - Document Load");
     setError("Failed to load PDF. Please try again later.");
     setLoading(false);
+    // A failed reload leaves no pages on screen, as a failed first load
+    // does, so the counter and its buttons go back to that state. They kept
+    // the old document's page count, and "next" counted up over page boxes
+    // no longer in the page.
+    setNumPages(null);
+    setPageNumber(1);
   };
 
   // Both flag userZoomed so the auto-fit stops overriding a deliberate choice
   // on the next resize.
   const zoomIn = () => {
     setUserZoomed(true);
-    setScale((prevScale) => Math.min(prevScale + 0.2, MAX_SCALE));
+    rescale(Math.min(scaleRef.current + 0.2, MAX_SCALE));
   };
   const zoomOut = () => {
     setUserZoomed(true);
-    setScale((prevScale) => Math.max(prevScale - 0.2, MIN_SCALE));
+    rescale(Math.max(scaleRef.current - 0.2, MIN_SCALE));
   };
 
   // Pages that have a box to scroll to: every page once the sizes are known,
@@ -353,9 +463,14 @@ export function PDFViewer({
     }
   };
 
-  // Update page number based on scroll position
+  // Update the page number from the page most in view: on every scroll, and
+  // on every layout that moves the pages without one. A zoom or a fit
+  // rescales every page box under the same scroll offset (zooming out on
+  // page 100 of the thesis showed page 120 under a counter still at 100, in
+  // Chromium and WebKit alike), and a new document lays the boxes out
+  // again.
   useEffect(() => {
-    const handleScroll = () => {
+    const updatePageNumber = () => {
       if (!scrollContainerRef.current || !numPages) return;
 
       const container = scrollContainerRef.current;
@@ -389,10 +504,19 @@ export function PDFViewer({
     };
 
     const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener("scroll", handleScroll);
-      return () => container.removeEventListener("scroll", handleScroll);
+    if (!container || !numPages) return;
+    container.addEventListener("scroll", updatePageNumber);
+    // The viewer and the column of pages inside it: between them, a resize,
+    // a zoom, a fit and a reload each change a size this reports.
+    const observer = new ResizeObserver(updatePageNumber);
+    observer.observe(container);
+    if (container.firstElementChild) {
+      observer.observe(container.firstElementChild);
     }
+    return () => {
+      container.removeEventListener("scroll", updatePageNumber);
+      observer.disconnect();
+    };
   }, [numPages]);
 
   // Memoize PDF options to prevent unnecessary re-renders
@@ -499,7 +623,15 @@ export function PDFViewer({
               <span>Some fonts in this PDF may not display correctly.</span>
             </div>
             <button
-              onClick={() => setDisableFontFace(true)}
+              onClick={() => {
+                // react-pdf destroys the current document as soon as the
+                // options change, long before the new one loads: the
+                // measuring in flight then rejects into zero sizes, which
+                // landed while their load still looked current and
+                // collapsed every page box. A new load id drops them.
+                loadIdRef.current++;
+                setDisableFontFace(true);
+              }}
               className="text-xs text-yellow-700 dark:text-yellow-300 hover:underline"
               aria-label="Use fallback fonts for better compatibility"
             >
@@ -509,16 +641,35 @@ export function PDFViewer({
         </div>
       )}
 
-      {/* PDF Content */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+      {/* PDF Content: a Tab stop of its own, so the keyboard can scroll a
+          PDF with nothing to focus in it (posters, slides: no links). */}
+      <div
+        ref={scrollContainerRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Pages"
+        className="flex-1 overflow-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+      >
         {/* w-max + min-w-full: fills and centres while the page is
             narrower than the viewer, and grows with it once zoomed in so
             the overflow stays reachable. A plain centred flex item that
             outgrows its container puts its left edge out of scroll range. */}
         <div className="flex flex-col items-center p-4 w-max min-w-full">
+          {/* In words too: the icon alone said nothing to a screen reader,
+              and it stands still in Safari and with motion off, where a
+              load looked like a hang. */}
           {loading && (
-            <div className="flex items-center justify-center h-96">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div
+              role="status"
+              className="flex flex-col items-center justify-center gap-3 h-96"
+            >
+              <Loader2
+                aria-hidden="true"
+                className="w-8 h-8 animate-spin text-primary"
+              />
+              <p className="text-sm text-muted-foreground">
+                Loading the PDF...
+              </p>
             </div>
           )}
 
@@ -536,11 +687,15 @@ export function PDFViewer({
             </div>
           )}
 
+          {/* No message of react-pdf's own: the viewer shows its spinner and
+              its error above, and react-pdf's default "Failed to load PDF
+              file." repeated the error under it. */}
           <Document
             file={url}
             onLoadSuccess={onDocumentLoadSuccess}
             onLoadError={onDocumentLoadError}
             loading=""
+            error=""
             options={pdfOptions}
           >
             {/* Every page for natural scrolling, each in a box of its own
@@ -551,6 +706,7 @@ export function PDFViewer({
                 const page = index + 1;
                 const size = sizes?.[index];
                 const drawn = sizes ? nearPages.has(page) : true;
+                const linkCallbacks = linkNames.pageCallbacks(page);
                 return (
                   <div
                     key={`page_${page}`}
@@ -590,6 +746,17 @@ export function PDFViewer({
                         renderAnnotationLayer={true}
                         onRenderTextLayerError={handleTextLayerError}
                         onGetTextError={handleTextLayerError}
+                        onGetAnnotationsSuccess={
+                          linkCallbacks.onGetAnnotationsSuccess
+                        }
+                        onGetTextSuccess={linkCallbacks.onGetTextSuccess}
+                        // The text layer is off with fallback fonts: a page
+                        // not yet named fetches its text itself.
+                        onLoadSuccess={
+                          disableFontFace
+                            ? linkCallbacks.onLoadSuccess
+                            : undefined
+                        }
                       />
                     </div>
                   </div>

@@ -4,7 +4,6 @@ import { TypeWriter } from "@/components/ui/TypeWriter";
 import { SocialLinks } from "@/components/ui/SocialLinks";
 import { greeting } from "@/data/portfolio";
 import { FileText, Mail } from "lucide-react";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { cn } from "@/lib/utils";
 import { pdfReaderIntent } from "@/lib/pdf-reader-preload";
 
@@ -73,7 +72,7 @@ export function IntroductionContent({
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg"
                 type="button"
               >
-                <ProtectedLucideIcon Icon={FileText} className="w-5 h-5" />
+                <FileText className="w-5 h-5" />
                 View Resume
               </button>
 
@@ -82,7 +81,7 @@ export function IntroductionContent({
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 type="button"
               >
-                <ProtectedLucideIcon Icon={Mail} className="w-5 h-5" />
+                <Mail className="w-5 h-5" />
                 Contact Me
               </button>
             </div>

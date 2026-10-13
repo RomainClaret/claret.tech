@@ -42,7 +42,7 @@ export function LanguageSpectrum({
                 "border border-transparent",
                 isHovered
                   ? "bg-muted/50 border-muted-foreground/20 text-foreground"
-                  : "text-muted-foreground/70 hover:text-muted-foreground",
+                  : "text-muted-foreground hover:text-foreground",
               )}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -50,11 +50,11 @@ export function LanguageSpectrum({
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              <span className="text-sm opacity-80">{lang.flag}</span>
+              <span className="text-sm">{lang.flag}</span>
               <span>{lang.language}</span>
               {isHovered && (
                 <m.span
-                  className="text-[10px] opacity-60 ml-1"
+                  className="text-[10px] ml-1"
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}

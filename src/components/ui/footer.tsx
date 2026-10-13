@@ -1,7 +1,6 @@
 "use client";
 
 import { footerNote, socialMediaLinks } from "@/data/portfolio";
-import { FadeIn } from "@/components/ui/animated";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { useEffect, useState } from "react";
 import {
@@ -57,7 +56,7 @@ export function Footer() {
   return (
     <footer className="bg-muted/50 border-t border-border">
       <div className="container mx-auto px-4 py-12">
-        <FadeIn className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Social Links */}
           {socialMediaLinks.display && (
             <div className="flex justify-center gap-6 mb-8">
@@ -209,7 +208,7 @@ export function Footer() {
               </button>
             </div>
           </div>
-        </FadeIn>
+        </div>
       </div>
     </footer>
   );

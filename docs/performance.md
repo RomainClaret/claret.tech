@@ -46,6 +46,13 @@ before and after a change.
 | W1  | WebKit, hero, idle                                              | BALANCED forced                            |
 | P1  | `/pdf/phd-thesis` at DPR 2: canvas memory                       | n/a                                        |
 
+The forced tiers are a manual pick (`quality-auto=false`), which runs no
+frame sampler since `b020d8d`, and an automatic tier runs none while
+animations are off since `ce9565a` (Safari's default): the sampler only
+feeds the automatic loop and, at battery saver, auto-disable. With
+animations playing its share is within noise ("Frame sampler", below), so
+S1 to S6 still stand for an automatic visit at their tier.
+
 ## What the columns mean
 
 | Column        | Meaning                                                                           |
@@ -239,6 +246,27 @@ How it holds together:
   its first paint. A working bundle removes it first (0.5 s after the first
   paint here, 3.6 s on Fast 3G with a 4x slower CPU); on Slow 3G the page
   shows 6 s after the first paint.
+- **Content that framer starts at opacity 0 shows without framer.**
+  framer-motion puts each `m` element's initial state in the HTML, which
+  for most of the text in `<main>` is opacity 0, and only its features
+  chunk, loaded after hydration since `acd4ead`, animates it in. When that
+  chunk fails, the bundle never runs or scripts are off, `globals.css` shows
+  that content instead: at once when the chunk failed twice (MotionProvider
+  asks once more a second after a first failure, so a transient one still
+  ends with the animations, then marks `<html data-motion-features>`), 6 s
+  after the first paint when nothing
+  said it arrived, and at once under `<noscript>`. Readable text in
+  `<main>` without scrolling went from 14% to 84-86% in those three cases,
+  against 85% on a normal visit. On Fast 3G with a 4x slower CPU the
+  features arrive 4.1 s after the first paint and nothing changes; on Slow
+  3G the content shows at 11.1 s instead of 19 s, and fades in once more
+  when the features arrive (18.9 s).
+  The experience timeline's cards wait for an IntersectionObserver of
+  their own, with classes rather than framer's inline styles, so these
+  rules missed them: 43% of that section could be read without scripts or
+  when the bundle never ran. They mark the wait (`data-reveal="pending"`)
+  and the same rules show them, except when only framer's chunk failed:
+  their observer still brings them in then.
 - **A page on screen before the splash keeps the screen.** When the 4 s
   timer or the CSS fallback uncovers the page before the splash shows (Slow
   3G: the splash used to arrive 7.7 s later and cover the page for two
@@ -246,11 +274,24 @@ How it holds together:
   (browser detection, the background, the projects) but shows nothing.
   AppWrapper sees the fallback through its `animationend`, or on mount if
   it ended before hydration.
+- **If the splash's own chunk fails, the page shows without it.** Its
+  loader goes through `withLoadFallback`: the stand-in tries once more as
+  it mounts (webpack forgets a failed chunk, so the second `import()`
+  requests it again), then `SplashUnavailable` completes the splash, which
+  removes the backdrop and opens the terminal's gate. Before, React.lazy
+  threw into AppWrapper's error boundary and the whole site became its
+  error screen until a reload. With every request for the chunk aborted,
+  the page shows at 0.45 s (Chromium) and 0.70 s (WebKit). A clean load is
+  unchanged: one request, and the splash shows at a median of 346 ms
+  against 351 ms before (Chromium).
 - **Guards:** `.github/scripts/check-static-home.mjs` fails the build job if
   `/` stops being prerendered or a middleware returns;
   `tests/e2e/static-shell.spec.ts` pins the first paint, a clean hydration,
-  the no-script page, the page when the bundle never runs, and no splash
-  over a page already on screen.
+  the no-script page, the page when the bundle never runs or the splash,
+  its player or the hero's brains cannot be fetched, and no splash over a
+  page already on screen; `tests/e2e/motion-fallback.spec.ts`, the
+  content when framer's features never arrive, and that a normal visit
+  keeps its entrance animations.
 
 Checked against a build of the commit before, in Chromium and WebKit, light
 and dark: after the splash the theme, tier, browser attributes and site grid
@@ -322,6 +363,58 @@ target the part 2 plan set.
   The spread is wide: the same build read 14 to 18 in one set of runs and
   36 to 46 in the next, an hour later.
 
+### Frame sampler (2026-10-10)
+
+The frame sampler (`useFpsOnly`) requested a frame on every display refresh
+for the whole visit, whether or not the quality loop or auto-disable read
+it. On an otherwise still page each callback is a full rendering update
+(style, layout, IntersectionObserver checks, a commit) that draws nothing.
+Since `b020d8d` it samples only while the automatic loop runs or
+auto-disable can count (battery tier, animations on), and since the fix
+after it, no longer once auto-disable has switched animations off: it
+kept sampling there for the rest of the session, on exactly the slowest
+machines. Measured with a
+scratch script, not measure.mjs: a rAF counter, a CDP trace (5 s), `ps` CPU
+per process (10 s), cookie notice dismissed. Chromium, manual LOW,
+animations off, 4 runs per side, load 5 to 13:
+
+| Metric                   | before | after |
+| ------------------------ | -----: | ----: |
+| rAF callbacks/s          |  120.8 |   0.8 |
+| BeginMainFrame/s (trace) |  107.5 |   3.3 |
+| Commits/s (trace)        |  113.2 |   9.6 |
+| Frames drawn/s (trace)   |    0.4 |   0.4 |
+| Main thread busy, ms/s   |   46.4 |  13.3 |
+| Renderer CPU, ms/s       |   84.4 |  22.8 |
+| GPU process CPU, ms/s    |   27.3 |   5.0 |
+
+Playwright's WebKit runs rAF at 60/s and pays more per callback: 159
+against 42 ms/s of CPU across its WebContent, UI and GPU processes in the
+same case. With animations playing (manual BALANCED) the sampler added 118
+callbacks/s but no measurable main-thread time (275.8 against 275.1 ms/s).
+
+An automatic visit with animations off, Safari's default, kept sampling
+all visit after that: 105 to 114 ms/s of CPU in WebKit over two series
+(166 against 61, 171 against 57). A still page always measures as fast,
+so its tier also climbed, LOW to BALANCED within 20 s. Since `ce9565a` the
+automatic loop, and its sampling, hold while animations are off and start
+over when they play again. WebKit, automatic tier, animations off, 3 runs
+per side:
+
+| Metric                |   before | after |
+| --------------------- | -------: | ----: |
+| rAF callbacks/s       |     60.1 |   0.5 |
+| WebContent CPU, ms/s  |    122.3 |  48.9 |
+| UI process CPU, ms/s  |     27.2 |   3.0 |
+| GPU process CPU, ms/s |     16.5 |   9.0 |
+| Tier after 20 s       | BALANCED |   LOW |
+
+What a visitor sees: with animations off, a Safari visit keeps LOW's grid
+(opacity 0.2, background 0.08) instead of drifting to BALANCED's (0.5,
+0.25) on those readings. After auto-disable the tier stays at battery
+saver, where it no longer climbs and announces "quality restored" while
+the animations stay off.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
@@ -333,7 +426,13 @@ target the part 2 plan set.
   nodes) and no `public/pdf.worker.min.mjs` (made by `scripts/setup-assets.js`,
   which `npx next build` skips, so its PDF reader failed to load). Link or copy
   them before building. The first comparisons on 2026-10-07/08 lacked both and
-  favoured the baseline.
+  favoured the baseline. The full list: `.env.local`, `node_modules` (a
+  link), `public/pdf.worker.min.mjs`, `public/profile.json`,
+  `public/pdfs/RomainClaret_CV.pdf`, `public/pyodide/` (the terminal's
+  Python), and the two caches `src/lib/utils/kudos-cache.json` and
+  `medium-cache.json`. Compare sizes within one checkout: two builds of the
+  same commit, one in the main checkout and one in a fresh worktree, gave
+  `/` sizes 809 B apart, with every chunk id changed (2026-10-11).
 - **Check for strays.** A test run that hangs can leave a forked vitest worker
   ("node (vitest 1)") at several cores; `pkill -f "vitest run"` does not reach
   it. One skewed an hour of measurements here. Look at `ps` first.
@@ -366,8 +465,119 @@ target the part 2 plan set.
   (`no-webgl`), which starts at LOW but may be raised after 60 s, so its S7
   and S8 numbers are not comparable. The harness records the verdict with
   each run (`probe`) and prints it for the scenarios on the automatic tier.
+- **Headless WebKit stalled on macOS: Playwright ran a build for an older
+  macOS.** A test's `page.evaluate` never returned, and the context then
+  failed to close: 60 s each, in about half of all `navigation.spec` runs on
+  2026-10-11, on every build tried, with every WebKit process idle (a
+  protocol stall, not a busy page). Playwright 1.57 caps macOS at version 15,
+  so on macOS 27 it ran WebKit 26.0 (build 2227) made for macOS 15. 1.64
+  runs WebKit 27.2 (build 2370) made for macOS 26: alternating 10 runs each
+  of `navigation.spec` and `pdf-reader.spec`, 1.57 failed 8 (1.9 to 2.9 min
+  each), 1.64 none (27 to 33 s), Fisher p = 0.0007 (2026-10-12). Before
+  calling a browser problem environmental, check which build Playwright
+  picks for the OS (`hostPlatform`), and judge a timeout by an A/B with a
+  concurrent control, never by a count from another day. And look for
+  strays first: a probe that had timed out kept a WebKit browser running
+  for 18 hours.
+- **Test mode must not change the layout under test.** A test-mode style
+  gave every nav, button and link `position: relative` and a z-index of
+  10002: in Chromium the fixed navigation scrolled away, and the logo test
+  passed because its helper forced styles and scrolled to the top itself;
+  `sr-only` links lost their clip and sat on screen at 168 x 19, so the
+  skip link test clicked a link no visitor sees. Gone since 2026-10-11:
+  tests see the site as it ships, and `ensureElementNotBlockedByToast`
+  fails instead of forcing its way.
+- **axe cannot decide on text over gradients, blurs or other elements.**
+  The axe tests fail on any contrast failure since 2026-10-11 (384 had
+  built up while they let them through), but on the homepage axe set aside
+  about 500 texts, the stat numbers among them: a clean run proves only
+  what it could measure. Measure the
+  rest on pixels: make the text transparent, capture its box (its own
+  range, not its padding or border), lay its colour over every pixel, and
+  take the 10th percentile (2026-10-11: 93 failures in the light theme
+  that axe never reported). Emulate reduced motion first, and tag the
+  elements before scrolling: axe's selectors carry state that a scroll
+  changes (`data-anim="off"`). Read `color(srgb ...)`, which `color-mix()`
+  computes to, in 0 to 1.
+- **Measure after the page settles.** `scroll-behavior: smooth` makes
+  `focus()` and `scrollTo()` animate, so poll for the end or scroll
+  `instant`ly; and a dialog fading in reads to axe at its partial opacity
+  (a 6.7:1 badge measured 1.01). A panel that springs in moves under a
+  hit test: points taken from its box mid-spring fell on the terminal's
+  edge, so wait for its transform to settle. Colours too: right after an
+  arrow key, WebKit gave axe one frame of a tab whose `transition-colors`
+  had moved its background but not its text (#9ca3af on #1e40af, 3.43:1),
+  and with motion the scan read every change at its start. Wait for the
+  running animations inside what is scanned (skip endless ones).
+- **The API's rate limit counted local test browsers as one client.** It
+  keys a client by IP and the first 50 characters of its user agent, and
+  locally no proxy sets an IP: all the test browsers of an engine shared
+  100 requests a minute, and each homepage load spends 6. One run of the
+  terminal spec (27 loads in 26 s) had 38% refused on a fresh bucket and
+  99% right after another run, and the sections fell back without a word.
+  Since 2026-10-12 `tests/e2e/utils/fixtures.ts` gives each test its own
+  `x-real-ip` (0 of 326 refused), and every spec imports `test` from it.
+  A header on the context, not a route: routing turns the HTTP cache off.
+  Contexts a test makes with `browser.newContext()` inherit it with the
+  test's other context options. Playwright's WebKit drops it now and then:
+  4 of 2,110 WebKit API requests in a full gate (Chromium: 0 of 1,119),
+  ordinary page fetches, all within the first seconds of a run while six
+  workers start their browsers; the test running at each, alone, sent 60
+  with the header in 10 runs. They land in the shared bucket, which no
+  test relies on.
+- **`test.use({ reducedMotion })` needs Playwright 1.64.** 1.57 had no such
+  test option and ignored the key, so `terminal.spec.ts`, written for a
+  reduced-motion page on 2026-08-04, ran with motion until the upgrade. The
+  spec now asserts the media query. TypeScript flagged the key from the
+  start (TS2353), but nothing type-checked test files until
+  `tsconfig.test.json` (2026-10-12), which found 61 more errors in 9 unit
+  test files.
+- **Load can also understate.** Under a load average of 83 to 190 the
+  frame sampler read cheaper than on a quiet machine (main thread 35
+  against 46 ms/s): the pipeline dropped frames, 79 traced BeginMainFrames
+  a second against 107.
+- **A test that orders events by the clock fails on a slow machine.**
+  static-shell held the splash chunk a fixed 6 s and assumed the 4 s timer,
+  which starts after hydration, came first: with the other chunks 5 s late
+  it failed every run, and under load 3 of 40. Hold each request until the
+  event it must follow (the page showing, the check after the first
+  failure) and let it go then: 20 of 20 since, and 3 of 3 with the delay.
+  CPU throttling past ~12x is not the same test: there the page stops
+  answering at all (the cliff in terminal.spec's header).
+- **No stopwatch in unit tests.** A jsdom render timed against 10 to 100
+  ms measures the machine: the button's failed at 37 ms under a load
+  average of ~500 and passed 29 of 29 runs at ~35. Guards against work
+  that grows faster than its input keep a ceiling a loaded runner cannot
+  reach (`sanitize.test.ts`, `markdown-server.test.ts`: 2,000 ms).
+- **Firefox and CI's Linux browsers run here in Playwright's image.**
+  Firefox does not start inside the macOS sandbox, and CI's WebKit is
+  Linux. Build a worktree as CI does (`SERVE_HTTP=true`,
+  `USE_GITHUB_DATA=false`, ...) and serve it with `SKIP_EXTERNAL_APIS=true`;
+  in `mcr.microsoft.com/playwright:v1.64.0-jammy` (arm64 here, Node 24),
+  copy `package.json`, the lockfile, `playwright.config.ts` and `tests/`
+  into the container and `npm ci --ignore-scripts` there (never into a
+  tree whose `node_modules` is the Mac's), start a small TCP forwarder so
+  `localhost:3000` reaches `host.docker.internal:3000` (the page stays a
+  secure context, and the config's `webServer` finds a server instead of
+  starting `npm run dev`), then run with `CI=true` and `--retries=0`.
+  Chromium and Firefox are dependable there; WebKit on arm64 is not (most
+  of its failures were "Page crashed" or clicks stuck on stability, on
+  the commit before as on the one after), so CI's x64 WebKit stays the
+  judge. Run the commit before too: on 2026-10-13 every failure the run
+  found was already there (PDF link names without their number in Linux
+  Firefox and WebKit, the fallback fonts differing; a Firefox flake on
+  the dashboard's close button; a Chromium flake in the reader's
+  fallback-fonts reload).
 
 ## Traps found on the way
+
+- **A requestAnimationFrame loop that draws nothing is not free.** The
+  frame sampler's callback is a few lines of arithmetic, yet on the still
+  homepage it cost 33 ms/s of main thread and about 84 ms/s of CPU across
+  Chromium's renderer and GPU processes, and about 117 ms/s in WebKit: each
+  callback runs a rendering update and a commit at the display rate, with
+  no frame drawn. Count BeginMainFrame, Commit and DrawFrame in a trace
+  before calling a page idle.
 
 - **A CSS `opacity` animation on an SVG element gets its own compositor
   layer** in Chromium, even while paused. Forty grid circles became forty
@@ -385,6 +595,215 @@ target the part 2 plan set.
 - **next/dynamic fetches when it renders.** A component rendered closed
   (`<Modal isOpen={false}>`) still downloads its chunk. Mount it only while
   open, and preload on intent (`load-on-intent.ts`).
+- **A failed next/dynamic chunk is an error, not an empty slot.** React.lazy
+  throws while rendering and keeps the rejection, so the nearest error
+  boundary takes over, and its "Try Again" cannot fetch the chunk again.
+  That was the whole site for the splash, its Lottie player and the
+  terminal's performance monitor, dashboard and report, everything under
+  the navigation for the hero's brains, and the reader on `/pdf/<slug>`.
+  Loaders on those paths now go through `withLoadFallback`. Test one by
+  aborting the chunk whose code contains a given string (`routeChunk` in
+  `static-shell.spec.ts`).
+- **A dialog rendered inside the page stays under it.** Every section sits
+  under AppWrapper's `relative z-10`, and each project card's grid item is a
+  stacking context of its own (its entrance animation keeps a transform), so
+  no z-index lifts what renders inside one above the next card or the
+  root-level cookie notice (`z-50`). The project cards' details panel painted
+  under the next row and gave it its links' clicks, and the PDF reader sat
+  under the cookie notice, a quarter of a phone's screen. Render a dialog
+  through a portal to `<body>` (`project-details-dialog.tsx`,
+  `pdf-modal.tsx`, `z-[9999]` as PerformanceModal), and once, outside the
+  clickable card: React events bubble through a portal along the component
+  tree, so inside the card every click in the dialog would reach the card's
+  handler. At the same z-index, the later element in the document paints
+  on top: the performance dashboard, rendered in place, opened from the
+  terminal under a PDF reader already open (a portal at the end of
+  `<body>`), so it portals too, and the one opened last is on top. So do
+  the performance monitor and the stand-ins for the dashboard, report and
+  monitor (2026-10-12): every point of the monitor opened over the reader
+  was the reader's. A panel that is not modal leaves an Escape typed inside
+  a modal dialog to that dialog.
+- **The cookie notice comes first in the page.** GOV.UK places its cookie
+  banner first in `<body>`, before the skip links. Last in `<body>`, the
+  notice came after the whole page, and after "Got it!" WebKit's next Tab
+  left the page for the browser's own controls. It renders through a
+  portal into a container prepended to `<body>` while it shows, a region
+  named "Cookies on claret.tech"; after "Got it!" the next Tab is the skip
+  link. Tests that tab or scan from the top and are not about the notice
+  acknowledge it first (`tests/e2e/utils/cookie-notice.ts`): it shows 1 s
+  after load, so they met it or not by timing.
+- **`/rss.xml` read the site's own API over HTTP.** Each poll was a second
+  request through the rate limiter (every RSS reader one client), made
+  `/api/medium-posts` scrape each post's page for images the feed never
+  uses, and in a local or preview build read production. Both read
+  Medium's feed through `fetchMediumFeed` (`src/lib/utils/medium-feed.ts`)
+  now.
+- **One scroll lock, counted.** The dialog hook, the performance dashboard
+  and the splash each wrote `body.style.overflow` and wrote back their own
+  idea of unlocked ("", "unset", "auto"), so whichever closed first
+  unlocked the page under the other. `lockPageScroll` (`scroll-lock.ts`)
+  counts: the first lock saves the inline value, the last release puts it
+  back.
+- **A hint laid over a panel takes its clicks.** The dashboard's "Press
+  ESC to close" floated at the window's top right, after the panel: below
+  1920 px wide it covered the header's minimize and close buttons, at
+  1280 x 720 a click at the close button's centre landed on it, and at
+  opacity 0, before it faded in, it already caught clicks. It sits in the
+  header now, where the layout keeps it apart from the buttons.
+- **A run started on "no result yet" loops on failure.** The report dialog
+  generated whenever no run was in flight and no report had come back. A
+  failed run ends that way too, so with the API answering 429 it started
+  over every 2.2 s, a new request each time, and cleared its error before
+  anyone could read it. It generates once per opening now.
+- **`statusText` is empty over HTTP/2.** HTTP/2 carries no reason phrase,
+  and production serves HTTP/2, so the report's error, built from
+  `response.statusText`, read "Failed to generate report: " and nothing
+  more. Say what the API said (`{ error, retryAfter }`) or the status code.
+- **A tap on a card still sliding in can scroll the page.** A card's 20 px
+  entrance starts when an IntersectionObserver reports it in view, a frame
+  or two after a test scrolls to it, so a trial tap or a wait for identity
+  transforms both run before it starts. A tap on the moving button waits,
+  retries, and Playwright 1.64 then scrolled the page 410 px to place it,
+  after the test had read the page's position (14 of 20 runs). A test that
+  is not about motion runs with reduced motion.
+- **The unit tests' `performance` has no methods.** `src/test/setup.ts`
+  spreads it into a plain object to mock `now`, and a spread copies none of
+  a class's methods, so `getEntriesByType` is missing; and vitest's fake
+  timers, by default, fake `performance` too and rebuild it the same way.
+  Fake only the timers (`toFake`) and define what the code reads.
+- **A line clamp does not stop a stretched box.** `-webkit-line-clamp` only
+  places the ellipsis; the lines after it are still laid out, and a box
+  stretched taller than the clamp (`flex-grow` in a card that a taller
+  neighbour stretches) shows them: 5 lines under a 2-line clamp on a phone.
+  Let a wrapper take the spare height and keep the clamped element at its
+  own.
+- **WebKit's Tab skips links and buttons.** Safari's default (and
+  Playwright's macOS WebKit) moves Tab between form fields and elements with
+  an explicit tabindex only (framer's tap gesture gives its buttons
+  `tabindex="0"`, so those count). A focus trap that wraps only at its first
+  and last control may never run: the PDF reader's own trap let the first
+  Tab from its close button leave it, and Shift+Tab walk the page behind it;
+  the legal texts' trap let all 12 Tab presses out. The modal dialogs (the
+  reader and its stand-in, the legal texts, a project's details, the
+  performance tools' stand-ins) now use `useModalDialog`, which moves focus
+  by hand on every Tab and Shift+Tab; the performance dashboard and report
+  are not modal dialogs and have no trap at all. In jsdom a Tab moves
+  nothing either, which is how a unit test catches the half trap.
+- **One Escape, one layer.** The performance monitor hides on Escape
+  through a `window` listener, and `window` comes after `document`, where
+  the dialogs listen, so one Escape closed a dialog and hid the monitor
+  with it. Whoever uses Escape now calls `preventDefault()`, and the
+  monitor skips a marked one. A dialog's own handler must not skip marked
+  keys: stacked dialogs register bottom first. The terminal sits above all
+  of them (z 10000), and xterm cancels Escape and Tab at its textarea, so
+  nothing it opened (the monitor, the dashboard, the report) could be
+  closed with Escape while typing there. It now lets Escape through
+  (`attachCustomKeyEventHandler` returning false skips xterm without
+  cancelling the event; neither the shell nor the REPL reads it), and a
+  dialog ignores an Escape whose target is an element outside it, other
+  than `body`, so Escape in the terminal never closes the reader beneath
+  it.
+- **A lazily mounted dialog hears keys only once its effects have run.**
+  The dashboard, the report and every dialog on `useModalDialog` set up
+  their Escape and Tab handling in `useEffect`; mounted from a chunk, that
+  ran after the browser painted them, and a key pressed in between went
+  elsewhere: under a load average of ~480 an Escape pressed as soon as the
+  dashboard showed closed the performance monitor instead. They use
+  `useIsomorphicLayoutEffect` now (listeners, focus, scroll lock before
+  paint). To test it deterministically, render a probe after the dialog:
+  its layout effect runs after the dialog's and before any passive effect,
+  which is when such a key lands. (A MutationObserver firing at the first
+  mutation is not enough: React may flush passive effects in the same task
+  when a render is fast.)
+- **pdf.js gives each link's wrapper `tabindex="1000"`, and the link no
+  name.** A positive tabindex goes ahead of everything else in the Tab
+  order, and each wrapper holds the link itself. On `/pdf/<slug>` the first
+  Tab presses walked the wrappers before the page's own controls, skip links
+  included (21 on the CV, 2,184 on the PhD thesis), and in a dialog that
+  cycles through its controls every link would be two stops (48 instead of
+  27 on the CV). The viewer now resets the wrappers to -1, names web and
+  mail links by their address (`pdf-links.ts`), and names the 3,400 links
+  within the site's PDFs by the text printed under them
+  (`pdf-link-names.ts`). It watches with a
+  MutationObserver: pdf.js appends each wrapper after an await, so none is
+  in place when react-pdf reports the layer rendered. A `setTimeout(0)` from
+  that callback would see them today, as those awaits are microtasks, but
+  the observer relies on neither, and catches the layers every zoom
+  rebuilds. `useModalDialog` still leaves positive tabindex out, as a guard.
+- **The text under a PDF link is in the page's text content, not the
+  DOM.** pdf.js merges a printed line into one text item, so joining the
+  items a link overlaps gave the right text for 16% of links. Each item is
+  split into characters, the item's width shared out by each character's
+  width in the text layer's fallback font (measured once per character on
+  a canvas: 85 measurements for all 28 PDFs), and a character belongs to
+  the link when its centre is inside the link's rectangle; words are kept
+  whole. Against the same centre test on PyMuPDF's glyph boxes (link
+  rectangles derotated), run in node over all 28 PDFs with pdf.js's own
+  text content and macOS's Times, Helvetica and Courier widths
+  (2026-10-11), that text is exact for 97.4% of the 3,400 links, and 98.9%
+  of names read as printed. Where the widths put a neighbouring word under
+  a link ("4.7 discusses", "Sybil[44", "traces" for a chapter's "7"), the
+  word is dropped, and a chapter, appendix, equation, theorem, proposition
+  or definition link with no number read takes its target's: those
+  targets' numbers matched the printed ones on every link of the 28 PDFs.
+  A bare number gets a type word from the target
+  ("cite." gives "Reference 5") or from the label printed before it ("Ch.
+  4"), or, for a year, its author's name ("Markram et al, 2004", also when
+  the citation wraps between the two links): 97.9% of them. The names come
+  from react-pdf's `onGetAnnotationsSuccess` and `onGetTextSuccess`, which
+  arrive in either order, carry no page number, and fire again for every
+  page on each zoom, so each page is named once per document; with
+  fallback fonts the text layer is off and the page's text is fetched on
+  its own. Cost in node: 34 to 37 ms warm for all 474 pages with internal
+  links, about 60 ms cold; one page takes at most 0.6 ms warm, and the
+  first page 3 ms cold. The PDF's own description (`/Contents`) wins when
+  there is one. The target's suffix is never checked against a printed
+  number, nor used for sections, figures, tables or algorithms: arXiv's and
+  IEEE's anchors (`section.42` printed "4", `table.1` printed "I") would
+  have stripped 110 correct numbers and caught none.
+- **An observer on the whole document sees every text span.**
+  SVGProtectionWrapper watched `document.documentElement` with `subtree`
+  for circles added anywhere, and the PDF reader adds 53,486 text-layer
+  spans for the thesis: its callback ran about 13,700 times for 145,059
+  records, 37 to 44 ms per load and zoom, and it scanned every circle on
+  the page every 5 s, idle or not. It guarded against a radius no current
+  code produces, after the head script's `setAttribute` guard had already
+  fixed it. Retired (2026-10-11): in Chromium on `/pdf/phd-thesis`, 5 runs
+  a side, the median script time fell from 361 to 333 ms on load and from
+  266 to 242 ms on a zoom. Watch the smallest subtree that can change; the
+  reader's own link watcher reads only additions to an annotation layer
+  (13.8 ms for the same records).
+- **will-change on an ancestor moves every fixed element.** On a hovered
+  or pressed element, `:hover` and `:active` also hold for every ancestor
+  up to `html`, and `will-change: transform` on `body` makes it the
+  containing block of every fixed element: in WebKit the navigation's top
+  read -2000 after a 2,000 px scroll, instead of 0. globals.css's Safari
+  block had a rule giving exactly that back on `:hover`, `:focus` and
+  `:active`; it never applied, as the block's `will-change: auto` rule
+  outweighs it (0,2,1 against 0,2,0), and it is gone. The same block stops
+  Tailwind's spinners in Safari, which is why the PDF reader also says in
+  words that it is loading.
+- **A route handler can outlive its test.** One that reads a fetched
+  response while the test closes its context fails the test with "Response
+  has been disposed" (`close()` disposes the responses first, and the
+  handler's rejection reaches the worker as an unhandled one, even in the
+  fixture's teardown); under a parallel run it did. Call
+  `context.unrouteAll({ behavior: "ignoreErrors" })` before closing
+  (`closeContext` in static-shell and motion-fallback); `page.unrouteAll`
+  for routes on a page.
+- **A PDF's text layer answers `getByText`.** On `/pdf/phd-thesis`,
+  `getByText(/^\d+%$/)` found the zoom label alone right after the first
+  page drew, and 170 elements five seconds later, once the pages' text had
+  loaded.
+- **A class name built at runtime is not in the CSS.** Tailwind keeps a
+  class from an `@layer` only when it sees it written out. `animated.tsx`
+  built its classes at runtime (`animate-${name}`, `animation-delay-${ms}`),
+  so only those another file spelled out shipped: no `delay` but 200 ms did
+  anything, the slides in from the left and right never moved, and
+  globals.css's `opacity: 1 !important` hid every fade. Romain chose to keep
+  that look (2026-10-11): the 19 wrappers that did nothing are plain `div`s,
+  the 24 delays are gone, and `animated.tsx` writes out the two classes it
+  still adds, which `animated.test.tsx` checks.
 - **A stylesheet import can drag a chunk in.** `Terminal.tsx` imports
   `@xterm/xterm/css/xterm.css`, and the `terminal` cache group collects every
   `@xterm` module, so mounting the terminal component downloaded all of xterm.
@@ -431,8 +850,16 @@ target the part 2 plan set.
 - **A changed file under an immutable URL never reaches a returning
   visitor.** `/images`, `/animations` and `/pyodide` are served
   `max-age=31536000, immutable`, so the browser keeps its copy for a year
-  without asking. Bumping the service worker's cache does not help: its
-  fetch on a miss goes through that HTTP cache. Give changed content a new
-  URL: the splash data is `*.v2.json` since it was minified, and the resized
-  conference logos carry `?v=2` from `LOGO_VERSIONS` in
-  `conference-logos.ts`.
+  without asking. Give changed content a new URL: the splash data is
+  `*.v2.json` since it was minified, and the resized conference logos carry
+  `?v=2` from `LOGO_VERSIONS` in `conference-logos.ts`.
+- **A listener added after its event never fires.** The service worker was
+  registered on the window "load" event, from an effect: on the static
+  homepage hydration ends after "load" (118 ms against 150 ms in Chromium),
+  so it never registered, throttled or not, and nothing said so (the
+  site's error logging is silent in production). Check
+  `document.readyState` before waiting for "load". The worker only
+  repeated the HTTP cache for `/images`, `/fonts` and `/animations`, so it
+  is retired instead: the page removes it and its `claret-tech-*` caches
+  (`service-worker-cleanup.tsx`), and `public/sw.js` removes itself from a
+  browser that still runs an older one.

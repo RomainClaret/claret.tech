@@ -5,8 +5,9 @@
  * with proper accessibility features, focus management, and interactions.
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { useState } from "react";
 import { LegalModal } from "./legal-modal";
 
 // Mock Lucide React icons
@@ -34,25 +35,15 @@ describe("LegalModal", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
-
-    // Mock document.activeElement. Configurable, and deleted in afterEach:
-    // left in place it shadowed the real getter (on Document.prototype) for
-    // every later file in the worker, so nothing could be seen focused.
-    Object.defineProperty(document, "activeElement", {
-      value: document.body,
-      writable: true,
-      configurable: true,
-    });
-
-    // Reset body overflow
-    document.body.style.overflow = "auto";
+    // Closing puts the page back where it was; jsdom has no scrollTo.
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    document.body.style.overflow = "";
   });
 
   afterEach(() => {
-    document.body.style.overflow = "auto";
-    delete (document as { activeElement?: unknown }).activeElement;
-    vi.useRealTimers();
+    // Unmount first, so a close's scrollTo still meets the spy.
+    cleanup();
+    document.body.style.overflow = "";
     vi.restoreAllMocks();
   });
 
@@ -102,7 +93,9 @@ describe("LegalModal", () => {
       const dialog = screen.getByRole("dialog");
       expect(dialog).toHaveAttribute("aria-modal", "true");
       expect(dialog).toHaveAttribute("aria-label", "Test Title");
-      expect(dialog).toHaveAttribute("aria-describedby", "legal-content");
+      // Not described by its content: that was the whole text, read out in
+      // full as the description on open.
+      expect(dialog).not.toHaveAttribute("aria-describedby");
     });
 
     it("has proper heading structure", () => {
@@ -188,63 +181,104 @@ describe("LegalModal", () => {
   });
 
   describe("Focus Management", () => {
-    it("sets up focus management when modal opens", () => {
-      const { rerender } = render(
-        <LegalModal {...defaultProps} isOpen={false} />,
-      );
-
-      rerender(<LegalModal {...defaultProps} isOpen={true} />);
-
-      // Verify the close button exists and has the proper ref connection
-      const closeButton = screen.getByRole("button", { name: /close/i });
-      expect(closeButton).toBeInTheDocument();
-      expect(closeButton).toHaveAttribute("aria-label", "Close Test Modal");
-    });
-
-    it("handles keyboard navigation events", () => {
+    it("takes the focus when it opens", () => {
+      // On the dialog itself, as the site's other dialogs: a screen reader
+      // names it, and the first Tab goes to the close button.
       render(<LegalModal {...defaultProps} isOpen={true} />);
 
-      // Verify Tab key handling doesn't crash
+      expect(document.activeElement).toBe(screen.getByRole("dialog"));
       fireEvent.keyDown(document, { key: "Tab" });
-
-      // Verify Shift+Tab key handling doesn't crash
-      fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-
-      // Verify other keys don't interfere
-      fireEvent.keyDown(document, { key: "Enter" });
-
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: /close/i }),
+      );
     });
 
-    it("properly finds focusable elements in modal", () => {
+    it("moves Tab on from a link in the middle", () => {
+      // macOS WebKit's own Tab skips buttons and links, so a trap that only
+      // wrapped at the first and last control let it out from in between.
       render(
         <LegalModal {...defaultProps} isOpen={true}>
-          <button data-testid="first-button">First</button>
-          <input data-testid="input-field" />
-          <a href="#" data-testid="link">
-            Link
-          </a>
+          <p>
+            <a href="https://example.com/a">First link</a> and{" "}
+            <a href="https://example.com/b">second link</a>
+          </p>
         </LegalModal>,
       );
+      screen.getByRole("link", { name: "First link" }).focus();
 
-      // Verify all focusable elements are present
-      expect(
-        screen.getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
-      expect(screen.getByTestId("first-button")).toBeInTheDocument();
-      expect(screen.getByTestId("input-field")).toBeInTheDocument();
-      expect(screen.getByTestId("link")).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Tab" });
+
+      expect(document.activeElement).toBe(
+        screen.getByRole("link", { name: "second link" }),
+      );
     });
 
-    it("cleans up focus management when modal closes", () => {
-      const { rerender } = render(
-        <LegalModal {...defaultProps} isOpen={true} />,
+    it("lets the keyboard reach the text, to scroll it", () => {
+      // The License has no links: nothing in its text could take focus, so
+      // the keyboard had no way to scroll it.
+      render(
+        <LegalModal {...defaultProps} isOpen={true} title="GNU GPLv3">
+          <p>No links here.</p>
+        </LegalModal>,
       );
+      const text = screen.getByRole("region", { name: "GNU GPLv3 text" });
 
-      rerender(<LegalModal {...defaultProps} isOpen={false} />);
+      fireEvent.keyDown(document, { key: "Tab" });
+      fireEvent.keyDown(document, { key: "Tab" });
 
-      // Modal should be removed from DOM
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(text);
+    });
+
+    it("gives the focus back to its own opener after another was used", () => {
+      // The provider mounts all three with inline closers, so every render
+      // re-ran every instance's effect: a closed one's cleanup focused the
+      // opener it remembered from an earlier visit, without preventScroll,
+      // and the page jumped there.
+      function Provider() {
+        const [privacy, setPrivacy] = useState(false);
+        const [terms, setTerms] = useState(false);
+        return (
+          <>
+            <button type="button" onClick={() => setPrivacy(true)}>
+              Privacy
+            </button>
+            <button type="button" onClick={() => setTerms(true)}>
+              Terms
+            </button>
+            <LegalModal
+              isOpen={privacy}
+              onClose={() => setPrivacy(false)}
+              title="Privacy Policy"
+            >
+              <p>Privacy text</p>
+            </LegalModal>
+            <LegalModal
+              isOpen={terms}
+              onClose={() => setTerms(false)}
+              title="Terms of Service"
+            >
+              <p>Terms text</p>
+            </LegalModal>
+          </>
+        );
+      }
+      render(<Provider />);
+      const privacyOpener = screen.getByRole("button", { name: "Privacy" });
+      const termsOpener = screen.getByRole("button", { name: "Terms" });
+
+      termsOpener.focus();
+      fireEvent.click(termsOpener);
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      privacyOpener.focus();
+      const toTerms = vi.spyOn(termsOpener, "focus");
+      const toPrivacy = vi.spyOn(privacyOpener, "focus");
+      fireEvent.click(privacyOpener);
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      expect(document.activeElement).toBe(privacyOpener);
+      expect(toPrivacy).toHaveBeenCalledWith({ preventScroll: true });
+      expect(toTerms).not.toHaveBeenCalled();
     });
   });
 
@@ -254,7 +288,7 @@ describe("LegalModal", () => {
         <LegalModal {...defaultProps} isOpen={false} />,
       );
 
-      expect(document.body.style.overflow).toBe("auto");
+      expect(document.body.style.overflow).toBe("");
 
       rerender(<LegalModal {...defaultProps} isOpen={true} />);
 
@@ -270,7 +304,8 @@ describe("LegalModal", () => {
 
       rerender(<LegalModal {...defaultProps} isOpen={false} />);
 
-      expect(document.body.style.overflow).toBe("auto");
+      // Back to the stylesheet's own value, not a forced "auto".
+      expect(document.body.style.overflow).toBe("");
     });
 
     it("restores body scroll on unmount", () => {
@@ -282,7 +317,32 @@ describe("LegalModal", () => {
 
       unmount();
 
-      expect(document.body.style.overflow).toBe("auto");
+      expect(document.body.style.overflow).toBe("");
+    });
+
+    it("puts the page back instantly when it closes", () => {
+      // It only unlocked the page; the shared dialog hook also restores the
+      // place, instantly, past globals.css's smooth scroll-behavior.
+      Object.defineProperty(window, "scrollY", {
+        configurable: true,
+        value: 900,
+      });
+      try {
+        const { rerender } = render(
+          <LegalModal {...defaultProps} isOpen={true} />,
+        );
+        rerender(<LegalModal {...defaultProps} isOpen={false} />);
+
+        expect(window.scrollTo).toHaveBeenCalledWith({
+          top: 900,
+          behavior: "instant",
+        });
+      } finally {
+        Object.defineProperty(window, "scrollY", {
+          configurable: true,
+          value: 0,
+        });
+      }
     });
   });
 
@@ -402,16 +462,6 @@ describe("LegalModal", () => {
         "keydown",
         expect.any(Function),
       );
-    });
-
-    it("handles focus trap edge cases", () => {
-      render(<LegalModal {...defaultProps} isOpen={true} />);
-
-      // Modal with only close button should handle Tab gracefully
-      fireEvent.keyDown(document, { key: "Tab" });
-
-      // Should not throw errors
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
   });
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { socialMediaLinks } from "@/data/portfolio";
-import { FadeIn } from "@/components/ui/animated";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import {
@@ -43,7 +42,7 @@ export function SocialLinks() {
     });
 
   return (
-    <FadeIn className="flex flex-wrap gap-4 justify-center">
+    <div className="flex flex-wrap gap-4 justify-center">
       {links.map(({ name, url, Icon, color }, index) => (
         <a
           key={name}
@@ -81,6 +80,6 @@ export function SocialLinks() {
           </div>
         </a>
       ))}
-    </FadeIn>
+    </div>
   );
 }

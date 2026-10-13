@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 
 interface LegalModalProps {
@@ -19,64 +19,15 @@ export function LegalModal({
 }: LegalModalProps) {
   // Covers the page: decorative motion behind it pauses until it closes.
   useOverlayLock(isOpen);
-  const modalRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const previousActiveElement = useRef<HTMLElement | null>(null);
-
-  // Handle escape key and focus management
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    const handleFocusTrap = (e: KeyboardEvent) => {
-      if (e.key !== "Tab" || !modalRef.current) return;
-
-      const focusableElements = modalRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      const firstElement = focusableElements[0] as HTMLElement;
-      const lastElement = focusableElements[
-        focusableElements.length - 1
-      ] as HTMLElement;
-
-      if (e.shiftKey && document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement?.focus();
-      } else if (!e.shiftKey && document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement?.focus();
-      }
-    };
-
-    if (isOpen) {
-      // Store the currently focused element
-      previousActiveElement.current = document.activeElement as HTMLElement;
-
-      document.addEventListener("keydown", handleEscape);
-      document.addEventListener("keydown", handleFocusTrap);
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = "hidden";
-
-      // Focus the close button when modal opens
-      setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 100);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.removeEventListener("keydown", handleFocusTrap);
-      document.body.style.overflow = "auto";
-
-      // Restore focus to the previously focused element
-      if (previousActiveElement.current) {
-        previousActiveElement.current.focus();
-      }
-    };
-  }, [isOpen, onClose]);
+  // Focus, Tab, Escape, the page's scroll and its place, as the site's other
+  // dialogs. Its own trap only wrapped at the first and last control, so
+  // macOS WebKit's Tab left it from anywhere in between; and its cleanup ran
+  // for every instance on each render of the provider (inline closers), so
+  // a closed one sent focus, and the page, back to the opener it remembered
+  // from an earlier visit.
+  const dialogRef = useModalDialog<HTMLDivElement>(isOpen, onClose, {
+    lockScroll: true,
+  });
 
   if (!isOpen) return null;
 
@@ -91,18 +42,17 @@ export function LegalModal({
 
       {/* Modal */}
       <div
-        ref={modalRef}
-        className="relative w-full h-full max-w-4xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col border border-border"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="relative w-full h-full max-w-4xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col border border-border outline-none"
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        aria-describedby="legal-content"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
           <h1 className="text-2xl font-bold text-foreground">{title}</h1>
           <button
-            ref={closeButtonRef}
             onClick={onClose}
             className="p-2 rounded-lg bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             aria-label={`Close ${title}`}
@@ -111,10 +61,14 @@ export function LegalModal({
           </button>
         </div>
 
-        {/* Content */}
+        {/* Content: a Tab stop of its own, so the keyboard can scroll a text
+            with no links in it (the License). */}
         <div
           id="legal-content"
-          className="flex-1 overflow-y-auto p-6 text-foreground"
+          tabIndex={0}
+          role="region"
+          aria-label={`${title} text`}
+          className="flex-1 overflow-y-auto p-6 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
         >
           {children}
         </div>

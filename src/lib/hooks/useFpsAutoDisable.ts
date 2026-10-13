@@ -12,8 +12,10 @@ import { logWarning } from "@/lib/utils/dev-logger";
 
 interface AutoDisableState {
   isAutoDisabled: boolean;
+  /** When the cooldown began: the last auto-disable, or a force. */
   lastAutoDisableTime: number;
   consecutiveLowFpsCount: number;
+  /** Within the cooldown: nothing is counted, so nothing switches off. */
   cooldownActive: boolean;
 }
 
@@ -98,18 +100,31 @@ export function useFpsAutoDisable(
   const countedSampleRef = useRef(sample);
   const toastShownRef = useRef<boolean>(false);
 
-  // The running tier, and since when. The first seconds at a new tier are
-  // spent re-rendering for it, and the quality loop ignores them
-  // (settleMs): counted here, the frames the drop to battery itself cost
-  // could switch animations off before the battery tier had a chance.
-  const tierSinceRef = useRef({ tier: getMotionGate().tier, since: 0 });
+  // The running tier, whether the page is hidden or covered, and since
+  // when. The first seconds at a new tier are spent re-rendering for it,
+  // and the quality loop ignores them (settleMs): counted here, the frames
+  // the drop to battery itself cost could switch animations off before the
+  // battery tier had a chance. The same goes for the first seconds after
+  // the page shows again (a background tab, the splash, a modal), when
+  // everything that held still restarts. The sampler pauses meanwhile, so
+  // the settle could run out unseen, and slow samples from before the
+  // pause joined the first one after it as if in a row. The quality loop
+  // restarts its window there too.
+  const settleRef = useRef({
+    tier: getMotionGate().tier,
+    suspended: getMotionGate().suspended,
+    since: 0,
+  });
   useEffect(() => {
-    tierSinceRef.current = { tier: getMotionGate().tier, since: Date.now() };
+    const restart = () => {
+      const { tier, suspended } = getMotionGate();
+      settleRef.current = { tier, suspended, since: Date.now() };
+    };
+    restart();
     return subscribeMotionGate(() => {
-      const { tier } = getMotionGate();
-      if (tier !== tierSinceRef.current.tier) {
-        tierSinceRef.current = { tier, since: Date.now() };
-      }
+      const { tier, suspended } = getMotionGate();
+      const current = settleRef.current;
+      if (tier !== current.tier || suspended !== current.suspended) restart();
     });
   }, []);
 
@@ -135,13 +150,18 @@ export function useFpsAutoDisable(
     return isSafari ? safariThreshold : standardThreshold;
   }, [isSafari, safariThreshold, standardThreshold]);
 
-  // Force enable animations (for console command)
+  // The terminal's "animations force", and "animations play" after an
+  // auto-disable: a visitor asking for animations. They come back on and
+  // the protection pauses for the cooldown, the pause starting now; it is
+  // persisted, so a reload in this session keeps it. Clearing the cooldown
+  // instead let a page still that slow switch them off again five seconds
+  // later, although the terminal said the protection was bypassed.
   const forceEnableAnimations = useCallback(() => {
     const newState: AutoDisableState = {
       isAutoDisabled: false,
-      lastAutoDisableTime: 0,
+      lastAutoDisableTime: Date.now(),
       consecutiveLowFpsCount: 0,
-      cooldownActive: false,
+      cooldownActive: true,
     };
 
     setState(newState);
@@ -151,12 +171,34 @@ export function useFpsAutoDisable(
     // Defer toast to avoid render cycle issues
     setTimeout(() => {
       showToast(
-        "🎬 Animations force-enabled!\nCooldown period cleared.",
+        `🎬 Animations back on.\nAuto-disable is paused for ${COOLDOWN_DURATION_MS / 60_000} minutes.`,
         "success",
         5000,
       );
     }, 0);
   }, [persistState]);
+
+  // The pause ends on the clock, not on the next sample: samples are only
+  // counted at the battery tier with animations on, so after a force at
+  // another tier the stored pause outlived its 30 minutes, and the monitor
+  // read "Auto-disable paused: 0m" for the rest of the visit.
+  useEffect(() => {
+    if (!state.cooldownActive || state.lastAutoDisableTime === 0) return;
+    const end = () =>
+      setState((prevState) => {
+        if (!prevState.cooldownActive) return prevState;
+        const newState = { ...prevState, cooldownActive: false };
+        persistState(newState);
+        return newState;
+      });
+    const left = state.lastAutoDisableTime + COOLDOWN_DURATION_MS - Date.now();
+    if (left <= 0) {
+      end();
+      return;
+    }
+    const timer = setTimeout(end, left);
+    return () => clearTimeout(timer);
+  }, [state.cooldownActive, state.lastAutoDisableTime, persistState]);
 
   // Check cooldown status
   const checkCooldown = useCallback(() => {
@@ -189,7 +231,7 @@ export function useFpsAutoDisable(
     // dropped to the battery tier, and that tier has settled. Above that,
     // lowering the tier is the remedy, and switching motion off would
     // pre-empt it.
-    const { tier, since } = tierSinceRef.current;
+    const { tier, since } = settleRef.current;
     const atLastResort =
       tier === "battery" && now - since >= QUALITY_TUNING.settleMs;
     const isLowFps = atLastResort && currentFps < threshold;
@@ -233,7 +275,7 @@ export function useFpsAutoDisable(
           // Use setTimeout to defer toast to next tick and avoid updating during render
           setTimeout(() => {
             showToast(
-              `🎬 Performance Protection Active\n\nAnimations automatically disabled due to low FPS (${currentFps} < ${threshold}) for ${durationThreshold} seconds.\n\nThis helps preserve performance on ${browserName}.\n\nForce re-enable: Type "animation force" in console`,
+              `🎬 Performance Protection Active\n\nAnimations automatically disabled due to low FPS (${currentFps} < ${threshold}) for ${durationThreshold} seconds.\n\nThis helps preserve performance on ${browserName}.\n\nTo switch them back on: type "animations force" in the terminal.`,
               "warning",
               12000, // 12 seconds for important message
             );

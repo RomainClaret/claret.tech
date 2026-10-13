@@ -48,9 +48,14 @@ env:
 #
 # It was never needed. canvas 2.11.2 publishes a prebuilt binary for Node 20 on
 # linux-glibc-x64 (node-v115), so it installs without any dev headers. Verified
-# in this exact image, mcr.microsoft.com/playwright:v1.57.0-jammy with Node
-# 20.19.0 and no apt packages: full `npm ci` succeeds in 86s and canvas, sharp
-# and jsdom all load. Nothing else in the tree compiles from source.
+# in mcr.microsoft.com/playwright:v1.57.0-jammy with Node 20.19.0 and no apt
+# packages: full `npm ci` succeeds in 86s and canvas, sharp and jsdom all load.
+# Nothing else in the tree compiles from source.
+#
+# The images follow @playwright/test (pinned exactly in package.json): the
+# browsers in the image are the ones that version drives. Both v1.57.0-jammy
+# and v1.64.0-jammy (2026-10-12) default to Node 24, which has no canvas
+# binary; the prebuilt one installs only because setup-node below pins Node 20.
 #
 # QUOTA OPTIMIZATION FEATURES:
 # - workflow_dispatch: Manual triggering to control usage
@@ -117,6 +122,7 @@ jobs:
               - 'tests/e2e/utils/**'
             accessibility:
               - 'tests/e2e/accessibility.spec.ts'
+              - 'tests/e2e/project-details.spec.ts'
               - 'src/**/*aria*.{ts,tsx}'
               - 'src/**/*a11y*.{ts,tsx}'
               - 'src/**/*accessibility*.{ts,tsx}'
@@ -129,6 +135,8 @@ jobs:
             performance:
               - 'tests/e2e/performance.spec.ts'
               - 'tests/e2e/static-shell.spec.ts'
+              - 'tests/e2e/motion-fallback.spec.ts'
+              - 'tests/e2e/pdf-reader.spec.ts'
               - 'src/**/*performance*.{ts,tsx}'
               - 'src/**/*optimization*.{ts,tsx}'
               - 'src/**/*lazy*.{ts,tsx}'
@@ -200,7 +208,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -319,7 +327,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -390,7 +398,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Accessibility Tests
-        run: npx playwright test tests/e2e/accessibility.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        # project-details: a GitHub card's details open in one dialog above
+        # the page (focus, Tab, Escape, the links take their own clicks), on
+        # desktop and a 390 px phone, with the GitHub APIs answered by
+        # fixtures since CI builds have no GitHub data.
+        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts --project=${{ matrix.browser }} --max-failures=3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -424,7 +436,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
 
     steps:
@@ -494,8 +506,12 @@ jobs:
         # static-shell: the homepage is generated at build time; its first
         # paint, its hydration, its no-script page, its page when the bundle
         # never runs, and no splash over a page already on screen, on this
-        # same build.
-        run: npx playwright test tests/e2e/performance.spec.ts tests/e2e/static-shell.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
+        # same build. motion-fallback: the content framer starts at opacity 0
+        # shows when its features fail, the bundle never runs or scripts are
+        # off, and waits for its animation otherwise. pdf-reader: the reader
+        # draws a canvas only for the pages near the view, and its counter
+        # names the page in view after a scroll, a zoom and a reload.
+        run: npx playwright test tests/e2e/performance.spec.ts tests/e2e/static-shell.spec.ts tests/e2e/motion-fallback.spec.ts tests/e2e/pdf-reader.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -530,7 +546,7 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
     strategy:
       fail-fast: false
@@ -657,7 +673,7 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
 
     steps:
@@ -757,7 +773,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.57.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
     needs: detect-changes  # Simplified dependencies to avoid cycles
     if: |

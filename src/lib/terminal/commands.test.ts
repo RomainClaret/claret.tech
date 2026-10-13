@@ -812,6 +812,64 @@ describe("Terminal Commands", () => {
   });
 
   describe("performance command", () => {
+    /** The types of the events a command sent: toHaveBeenCalledWith(new
+     *  CustomEvent(x)) matches any CustomEvent at all. */
+    const sent = () =>
+      mockWindow.dispatchEvent.mock.calls.map(([event]) => event.type);
+
+    it("closes the dashboard and the report", () => {
+      mockWindow.dispatchEvent.mockClear();
+      const result = commands.performance(
+        ["close"],
+        mockContext,
+      ) as CommandResult;
+
+      expect(result.output).toBe("Performance dashboard and report closed");
+      expect(sent()).toEqual(["terminal-performance-close"]);
+    });
+
+    it("hides everything it showed, as its output says", () => {
+      mockWindow.dispatchEvent.mockClear();
+      const result = commands.performance(
+        ["hide"],
+        mockContext,
+      ) as CommandResult;
+
+      expect(result.output).toContain("Performance monitoring stopped");
+      expect(sent()).toEqual(["terminal-performance-hide"]);
+    });
+
+    it("leaves no listener behind once a report is done", () => {
+      // Each run added listeners for the report's progress, completion and
+      // error, and each handler removed only itself, so one stayed for good;
+      // and nothing read what they wrote.
+      mockWindow.addEventListener.mockClear();
+      mockWindow.removeEventListener.mockClear();
+      const result = commands.performance(
+        ["report"],
+        mockContext,
+      ) as CommandResult;
+      const added = mockWindow.addEventListener.mock.calls as [
+        string,
+        (event: Event) => void,
+      ][];
+      added
+        .filter(([type]) => type === "performance-report-complete")
+        .forEach(([type, listener]) => listener(new CustomEvent(type)));
+
+      const removed = mockWindow.removeEventListener.mock.calls as [
+        string,
+        unknown,
+      ][];
+      const live = added.filter(
+        ([type, listener]) =>
+          !removed.some(([t, l]) => t === type && l === listener),
+      );
+      expect(live).toEqual([]);
+      expect(result.output).toBe("Generating performance report...\n");
+      expect(sent()).toEqual(["terminal-performance-report"]);
+    });
+
     it("opens dashboard by default", () => {
       const result = commands.performance([], mockContext) as CommandResult;
 
@@ -1326,6 +1384,37 @@ describe("Terminal Commands", () => {
 
         expect(status()).toContain("Current: 🚀 Maximum");
         expect(status()).toContain("Auto-Adjust: ❌ Disabled");
+      });
+
+      it("drops the pause once its 30 minutes are over", () => {
+        // What force stores: the flag outlives the pause when no sample is
+        // counted to clear it, and the status said "0 minutes left".
+        sessionStorage.setItem(
+          "fps-auto-disable-state",
+          JSON.stringify({
+            isAutoDisabled: false,
+            lastAutoDisableTime: Date.now() - 31 * 60 * 1000,
+            consecutiveLowFpsCount: 0,
+            cooldownActive: true,
+          }),
+        );
+
+        expect(status()).not.toContain("Auto-disable paused");
+      });
+
+      it("names the running tier once", () => {
+        // It read "Balanced (Balanced (key animations))": the tier's name,
+        // then its description, which starts with the name again.
+        const lines: Record<string, string> = {
+          battery: "Current: 🔋 Battery saver (minimal effects)\n",
+          low: "Current: 🔅 Low performance (Safari-optimized)\n",
+          balanced: "Current: ⚖️ Balanced (key animations)\n",
+          maximum: "Current: 🚀 Maximum (all effects)\n",
+        };
+        for (const [tier, line] of Object.entries(lines)) {
+          gate.tier = tier;
+          expect(status()).toContain(line);
+        }
       });
     });
   });

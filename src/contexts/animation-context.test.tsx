@@ -563,19 +563,6 @@ describe("AnimationContext", () => {
   });
 
   describe("Performance", () => {
-    it("renders efficiently", () => {
-      const startTime = Date.now();
-
-      render(
-        <AnimationProvider>
-          <TestComponent />
-        </AnimationProvider>,
-      );
-
-      const endTime = Date.now();
-      expect(endTime - startTime).toBeLessThan(50); // 50ms threshold
-    });
-
     it("handles rapid state changes efficiently", () => {
       render(
         <AnimationProvider>

@@ -212,8 +212,21 @@ export function PerformanceMonitorProvider({
       }
     };
 
+    // "performance close": the dashboard and the report alike; nothing
+    // else in the terminal closed the report.
     const handleDashboardClose = () => {
       hideDashboard();
+      hideReportModal();
+    };
+
+    // "performance hide": everything the performance commands show, and the
+    // monitoring they turn on, as its output says ("Performance monitoring
+    // stopped", "Overlay hidden"). It closed the dashboard alone.
+    const handlePerformanceHide = () => {
+      hideDashboard();
+      hideReportModal();
+      hidePerformanceMonitor();
+      disableAllMonitoring();
     };
 
     const handleDashboardReport = () => {
@@ -226,6 +239,7 @@ export function PerformanceMonitorProvider({
       handleDashboardCommand as EventListener,
     );
     window.addEventListener("terminal-performance-close", handleDashboardClose);
+    window.addEventListener("terminal-performance-hide", handlePerformanceHide);
     window.addEventListener(
       "terminal-performance-report",
       handleDashboardReport,
@@ -241,11 +255,22 @@ export function PerformanceMonitorProvider({
         handleDashboardClose,
       );
       window.removeEventListener(
+        "terminal-performance-hide",
+        handlePerformanceHide,
+      );
+      window.removeEventListener(
         "terminal-performance-report",
         handleDashboardReport,
       );
     };
-  }, [showDashboard, hideDashboard, generateReport]);
+  }, [
+    showDashboard,
+    hideDashboard,
+    generateReport,
+    hideReportModal,
+    hidePerformanceMonitor,
+    disableAllMonitoring,
+  ]);
 
   // Listen for report progress updates
   useEffect(() => {
@@ -289,8 +314,11 @@ export function PerformanceMonitorProvider({
   useEffect(() => {
     if (!isMonitorActive) return;
 
+    // On window, so every dialog's document listener runs first; one that
+    // used the key marks it with preventDefault, and one Escape then closes
+    // that dialog and leaves the monitor.
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !event.defaultPrevented) {
         hidePerformanceMonitor();
       }
     };

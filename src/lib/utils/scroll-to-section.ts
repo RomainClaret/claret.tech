@@ -21,10 +21,16 @@ export const NAV_OFFSET = 64;
  * caller that can go away passes `signal` and aborts it: on unmount, or when a
  * newer scroll replaces this one. Without that it outlives its caller and
  * keeps snapping the page to a target nobody is looking for any more.
+ *
+ * With `focus`, the section also takes focus, as it would after a native
+ * in-page link: the caller cancelled that link, so the browser never moved
+ * focus, and the next Tab started from wherever it was (the body, once a
+ * menu that held the link closed). For a choice the user made, not for a
+ * deep link on load.
  */
 export function scrollToSection(
   sectionId: string,
-  { signal }: { signal?: AbortSignal } = {},
+  { signal, focus = false }: { signal?: AbortSignal; focus?: boolean } = {},
 ): boolean {
   const element = document.getElementById(sectionId);
   if (!element || signal?.aborted) return false;
@@ -34,6 +40,7 @@ export function scrollToSection(
 
   const startedAt = window.pageYOffset;
   window.scrollTo({ top: targetTop(), behavior: "smooth" });
+  if (focus) focusInPlace(element);
 
   // ~2s of supervision: long enough for a smooth scroll plus late layout
   // shifts, short enough that it never fights a user who takes over.
@@ -69,4 +76,27 @@ export function scrollToSection(
   signal?.addEventListener("abort", stop, { once: true });
 
   return true;
+}
+
+/**
+ * Focuses `element` without scrolling to it. A section is a container, not a
+ * control: it takes focus through a temporary tabindex, with no outline (an
+ * inline style, as src/lib is outside Tailwind's content), and both go when
+ * focus moves on. A tabindex of its own is kept.
+ */
+function focusInPlace(element: HTMLElement) {
+  if (!element.hasAttribute("tabindex")) {
+    const outline = element.style.outline;
+    element.setAttribute("tabindex", "-1");
+    element.style.outline = "none";
+    element.addEventListener(
+      "blur",
+      () => {
+        element.removeAttribute("tabindex");
+        element.style.outline = outline;
+      },
+      { once: true },
+    );
+  }
+  element.focus({ preventScroll: true });
 }

@@ -387,6 +387,22 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
         term.loadAddon(fitAddon);
         term.loadAddon(webLinksAddon);
 
+        // Escape belongs to the page. xterm turns it into ESC and cancels
+        // the keydown, yet neither the shell nor the REPL reads ESC, while
+        // what this terminal opens (the performance dashboard, report and
+        // monitor) closes on Escape through document and window listeners:
+        // "Press ESC to close" never worked from here. false skips xterm
+        // without cancelling the event. Keydown only, as xterm's keyup work
+        // still runs, and not mid-composition, where Escape is the IME's.
+        term.attachCustomKeyEventHandler(
+          (event) =>
+            !(
+              event.type === "keydown" &&
+              event.key === "Escape" &&
+              !event.isComposing
+            ),
+        );
+
         term.open(terminalRef.current!);
 
         // Fix autofill warning for xterm's helper elements

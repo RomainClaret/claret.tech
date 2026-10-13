@@ -13,7 +13,6 @@ import { BackgroundProvider } from "@/contexts/background-context";
 import { SafariProvider } from "@/contexts/safari-context";
 import { AnimationStateProvider } from "@/contexts/animation-state-context";
 import { QualityProvider } from "@/contexts/quality-context";
-import { SVGProtectionWrapper } from "@/components/ui/svg-protection-wrapper";
 import { AnimatedFavicon } from "@/components/ui/animated-favicon";
 import { ToastContainer } from "@/components/ui/toast";
 import CookieNotice from "@/components/ui/cookie-notice";
@@ -156,9 +155,14 @@ export default function RootLayout({
         {/* First in <head>, so it runs before anything is drawn. */}
         <script dangerouslySetInnerHTML={{ __html: HEAD_BOOT_SCRIPT }} />
         {/* The splash's backdrop is in the HTML (app-wrapper.tsx); with
-            scripts off nothing would ever remove it. */}
+            scripts off nothing would ever remove it. Nor would anything
+            animate in the content framer starts at opacity 0 (globals.css). */}
         <noscript>
-          <style>{"[data-splash-backdrop]{display:none}"}</style>
+          <style>
+            {
+              '[data-splash-backdrop]{display:none}[style*="opacity:0;transform:"],[style="opacity:0"],[style="transform:scale(0)"],[data-reveal="pending"]{opacity:1!important;transform:none!important}'
+            }
+          </style>
         </noscript>
         <style dangerouslySetInnerHTML={{ __html: montserratRestFace }} />
         <meta name="theme-color" content="#55198b" />
@@ -209,19 +213,12 @@ export default function RootLayout({
               body[data-test-mode="true"] canvas {
                 pointer-events: none !important;
               }
-              
-              /* Ensure interactive elements have higher z-index in test mode */
-              html[data-test-mode="true"] nav,
-              body[data-test-mode="true"] nav,
-              html[data-test-mode="true"] button,
-              body[data-test-mode="true"] button,
-              html[data-test-mode="true"] a,
-              body[data-test-mode="true"] a,
-              html[data-test-mode="true"] .terminal,
-              body[data-test-mode="true"] .terminal {
-                position: relative;
-                z-index: 10002 !important;
-              }
+
+              /* No layout of its own in test mode: a rule here once gave
+                 every nav, button and link position: relative and a
+                 z-index of 10002, so the navigation was not fixed in
+                 Chromium's and Firefox's tests and a logo test passed with
+                 the logo scrolled away. Tests see the site as it ships. */
             `,
           }}
         />
@@ -230,17 +227,13 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-        {/* 
-        SVG Circle Radius Protection (Emergency Failsafe)
-        
-        This runtime protection catches any remaining SVG circle radius issues at the DOM level.
-        While components now use the shared validateRadius utility (src/lib/utils/svg-validation.ts),
-        this failsafe provides additional protection against undefined radius values that could
-        cause rendering errors.
-        
-        Note: This could be removed after thorough testing confirms all SVG issues are resolved
-        by the validateRadius utility in components.
-        */}
+        {/* A circle's radius, checked as it is set: every write to `r`, from
+            React or framer-motion, goes through setAttribute, so a bad value
+            ("undefined", "NaN", "") becomes 4 before it reaches the DOM and
+            the browser's "Expected length" error. It runs before any
+            component, and it is the one guard: components also clamp their
+            radii (validateRadius in src/lib/utils/svg-validation.ts).
+            layout-svg-guard.test.ts runs it as shipped. */}
         <script
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
@@ -326,23 +319,21 @@ export default function RootLayout({
                   <QualityProvider>
                     <BackgroundProvider>
                       <TerminalProvider>
-                        <SVGProtectionWrapper>
-                          <LegalModalsProvider>
-                            <AppWrapper>
-                              <AnimatedFavicon />
-                              <Navigation />
-                              <main id="main-content" className="pt-16">
-                                {children}
-                              </main>
-                              <FloatingNav />
-                              <Footer />
-                            </AppWrapper>
-                            <ToastContainer />
-                            <CookieNotice />
-                          </LegalModalsProvider>
-                          {process.env.NODE_ENV === "production" &&
-                            process.env.VERCEL && <Analytics />}
-                        </SVGProtectionWrapper>
+                        <LegalModalsProvider>
+                          <AppWrapper>
+                            <AnimatedFavicon />
+                            <Navigation />
+                            <main id="main-content" className="pt-16">
+                              {children}
+                            </main>
+                            <FloatingNav />
+                            <Footer />
+                          </AppWrapper>
+                          <ToastContainer />
+                          <CookieNotice />
+                        </LegalModalsProvider>
+                        {process.env.NODE_ENV === "production" &&
+                          process.env.VERCEL && <Analytics />}
                       </TerminalProvider>
                     </BackgroundProvider>
                   </QualityProvider>

@@ -1,7 +1,7 @@
 "use client";
 
 import { isDisplayed, researchSection } from "@/data/sections/research";
-import { FadeIn, SlideInUp, ScaleIn } from "@/components/ui/animated";
+import { SlideInUp, ScaleIn } from "@/components/ui/animated";
 import Link from "next/link";
 import {
   ExternalLink,
@@ -37,6 +37,7 @@ import { loadPdfModal } from "@/components/ui/pdf-modal-loader";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import dynamic from "next/dynamic";
+import { accentStyle } from "@/components/ui/accent-text";
 
 // Hidden cards are dropped once, here, so the hero, the grid, the stats and
 // the deep links all index the same list. activeIndex is shared between
@@ -78,7 +79,7 @@ const statusConfig = {
   active: {
     icon: Zap,
     text: "Active Research",
-    color: "text-green-500",
+    color: "text-green-700 dark:text-green-400",
     bgColor: "bg-green-500/20",
     borderColor: "border-green-500/30",
     glowColor: "shadow-green-500/25",
@@ -87,7 +88,7 @@ const statusConfig = {
   ongoing: {
     icon: Clock,
     text: "Ongoing",
-    color: "text-yellow-500",
+    color: "text-yellow-700 dark:text-yellow-400",
     bgColor: "bg-yellow-500/20",
     borderColor: "border-yellow-500/30",
     glowColor: "shadow-yellow-500/25",
@@ -96,7 +97,7 @@ const statusConfig = {
   completed: {
     icon: CheckCircle2,
     text: "Completed",
-    color: "text-blue-500",
+    color: "text-blue-700 dark:text-blue-400",
     bgColor: "bg-blue-500/20",
     borderColor: "border-blue-500/30",
     glowColor: "shadow-blue-500/25",
@@ -199,7 +200,7 @@ function ResearchCard({
                   {project.subtitle}
                 </p>
                 {project.shortDescription && (
-                  <p className="text-xs text-muted-foreground/80 line-clamp-3">
+                  <p className="text-xs text-muted-foreground line-clamp-3">
                     {project.shortDescription}
                   </p>
                 )}
@@ -209,10 +210,10 @@ function ResearchCard({
             {/* Status Badge */}
             <div className="mb-3">
               <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium accent-text"
                 style={{
+                  ...accentStyle(`rgb(${status.rgbColor})`),
                   backgroundColor: `rgba(${status.rgbColor}, 0.1)`,
-                  color: `rgb(${status.rgbColor})`,
                   border: `1px solid rgba(${status.rgbColor}, 0.3)`,
                 }}
               >
@@ -459,7 +460,7 @@ export function Research() {
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
       <div className="lg:px-8">
         {/* Header */}
-        <FadeIn className="text-center mb-6 sm:mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <h2 className="section-title-gradient">{researchSection.title}</h2>
           <p className="text-base sm:text-lg text-muted-foreground max-w-4xl mx-auto">
             <span className="text-primary font-semibold">
@@ -468,11 +469,11 @@ export function Research() {
             {" • "}
             {researchSection.subtitle.normalText}
           </p>
-        </FadeIn>
+        </div>
 
         {/* Research Journey - Expandable Description */}
         {researchSection.journeyDescription && (
-          <SlideInUp delay={100} className="mb-8 sm:mb-12">
+          <SlideInUp className="mb-8 sm:mb-12">
             <m.div
               className="relative max-w-4xl mx-auto"
               whileHover={{ scale: 1.005 }}
@@ -560,8 +561,8 @@ export function Research() {
                       whileTap={{ scale: 0.95 }}
                     >
                       <span
-                        className="text-sm font-medium"
-                        style={{ color: "rgb(245, 158, 11)" }}
+                        className="text-sm font-medium accent-text"
+                        style={accentStyle("rgb(245, 158, 11)")}
                       >
                         {isJourneyExpanded ? "Show less" : "Read full story"}
                       </span>
@@ -603,7 +604,7 @@ export function Research() {
             delay={0.15}
           >
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400 mb-0.5 sm:mb-1">
                 {stats.activeProjects}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -618,7 +619,7 @@ export function Research() {
             delay={0.2}
           >
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-amber-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-400 mb-0.5 sm:mb-1">
                 {stats.yearsOfResearch}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -633,7 +634,7 @@ export function Research() {
             delay={0.25}
           >
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-purple-500 mb-0.5 sm:mb-1">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-700 dark:text-purple-400 mb-0.5 sm:mb-1">
                 {stats.researchAreas}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -647,7 +648,7 @@ export function Research() {
         {/* z-20, above the z-10 project grid below. The highlight tooltips
             hang past this card's bottom edge, and at equal z-index the grid
             wins on DOM order and paints over the escaping text. */}
-        <SlideInUp delay={200} className="mb-8 sm:mb-16 relative z-20">
+        <SlideInUp className="mb-8 sm:mb-16 relative z-20">
           <m.div
             id={heroAnchor}
             className={cn(
@@ -760,10 +761,10 @@ export function Research() {
                       whileTap={{ scale: 0.95 }}
                     >
                       <span
-                        className="text-xs font-medium"
-                        style={{
-                          color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
-                        }}
+                        className="text-xs font-medium accent-text"
+                        style={accentStyle(
+                          `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                        )}
                       >
                         {isPhdExpanded ? "Show less" : "Read full description"}
                       </span>
@@ -792,7 +793,7 @@ export function Research() {
                       visibleProjects[0].expandedHighlightDescriptions || [];
 
                     return (
-                      <ScaleIn key={i} delay={300 + i * 50} className="h-full">
+                      <ScaleIn key={i} className="h-full">
                         <m.div
                           className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
                           whileHover={{ scale: 1.05 }}
@@ -850,10 +851,12 @@ export function Research() {
                   {visibleProjects[0].tags.map((tag, i) => (
                     <span
                       key={i}
-                      className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-medium rounded-lg"
+                      className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-medium rounded-lg accent-text"
                       style={{
+                        ...accentStyle(
+                          `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                        ),
                         backgroundColor: `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.1)`,
-                        color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
                         border: `1px solid rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.3)`,
                       }}
                     >
@@ -957,7 +960,7 @@ export function Research() {
           {/* Other Research Projects Grid */}
           <div className="grid md:grid-cols-2 gap-4 sm:gap-6 relative z-10">
             {visibleProjects.slice(1).map((project, index) => (
-              <SlideInUp key={index + 1} delay={300 + index * 100}>
+              <SlideInUp key={index + 1}>
                 <ResearchCard
                   project={project}
                   index={index + 1}

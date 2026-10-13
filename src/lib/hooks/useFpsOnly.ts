@@ -53,9 +53,11 @@ type Listener = (data: FpsOnlyData) => void;
  * One frame loop for every subscriber. QualityProvider and
  * AnimationStateProvider both need the frame rate; each used to run its own
  * loop, so the page requested two animation frames per vsync forever just to
- * measure itself. The loop stops when the last subscriber leaves, and pauses
- * while the page is suspended (hidden tab, or covered by the splash or a
- * modal), when the frame rate says nothing about the page.
+ * measure itself. Each subscribes only while it uses the readings: the
+ * automatic quality loop, and auto-disable at the battery tier. The loop
+ * stops when the last subscriber leaves, and pauses while the page is
+ * suspended (hidden tab, or covered by the splash or a modal), when the
+ * frame rate says nothing about the page.
  */
 const listeners = new Set<Listener>();
 let data: FpsOnlyData = INITIAL_DATA;

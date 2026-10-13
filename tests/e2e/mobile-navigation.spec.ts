@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
 
 /**
@@ -43,6 +43,9 @@ async function expectMenuNavigation(page: Page, sectionId: string) {
   // nav clicks preventDefault() and scroll via scrollToSection(), so the
   // URL hash never changes; the observable contract is arriving on section
   await expect(page.locator(`#${sectionId}`)).toBeInViewport();
+  // and focus moving there, as an in-page link's would: the link went away
+  // with the menu, and focus fell to the body
+  await expect(page.locator(`#${sectionId}`)).toBeFocused();
 }
 
 test.describe("Mobile Navigation", () => {

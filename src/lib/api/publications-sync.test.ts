@@ -44,7 +44,9 @@ describe("publications.json against the static source", () => {
       if (!shipped) continue; // covered by the id test above
       const keys = new Set([...Object.keys(source), ...Object.keys(shipped)]);
       for (const key of keys) {
-        const a = JSON.stringify((source as Record<string, unknown>)[key]);
+        const a = JSON.stringify(
+          (source as unknown as Record<string, unknown>)[key],
+        );
         const b = JSON.stringify(shipped[key]);
         if (a !== b) drift.push(`${source.id}.${key}: ${a} vs ${b}`);
       }

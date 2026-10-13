@@ -43,11 +43,12 @@ export async function dismissToasts(
   // CI environment requires more aggressive toast handling
   const isCI = !!process.env.CI;
 
-  // Common toast selectors
+  // Common toast selectors. Not the toast live region: it is visually
+  // hidden, blocks nothing, and hiding it silenced the site's polite
+  // announcements for the rest of the test.
   const toastSelectors = [
     '[role="alert"]',
     '[data-testid="toast"]',
-    '[data-testid="toast-live-region"]',
     ".toast",
     ".notification",
     ".alert",
@@ -72,15 +73,12 @@ export async function dismissToasts(
             element.style.position = "fixed";
             element.style.left = "-9999px";
             element.style.top = "-9999px";
-            // Deliberately NOT element.remove(). One of the selectors above is
-            // the toast live region, which ToastContainer renders
-            // unconditionally and which sits directly after AppWrapper in the
-            // DOM. Detaching it left React holding a stale insertBefore
-            // reference, so the next host insertion -- the terminal div, on
-            // click -- threw NotFoundError and tore the whole app down. That
-            // crash only happened under CI, because this branch is gated on
-            // process.env.CI, and it presented as "the terminal never opens".
-            // The styles above already make the toast non-blocking.
+            // Deliberately NOT element.remove(): React owns these nodes.
+            // Detaching one (the toast live region, then matched here) left
+            // React holding a stale insertBefore reference, so the next host
+            // insertion -- the terminal div, on click -- threw NotFoundError
+            // and tore the whole app down, under CI only. The styles above
+            // already make a toast non-blocking.
           });
 
           // Catch toasts that mount while this call is still running. The
@@ -441,195 +439,38 @@ export async function waitForToastWithAccessibility(
 }
 
 /**
- * Ensure no toasts are blocking a specific element
+ * Waits until nothing covers an element where it is: the element at its
+ * centre is it, or inside it, within the window. It does not scroll.
+ *
+ * It used to force its way through after three tries (scrolling the
+ * element into view, writing pointer-events, z-index, opacity and
+ * position on it, removing `disabled`) and let the test go on, so a
+ * covered or scrolled-away control passed: the logo test scrolled the page
+ * back to the top through it. A covered element now fails the test.
  */
 export async function ensureElementNotBlockedByToast(
   page: Page,
   elementSelector: string,
   timeout: number = 10000,
 ): Promise<void> {
-  // First, force any existing toasts to be non-blocking
   await dismissToasts(page, { timeout: 3000 });
-
-  // Progressive wait strategy with multiple shorter attempts
-  let accessible = false;
-  const maxAttempts = 3;
-  const attemptTimeout = Math.min(
-    timeout / maxAttempts,
-    process.env.CI ? 5000 : 3000,
+  await page.waitForFunction(
+    (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+        return false;
+      }
+      const hit = document.elementFromPoint(x, y);
+      return !!hit && (hit === element || element.contains(hit));
+    },
+    elementSelector,
+    { timeout },
   );
-
-  for (let attempt = 1; attempt <= maxAttempts && !accessible; attempt++) {
-    try {
-      // Short wait with progressive timeout reduction
-      const currentTimeout =
-        (attemptTimeout * (maxAttempts - attempt + 1)) / maxAttempts;
-
-      await page.waitForFunction(
-        ({ selector }) => {
-          const element = document.querySelector(selector);
-          if (!element) return false;
-
-          // Quick visibility check first
-          const rect = element.getBoundingClientRect();
-          if (rect.width === 0 || rect.height === 0) return false;
-
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-
-          // Check if element is in viewport
-          if (
-            centerX < 0 ||
-            centerY < 0 ||
-            centerX > window.innerWidth ||
-            centerY > window.innerHeight
-          ) {
-            return false;
-          }
-
-          // Check if the element at the center point is our target or a child
-          const elementAtPoint = document.elementFromPoint(centerX, centerY);
-
-          return (
-            elementAtPoint &&
-            (elementAtPoint === element || element.contains(elementAtPoint))
-          );
-        },
-        { selector: elementSelector },
-        { timeout: currentTimeout },
-      );
-
-      accessible = true;
-      break;
-    } catch (waitError) {
-      if (attempt === maxAttempts) {
-        // Log the final attempt failure
-        console.warn(
-          `Element accessibility check failed after ${maxAttempts} attempts for ${elementSelector}, trying fallback:`,
-          waitError instanceof Error ? waitError.message : String(waitError),
-        );
-      } else {
-        // For intermediate attempts, just log briefly and try again
-        console.log(
-          `Accessibility check attempt ${attempt} failed for ${elementSelector}, retrying...`,
-        );
-
-        // Brief wait before retry
-        await page.waitForTimeout(500);
-      }
-    }
-  }
-
-  // If still not accessible after all attempts, use enhanced fallback verification
-  if (!accessible) {
-    console.warn(
-      `Element accessibility check timed out for ${elementSelector}, using enhanced fallback verification`,
-    );
-
-    try {
-      const element = page.locator(elementSelector).first();
-
-      // First, try scrolling element into view
-      await element.scrollIntoViewIfNeeded().catch(() => {});
-
-      // Wait a bit for any animations to complete
-      await page.waitForTimeout(500);
-
-      // Enhanced visibility and interactivity checks
-      const checks = await element.evaluate((el) => {
-        const rect = el.getBoundingClientRect();
-        const styles = window.getComputedStyle(el);
-
-        // Force reset any problematic styles that might make element inaccessible
-        if (styles.pointerEvents === "none") {
-          (el as HTMLElement).style.pointerEvents = "auto";
-        }
-        if (styles.zIndex && parseInt(styles.zIndex) < 0) {
-          (el as HTMLElement).style.zIndex = "1";
-        }
-        if (styles.opacity === "0") {
-          (el as HTMLElement).style.opacity = "1";
-        }
-
-        return {
-          hasSize: rect.width > 0 && rect.height > 0,
-          isVisibleStyle: styles.visibility !== "hidden",
-          hasOpacity: styles.opacity !== "0",
-          inViewport:
-            rect.top >= 0 &&
-            rect.left >= 0 &&
-            rect.bottom <= window.innerHeight &&
-            rect.right <= window.innerWidth,
-          interactable: styles.pointerEvents !== "none",
-        };
-      });
-
-      const isVisible = await element.isVisible();
-      const isEnabled = await element.isEnabled().catch(() => true);
-
-      if (!isVisible || !isEnabled || !checks.hasSize) {
-        console.warn(`Element ${elementSelector} failed basic checks:`, {
-          isVisible,
-          isEnabled,
-          ...checks,
-        });
-
-        // Try force enabling the element
-        await element.evaluate((el) => {
-          const htmlEl = el as HTMLElement;
-          htmlEl.style.pointerEvents = "auto";
-          htmlEl.style.zIndex = "9999";
-          htmlEl.style.position = "relative";
-          htmlEl.removeAttribute("disabled");
-          if (htmlEl.hasAttribute("aria-disabled")) {
-            htmlEl.removeAttribute("aria-disabled");
-          }
-        });
-
-        // Final check - just verify element exists
-        const elementHandle = await element.elementHandle();
-        if (!elementHandle) {
-          throw new Error(
-            `Element ${elementSelector} is not visible or enabled after toast dismissal`,
-          );
-        }
-
-        console.warn(
-          `Element ${elementSelector} exists but not fully accessible, proceeding with caution`,
-        );
-      }
-
-      // Additional wait to ensure element is stable
-      await page.waitForTimeout(300);
-
-      console.log(
-        `Enhanced fallback verification completed for ${elementSelector}`,
-      );
-    } catch (fallbackError) {
-      console.warn(
-        `Enhanced fallback element check also failed for ${elementSelector}:`,
-        fallbackError,
-      );
-
-      // Final attempt - just check if element exists at all
-      try {
-        const elementCount = await page.locator(elementSelector).count();
-        if (elementCount > 0) {
-          console.warn(
-            `Element ${elementSelector} exists but not accessible, allowing test to continue`,
-          );
-          return; // Allow test to continue - element exists
-        }
-      } catch {
-        // Element doesn't exist at all
-      }
-
-      // If we get here, element truly doesn't exist or is completely inaccessible
-      throw new Error(
-        `Element ${elementSelector} is not visible or enabled after toast dismissal`,
-      );
-    }
-  }
 }
 
 /**

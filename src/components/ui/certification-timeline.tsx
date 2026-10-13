@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Calendar,
 } from "lucide-react";
+import { accentStyle } from "@/components/ui/accent-text";
 
 interface Certification {
   name: string;
@@ -159,14 +160,12 @@ export function CertificationTimeline({
                     >
                       {cert.name}
                     </div>
-                    <div className="text-[10px] text-muted-foreground/60 truncate">
+                    <div className="text-[10px] text-muted-foreground truncate">
                       {cert.issuer}
                     </div>
                     <div
-                      className="text-[9px] font-medium mt-0.5"
-                      style={{
-                        color: `rgba(${color}, 0.8)`,
-                      }}
+                      className="text-[9px] font-medium mt-0.5 accent-text"
+                      style={accentStyle(`rgb(${color})`)}
                     >
                       {cert.year}
                     </div>
@@ -235,7 +234,7 @@ export function CertificationTimeline({
                   <div className="text-xs font-medium text-foreground/80 truncate">
                     {cert.name}
                   </div>
-                  <div className="text-[10px] text-muted-foreground/60 truncate">
+                  <div className="text-[10px] text-muted-foreground truncate">
                     {cert.issuer} • {cert.year}
                   </div>
                 </div>
@@ -284,7 +283,7 @@ export function CertificationTimeline({
                   <div className="text-sm font-medium text-foreground/80">
                     {cert.name}
                   </div>
-                  <div className="text-xs text-muted-foreground/60">
+                  <div className="text-xs text-muted-foreground">
                     {cert.issuer} • {cert.year}
                   </div>
                 </div>

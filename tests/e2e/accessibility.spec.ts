@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./utils/fixtures";
+import { acknowledgeCookieNotice } from "./utils/cookie-notice";
 import AxeBuilder from "@axe-core/playwright";
 import {
   waitForScrollCompletion,
@@ -11,6 +12,59 @@ import {
   toggleThemeReliably,
   stabilizeMobileViewport,
 } from "./utils/toast-utils";
+
+/**
+ * The whole page, as a visitor sees it: the splash gone and every section
+ * mounted, by scrolling through once, then back at the top. The splash's
+ * backdrop is in the HTML and leaves only once the splash shows, so its
+ * going, then the progress bar's, cannot pass before the splash mounts.
+ */
+async function showWholePage(page: Page): Promise<void> {
+  await expect(page.locator("[data-splash-backdrop]")).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(
+    page.getByRole("progressbar", { name: "Loading portfolio" }),
+  ).toHaveCount(0, { timeout: 15_000 });
+  const height = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  for (let y = 0; y < height; y += 600) {
+    await page.evaluate(
+      (top) => window.scrollTo({ top, behavior: "instant" }),
+      y,
+    );
+    await page.waitForTimeout(150);
+  }
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+}
+
+/**
+ * Contrast is enforced (2026-10-11): every text axe can measure reads at
+ * 4.5:1, or 3:1 when large (WCAG 1.4.3). Until then these tests let any
+ * contrast failure through, "as the design is final", and 384 were found.
+ * Each failure is listed by its selector and ratio.
+ */
+function contrastFailures(results: { violations: AxeViolation[] }): string[] {
+  return results.violations
+    .filter((violation) => violation.id === "color-contrast")
+    .flatMap((violation) =>
+      violation.nodes.map(
+        (node) =>
+          `${node.target.join(" ")}: ${node.any[0]?.data?.contrastRatio} (needs ${node.any[0]?.data?.expectedContrastRatio})`,
+      ),
+    );
+}
+
+type AxeViolation = {
+  id: string;
+  nodes: {
+    target: unknown[];
+    any: {
+      data?: { contrastRatio?: number; expectedContrastRatio?: string };
+    }[];
+  }[];
+};
 
 /**
  * Open the mobile navigation menu, or fail the calling test.
@@ -70,6 +124,7 @@ test.describe("Accessibility", () => {
   test("should pass accessibility checks on light theme", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
+    await showWholePage(page);
 
     // Run axe accessibility tests
     const accessibilityScanResults = await new AxeBuilder({ page })
@@ -96,8 +151,9 @@ test.describe("Accessibility", () => {
     );
     expect(criticalViolations).toEqual([]);
 
-    // Allow color contrast violations and other non-critical issues as the design is final
-    // We're only concerned with critical accessibility issues that prevent usage
+    expect(contrastFailures(accessibilityScanResults)).toEqual([]);
+
+    // Other serious issues: some allowed, as before.
     const seriousNonContrastViolations =
       accessibilityScanResults.violations.filter(
         (v) => v.id !== "color-contrast" && v.impact === "serious",
@@ -167,6 +223,7 @@ test.describe("Accessibility", () => {
 
     // Wait for any theme animation to complete
     await waitForAnimationCompletion(page, "body", 3000);
+    await showWholePage(page);
 
     // Run axe accessibility tests
     const accessibilityScanResults = await new AxeBuilder({ page })
@@ -192,8 +249,9 @@ test.describe("Accessibility", () => {
     );
     expect(criticalViolations).toEqual([]);
 
-    // Allow color contrast violations and other non-critical issues as the design is final
-    // We're only concerned with critical accessibility issues that prevent usage
+    expect(contrastFailures(accessibilityScanResults)).toEqual([]);
+
+    // Other serious issues: some allowed, as before.
     const seriousNonContrastViolations =
       accessibilityScanResults.violations.filter(
         (v) => v.id !== "color-contrast" && v.impact === "serious",
@@ -447,31 +505,45 @@ test.describe("Accessibility", () => {
   test("should have sufficient color contrast", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
+    await showWholePage(page);
 
-    // Run contrast-specific accessibility tests
-    const accessibilityScanResults = await new AxeBuilder({ page })
+    const results = await new AxeBuilder({ page })
       .withRules(["color-contrast"])
       .analyze();
 
-    // Log violations for awareness but allow some flexibility
-    if (accessibilityScanResults.violations.length > 0) {
-      // Log violations for debugging if needed
-      // console.log(
-      //   "Color contrast issues found:",
-      //   accessibilityScanResults.violations.map((v) => ({
-      //     id: v.id,
-      //     impact: v.impact,
-      //     nodes: v.nodes.length,
-      //   })),
-      // );
+    expect(contrastFailures(results)).toEqual([]);
+  });
 
-      // Only fail on critical violations
-      const criticalViolations = accessibilityScanResults.violations.filter(
-        (v) => v.impact === "critical",
-      );
+  test("should have sufficient color contrast in the PDF reader, both themes", async ({
+    browser,
+  }) => {
+    // The reader's own text, not the PDF's: pdf.js's text layer is
+    // transparent over the page it describes. Nor the cookie notice's,
+    // dimmed behind the reader's backdrop on purpose: whether it had shown
+    // (1 s after load) was timing.
+    for (const theme of ["light", "dark"]) {
+      const context = await browser.newContext();
+      await acknowledgeCookieNotice(context);
+      await context.addInitScript((value) => {
+        try {
+          localStorage.setItem("theme", value);
+        } catch {
+          // storage blocked: the default theme then
+        }
+      }, theme);
+      const page = await context.newPage();
+      await page.goto("/pdf/cv");
+      await expect(page.locator(".react-pdf__Page").first()).toBeVisible({
+        timeout: 30_000,
+      });
 
-      // Allow serious color contrast issues as design is final
-      expect(criticalViolations.length).toBeLessThanOrEqual(0);
+      const results = await new AxeBuilder({ page })
+        .withRules(["color-contrast"])
+        .exclude(".react-pdf__Page")
+        .analyze();
+
+      expect(contrastFailures(results), `${theme} theme`).toEqual([]);
+      await context.close();
     }
   });
 
@@ -631,31 +703,23 @@ test.describe("Accessibility", () => {
     }
   });
 
-  test("should have skip links for keyboard users", async ({ page }) => {
+  test("should have skip links for keyboard users", async ({
+    page,
+    browserName,
+  }) => {
+    // The first stop from the keyboard is the skip link. macOS WebKit's Tab
+    // skips links (Safari's default; Alt+Tab reaches them): plain Tab landed
+    // on the projects' search box, an input with no text, and this test,
+    // which only asked for any focused text, failed or passed by timing.
+    await acknowledgeCookieNotice(page);
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.goto("/");
 
-    // Check for skip to main content link
-    const skipLink = page.locator(
-      'a[href="#main"], a[href="#content"], a:has-text("Skip")',
-    );
-    const skipLinkExists = await skipLink.count();
+    await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
 
-    if (skipLinkExists > 0) {
-      // Skip link should be the first focusable element
-      await page.keyboard.press("Tab");
-      const focusedElement = await page.evaluate(() => {
-        const el = document.activeElement as HTMLElement;
-        return {
-          text: el?.textContent,
-          href: (el as HTMLAnchorElement)?.href,
-        };
-      });
-
-      // App might not have skip links, check for any focused text
-      expect(focusedElement.text).toBeTruthy();
-    }
+    await expect(
+      page.getByRole("link", { name: "Skip to main content" }),
+    ).toBeFocused();
   });
 
   test("should have proper image alt text", async ({ page }) => {
@@ -1044,6 +1108,9 @@ test.describe("Accessibility", () => {
   });
 
   test("should have focus indicators", async ({ page }) => {
+    // The first Tab stop is the page's own, not the notice's (first in the
+    // page, shown 1 s after load): which one this test met was timing.
+    await acknowledgeCookieNotice(page);
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
 
@@ -1174,4 +1241,119 @@ test.describe("Accessibility", () => {
     expect(landmarks.navigation).toBeGreaterThan(0);
     expect(landmarks.main).toBeGreaterThan(0);
   });
+});
+
+test.describe("The cookie notice", () => {
+  // Fixed at the bottom, it covered the footer's last row, the legal links
+  // (73 px of a 1280 x 720 window, 205 px of a 390 x 844 phone's), and a
+  // Tab to them landed on a control nobody could see (WCAG 2.4.11).
+  const clearOfNotice = (element: Element) => {
+    const box = element.getBoundingClientRect();
+    const notice = [...document.querySelectorAll("div.fixed")]
+      .find((candidate) => candidate.textContent?.includes("Cookie Selection"))!
+      .getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      box.left + box.width / 2,
+      box.top + box.height / 2,
+    );
+    return {
+      above: box.bottom <= notice.top + 0.5,
+      reached: element === hit || element.contains(hit),
+    };
+  };
+
+  for (const [label, viewport] of [
+    ["desktop", { width: 1280, height: 720 }],
+    ["phone", { width: 390, height: 844 }],
+  ] as const) {
+    test(`comes first from the keyboard, then hands Tab to the skip link, ${label}`, async ({
+      page,
+      browserName,
+    }) => {
+      // First in <body>, before the skip links (GOV.UK's placement). Last in
+      // <body>, it came after the whole page, and after "Got it!" WebKit's
+      // next Tab left the page for the browser's own controls.
+      const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+      await page.setViewportSize(viewport);
+      await page.goto("/?playwright=true");
+      const splash = page.getByRole("progressbar", {
+        name: "Loading portfolio",
+      });
+      await expect(splash).toBeVisible();
+      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+      const notice = page.getByRole("region", {
+        name: "Cookies on claret.tech",
+      });
+      await expect(notice).toBeVisible();
+
+      await page.keyboard.press(tab);
+      expect(
+        await notice.evaluate((region) =>
+          region.contains(document.activeElement),
+        ),
+      ).toBe(true);
+
+      await page.getByRole("button", { name: /Got it/ }).focus();
+      await page.keyboard.press("Enter");
+      await expect(notice).toHaveCount(0);
+      await page.keyboard.press(tab);
+      await expect(
+        page.getByRole("link", { name: "Skip to main content" }),
+      ).toBeFocused();
+    });
+
+    test(`leaves the footer's legal links in view, ${label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/?playwright=true");
+      // Shown, then gone: a count of 0 alone passes before it mounts.
+      const splash = page.getByRole("progressbar", {
+        name: "Loading portfolio",
+      });
+      await expect(splash).toBeVisible();
+      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+      await expect(
+        page.getByRole("button", { name: /Accept cookie notice/ }),
+      ).toBeVisible();
+
+      const legal = ["View Privacy Policy", "View Terms of Service"].map(
+        (name) => page.getByRole("button", { name }),
+      );
+      // A Tab to each, from the top: the browser scrolls it into view
+      // (smoothly, as globals.css asks, so wait for it to settle).
+      for (const link of legal) {
+        await page.evaluate(() =>
+          window.scrollTo({ top: 0, behavior: "instant" }),
+        );
+        await link.focus();
+        await expect
+          .poll(() => link.evaluate(clearOfNotice), { timeout: 10_000 })
+          .toEqual({ above: true, reached: true });
+      }
+
+      // At the very end of the page too, with the floating navigation.
+      await page.evaluate(() =>
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: "instant",
+        }),
+      );
+      for (const link of legal) {
+        expect(await link.evaluate(clearOfNotice)).toEqual({
+          above: true,
+          reached: true,
+        });
+      }
+      if (label === "desktop") {
+        const floating = page.locator("div.fixed.right-8").first();
+        expect((await floating.evaluate(clearOfNotice)).above).toBe(true);
+      }
+
+      await legal[0].click();
+      await expect(
+        page.getByRole("dialog", { name: "Privacy Policy" }),
+      ).toBeVisible();
+    });
+  }
 });

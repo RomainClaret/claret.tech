@@ -1,7 +1,6 @@
 "use client";
 
 import { workExperiences } from "@/data/portfolio";
-import { FadeIn } from "@/components/ui/animated";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
 import {
@@ -50,7 +49,7 @@ function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
   ) {
     return {
       icon: GraduationCap,
-      colorClass: "text-purple-600 dark:text-purple-400",
+      colorClass: "text-purple-700 dark:text-purple-400",
       bgClass: "bg-purple-600/10 dark:bg-purple-400/10",
       borderClass: "border-purple-600/30 dark:border-purple-400/30",
       label: "Academic",
@@ -59,7 +58,7 @@ function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
   if (role.includes("founder") || role.includes("co-founder")) {
     return {
       icon: Rocket,
-      colorClass: "text-emerald-600 dark:text-emerald-400",
+      colorClass: "text-emerald-700 dark:text-emerald-400",
       bgClass: "bg-emerald-600/10 dark:bg-emerald-400/10",
       borderClass: "border-emerald-600/30 dark:border-emerald-400/30",
       label: "Startup",
@@ -68,7 +67,7 @@ function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
   if (role.includes("engineer") || role.includes("developer")) {
     return {
       icon: Briefcase,
-      colorClass: "text-blue-600 dark:text-blue-400",
+      colorClass: "text-blue-700 dark:text-blue-400",
       bgClass: "bg-blue-600/10 dark:bg-blue-400/10",
       borderClass: "border-blue-600/30 dark:border-blue-400/30",
       label: "Engineering",
@@ -76,7 +75,7 @@ function getExperienceType(experience: (typeof workExperiences.experience)[0]) {
   }
   return {
     icon: Building,
-    colorClass: "text-slate-600 dark:text-slate-400",
+    colorClass: "text-slate-700 dark:text-slate-400",
     bgClass: "bg-slate-600/10 dark:bg-slate-400/10",
     borderClass: "border-slate-600/30 dark:border-slate-400/30",
     label: "Professional",
@@ -149,6 +148,11 @@ function ExperienceTimelineItem({
     <div
       ref={itemRef}
       id={experience.anchorId}
+      // Marks the waiting state for the page's stylesheet, which shows it
+      // without scripts and 6 s after the first paint when the bundle never
+      // ran (globals.css, layout.tsx): opacity-0 here is a class, which the
+      // rules for framer's inline opacity 0 do not see.
+      data-reveal={shown ? undefined : "pending"}
       className={cn(
         "relative flex gap-4 sm:gap-6 transition-all duration-700",
         shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
@@ -500,7 +504,7 @@ export function ExperienceTimeline() {
 
   return (
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-4xl relative">
-      <FadeIn className="text-center mb-8 sm:mb-12">
+      <div className="text-center mb-8 sm:mb-12">
         <h2 className="section-title-gradient">{workExperiences.title}</h2>
         <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto">
           <span className="text-primary font-semibold">
@@ -509,7 +513,7 @@ export function ExperienceTimeline() {
           {" • "}
           {workExperiences.subtitle.normalText}
         </p>
-      </FadeIn>
+      </div>
 
       {/* Career stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-12">
@@ -520,7 +524,7 @@ export function ExperienceTimeline() {
         >
           <div className="flex flex-col items-center">
             <Briefcase className="w-5 h-5 text-blue-500 mb-2" />
-            <div className="text-2xl sm:text-3xl font-bold text-blue-500 mb-0.5">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-400 mb-0.5">
               {stats.totalPositions}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">
@@ -536,7 +540,7 @@ export function ExperienceTimeline() {
         >
           <div className="flex flex-col items-center">
             <Calendar className="w-5 h-5 text-amber-500 mb-2" />
-            <div className="text-2xl sm:text-3xl font-bold text-amber-500 mb-0.5">
+            <div className="text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-400 mb-0.5">
               {stats.yearsExperience}
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">
@@ -552,7 +556,7 @@ export function ExperienceTimeline() {
         >
           <div className="flex flex-col items-center">
             <Rocket className="w-5 h-5 text-green-500 mb-2" />
-            <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-0.5">
+            <div className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400 mb-0.5">
               1
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">
@@ -568,7 +572,7 @@ export function ExperienceTimeline() {
         >
           <div className="flex flex-col items-center">
             <GraduationCap className="w-5 h-5 text-purple-500 mb-2" />
-            <div className="text-2xl sm:text-3xl font-bold text-purple-500 mb-0.5">
+            <div className="text-2xl sm:text-3xl font-bold text-purple-700 dark:text-purple-400 mb-0.5">
               4
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">

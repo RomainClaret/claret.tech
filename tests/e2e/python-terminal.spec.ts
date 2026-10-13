@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
 // The two helpers every keyboard-driven terminal test needs. They live in
 // utils/ because terminal.spec.ts needs exactly the same ones, and having two

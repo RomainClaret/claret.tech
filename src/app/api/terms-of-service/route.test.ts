@@ -33,6 +33,12 @@ import { devError } from "@/lib/utils/dev-logger";
 import { renderMarkdownToHtml } from "@/lib/utils/markdown-server";
 import { ApiCache } from "@/lib/utils/api-cache";
 
+// A request with no client headers: the rate limiter keys it as
+// "unknown:unknown", as it did when these tests called GET() with nothing,
+// which TypeScript rejects (the handler takes the request).
+const anonymousRequest = () =>
+  ({ headers: new Headers() }) as unknown as Parameters<typeof GET>[0];
+
 const mockFs = vi.mocked(fs);
 const mockDevError = vi.mocked(devError);
 const mockRenderMarkdownToHtml = vi.mocked(renderMarkdownToHtml);
@@ -89,7 +95,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue(mockMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining("TERMS-OF-SERVICE.md"),
@@ -118,7 +124,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue("# Terms of Service");
       mockRenderMarkdownToHtml.mockReturnValue("<h1>Terms of Service</h1>");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.any(Object),
@@ -143,7 +149,7 @@ describe("Terms of Service API Route", () => {
         html: mockHtml,
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File system should not be accessed when cache hits
       expect(mockFs.readFileSync).not.toHaveBeenCalled();
@@ -174,7 +180,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue(oldMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(oldHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       // Advance time beyond cache duration (1 hour)
       vi.advanceTimersByTime(61 * 60 * 1000);
@@ -185,7 +191,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue(newMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(newHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       // File should be read again after cache expiration
       expect(mockFs.readFileSync).toHaveBeenCalled();
@@ -204,7 +210,7 @@ describe("Terms of Service API Route", () => {
     it("returns 404 when terms file does not exist", async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "TERMS-OF-SERVICE.md file not found at:",
@@ -223,7 +229,7 @@ describe("Terms of Service API Route", () => {
     it("does not call markdown renderer when file not found", async () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockRenderMarkdownToHtml).not.toHaveBeenCalled();
     });
@@ -236,7 +242,7 @@ describe("Terms of Service API Route", () => {
         throw new Error("Permission denied");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockDevError).toHaveBeenCalledWith(
         "Failed to read TERMS-OF-SERVICE file:",
@@ -257,7 +263,7 @@ describe("Terms of Service API Route", () => {
         throw new Error("Read error");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       const fallbackCall = (NextResponse.json as any).mock.calls[0][0];
       expect(fallbackCall.content).toContain("# Terms of Service");
@@ -281,7 +287,7 @@ describe("Terms of Service API Route", () => {
         throw new Error("Markdown rendering failed");
       });
 
-      await GET();
+      await GET(anonymousRequest());
 
       // Should call devError and return fallback content
       expect(mockDevError).toHaveBeenCalledWith(
@@ -304,7 +310,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue("# Terms of Service");
       mockRenderMarkdownToHtml.mockReturnValue("<h1>Terms of Service</h1>");
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(mockFs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining("TERMS-OF-SERVICE.md"),
@@ -325,7 +331,7 @@ describe("Terms of Service API Route", () => {
       mockFs.readFileSync.mockReturnValue(mockMarkdown);
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -345,11 +351,11 @@ describe("Terms of Service API Route", () => {
       mockRenderMarkdownToHtml.mockReturnValue(mockHtml);
 
       // First call
-      await GET();
+      await GET(anonymousRequest());
 
       // Clear mocks and make second call to verify cache
       vi.clearAllMocks();
-      await GET();
+      await GET(anonymousRequest());
 
       expect(NextResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({

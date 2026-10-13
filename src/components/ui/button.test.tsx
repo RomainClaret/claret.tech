@@ -630,24 +630,10 @@ describe("Button", () => {
     });
   });
 
-  describe("Performance", () => {
-    it("renders efficiently with default props", () => {
-      const renderTime = performance.now();
-      render(<Button>Performance Test</Button>);
-      const renderDuration = performance.now() - renderTime;
-
-      // Should render quickly (less than 10ms is reasonable for a simple component)
-      expect(renderDuration).toBeLessThan(10);
-    });
-
-    it("handles re-renders efficiently", () => {
+  describe("Re-render", () => {
+    it("shows its new label", () => {
       const { rerender } = render(<Button>Initial</Button>);
-
-      const rerenderTime = performance.now();
       rerender(<Button>Updated</Button>);
-      const rerenderDuration = performance.now() - rerenderTime;
-
-      expect(rerenderDuration).toBeLessThan(5);
       expect(screen.getByText("Updated")).toBeInTheDocument();
     });
   });

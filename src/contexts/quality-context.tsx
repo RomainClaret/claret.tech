@@ -11,6 +11,7 @@ import {
   useRef,
 } from "react";
 import { useFpsOnly } from "@/lib/hooks/useFpsOnly";
+import { useAnimationStateOptional } from "@/contexts/animation-state-context";
 import { readStorage, writeStorage } from "@/lib/utils/safe-storage";
 import { loadBackoff, saveBackoff, type Backoff } from "@/lib/quality/backoff";
 import {
@@ -178,8 +179,23 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     setIsAutoState(false);
   }, [isTestMode]);
 
-  // FPS monitoring for auto-adjustment
-  const fpsData = useFpsOnly(typeof window !== "undefined");
+  // The loop below measures the page while it animates. With animations
+  // off (Safari's default, the terminal's "animations stop", auto-disable)
+  // the page hardly moves, so its frame rate measured the sampler and
+  // nothing else, and the loop raised a still page tier after tier on it:
+  // a Safari visit went from LOW to BALANCED in its first 20 s. It holds
+  // the tier until they play again. AnimationStateProvider sits above this
+  // provider; without it (tests, isolated tools) they count as playing.
+  const animationsPlaying =
+    useAnimationStateOptional()?.areAnimationsPlaying ?? true;
+  const loopRuns = restored && isAuto && !isTestMode && animationsPlaying;
+
+  // FPS monitoring for auto-adjustment, and only while the loop below runs:
+  // nothing else here reads it. The sampler is a frame callback on every
+  // display refresh (120 a second on a 120Hz panel), and each one makes the
+  // page run a rendering update. Sampled always, a visitor on a tier of
+  // their own paid that all visit for readings nothing used.
+  const fpsData = useFpsOnly(loopRuns);
   // Latest fps for the polling interval below WITHOUT being an effect
   // dependency: keying the effect on fps tore down and recreated the poll
   // every second, so the adjustment could starve.
@@ -206,7 +222,8 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // it should trigger a render, and keeping it out of the dependency array is
   // what lets the interval run uninterrupted.
   const decisionRef = useRef<QualityDecisionState | null>(null);
-  // Set while the auto loop below is stopped (auto off, or test mode).
+  // Set while the auto loop below is stopped (auto off, test mode, or
+  // animations off).
   const loopStoppedRef = useRef(false);
   // The backoff last saved (lib/quality/backoff.ts), so the loop, which
   // ticks every second, writes only when a demotion, the recovery owed or
@@ -239,12 +256,12 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // buried in this effect.
   useEffect(() => {
     if (!restored) return;
-    if (!isAuto || typeof window === "undefined" || isTestMode) {
+    if (!loopRuns || typeof window === "undefined") {
       loopStoppedRef.current = true;
       return;
     }
-    // Auto switched back on: the window still holds samples from before it
-    // was switched off, and on the same tier the tick's re-base keeps them,
+    // Auto, or animations, switched back on: the window still holds samples
+    // from before, and on the same tier the tick's re-base keeps them,
     // so a drop could follow from evidence minutes old. Start it over. Only
     // then: this effect also restarts on the loop's own tier changes, which
     // reset the window already and may have just recorded a recovery owed.
@@ -308,7 +325,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     // than the data arrives would only discard samples.
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [quality, isAuto, isTestMode, setDecision, restored]);
+  }, [quality, loopRuns, setDecision, restored]);
 
   // Save preferences to localStorage
   // Manual choices persist; automatic ones last the session (see above). An

@@ -8,8 +8,13 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useSyncExternalStore,
 } from "react";
 import { useSafariContext } from "@/contexts/safari-context";
+import {
+  getSnapshot as getMotionGate,
+  subscribe as subscribeMotionGate,
+} from "@/lib/utils/motion-gate";
 import {
   getAnimationPreference,
   storeAnimationPreference,
@@ -45,14 +50,34 @@ const AnimationStateContext = createContext<
 export function AnimationStateProvider({ children }: { children: ReactNode }) {
   const { isSafari, isHydrated } = useSafariContext();
 
-  // Lightweight FPS tracking (only for auto-disable)
-  const shouldMonitorFps = isHydrated && typeof window !== "undefined";
-  const fpsData = useFpsOnly(shouldMonitorFps);
-
   // Playing, as the HTML was rendered: the page is generated once for every
   // visitor, so neither their stored choice nor their browser can go into
   // the first render. Both are settled in the effect below.
   const [userAnimationPreference, setUserAnimationPreference] = useState(true);
+
+  // Lightweight FPS tracking, for auto-disable only, which counts only at
+  // the battery tier with animations on (useFpsAutoDisable): sampled there
+  // and nowhere else. The sampler is a frame callback on every display
+  // refresh, each one a rendering update of the page, and it used to run all
+  // visit for readings nothing used.
+  const shouldMonitorFps = isHydrated && typeof window !== "undefined";
+  const atBatteryTier = useSyncExternalStore(
+    subscribeMotionGate,
+    () => getMotionGate().tier === "battery",
+    () => false,
+  );
+  // Not once auto-disable has switched animations off: the counting stops
+  // there, and the machines that get that far are the slowest, which then
+  // paid a rendering update per refresh for the rest of the session. The
+  // hook that decides comes after the sampler it reads, so its verdict is
+  // mirrored here and stops the sampler on the next render.
+  const [autoDisabled, setAutoDisabled] = useState(false);
+  const fpsData = useFpsOnly(
+    shouldMonitorFps &&
+      userAnimationPreference &&
+      atBatteryTier &&
+      !autoDisabled,
+  );
 
   // FPS auto-disable logic
   const autoDisableState = useFpsAutoDisable(
@@ -66,6 +91,9 @@ export function AnimationStateProvider({ children }: { children: ReactNode }) {
       },
     },
   );
+  useEffect(() => {
+    setAutoDisabled(autoDisableState.isAutoDisabled);
+  }, [autoDisableState.isAutoDisabled]);
 
   // The actual animation state is user preference AND not auto-disabled
   const areAnimationsPlaying =

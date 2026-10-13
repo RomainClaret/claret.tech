@@ -1,6 +1,5 @@
 "use client";
 
-import { SlideInLeft, SlideInRight } from "@/components/ui/animated";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
@@ -13,23 +12,30 @@ import { IntroductionContent } from "./IntroductionContent";
 import { IntroductionAnimations } from "./IntroductionAnimations";
 import { InterestConstellation } from "@/components/ui/interest-constellation";
 import { greeting } from "@/data/portfolio";
+import { withLoadFallback } from "@/lib/utils/load-fallback";
+import { logError } from "@/lib/utils/dev-logger";
 
-// Dynamic imports for performance
+// The component's own height: its primary brain's (200, 250 or 300 px by
+// breakpoint). A square up to 512 px stood in for it, so the hero's brain
+// column shrank when the component arrived and the content around it
+// re-centred, a layout shift on every load.
+const BrainsPlaceholder = () => (
+  <div className="w-full h-[200px] sm:h-[250px] lg:h-[300px]" />
+);
+
+// Dynamic imports for performance. When the brains' chunk cannot be fetched,
+// their box keeps its placeholder: React.lazy threw while rendering, and the
+// page's error boundary (error.tsx) replaced everything under the navigation.
 const DualBrainAnimation = dynamic(
-  () =>
-    import("@/components/ui/dual-brain-animation").then(
-      (mod) => mod.DualBrainAnimation,
-    ),
-  {
-    ssr: false,
-    // The component's own height: its primary brain's (200, 250 or 300 px
-    // by breakpoint). A square up to 512 px stood in for it, so the hero's
-    // brain column shrank when the component arrived and the content
-    // around it re-centred, a layout shift on every load.
-    loading: () => (
-      <div className="w-full h-[200px] sm:h-[250px] lg:h-[300px]" />
-    ),
-  },
+  withLoadFallback(
+    () =>
+      import("@/components/ui/dual-brain-animation").then(
+        (mod) => mod.DualBrainAnimation,
+      ),
+    BrainsPlaceholder,
+    { onError: (error) => logError(error, "Hero brains chunk") },
+  ),
+  { ssr: false, loading: BrainsPlaceholder },
 );
 
 // Fetched on intent and mounted only while open (pdf-reader-preload.ts).
@@ -142,16 +148,16 @@ export function Introduction() {
       <div className="container mx-auto max-w-7xl relative z-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Text Content Panel */}
-          <SlideInLeft className="text-center lg:text-left">
+          <div className="text-center lg:text-left">
             <IntroductionContent
               onResumeClick={handleResumeClick}
               onContactClick={handleContactClick}
               className="relative"
             />
-          </SlideInLeft>
+          </div>
 
           {/* Brain Animation Panel */}
-          <SlideInRight delay={300} className="relative lg:pr-8">
+          <div className="relative lg:pr-8">
             <div className="relative">
               <DualBrainAnimation
                 isVisible={isVisible}
@@ -171,7 +177,7 @@ export function Introduction() {
                 </div>
               </div>
             </div>
-          </SlideInRight>
+          </div>
         </div>
       </div>
 

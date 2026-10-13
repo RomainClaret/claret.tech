@@ -15,7 +15,6 @@ interface HolographicCardProps {
   insideBackgroundColor?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  isActive?: boolean;
   isConnected?: boolean;
   /** Hold the hover color shift on, as if the pointer were over the card
    *  (used by paper deep links until the user interacts). */
@@ -43,7 +42,6 @@ export function HolographicCard({
   insideBackgroundColor,
   onMouseEnter,
   onMouseLeave,
-  isActive = false,
   isConnected = false,
   forceHover = false,
   allowContentOverflow = false,
@@ -217,8 +215,8 @@ export function HolographicCard({
           "relative bg-card/95 dark:bg-card/90",
           // This is the only element in the tree that clips card content.
           // Nothing positioned inside it depends on the clip (the border,
-          // activity dot, light reflection and tint overlay are all inset), so
-          // opting out is safe where a child needs to escape.
+          // light reflection and tint overlay are all inset), so opting out
+          // is safe where a child needs to escape.
           "rounded-lg",
           allowContentOverflow ? "overflow-visible" : "overflow-hidden",
           "shadow-lg border border-border",
@@ -229,7 +227,6 @@ export function HolographicCard({
           "before:transition-opacity",
           "hover:before:opacity-100",
           "h-full",
-          isActive && "before:opacity-100",
           forceHover && "before:opacity-100",
           className?.includes("blog-card-enhanced") &&
             "bg-card/95 dark:bg-card/90",
@@ -259,67 +256,6 @@ export function HolographicCard({
             backgroundSize: "200% 200%",
           }}
         />
-
-        {/* Neural activity indicator - simplified for Safari */}
-        {isActive && (
-          <m.div
-            className="absolute top-2 right-2 z-20"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200 }}
-          >
-            {/* Outer pulse ring - disabled animation on Safari */}
-            <m.div
-              className="absolute w-6 h-6 rounded-full border-2"
-              style={{
-                borderColor: `rgb(${glowColor})`,
-                top: "-2px",
-                left: "-2px",
-              }}
-              animate={
-                shouldReduceAnimations || !areAnimationsPlaying
-                  ? {}
-                  : {
-                      scale: [1, 1.5, 1],
-                      opacity: [0.5, 0, 0.5],
-                    }
-              }
-              transition={{
-                duration: 2,
-                repeat:
-                  shouldReduceAnimations || !areAnimationsPlaying
-                    ? 0
-                    : Infinity,
-                ease: "easeInOut",
-              }}
-            />
-            {/* Inner dot - simplified for Safari */}
-            <m.div
-              className="relative w-2 h-2 rounded-full"
-              style={{
-                backgroundColor: `rgb(${glowColor})`,
-                boxShadow: shouldReduceAnimations
-                  ? "none"
-                  : `0 0 10px rgba(${glowColor}, 0.8)`,
-              }}
-              animate={
-                shouldReduceAnimations || !areAnimationsPlaying
-                  ? {}
-                  : {
-                      scale: [1, 1.2, 1],
-                    }
-              }
-              transition={{
-                duration: 1,
-                repeat:
-                  shouldReduceAnimations || !areAnimationsPlaying
-                    ? 0
-                    : Infinity,
-                ease: "easeInOut",
-              }}
-            />
-          </m.div>
-        )}
 
         {/* Light reflection effect */}
         <div

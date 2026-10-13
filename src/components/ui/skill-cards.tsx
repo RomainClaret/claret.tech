@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 
 interface Skill {
   name: string;
@@ -40,11 +39,7 @@ export function SkillCards({
     <div className={cn("mt-6", className)}>
       {/* Section header */}
       <div className="flex items-center gap-2 mb-3">
-        <ProtectedLucideIcon
-          Icon={Sparkles}
-          className="w-4 h-4"
-          style={{ color }}
-        />
+        <Sparkles className="w-4 h-4" style={{ color }} />
         <span className="text-xs font-medium text-muted-foreground">
           Key Skills & Technologies
         </span>

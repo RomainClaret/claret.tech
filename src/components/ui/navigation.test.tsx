@@ -30,6 +30,9 @@ import { Navigation } from "./navigation";
 const mockPathname = vi.hoisted(() => ({ current: "/" }));
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
+/** Sections the getElementById stub put in the page, removed after each test. */
+const stubSections: HTMLElement[] = [];
+
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname.current,
   useRouter: () => ({ push: mockRouterPush }),
@@ -57,17 +60,6 @@ vi.mock("./high-contrast-toggle", () => ({
   HighContrastToggle: () => (
     <div data-testid="high-contrast-toggle">High Contrast</div>
   ),
-}));
-
-vi.mock("./protected-lucide-icon", () => ({
-  ProtectedLucideIcon: ({
-    Icon,
-    className,
-    ...props
-  }: {
-    Icon: React.ComponentType<{ className?: string }>;
-    className?: string;
-  }) => <Icon className={className} data-testid="lucide-icon" {...props} />,
 }));
 
 vi.mock("next/link", () => ({
@@ -134,25 +126,37 @@ describe("Navigation", () => {
       writable: true,
     });
 
-    // Mock document.getElementById
+    // A real, connected section behind every target, placed as before
+    // (home 0, skills 500, the rest 1000): a nav choice now focuses it. An
+    // element a test puts in the page itself wins.
+    const realGetElementById = document.getElementById.bind(document);
     vi.spyOn(document, "getElementById").mockImplementation((id) => {
-      return {
-        offsetTop: id === "home" ? 0 : id === "skills" ? 500 : 1000,
-        getBoundingClientRect: () => ({
+      const existing = realGetElementById(id);
+      if (existing) return existing;
+      const section = document.createElement("section");
+      section.id = id;
+      Object.defineProperty(section, "offsetTop", {
+        value: id === "home" ? 0 : id === "skills" ? 500 : 1000,
+      });
+      section.getBoundingClientRect = () =>
+        ({
           top: 100,
           left: 0,
           right: 0,
           bottom: 0,
           width: 0,
           height: 0,
-        }),
-      } as unknown as HTMLElement;
+        }) as DOMRect;
+      document.body.appendChild(section);
+      stubSections.push(section);
+      return section;
     });
 
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    stubSections.splice(0).forEach((section) => section.remove());
     vi.restoreAllMocks();
     // vi.restoreAllMocks() does NOT undo the Object.defineProperty replacements
     // in beforeEach. Restore the real window event methods so the stubbed (no-op)
@@ -307,6 +311,86 @@ describe("Navigation", () => {
 
       const mobileMenu = screen.getByTestId("mobile-navigation-menu");
       expect(mobileMenu).toHaveAttribute("id", "mobile-navigation-menu");
+    });
+
+    it("moves focus to the section chosen, as an in-page link does", async () => {
+      // The click is cancelled and the page scrolled by script, so the
+      // browser never moved focus: the link went away with the menu, focus
+      // fell to the body, and the next Tab started over from the top.
+      render(<Navigation />);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("mobile-menu-button"));
+      });
+      const link = screen
+        .getByTestId("mobile-navigation-menu")
+        .querySelector<HTMLAnchorElement>('a[href="#projects"]')!;
+      link.focus();
+
+      await act(async () => {
+        fireEvent.click(link);
+      });
+
+      expect(document.activeElement).toBe(document.getElementById("projects"));
+    });
+
+    it("closes on Escape and returns focus to the menu button", async () => {
+      render(<Navigation />);
+      const mobileButton = screen.getByTestId("mobile-menu-button");
+      await act(async () => {
+        fireEvent.click(mobileButton);
+      });
+      const firstLink = screen
+        .getByTestId("mobile-navigation-menu")
+        .querySelector("a")!;
+      firstLink.focus();
+
+      let notCancelled = true;
+      await act(async () => {
+        notCancelled = fireEvent.keyDown(firstLink, { key: "Escape" });
+      });
+
+      expect(mobileButton).toHaveAttribute("aria-expanded", "false");
+      expect(mobileButton).toHaveFocus();
+      // Marked as used, so the performance monitor stays.
+      expect(notCancelled).toBe(false);
+    });
+
+    it("closes when focus moves to an element outside the navigation", async () => {
+      render(
+        <>
+          <Navigation />
+          <button>page control</button>
+        </>,
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("mobile-menu-button"));
+      });
+      const contact = screen.getByRole("button", { name: "Contact me" });
+
+      // React's onBlur listens to focusout, which bubbles to the nav
+      await act(async () => {
+        fireEvent.focusOut(contact, {
+          relatedTarget: screen.getByText("page control"),
+        });
+      });
+
+      expect(
+        screen.queryByTestId("mobile-navigation-menu"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("stays open when focus goes to no element, as a tap on a link does in Safari", async () => {
+      render(<Navigation />);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("mobile-menu-button"));
+      });
+      const contact = screen.getByRole("button", { name: "Contact me" });
+
+      await act(async () => {
+        fireEvent.focusOut(contact, { relatedTarget: null });
+      });
+
+      expect(screen.getByTestId("mobile-navigation-menu")).toBeInTheDocument();
     });
   });
 

@@ -39,7 +39,8 @@
  * Fixing this properly means expecting red for a while, which is why it is its
  * own piece of work rather than a tidy-up.
  */
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "./utils/fixtures";
+import { acknowledgeCookieNotice } from "./utils/cookie-notice";
 import {
   waitForScrollCompletion,
   waitForMeaningfulVisibility,
@@ -277,6 +278,9 @@ async function openMobileMenuRobust(page: Page): Promise<void> {
 
 test.describe("Navigation", () => {
   test.beforeEach(async ({ page, isMobile }) => {
+    // The notice is first in the page, and these tests start from the top:
+    // the skip link's test, and the keyboard test's fourth Tab, met it.
+    await acknowledgeCookieNotice(page);
     // Include playwright parameter from the start to avoid double navigation
     await page.goto("/?playwright=true");
 
@@ -310,6 +314,13 @@ test.describe("Navigation", () => {
 
     // Wait for the page to be ready
     await page.waitForLoadState("domcontentloaded");
+    // And for the splash, which covers it: shown, then gone (a count of 0
+    // alone passes before it mounts).
+    const splash = page.getByRole("progressbar", {
+      name: "Loading portfolio",
+    });
+    await expect(splash).toBeVisible();
+    await expect(splash).toHaveCount(0, { timeout: 15_000 });
   });
 
   test("should display all navigation items", async ({ page, isMobile }) => {
@@ -1513,42 +1524,29 @@ test.describe("Navigation", () => {
   test("should have working skip navigation link", async ({
     page,
     isMobile,
+    browserName,
   }) => {
     // Skip links are more relevant for desktop
     if (isMobile) {
       // Skipping skip navigation test on mobile
       return;
     }
-    // Tab to reveal skip link (if present)
-    await page.keyboard.press("Tab");
+    // From the keyboard, as it is meant (macOS WebKit's Tab skips links:
+    // Alt+Tab reaches them). It shows only while focused: the test-mode CSS
+    // used to keep it on screen, so a click on it passed.
+    const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    await page.keyboard.press(tab);
+    await expect(skipLink).toBeFocused();
+    expect((await skipLink.boundingBox())!.width).toBeGreaterThan(1);
 
-    // Check if skip link exists
-    const skipLink = page.locator(
-      'a:has-text("Skip"), a[href="#main"], a[href="#content"]',
-    );
-    const skipLinkCount = await skipLink.count();
-
-    if (skipLinkCount > 0) {
-      // Click skip link
-      await skipLink.first().click();
-
-      // Custom viewport check for CI
-      const mainInView = await page.evaluate(() => {
-        const selectors = ["main", "#main", "#content"];
-        for (const selector of selectors) {
-          const element = document.querySelector(selector);
-          if (element) {
-            const rect = element.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            // Element is in viewport if any part is visible
-            return rect.bottom > 0 && rect.top < viewportHeight;
-          }
-        }
-        return false;
-      });
-
-      expect(mainInView).toBeTruthy();
-    }
+    // It moves the keyboard past the navigation, into the content.
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#main-content$/);
+    await page.keyboard.press(tab);
+    expect(
+      await page.evaluate(() => !!document.activeElement?.closest("main")),
+    ).toBe(true);
   });
 
   test("should handle keyboard navigation", async ({
@@ -1655,124 +1653,30 @@ test.describe("Navigation", () => {
     expect(hasScrolledState).toBeTruthy();
   });
 
-  test("should navigate back to top when clicking logo", async ({
-    page,
-    browserName,
-  }) => {
-    // Dismiss toasts that might interfere
-    await dismissToasts(page);
+  test("should navigate back to top when clicking logo", async ({ page }) => {
+    // The fixed navigation's logo, clicked from far down the page, takes
+    // the reader back to the top. With the navigation un-fixed in test
+    // mode, the helper's fallback scrolled the page up itself and a click
+    // escalated to a script click, so this passed whatever the logo did.
+    await page.evaluate(() =>
+      window.scrollTo({ top: 1000, behavior: "instant" }),
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(500);
 
-    // Multiple robust scroll-down strategies
-    let scrolledDown = false;
-    let initialScrollY = 0;
-    const scrollDownStrategies = [
-      // Strategy 1: Simple scrollTo
-      async () => {
-        await page.evaluate(() => window.scrollTo(0, 1000));
-        await page.waitForTimeout(300);
-      },
-      // Strategy 2: Force scroll with multiple methods
-      async () => {
-        await page.evaluate(() => {
-          window.scrollTo(0, 1000);
-          document.body.scrollTop = 1000;
-          document.documentElement.scrollTop = 1000;
-        });
-        await page.waitForTimeout(300);
-      },
-      // Strategy 3: Element-based scroll
-      async () => {
-        await page.evaluate(() => {
-          const projects = document.getElementById("projects");
-          if (projects) {
-            projects.scrollIntoView({ behavior: "auto" });
-          } else {
-            window.scrollTo(0, 1000);
-          }
-        });
-        await page.waitForTimeout(300);
-      },
-    ];
+    // On screen and on top where the navigation stays, without scrolling.
+    await ensureElementNotBlockedByToast(page, 'nav a[href="#home"]');
+    const box = (await page
+      .locator('nav a[href="#home"]')
+      .first()
+      .boundingBox())!;
+    // A click where it is: a locator click would scroll to it first.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
-    // Try scroll strategies until one works
-    for (const strategy of scrollDownStrategies) {
-      await strategy();
-      initialScrollY = await page.evaluate(() => window.scrollY);
-      // More lenient threshold for CI
-      if (initialScrollY > (browserName === "webkit" ? 200 : 300)) {
-        scrolledDown = true;
-        break;
-      }
-    }
-
-    // If scroll strategies failed, try one more aggressive approach
-    if (!scrolledDown) {
-      await page.evaluate(() => {
-        // Ultra-aggressive scroll
-        for (let i = 0; i < 5; i++) {
-          window.scrollTo(0, 1000);
-          document.body.scrollTop = 1000;
-          document.documentElement.scrollTop = 1000;
-        }
-      });
-      await page.waitForTimeout(500);
-      initialScrollY = await page.evaluate(() => window.scrollY);
-    }
-
-    // More lenient expectation - we just need some scroll
-    const minScroll = browserName === "webkit" ? 200 : 300;
-    expect(initialScrollY).toBeGreaterThan(minScroll); // Ensure we're scrolled down
-
-    // Ensure logo is not blocked by toasts with shorter timeout to avoid hangs
-    try {
-      await ensureElementNotBlockedByToast(page, 'nav a[href="#home"]', 2000);
-    } catch (toastError) {
-      console.warn(
-        "Toast blocking check failed, proceeding with logo click:",
-        toastError,
-      );
-    }
-
-    // Click on logo with retry logic
-    const logo = page.locator('nav a[href="#home"]').first();
-    let logoClicked = false;
-    const clickStrategies = [
-      () => logo.click({ timeout: 5000 }),
-      () => logo.click({ force: true, timeout: 3000 }),
-      () => logo.evaluate((el) => (el as HTMLElement).click?.()),
-    ];
-
-    for (const strategy of clickStrategies) {
-      try {
-        await strategy();
-        logoClicked = true;
-        break;
-      } catch (clickError) {
-        console.warn("Logo click strategy failed:", clickError);
-      }
-    }
-
-    if (!logoClicked) {
-      throw new Error("All logo click strategies failed");
-    }
-
-    // Wait for scroll animation to complete with browser-specific timing
-    const scrollAnimationWait = browserName === "webkit" ? 2500 : 2000;
-    await page.waitForTimeout(scrollAnimationWait);
-
-    // Wait for scroll to reach the top with retry logic
-    let scrollY = await page.evaluate(() => window.scrollY);
-    let attempts = 0;
-    const maxAttempts = 5;
-
-    while (scrollY >= 100 && attempts < maxAttempts) {
-      await page.waitForTimeout(500);
-      scrollY = await page.evaluate(() => window.scrollY);
-      attempts++;
-    }
-
-    // Should be back at top (allow some tolerance for smooth scroll)
-    expect(scrollY).toBeLessThan(100);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 10_000 })
+      .toBeLessThan(100);
   });
 
   test("should handle deep linking", async ({ page, browserName }) => {

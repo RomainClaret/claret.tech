@@ -117,19 +117,17 @@ function TestLayout({ children }: { children: React.ReactNode }) {
             <div data-testid="quality-provider">
               <div data-testid="background-provider">
                 <div data-testid="terminal-provider">
-                  <div data-testid="svg-protection-wrapper">
-                    <div data-testid="app-wrapper">
-                      <div data-testid="animated-favicon">Animated Favicon</div>
-                      <nav data-testid="navigation">Navigation</nav>
-                      <main id="main-content" className="pt-16">
-                        {children}
-                      </main>
-                      <nav data-testid="floating-nav">Floating Nav</nav>
-                      <footer data-testid="footer">Footer</footer>
-                    </div>
-                    <div data-testid="toast-container">Toast Container</div>
-                    <div data-testid="cookie-notice">Cookie Notice</div>
+                  <div data-testid="app-wrapper">
+                    <div data-testid="animated-favicon">Animated Favicon</div>
+                    <nav data-testid="navigation">Navigation</nav>
+                    <main id="main-content" className="pt-16">
+                      {children}
+                    </main>
+                    <nav data-testid="floating-nav">Floating Nav</nav>
+                    <footer data-testid="footer">Footer</footer>
                   </div>
+                  <div data-testid="toast-container">Toast Container</div>
+                  <div data-testid="cookie-notice">Cookie Notice</div>
                 </div>
               </div>
             </div>
@@ -260,7 +258,6 @@ describe("RootLayout", () => {
       expect(screen.getByTestId("quality-provider")).toBeInTheDocument();
       expect(screen.getByTestId("background-provider")).toBeInTheDocument();
       expect(screen.getByTestId("terminal-provider")).toBeInTheDocument();
-      expect(screen.getByTestId("svg-protection-wrapper")).toBeInTheDocument();
       expect(screen.getByTestId("app-wrapper")).toBeInTheDocument();
     });
 
@@ -331,9 +328,7 @@ describe("RootLayout", () => {
       const terminalProvider = container.querySelector(
         '[data-testid="terminal-provider"]',
       );
-      const svgWrapper = container.querySelector(
-        '[data-testid="svg-protection-wrapper"]',
-      );
+      const appWrapper = container.querySelector('[data-testid="app-wrapper"]');
 
       expect(themeProvider).toBeInTheDocument();
       expect(safariProvider).toBeInTheDocument();
@@ -345,7 +340,7 @@ describe("RootLayout", () => {
       expect(animationProvider?.contains(qualityProvider!)).toBe(true);
       expect(qualityProvider?.contains(backgroundProvider!)).toBe(true);
       expect(backgroundProvider?.contains(terminalProvider!)).toBe(true);
-      expect(terminalProvider?.contains(svgWrapper!)).toBe(true);
+      expect(terminalProvider?.contains(appWrapper!)).toBe(true);
     });
 
     it("passes correct initial props to providers", () => {
@@ -498,18 +493,6 @@ describe("RootLayout", () => {
   });
 
   describe("Performance Considerations", () => {
-    it("renders efficiently with test structure", () => {
-      const startTime = Date.now();
-      render(
-        <TestLayout>
-          <TestChildren />
-        </TestLayout>,
-      );
-      const endTime = Date.now();
-
-      expect(endTime - startTime).toBeLessThan(100); // 100ms threshold
-    });
-
     it("maintains consistent DOM structure", () => {
       const { container } = render(
         <TestLayout>
@@ -541,16 +524,6 @@ describe("RootLayout", () => {
   });
 
   describe("Browser Compatibility", () => {
-    it("includes SVG protection in component hierarchy", () => {
-      render(
-        <TestLayout>
-          <TestChildren />
-        </TestLayout>,
-      );
-
-      expect(screen.getByTestId("svg-protection-wrapper")).toBeInTheDocument();
-    });
-
     it("handles Safari-specific configurations through providers", () => {
       render(
         <TestLayout>

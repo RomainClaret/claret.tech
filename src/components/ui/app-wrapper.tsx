@@ -12,7 +12,13 @@ import {
 } from "@/components/terminal/load-terminal";
 import { TerminalUnavailable } from "@/components/terminal/TerminalUnavailable";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
-import { ServiceWorkerRegister } from "./service-worker-register";
+import { SplashUnavailable } from "./splash-unavailable";
+import {
+  PerformanceDashboardUnavailable,
+  PerformanceMonitorUnavailable,
+  PerformanceReportUnavailable,
+} from "./performance-unavailable";
+import { ServiceWorkerCleanup } from "./service-worker-cleanup";
 import { ProjectsProvider } from "@/contexts/projects-context";
 import {
   PerformanceMonitorProvider,
@@ -26,8 +32,17 @@ import { PenguinConsole } from "./penguin-console";
 import { useKonamiCode } from "@/lib/hooks/useKonamiCode";
 import { showToast } from "@/components/ui/toast";
 
+// When its chunk cannot be fetched, the splash stands down instead of taking
+// the page with it: React.lazy threw while rendering, and the error boundary
+// below replaced the whole site with an error screen that a reload alone
+// undid. The stand-in tries once more as it mounts (webpack forgets a failed
+// chunk, so that import() requests it again), then completes.
 const SplashScreen = dynamic(
-  () => import("./splash-screen").then((mod) => mod.SplashScreen),
+  withLoadFallback(
+    () => import("./splash-screen").then((mod) => mod.SplashScreen),
+    SplashUnavailable,
+    { onError: (error) => logError(error, "Splash chunk") },
+  ),
   { ssr: false },
 );
 
@@ -50,24 +65,39 @@ const Terminal = dynamic(
   },
 );
 
+// The terminal's performance tools. A chunk that cannot be fetched shows a
+// stand-in with a retry: these render under the error boundary below, which
+// replaced the whole site with its error screen until a reload.
 const PerformanceMonitor = dynamic(
-  () => import("./performance-monitor").then((mod) => mod.PerformanceMonitor),
+  withLoadFallback(
+    () => import("./performance-monitor").then((mod) => mod.PerformanceMonitor),
+    PerformanceMonitorUnavailable,
+    { onError: (error) => logError(error, "Performance monitor chunk") },
+  ),
   { ssr: false },
 );
 
 const PerformanceModal = dynamic(
-  () =>
-    import("@/components/performance/PerformanceModal").then(
-      (mod) => mod.PerformanceModal,
-    ),
+  withLoadFallback(
+    () =>
+      import("@/components/performance/PerformanceModal").then(
+        (mod) => mod.PerformanceModal,
+      ),
+    PerformanceDashboardUnavailable,
+    { onError: (error) => logError(error, "Performance dashboard chunk") },
+  ),
   { ssr: false },
 );
 
 const PerformanceReportModal = dynamic(
-  () =>
-    import("@/components/performance/PerformanceReportModal").then(
-      (mod) => mod.PerformanceReportModal,
-    ),
+  withLoadFallback(
+    () =>
+      import("@/components/performance/PerformanceReportModal").then(
+        (mod) => mod.PerformanceReportModal,
+      ),
+    PerformanceReportUnavailable,
+    { onError: (error) => logError(error, "Performance report chunk") },
+  ),
   { ssr: false },
 );
 
@@ -192,7 +222,7 @@ export function AppWrapper({ children }: AppWrapperProps) {
           The module and its tests are kept; only the unused mount is gone. */}
       <PerformanceMonitorProvider>
         <ProjectsProvider>
-          <ServiceWorkerRegister />
+          <ServiceWorkerCleanup />
           <PenguinConsole />
           {/* Site-wide grid background with very low opacity - Disabled on Safari for performance */}
           {!shouldReduceAnimations && (

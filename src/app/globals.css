@@ -76,12 +76,34 @@
 }
 
 @layer base {
+  /* While the cookie notice shows, the page keeps clear of it: the end of
+     the page scrolls above it, and a focused element is scrolled into view
+     above it (WCAG 2.4.11). cookie-notice.tsx sets the height. */
+  html {
+    scroll-padding-bottom: var(--cookie-notice-height, 0px);
+  }
+
   body {
+    padding-bottom: var(--cookie-notice-height, 0px);
     @apply bg-background text-foreground;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
   }
+}
+
+/* Text in a colour that comes from data (accent-text.ts): darkened on the
+   light theme, lightened on the dark one. Over the site's data colours it
+   reads at 5.07:1 or more on white, slate-50 and the colour's own 10 to 20%
+   tints, and at 5.71:1 or more on the dark ones (accent-text.test.ts);
+   used as they were, the colours read at 1.5 to 4.3:1 on their own light
+   tints (WCAG 1.4.3 asks 4.5 for small text). */
+.accent-text {
+  color: color-mix(in srgb, var(--accent) 50%, black);
+}
+
+.dark .accent-text {
+  color: color-mix(in srgb, var(--accent) 70%, white);
 }
 
 /* Custom utilities */
@@ -227,24 +249,6 @@
     transform: translateY(20px);
   }
 
-  .animate-slide-in-down {
-    animation: slideInDown 0.6s ease-out forwards;
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  .animate-slide-in-left {
-    animation: slideInLeft 0.6s ease-out forwards;
-    opacity: 0;
-    transform: translateX(-50px);
-  }
-
-  .animate-slide-in-right {
-    animation: slideInRight 0.6s ease-out forwards;
-    opacity: 0;
-    transform: translateX(50px);
-  }
-
   .animate-scale-in {
     animation: scaleIn 0.4s ease-out forwards;
     opacity: 0;
@@ -264,27 +268,6 @@
     }
   }
 
-  @keyframes slideInDown {
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes slideInLeft {
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  @keyframes slideInRight {
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
   @keyframes scaleIn {
     to {
       opacity: 1;
@@ -292,24 +275,9 @@
     }
   }
 
-  /* Animation delays */
-  .animation-delay-100 {
-    animation-delay: 100ms;
-  }
+  /* The splash's one delay (splash-screen.tsx); the entrances have none. */
   .animation-delay-200 {
     animation-delay: 200ms;
-  }
-  .animation-delay-300 {
-    animation-delay: 300ms;
-  }
-  .animation-delay-400 {
-    animation-delay: 400ms;
-  }
-  .animation-delay-500 {
-    animation-delay: 500ms;
-  }
-  .animation-delay-600 {
-    animation-delay: 600ms;
   }
 
   /* Shimmer animation for color headers */
@@ -472,9 +440,6 @@
   /* Ensure animations are visible when not using the animate-on-scroll wrapper */
   .animate-fade-in:not(.animate-on-scroll),
   .animate-slide-in-up:not(.animate-on-scroll),
-  .animate-slide-in-down:not(.animate-on-scroll),
-  .animate-slide-in-left:not(.animate-on-scroll),
-  .animate-slide-in-right:not(.animate-on-scroll),
   .animate-scale-in:not(.animate-on-scroll) {
     opacity: 1 !important;
   }
@@ -549,9 +514,6 @@
   /* Disable specific animations */
   .animate-fade-in,
   .animate-slide-in-up,
-  .animate-slide-in-down,
-  .animate-slide-in-left,
-  .animate-slide-in-right,
   .animate-scale-in,
   .animate-float,
   .animate-gradient-xy,
@@ -608,6 +570,52 @@
   }
 }
 
+/* framer-motion puts each `m` element's initial state in the HTML, and for
+   most of the page's text that is opacity 0: only framer's features, a
+   chunk loaded after hydration (motion-provider.tsx), animate it in. When
+   that chunk fails, the bundle never runs or scripts are off, 14% of the
+   text in <main> could be read. These show it instead: at once when the
+   chunk failed, 6 s after the first paint when nothing said it arrived (the
+   backdrop's 6 s, above), and at once without scripts (layout.tsx).
+   - Entrance states hold "opacity:0;transform:" (as the server writes
+     them) or "opacity: 0; transform:" (once React rewrites the attribute),
+     or are opacity 0 alone. The decorative pulses put their opacity 0
+     after a will-change and stay hidden.
+   - The experience cards wait for an IntersectionObserver of their own,
+     with classes, and say so with data-reveal="pending". They show at the
+     same 6 s and without scripts, but not when only framer's chunk failed:
+     their own observer still brings them in.
+   - The timeline's company logos start at scale 0 alone
+     ("transform:scale(0)"), so the text check never saw them hidden.
+   - A plain selector list, no :is(): the browsers that cannot run the
+     bundle may not parse it either. */
+html:not([data-motion-features]) [style*="opacity:0;transform:"],
+html:not([data-motion-features]) [style*="opacity: 0; transform:"],
+html:not([data-motion-features]) [style="opacity:0"],
+html:not([data-motion-features]) [style="opacity: 0;"],
+html:not([data-motion-features]) [style="transform:scale(0)"],
+html:not([data-motion-features]) [style="transform: scale(0);"],
+html:not([data-motion-features]) [data-reveal="pending"] {
+  animation: motion-features-timeout 0s 6s forwards !important;
+}
+
+html[data-motion-features="failed"] [style*="opacity:0;transform:"],
+html[data-motion-features="failed"] [style*="opacity: 0; transform:"],
+html[data-motion-features="failed"] [style="opacity:0"],
+html[data-motion-features="failed"] [style="opacity: 0;"],
+html[data-motion-features="failed"] [style="transform:scale(0)"],
+html[data-motion-features="failed"] [style="transform: scale(0);"] {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@keyframes motion-features-timeout {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Fonts are loaded via next/font in layout.tsx (its hashed @font-face rules
    and CSS variables); the old manual @font-face duplicates were never applied
    because Tailwind only references the next/font variables. */
@@ -639,40 +647,43 @@
   }
 }
 
-/* Safari-specific performance optimizations */
-/* Disable infinite animations that cause compositor saturation */
+/* Safari only: WebKit is the engine that matches this test (Chromium
+   supports backdrop-filter unprefixed only). Endless motion saturated its
+   compositor, so here:
+   - Tailwind's spinners, pulses and bounces stand still (the PDF reader
+     says in words that it is loading for that reason);
+   - an animation set inline as infinite runs once;
+   - an inline translate3d or translateZ transform is dropped;
+   - will-change is auto everywhere, and .fixed, nav and "floating"
+     elements are held at position: fixed.
+   will-change must never be given back to a hovered or pressed element:
+   those states hold for every ancestor up to html, and will-change:
+   transform on body makes it the containing block of every fixed
+   element, so the navigation scrolls away with the page (measured in
+   WebKit: its top at -2000 after a 2,000 px scroll, instead of 0). A rule
+   here did exactly that for :hover, :focus and :active, and never
+   applied: the auto rule outweighs it, and the elements that rule leaves
+   out are all .fixed. */
 @supports (-webkit-backdrop-filter: blur(1px)) {
-  /* This specifically targets Safari */
   .animate-pulse,
   .animate-spin,
   .animate-bounce {
     animation: none !important;
   }
 
-  /* Disable infinite animations via CSS attribute selectors */
   *[style*="infinite"] {
     animation-iteration-count: 1 !important;
   }
 
-  /* Reduce complex transform animations */
   *[style*="translate3d"],
   *[style*="translateZ"] {
     transform: none !important;
   }
 
-  /* Limit will-change usage - exclude fixed positioned elements */
   *:not(.fixed):not(nav):not([class*="floating"]) {
     will-change: auto !important;
   }
 
-  /* Keep essential will-change only for direct user interactions */
-  :hover:not(.fixed),
-  :focus:not(.fixed),
-  :active:not(.fixed) {
-    will-change: transform !important;
-  }
-
-  /* Preserve fixed positioning */
   .fixed,
   nav,
   [class*="floating"] {

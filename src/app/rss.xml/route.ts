@@ -1,5 +1,6 @@
 // RSS Feed Generator
 import { logError } from "@/lib/utils/dev-logger";
+import { fetchMediumFeed } from "@/lib/utils/medium-feed";
 
 /**
  * Escape text for an XML element or attribute.
@@ -30,9 +31,10 @@ export async function GET() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://claret.tech";
 
   try {
-    // Fetch Medium posts from our API
-    const response = await fetch(`${siteUrl}/api/medium-posts`);
-    const data = await response.json();
+    // Medium's own feed, read directly: through the site's API over HTTP it
+    // cost each poll a rate-limited request and the API's image scraping,
+    // and a local or preview build read production's API.
+    const data = await fetchMediumFeed();
 
     // Generate RSS XML
     const rss = `<?xml version="1.0" encoding="UTF-8"?>

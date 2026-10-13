@@ -18,6 +18,7 @@ import Timer from "lucide-react/dist/esm/icons/timer";
 import Eye from "lucide-react/dist/esm/icons/eye";
 import Cpu from "lucide-react/dist/esm/icons/cpu";
 import { cn } from "@/lib/utils";
+import { STATUS_BG, STATUS_TEXT } from "./status-colors";
 import { usePerformanceMonitor } from "@/lib/hooks/usePerformanceMonitor";
 import { latestEntry } from "@/lib/utils/intersection";
 
@@ -39,35 +40,10 @@ interface BrowserPerformance {
   isActive: boolean;
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "excellent":
-      return "text-green-500";
-    case "good":
-      return "text-blue-500";
-    case "fair":
-      return "text-yellow-500";
-    case "poor":
-      return "text-red-500";
-    default:
-      return "text-gray-500";
-  }
-};
+const getStatusColor = (status: string) =>
+  STATUS_TEXT[status] ?? STATUS_TEXT.unknown;
 
-const getStatusBg = (status: string) => {
-  switch (status) {
-    case "excellent":
-      return "bg-green-500/10";
-    case "good":
-      return "bg-blue-500/10";
-    case "fair":
-      return "bg-yellow-500/10";
-    case "poor":
-      return "bg-red-500/10";
-    default:
-      return "bg-gray-500/10";
-  }
-};
+const getStatusBg = (status: string) => STATUS_BG[status] ?? STATUS_BG.unknown;
 
 const getTrendIcon = (trend?: string) => {
   switch (trend) {
@@ -532,9 +508,10 @@ export function PerformanceDashboard() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+        {/* The dialog's header holds the heading; this is its title card. */}
+        <p className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
           Performance Dashboard
-        </h2>
+        </p>
         <p className="text-muted-foreground mt-2">
           Real-time cross-browser performance monitoring and metrics
         </p>
@@ -567,7 +544,7 @@ export function PerformanceDashboard() {
             <Timer className="w-5 h-5 text-blue-500" />
             <span className="text-sm font-medium">Current FPS</span>
           </div>
-          <div className="text-2xl font-bold text-blue-500">
+          <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
             {performanceData.fps}
           </div>
           <div className="text-xs text-muted-foreground">
@@ -580,7 +557,7 @@ export function PerformanceDashboard() {
             <Eye className="w-5 h-5 text-green-500" />
             <span className="text-sm font-medium">Web Vitals</span>
           </div>
-          <div className="text-2xl font-bold text-green-500">
+          <div className="text-2xl font-bold text-green-700 dark:text-green-400">
             {performanceData.getWebVitalsScore() || "..."}
           </div>
           <div className="text-xs text-muted-foreground">
@@ -593,7 +570,7 @@ export function PerformanceDashboard() {
             <Cpu className="w-5 h-5 text-purple-500" />
             <span className="text-sm font-medium">System Load</span>
           </div>
-          <div className="text-2xl font-bold text-purple-500">
+          <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">
             {performanceData.cpuUsage
               ? `${performanceData.cpuUsage.toFixed(0)}%`
               : "N/A"}

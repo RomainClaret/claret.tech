@@ -11,9 +11,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ExperienceTimeline } from "./ExperienceTimeline";
 
 /**
- * First tests for this component. It is the one the site actually renders
- * (`page.tsx` imports it as `Experience`), while the neighbouring
- * `Experience.tsx` is dead code that only its own test file exercises.
+ * First tests for this component, the one the site renders (`page.tsx`
+ * imports it as `Experience`).
  *
  * The focus here is the deep-link behaviour, which is the part with real
  * moving pieces: hash matching, scrolling, forcing the card open, and forcing
@@ -37,12 +36,6 @@ class NoopIntersectionObserver {
 }
 
 vi.stubGlobal("IntersectionObserver", NoopIntersectionObserver);
-
-vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="fade-in">{children}</div>
-  ),
-}));
 
 vi.mock("@/components/ui/optimized-image", () => ({
   OptimizedImage: ({ alt }: { alt: string }) => <img alt={alt} />,
@@ -275,6 +268,25 @@ describe("ExperienceTimeline", () => {
       expect(
         document.getElementById("ucd-teaching-specialist")?.className,
       ).toContain("opacity-0");
+    });
+
+    it("marks the cards still waiting for their entrance", async () => {
+      // The page's stylesheet shows the marked cards without scripts, and
+      // 6 s after the first paint when the bundle never ran: their
+      // opacity-0 comes from classes, which the rules for framer's inline
+      // opacity 0 missed, so 57% of the section stayed unreadable.
+      window.location.hash = "#artificialkind-founder";
+
+      render(<ExperienceTimeline />);
+
+      await waitFor(() => {
+        expect(
+          document.getElementById("artificialkind-founder"),
+        ).not.toHaveAttribute("data-reveal");
+      });
+      expect(
+        document.getElementById("ucd-teaching-specialist"),
+      ).toHaveAttribute("data-reveal", "pending");
     });
 
     it("holds the hover glow until the user scrolls", async () => {

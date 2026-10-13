@@ -68,7 +68,9 @@ npx playwright test --project=webkit
 ### Basic Test Example
 
 ```typescript
-import { test, expect } from "@playwright/test";
+// Not "@playwright/test": the fixture makes each test its own client for
+// the API's rate limit (see utils/fixtures.ts).
+import { test, expect } from "./utils/fixtures";
 
 test("should display hero section", async ({ page }) => {
   await page.goto("/");

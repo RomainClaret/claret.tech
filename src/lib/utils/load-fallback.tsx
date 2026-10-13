@@ -46,6 +46,17 @@ export function withLoadFallback<P extends object>(
   // and showed it, "Trying again", until its own load settled.
   let resolved: ComponentType<P> | null = null;
 
+  // A reporter that throws must not undo the fallback it reports on: on the
+  // first load the rejection reached the page's error boundary, and on a
+  // retry the stand-in never left "Trying again".
+  const report = (error: unknown) => {
+    try {
+      onError?.(error);
+    } catch {
+      // Nothing to fall back to: the failure itself is already handled.
+    }
+  };
+
   function Retrying(props: P) {
     const [Loaded, setLoaded] = useState<ComponentType<P> | null>(
       () => resolved ?? peek?.() ?? null,
@@ -61,8 +72,8 @@ export function withLoadFallback<P extends object>(
           setLoaded(() => component);
         },
         (error: unknown) => {
-          onError?.(error);
           setRetrying(false);
+          report(error);
         },
       );
     }, []);
@@ -81,7 +92,7 @@ export function withLoadFallback<P extends object>(
 
   return () =>
     load().catch((error: unknown) => {
-      onError?.(error);
+      report(error);
       return Retrying;
     });
 }

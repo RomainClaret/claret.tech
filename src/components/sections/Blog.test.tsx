@@ -27,16 +27,6 @@ vi.mock("@/data/portfolio", () => ({
 }));
 
 // Mock animated components
-vi.mock("@/components/ui/animated", () => ({
-  FadeIn: ({
-    children,
-    className,
-  }: {
-    children: React.ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
-}));
-
 // Mock HolographicCard (exposes forceHover so deep-link tests can assert it)
 vi.mock("@/components/ui/holographic-card", () => ({
   HolographicCard: ({

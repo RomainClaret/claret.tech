@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import type { DeviceProbe, WeakDeviceReason } from "@/lib/quality/probe";
 import React from "react";
 
 /**
@@ -14,7 +15,11 @@ vi.mock("@/components/providers/test-mode-provider", () => ({
 }));
 
 const probe = vi.hoisted(() => ({
-  result: { weak: true, reason: "software-renderer", renderer: "SwiftShader" },
+  result: {
+    weak: true,
+    reason: "software-renderer",
+    renderer: "SwiftShader",
+  } as DeviceProbe,
   calls: 0,
 }));
 vi.mock("@/lib/quality/probe", () => ({
@@ -47,6 +52,9 @@ vi.mock("@/lib/utils/when-idle", () => ({
 }));
 
 import { QualityProvider, useQuality } from "./quality-context";
+import { AnimationStateProvider } from "./animation-state-context";
+import { SafariProvider } from "./safari-context";
+import { resetMotionGateForTests } from "@/lib/utils/motion-gate";
 import { memoryStorage } from "@/test/memory-storage";
 import { QualityMode } from "@/lib/quality/mode";
 
@@ -126,7 +134,7 @@ describe("QualityProvider startup check", () => {
   // runs on SwiftShader or WARP, and then composites and rasterizes in
   // software too. Headless Chromium, where scripts/perf/measure.mjs runs S7
   // and S8, gets this reason; started soft, the loop may raise it at 60 s.
-  it.each([
+  it.each<[WeakDeviceReason, string | null]>([
     ["software-renderer", "SwiftShader"],
     ["software-webgl", null],
   ])(
@@ -147,7 +155,7 @@ describe("QualityProvider startup check", () => {
     },
   );
 
-  it.each(["no-webgl", "save-data"])(
+  it.each<WeakDeviceReason>(["no-webgl", "save-data"])(
     "lets the loop raise a %s machine once LOW has run smoothly past the first backoff",
     (reason) => {
       // Neither says anything about speed: WebGL is often off by policy or
@@ -182,7 +190,7 @@ describe("QualityProvider startup check", () => {
     expect(screen.getByTestId("quality").textContent).toBe("balanced");
   });
 
-  it.each(["software-renderer", "software-webgl"])(
+  it.each<WeakDeviceReason>(["software-renderer", "software-webgl"])(
     "pins a %s machine on every page view",
     (reason) => {
       // Past the once-a-session flag that stops the soft reasons: a tier
@@ -279,5 +287,129 @@ describe("QualityProvider startup check", () => {
 
     expect(screen.getByTestId("quality").textContent).toBe("low");
     expect(probe.calls).toBe(0);
+  });
+});
+
+/**
+ * The tests above render QualityProvider alone, where animations count as
+ * playing. In the layout AnimationStateProvider sits above it, and with
+ * animations off (the terminal's "animations stop", auto-disable) the loop
+ * holds the tier and restarts its window when they play again. The check
+ * does not run through the loop, so a software session must still be pinned
+ * on every page view, and the block must outlast that restart.
+ */
+describe("QualityProvider startup check, animations off", () => {
+  const tree = () => (
+    <SafariProvider initialSafari={false}>
+      <AnimationStateProvider>
+        <QualityProvider>
+          <Quality />
+        </QualityProvider>
+      </AnimationStateProvider>
+    </SafariProvider>
+  );
+  // The visitor's own choice, as "animations stop" saves it.
+  const stopAnimations = () =>
+    localStorage.setItem(
+      "background-animations-state",
+      JSON.stringify({
+        value: false,
+        browser: "other",
+        isUserPreference: true,
+        timestamp: 0,
+      }),
+    );
+
+  beforeEach(() => resetMotionGateForTests());
+  afterEach(() => resetMotionGateForTests());
+
+  /**
+   * A page view in the browser's order: the providers settle first
+   * (animations off, so the loop holds), and the check's idle task runs
+   * after that.
+   */
+  function loadWithAnimationsOff() {
+    stopAnimations();
+    idle.hold = true;
+    const view = render(tree());
+    act(() => idle.tasks.forEach((task) => task()));
+    return view;
+  }
+
+  it.each<WeakDeviceReason>(["software-renderer", "software-webgl"])(
+    "pins a %s machine on a page view with animations off",
+    (reason) => {
+      // Later in the session, at the tier above LOW this page view restored.
+      probe.result = { weak: true, reason, renderer: null };
+      sessionStorage.setItem("quality-probe-applied", "1");
+      sessionStorage.setItem("quality-mode", "balanced");
+
+      loadWithAnimationsOff();
+
+      expect(screen.getByTestId("quality").textContent).toBe("low");
+      const saved = JSON.parse(sessionStorage.getItem("quality-backoff")!);
+      expect(saved.demotions.balanced.blockedUntil).toBe(Number.MAX_VALUE);
+    },
+  );
+
+  /**
+   * Load with animations off, send the terminal's "animations auto" while
+   * the loop holds (auto is on already, so it must change nothing), then
+   * play them and let `seconds` of samples arrive. Returns the tier at each
+   * second of play.
+   */
+  function playAfterHold(seconds: number) {
+    const view = loadWithAnimationsOff();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      window.dispatchEvent(new Event("quality-auto"));
+    });
+    act(() => {
+      window.dispatchEvent(new Event("animation-play"));
+    });
+    const tiers: string[] = [];
+    for (let second = 0; second < seconds; second++) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      view.rerender(tree());
+      tiers.push(screen.getByTestId("quality").textContent ?? "");
+    }
+    return tiers;
+  }
+
+  it.each<WeakDeviceReason>(["software-renderer", "software-webgl"])(
+    "keeps a %s machine at LOW once animations play again",
+    (reason) => {
+      // Two minutes of smooth LOW after the restart. Restarted without the
+      // block, the loop raised the tier 14 s in; a soft block would have
+      // ended at 60 s.
+      probe.result = { weak: true, reason, renderer: null };
+      vi.useFakeTimers();
+      try {
+        const tiers = playAfterHold(120);
+
+        expect(new Set(tiers)).toEqual(new Set(["low"]));
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("still lets the loop raise a no-WebGL machine once animations play again", () => {
+    // The same run with a soft reason: the harness does see a raise.
+    probe.result = { weak: true, reason: "no-webgl", renderer: null };
+    vi.useFakeTimers();
+    try {
+      const tiers = playAfterHold(120);
+
+      expect(tiers[0]).toBe("low");
+      expect(tiers[50]).toBe("low"); // blocked for the first step (60 s)
+      expect(tiers[119]).not.toBe("low");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

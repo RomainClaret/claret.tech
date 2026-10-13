@@ -192,3 +192,22 @@ describe("SplashScreen onShow", () => {
     expect(onShow).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("SplashScreen and the page's scroll", () => {
+  it("locks it while it shows, and puts it back as it was", () => {
+    // It wrote "auto" on its way out, which then stayed on the body.
+    const onComplete = vi.fn();
+    render(<SplashScreen onComplete={onComplete} />);
+    act(() => {
+      vi.advanceTimersByTime(10);
+    });
+    expect(document.body.style.overflow).toBe("hidden");
+
+    act(() => {
+      vi.advanceTimersByTime(2500); // past the duration and the exit
+    });
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(document.body.style.overflow).toBe("");
+  });
+});

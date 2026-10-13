@@ -139,4 +139,59 @@ describe("scrollToSection", () => {
     // What tells the caller to navigate home instead of scrolling nowhere.
     expect(scrollToSection("not-here")).toBe(false);
   });
+
+  describe("with focus", () => {
+    // A nav choice cancels the link and scrolls by script, so the browser
+    // never moved focus: the menu's link went away with the menu, focus fell
+    // to the body, and the next Tab started over from the top.
+    it("moves focus to the section without scrolling to it", () => {
+      stubScroll({ smoothWorks: true });
+      const section = placeSection("projects", 3000);
+      const focus = vi.spyOn(section, "focus");
+
+      scrollToSection("projects", { focus: true });
+
+      expect(document.activeElement).toBe(section);
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+      expect(section.getAttribute("tabindex")).toBe("-1");
+      expect(section.style.outline).toBe("none");
+    });
+
+    it("leaves no trace once focus moves on", () => {
+      stubScroll({ smoothWorks: true });
+      const section = placeSection("projects", 3000);
+      const next = document.createElement("button");
+      document.body.appendChild(next);
+
+      scrollToSection("projects", { focus: true });
+      next.focus();
+
+      expect(section.hasAttribute("tabindex")).toBe(false);
+      expect(section.style.outline).toBe("");
+    });
+
+    it("keeps a section's own tabindex", () => {
+      stubScroll({ smoothWorks: true });
+      const section = placeSection("projects", 3000);
+      section.tabIndex = 0;
+
+      scrollToSection("projects", { focus: true });
+      section.blur();
+
+      expect(section.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("leaves focus alone without the option or a target", () => {
+      stubScroll({ smoothWorks: true });
+      placeSection("projects", 3000);
+      const aborted = new AbortController();
+      aborted.abort();
+
+      scrollToSection("projects");
+      scrollToSection("projects", { focus: true, signal: aborted.signal });
+      scrollToSection("not-here", { focus: true });
+
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
 });

@@ -121,6 +121,72 @@ describe("useFpsAutoDisable", () => {
   });
 });
 
+describe("useFpsAutoDisable after force", () => {
+  // Force, and the terminal's "animations play" after an auto-disable, are
+  // a visitor asking for animations: they pause the protection for 30
+  // minutes. Both used to clear the pause instead, so on a page still that
+  // slow the animations switched off again five seconds later.
+  const pause = 30 * 60 * 1000;
+
+  it("keeps animations on for 30 minutes after force", () => {
+    act(() => setMotionTier("battery"));
+    const { hook, nextSample } = setup(12);
+    settle();
+    for (let i = 0; i < 5; i++) nextSample();
+    expect(hook.result.current.isAutoDisabled).toBe(true);
+
+    act(() => hook.result.current.forceEnableAnimations());
+    for (let i = 0; i < 60; i++) nextSample();
+
+    expect(hook.result.current.isAutoDisabled).toBe(false);
+  });
+
+  it("switches them off again once the pause is over", () => {
+    act(() => setMotionTier("battery"));
+    const { hook, nextSample } = setup(12);
+    settle();
+    act(() => hook.result.current.forceEnableAnimations());
+
+    vi.advanceTimersByTime(pause);
+    for (let i = 0; i < 5; i++) nextSample();
+
+    expect(hook.result.current.isAutoDisabled).toBe(true);
+  });
+
+  it("ends the pause on the clock, with no sample to count", () => {
+    // Samples are counted only at the battery tier with animations on: after
+    // a force at another tier the pause outlived its 30 minutes, and the
+    // monitor said "Auto-disable paused: 0m" for the rest of the visit.
+    act(() => setMotionTier("balanced"));
+    const { hook } = setup(60);
+    act(() => hook.result.current.forceEnableAnimations());
+    expect(hook.result.current.cooldownActive).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(pause);
+    });
+
+    expect(hook.result.current.cooldownActive).toBe(false);
+    expect(
+      JSON.parse(sessionStorage.getItem("fps-auto-disable-state") ?? "{}"),
+    ).toMatchObject({ cooldownActive: false });
+  });
+
+  it("keeps the pause across a reload in the same session", () => {
+    act(() => setMotionTier("battery"));
+    const first = setup(12);
+    settle();
+    act(() => first.hook.result.current.forceEnableAnimations());
+    first.hook.unmount();
+
+    const { hook, nextSample } = setup(12);
+    settle();
+    for (let i = 0; i < 10; i++) nextSample();
+
+    expect(hook.result.current.isAutoDisabled).toBe(false);
+  });
+});
+
 describe("useFpsAutoDisable on a page generated at build time", () => {
   const Probe = () => {
     const { isAutoDisabled } = useFpsAutoDisable({ fps: 60, sample: 0 });

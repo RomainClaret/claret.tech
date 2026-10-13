@@ -12,17 +12,26 @@ import React from "react";
 
 // A stand-in xterm whose download a test holds until it releases it.
 const xterm = vi.hoisted(() => {
-  const instances: { parent: HTMLElement | null; disposed: boolean }[] = [];
+  type KeyHandler = (event: KeyboardEvent) => boolean;
+  const instances: {
+    parent: HTMLElement | null;
+    disposed: boolean;
+    keyHandler: KeyHandler | null;
+  }[] = [];
   class FakeTerminal {
     cols = 80;
     rows = 24;
     parent: HTMLElement | null = null;
     disposed = false;
+    keyHandler: KeyHandler | null = null;
     constructor() {
       instances.push(this);
     }
     open(parent: HTMLElement) {
       this.parent = parent;
+    }
+    attachCustomKeyEventHandler(handler: KeyHandler) {
+      this.keyHandler = handler;
     }
     loadAddon() {}
     write() {}
@@ -151,5 +160,37 @@ describe("Terminal load", () => {
     await settle();
 
     expect(python.shutdowns).toBe(1);
+  });
+});
+
+describe("Terminal keys", () => {
+  it("lets Escape through to the page", async () => {
+    // xterm cancels Escape at its textarea, so the performance panels the
+    // terminal opens, which close on Escape through document and window
+    // listeners ("Press ESC to close"), never heard it.
+    xterm.release();
+    render(<Terminal isOpen onClose={() => {}} />);
+    advance(200);
+    await settle();
+
+    const handler = xterm.instances.at(-1)?.keyHandler;
+    expect(handler).toBeTypeOf("function");
+    const press = (init: KeyboardEventInit, type = "keydown") =>
+      handler!(new KeyboardEvent(type, init));
+    // false: xterm skips the key and leaves the event alone.
+    expect(press({ key: "Escape" })).toBe(false);
+    expect(press({ key: "Escape", altKey: true })).toBe(false);
+    // Everything else stays the terminal's.
+    expect(press({ key: "Escape" }, "keyup")).toBe(true);
+    expect(press({ key: "Escape", isComposing: true })).toBe(true);
+    for (const init of [
+      { key: "Tab" },
+      { key: "Enter" },
+      { key: "a" },
+      { key: "ArrowUp" },
+      { key: "c", ctrlKey: true },
+    ]) {
+      expect(press(init)).toBe(true);
+    }
   });
 });

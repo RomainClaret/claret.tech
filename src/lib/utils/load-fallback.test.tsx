@@ -201,4 +201,34 @@ describe("withLoadFallback", () => {
     expect(screen.getByText("Loaded privacy")).toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(1); // nothing to retry
   });
+
+  // A reporter that throws must not undo the fallback it reports on.
+  const throwing = () => {
+    throw new Error("logger broke");
+  };
+
+  it("still resolves to the stand-in when the report of the first failure throws", async () => {
+    // Rejecting here is what the fallback exists to prevent: React.lazy
+    // throws, and the nearest error boundary replaces the page.
+    await expect(
+      withLoadFallback(flaky(1), Failed, { onError: throwing })(),
+    ).resolves.toBeDefined();
+  });
+
+  it("re-enables the retry when the report of a failed retry throws", async () => {
+    // The stand-in's try on mount fails too, and its report throws. Told
+    // only after the report, the stand-in stayed on a disabled "Trying
+    // again" with nothing in flight.
+    let reports = 0;
+    await mount(
+      withLoadFallback(flaky(Infinity), Failed, {
+        onError: () => {
+          if (++reports > 1) throwing();
+        },
+      }),
+    );
+
+    expect(reports).toBe(2); // the first load and the try on mount
+    expect(screen.getByText("Could not load. Try again")).toBeEnabled();
+  });
 });

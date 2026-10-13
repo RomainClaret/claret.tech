@@ -9,6 +9,23 @@
 import { render, screen, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AppWrapper } from "./app-wrapper";
+import { SplashUnavailable } from "./splash-unavailable";
+import {
+  PerformanceDashboardUnavailable,
+  PerformanceMonitorUnavailable,
+  PerformanceReportUnavailable,
+} from "./performance-unavailable";
+
+// What each loader falls back to, keyed by the loader's code. The loaders
+// themselves pass through unwrapped, so the next/dynamic mock below can tell
+// them apart by what they import.
+const fallbacks = vi.hoisted(() => new Map<string, unknown>());
+vi.mock("@/lib/utils/load-fallback", () => ({
+  withLoadFallback: (load: () => Promise<unknown>, Failed: unknown) => {
+    fallbacks.set(load.toString(), Failed);
+    return load;
+  },
+}));
 
 // Mock all the external dependencies
 vi.mock("@/data/portfolio", () => ({
@@ -71,8 +88,8 @@ vi.mock("@/components/error/ErrorBoundary", () => ({
   ),
 }));
 
-vi.mock("./service-worker-register", () => ({
-  ServiceWorkerRegister: () => <div data-testid="service-worker-register" />,
+vi.mock("./service-worker-cleanup", () => ({
+  ServiceWorkerCleanup: () => <div data-testid="service-worker-cleanup" />,
 }));
 
 vi.mock("./grid-background", () => ({
@@ -213,14 +230,14 @@ describe("AppWrapper", () => {
       expect(screen.getByTestId("test-children")).toBeInTheDocument();
     });
 
-    it("renders service worker register component", () => {
+    it("renders the service worker cleanup", () => {
       render(
         <AppWrapper>
           <div>Test</div>
         </AppWrapper>,
       );
 
-      expect(screen.getByTestId("service-worker-register")).toBeInTheDocument();
+      expect(screen.getByTestId("service-worker-cleanup")).toBeInTheDocument();
     });
 
     it("renders splash screen initially", () => {
@@ -551,6 +568,34 @@ describe("AppWrapper", () => {
   });
 
   describe("Dynamic Import Fallbacks", () => {
+    it("stands the splash down when its chunk cannot be fetched", () => {
+      // Its loader threw into the error boundary around the whole site,
+      // which replaced the page until a reload.
+      const splash = [...fallbacks].find(([load]) =>
+        load.includes("splash-screen"),
+      );
+
+      expect(splash?.[1]).toBe(SplashUnavailable);
+    });
+
+    it("keeps the site up when a performance tool's chunk cannot be fetched", () => {
+      // The terminal's `fps`, `performance` and its report load these under
+      // the error boundary around the whole site, which replaced the page
+      // with its error screen until a reload.
+      const fallbackFor = (marker: string) =>
+        [...fallbacks].find(([load]) => load.includes(marker))?.[1];
+
+      expect(fallbackFor("performance-monitor")).toBe(
+        PerformanceMonitorUnavailable,
+      );
+      expect(fallbackFor("/PerformanceModal")).toBe(
+        PerformanceDashboardUnavailable,
+      );
+      expect(fallbackFor("/PerformanceReportModal")).toBe(
+        PerformanceReportUnavailable,
+      );
+    });
+
     it("provides proper component structure for dynamic imports", () => {
       render(
         <AppWrapper>
@@ -601,7 +646,7 @@ describe("AppWrapper", () => {
       expect(screen.queryByTestId("terminal")).not.toBeInTheDocument();
 
       // Service worker should always render
-      expect(screen.getByTestId("service-worker-register")).toBeInTheDocument();
+      expect(screen.getByTestId("service-worker-cleanup")).toBeInTheDocument();
 
       // All context providers should be present
       expect(

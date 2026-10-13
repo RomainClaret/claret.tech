@@ -3,10 +3,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * public/sw.js, run against a stand-in worker scope and Cache Storage. Cache
- * Storage belongs to the whole origin: WebLLM keeps the AI terminal's model
- * there (about 1 GB), and the worker used to delete every cache but its own
- * current one whenever a new version activated.
+ * public/sw.js, run against a stand-in worker scope and Cache Storage.
+ *
+ * The site no longer uses a service worker. Browsers that registered an
+ * earlier one still run it, and fetch this file on their next update
+ * check: it must take over at once, delete the site's own caches and
+ * unregister itself. Cache Storage belongs to the whole origin: WebLLM
+ * keeps the AI terminal's model there (about 1 GB), and an earlier worker
+ * deleted every cache but its own whenever a new version activated.
  */
 
 const workerSource = readFileSync(
@@ -19,9 +23,20 @@ function loadWorker(cacheNames: string[] = []) {
   const handlers: Record<string, (event: unknown) => void> = {};
   const deleted: string[] = [];
   const fetched: string[] = [];
+  const calls: string[] = [];
   const self = {
     addEventListener: (type: string, handler: (event: unknown) => void) => {
       handlers[type] = handler;
+    },
+    skipWaiting: async () => {
+      calls.push("skipWaiting");
+    },
+    registration: {
+      unregister: async () => {
+        // After the caches: an unregistered worker may be stopped at once.
+        calls.push(`unregister after deleting ${deleted.length}`);
+        return true;
+      },
     },
   };
   const caches = {
@@ -48,19 +63,12 @@ function loadWorker(cacheNames: string[] = []) {
     });
     return settled;
   };
-  return { dispatch, deleted, fetched };
-}
-
-/** Activate the worker with these caches present; return what it deletes. */
-async function activateWith(cacheNames: string[]) {
-  const worker = loadWorker(cacheNames);
-  await worker.dispatch("activate");
-  return worker.deleted;
+  return { dispatch, deleted, fetched, calls, handlers };
 }
 
 describe("service worker", () => {
-  it("deletes only the site's own old caches", async () => {
-    const deleted = await activateWith([
+  it("deletes the site's own caches, and only those, then unregisters", async () => {
+    const worker = loadWorker([
       "claret-tech-v5",
       "claret-tech-v6",
       "webllm/model",
@@ -68,8 +76,26 @@ describe("service worker", () => {
       "webllm/wasm",
     ]);
 
-    expect(deleted).toEqual(["claret-tech-v5"]);
+    await worker.dispatch("activate");
+
+    expect(worker.deleted).toEqual(["claret-tech-v5", "claret-tech-v6"]);
+    expect(worker.calls).toContain("unregister after deleting 2");
   });
+
+  it("takes over at once, so an old worker does not keep serving", async () => {
+    const worker = loadWorker();
+
+    await worker.dispatch("install");
+
+    expect(worker.calls).toContain("skipWaiting");
+  });
+
+  it("serves nothing", () => {
+    // The old worker answered /images, /fonts and /animations from its own
+    // cache, which the HTTP cache already keeps for a year as immutable.
+    expect(loadWorker().handlers.fetch).toBeUndefined();
+  });
+
   it("fetches nothing to install", async () => {
     // It used to precache the web manifest, which it never serves.
     const worker = loadWorker();

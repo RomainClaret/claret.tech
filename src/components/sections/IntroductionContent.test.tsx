@@ -13,19 +13,6 @@ vi.mock("@/components/ui/SocialLinks", () => ({
   SocialLinks: () => <div data-testid="social-links">Social Links</div>,
 }));
 
-vi.mock("@/components/ui/protected-lucide-icon", () => ({
-  ProtectedLucideIcon: ({
-    Icon,
-    ...props
-  }: {
-    Icon?: React.ComponentType;
-    [key: string]: unknown;
-  }) => {
-    if (!Icon) return <div data-testid="protected-icon" {...props} />;
-    return <Icon {...props} />;
-  },
-}));
-
 vi.mock("lucide-react", () => ({
   FileText: (props: React.ComponentProps<"div">) => (
     <div data-testid="file-text-icon" {...props} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
@@ -21,7 +21,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useTerminalToggle } from "@/lib/terminal/terminal-context";
 import { terminalIntent } from "@/components/terminal/load-terminal";
-import { ProtectedLucideIcon } from "@/components/ui/protected-lucide-icon";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { scrollToSection } from "@/lib/utils/scroll-to-section";
@@ -112,12 +111,40 @@ export function Navigation() {
 
     e.preventDefault();
 
-    scrollToSection(href.replace("#", ""));
+    // Focus follows, as after a native in-page link.
+    scrollToSection(href.replace("#", ""), { focus: true });
+  };
+
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The mobile menu is a disclosure (WAI-ARIA APG "Disclosure Navigation
+  // Menu"), not a modal: focus is not trapped in it. Escape closes it and
+  // hands focus back to its button, and focus leaving the header closes it
+  // too, or the floating panel stays open over the control that now has
+  // focus and hides it.
+  const handleNavKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Escape" || !isMobileMenuOpen) return;
+    // Used: the performance monitor, listening on window, leaves it.
+    e.preventDefault();
+    setIsMobileMenuOpen(false);
+    menuButtonRef.current?.focus();
+  };
+
+  const handleNavBlur = (e: React.FocusEvent<HTMLElement>) => {
+    // relatedTarget is null when focus goes to no element, which is what a
+    // tap on a menu link does in Safari: it does not focus links. Closing
+    // then would unmount the link before its click lands.
+    const next = e.relatedTarget;
+    if (isMobileMenuOpen && next && !e.currentTarget.contains(next)) {
+      setIsMobileMenuOpen(false);
+    }
   };
 
   return (
     <nav
       id="main-navigation"
+      onKeyDown={handleNavKeyDown}
+      onBlur={handleNavBlur}
       className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
         isScrolled
@@ -190,6 +217,7 @@ export function Navigation() {
             <HighContrastToggle />
             <ThemeToggle />
             <button
+              ref={menuButtonRef}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               data-testid="mobile-menu-button"
               className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-sm font-medium transition-colors hover:bg-muted"
@@ -206,17 +234,9 @@ export function Navigation() {
                 Toggle navigation menu to access all sections
               </span>
               {isMobileMenuOpen ? (
-                <ProtectedLucideIcon
-                  Icon={X}
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                />
+                <X className="h-5 w-5" aria-hidden="true" />
               ) : (
-                <ProtectedLucideIcon
-                  Icon={Menu}
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                />
+                <Menu className="h-5 w-5" aria-hidden="true" />
               )}
             </button>
           </div>
@@ -285,8 +305,7 @@ export function Navigation() {
                                 isActive && "from-primary/30 to-primary/20",
                               )}
                             >
-                              <ProtectedLucideIcon
-                                Icon={Icon}
+                              <Icon
                                 className={cn(
                                   "w-4 h-4 transition-colors",
                                   isActive
@@ -332,7 +351,7 @@ export function Navigation() {
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-lg font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                     aria-label="Contact me"
                   >
-                    <ProtectedLucideIcon Icon={Mail} className="w-5 h-5" />
+                    <Mail className="w-5 h-5" />
                     Get In Touch
                   </button>
                 </div>

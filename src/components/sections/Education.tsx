@@ -1,7 +1,7 @@
 "use client";
 
 import { educationInfo } from "@/data/portfolio";
-import { FadeIn, SlideInUp } from "@/components/ui/animated";
+import { SlideInUp } from "@/components/ui/animated";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
@@ -342,7 +342,7 @@ export function Education() {
   return (
     <div className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative">
       <div className="absolute inset-0 bg-background -z-10" />
-      <FadeIn className="text-center mb-12 sm:mb-16">
+      <div className="text-center mb-12 sm:mb-16">
         <h2 className="section-title-gradient mb-4">{educationInfo.title}</h2>
         <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto mb-6">
           <span className="text-primary font-semibold">
@@ -355,7 +355,7 @@ export function Education() {
         <div className="flex justify-center gap-6 sm:gap-8 mt-8">
           {/* ... stats ... */}
         </div>
-      </FadeIn>
+      </div>
 
       <div ref={sectionRef} className="flex gap-4 sm:gap-8">
         {/* Neural Pathway Timeline */}
@@ -390,7 +390,7 @@ export function Education() {
       {educationInfo.certifications &&
         educationInfo.certifications.length > 0 && (
           <div className="mt-20">
-            <SlideInUp delay={600} className="text-center mb-8">
+            <SlideInUp className="text-center mb-8">
               <h3 className="section-subtitle-gradient text-2xl md:text-3xl mb-2">
                 {educationInfo.certificationSection.title}
               </h3>
