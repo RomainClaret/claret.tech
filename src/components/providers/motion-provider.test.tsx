@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { retryOnce, trackMotionFeatures } from "./motion-provider";
+import { render, screen } from "@testing-library/react";
+import {
+  MotionConfigContext,
+  useReducedMotion,
+  useReducedMotionConfig,
+} from "framer-motion";
+import { useContext } from "react";
+import {
+  MotionProvider,
+  retryOnce,
+  trackMotionFeatures,
+} from "./motion-provider";
 
 /**
  * globals.css shows the content framer starts at opacity 0 unless <html>
@@ -88,5 +99,33 @@ describe("retryOnce", () => {
 
     await expect(retryOnce(load, 1000)).resolves.toBe("features");
     expect(load).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("MotionProvider", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-motion-features");
+  });
+
+  it("lets framer follow a visitor's reduced-motion setting", () => {
+    // Without a MotionConfig, framer's reducedMotion is "never": it slid and
+    // scaled things for visitors who asked for less motion. framer reads the
+    // system's setting itself, once per process (an earlier test file may
+    // have read it), so this checks the config the provider hands framer,
+    // and that framer's answer then is the system's.
+    function Probe() {
+      const { reducedMotion } = useContext(MotionConfigContext);
+      const system = useReducedMotion();
+      const applied = useReducedMotionConfig();
+      return <p>{`${reducedMotion} ${String(applied === system)}`}</p>;
+    }
+
+    render(
+      <MotionProvider>
+        <Probe />
+      </MotionProvider>,
+    );
+
+    expect(screen.getByText("user true")).toBeInTheDocument();
   });
 });

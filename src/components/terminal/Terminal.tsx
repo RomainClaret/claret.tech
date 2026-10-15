@@ -104,6 +104,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     restore,
     isDragging,
     setIsDragging,
+    aside,
   } = useTerminal();
 
   // Keep a ref to the current user to always have the latest value
@@ -943,6 +944,10 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                 terminalRows: term.rows,
                 writer: (text: string) => {
                   if (outputSinkDetachedRef.current) return;
+                  // Ctrl+C drew "Command canceled by user" and a new prompt;
+                  // anything the command still wrote landed after it (a
+                  // python boot went on to print "Downloading CPython...").
+                  if (abortController.signal.aborted) return;
                   term.write(text);
                 },
                 abortController,
@@ -1634,7 +1639,9 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
   // Additional effect for handling resize when terminal is already loaded
   useEffect(() => {
-    if (!isOpen || !fitAddonRef.current || windowState === "minimized") return;
+    // Not while it is aside, out of sight: hidden, it measures nothing.
+    if (!isOpen || !fitAddonRef.current || windowState === "minimized" || aside)
+      return;
 
     const handleResize = () => {
       // Add a small delay to ensure dimensions are updated
@@ -1646,7 +1653,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     handleResize(); // Fit on mount
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isOpen, windowState, size]);
+  }, [isOpen, windowState, size, aside]);
 
   // Handle window button clicks
   const handleMinimize = useCallback(() => {
@@ -1711,6 +1718,9 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
             position: "fixed", // Ensure position is set
             opacity: isTerminalReady || windowState === "minimized" ? 1 : 0,
             transition: "opacity 300ms ease-in-out",
+            // Aside while the research map is open: above the map's dialog,
+            // it covered the map and took its clicks.
+            ...(aside && { display: "none" }),
           }}
         >
           <span id="terminal-help-text" className="sr-only">

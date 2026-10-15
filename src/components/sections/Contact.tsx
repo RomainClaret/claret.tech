@@ -34,10 +34,14 @@ export function Contact() {
     : GLOW_REST_TRANSITION;
 
   return (
+    // overflow-x-clip: on a phone the avatar column is as wide as the screen
+    // inside the padding, and its entrance starts it 20 px to the right. The
+    // server's HTML paints it there until the bundle runs, and the page
+    // panned sideways by 4 px. Clipped, not hidden: no scroll container.
     <div
       ref={motionRef}
       data-anim={motionActive ? "on" : "off"}
-      className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative"
+      className="container mx-auto px-4 md:px-16 pt-20 pb-8 sm:pt-24 sm:pb-16 max-w-7xl relative overflow-x-clip"
     >
       <div className="lg:px-8">
         <div className="text-center mb-12">

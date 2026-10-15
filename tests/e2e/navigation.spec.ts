@@ -41,6 +41,7 @@
  */
 import { test, expect, Page } from "./utils/fixtures";
 import { acknowledgeCookieNotice } from "./utils/cookie-notice";
+import { waitForSplashToEnd } from "./utils/splash";
 import {
   waitForScrollCompletion,
   waitForMeaningfulVisibility,
@@ -314,13 +315,8 @@ test.describe("Navigation", () => {
 
     // Wait for the page to be ready
     await page.waitForLoadState("domcontentloaded");
-    // And for the splash, which covers it: shown, then gone (a count of 0
-    // alone passes before it mounts).
-    const splash = page.getByRole("progressbar", {
-      name: "Loading portfolio",
-    });
-    await expect(splash).toBeVisible();
-    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+    // And for the splash, which covers it, or skips itself on a slow load.
+    await waitForSplashToEnd(page);
   });
 
   test("should display all navigation items", async ({ page, isMobile }) => {

@@ -4,6 +4,7 @@ import { dismissToasts } from "./utils/toast-utils";
 // utils/ because terminal.spec.ts needs exactly the same ones, and having two
 // copies is how one of them ends up reading `.xterm-screen` again.
 import { screen, focusTerminal } from "./utils/terminal-utils";
+import { routeChunk } from "./utils/chunks";
 
 /**
  * End-to-end coverage for the `python` terminal command.
@@ -23,6 +24,28 @@ const isCI = !!process.env.CI;
 // Booting Pyodide means fetching ~12MB and initializing CPython. Generous, but
 // still bounded: a hang should fail the test rather than stall the suite.
 const BOOT_TIMEOUT = isCI ? 120_000 : 60_000;
+
+/**
+ * What the screen shows below the last echo of `command`, where its output
+ * goes. A wait on the whole screen passed on the echo itself, or on an
+ * earlier line: "echo still-alive" waited for /still-alive/, and "exit()"
+ * for a prompt the shell had shown before Python started. The command is
+ * walked past character by character, row breaks skipped, so a long one
+ * that wraps is passed too. Off screen, it cannot match anything.
+ */
+function below(text: string, command: string): string {
+  const start = text.lastIndexOf(command.slice(0, 24));
+  if (start < 0) return text;
+  let index = start;
+  for (
+    let matched = 0;
+    index < text.length && matched < command.length;
+    index++
+  ) {
+    if (text[index] !== "\n") matched++;
+  }
+  return text.slice(index);
+}
 
 test.describe("Terminal: python", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "chromium only");
@@ -110,10 +133,11 @@ test.describe("Terminal: python", () => {
 
     await page.keyboard.press("Enter");
     await expect
-      .poll(async () => (expected.test(await screen(page)) ? "found" : "..."), {
-        timeout,
-        intervals: [500, 1000, 2000],
-      })
+      .poll(
+        async () =>
+          expected.test(below(await screen(page), command)) ? "found" : "...",
+        { timeout, intervals: [500, 1000, 2000] },
+      )
       .toBe("found");
     return screen(page);
   }
@@ -364,10 +388,17 @@ test.describe("Terminal: python", () => {
     );
     await page.keyboard.press("Enter");
 
-    // Wait until it is actually producing output, then interrupt.
+    // Wait until it is actually producing output, then interrupt: a line of
+    // its own, as the command line holds "spam" too, and the Ctrl+C then
+    // came while Python was still starting.
     await expect
       .poll(
-        async () => ((await screen(page)).includes("spam") ? "running" : "..."),
+        async () =>
+          (await screen(page))
+            .split("\n")
+            .some((line) => line.trim() === "spam")
+            ? "running"
+            : "...",
         {
           timeout: BOOT_TIMEOUT,
           intervals: [500, 1000, 2000],
@@ -392,6 +423,83 @@ test.describe("Terminal: python", () => {
       20_000,
     );
     expect(text).toContain("after-interrupt");
+  });
+
+  /**
+   * After a Ctrl+C, the screen holds the terminal's "Command canceled by
+   * user" and its prompt, nothing after them, and the shell still answers.
+   */
+  async function expectCancelled(page: Page) {
+    const cancelled = (text: string) =>
+      text.slice(text.lastIndexOf("Command canceled by user"));
+    await expect
+      .poll(async () =>
+        (await screen(page)).includes("Command canceled by user"),
+      )
+      .toBe(true);
+    // Nothing may follow the prompt: no boot line, no output, no banner.
+    const settled = cancelled(await screen(page)).trimEnd();
+    expect(settled).toMatch(/Claret\.Tech\s*%$/);
+    await page.waitForTimeout(5000);
+    expect(cancelled(await screen(page)).trimEnd()).toBe(settled);
+
+    const text = await run(page, "echo still-here", /still-here/, 20_000);
+    expect(below(text, "echo still-here")).toContain("still-here");
+  }
+
+  test("Ctrl+C while the interpreter's code loads stops the run", async ({
+    page,
+  }) => {
+    // The command listened for Ctrl+C only once that code had loaded, so a
+    // Ctrl+C before it went unheard: the boot and the program ran anyway,
+    // after the terminal's new prompt.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await routeChunk(
+      page.context(),
+      "could not start the Python worker",
+      async (route, response) => {
+        await held;
+        await route.fulfill({ response });
+      },
+    );
+    await focusTerminal(page);
+    await page.keyboard.type("python -c \"print('LATE'+'RUN')\"");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1000);
+    await page.keyboard.press("Control+c");
+    release();
+
+    await expectCancelled(page);
+    expect(await screen(page)).not.toContain("LATERUN");
+  });
+
+  test("Ctrl+C while CPython downloads keeps the shell", async ({ page }) => {
+    // The REPL did not look at the abort: its boot finished, cleared the
+    // boot line by restoring a cursor saved above the "^C" lines (erasing
+    // them), printed its banner and took the terminal over.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    // The runtime the boot downloads, not pyodide.mjs: the worker imports
+    // that before it can say "Downloading". On the context: the worker asks
+    // for these, not the page.
+    await page.context().route(/\/pyodide\/(?!pyodide\.mjs)/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await focusTerminal(page);
+    await page.keyboard.type("python");
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => (await screen(page)).includes("Downloading CPython"), {
+        timeout: 30_000,
+      })
+      .toBe(true);
+    await page.keyboard.press("Control+c");
+    release();
+
+    await expectCancelled(page);
+    expect(await screen(page)).not.toContain(">>>");
   });
 
   test.describe("interactive interpreter", () => {

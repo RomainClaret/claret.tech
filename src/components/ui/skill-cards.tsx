@@ -55,11 +55,16 @@ export function SkillCards({
               animationDelay: `${index * 100}ms`,
             }}
           >
-            {/* Skill card */}
+            {/* Skill card. No backdrop blur: on the card's near-opaque
+                background it blurred nothing anyone could see (33 of
+                207,480 pixels changed, by 3/255 at most, in Chromium; none
+                in WebKit), and with these 24 chips on the homepage, Linux
+                WebKit (Playwright 1.64) grew its page process by hundreds
+                of MB a second until it was killed. */}
             <div
               className={cn(
                 "relative px-3 py-2 rounded-md text-xs font-medium",
-                "backdrop-blur-sm border transition-all duration-300",
+                "border transition-all duration-300",
                 "hover:scale-105 cursor-default",
                 "animate-in fade-in slide-in-from-bottom-2",
                 "bg-gray-100/80 dark:bg-gray-900/80",

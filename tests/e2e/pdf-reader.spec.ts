@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "./utils/fixtures";
 import { acknowledgeCookieNotice } from "./utils/cookie-notice";
+import { waitForSplashToEnd } from "./utils/splash";
 import AxeBuilder from "@axe-core/playwright";
 
 /**
@@ -395,10 +396,7 @@ test.describe("The PDF reader over the homepage", () => {
 
   async function openHomepage(page: Page) {
     await page.goto("/?playwright=true");
-    // Shown, then gone: a count of 0 alone passes before the splash mounts.
-    const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
-    await expect(splash).toBeVisible();
-    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+    await waitForSplashToEnd(page);
   }
 
   const PHONE = {

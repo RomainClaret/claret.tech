@@ -148,6 +148,9 @@ jobs:
             terminal:
               - 'tests/e2e/terminal.spec.ts'
               - 'tests/e2e/python-terminal.spec.ts'
+              # The research map, opened from the terminal (`research`).
+              - 'tests/e2e/research-map.spec.ts'
+              - 'src/components/research-map/**'
               - 'src/**/terminal/**'
               - 'src/**/*terminal*.{ts,tsx}'
               - 'src/**/*command*.{ts,tsx}'
@@ -575,7 +578,7 @@ jobs:
             playwright-report/
             test-results/
             .playwright-cache/
-          key: playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ hashFiles('tests/e2e/terminal.spec.ts', 'src/**/terminal/**', 'src/**/*terminal*.{ts,tsx}', 'src/**/*command*.{ts,tsx}', 'package-lock.json') }}
+          key: playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ hashFiles('tests/e2e/terminal.spec.ts', 'tests/e2e/research-map.spec.ts', 'src/**/terminal/**', 'src/**/*terminal*.{ts,tsx}', 'src/**/*command*.{ts,tsx}', 'src/components/research-map/**', 'package-lock.json') }}
           restore-keys: |
             playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.ref_name }}-
             playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-
@@ -637,7 +640,9 @@ jobs:
           # python-terminal.spec.ts skips itself on non-chromium projects, so
           # the webkit and firefox shards cost nothing here. It is the only
           # place the sandbox is exercised for real rather than against mocks.
-          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2
+          # research-map.spec.ts: the map `research` opens (14 tests, about
+          # 4 to 10 s each).
+          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts tests/e2e/research-map.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true

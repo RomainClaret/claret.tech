@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "./utils/fixtures";
+import { gotoWithoutScripts } from "./utils/no-script";
 
 /**
  * framer-motion renders each `m` element's initial state into the HTML, and
@@ -119,12 +120,34 @@ test.describe("Content behind framer's entrance animations", () => {
     const page = await context.newPage();
     await page.goto("/?playwright=true");
 
+    // Counted from where the stylesheet's own 6 s began: its animations'
+    // start times, on performance.now()'s clock. 4.5 and 6.5 s after the
+    // navigation assumed the first paint came within 0.5 s; under emulation
+    // it came later, and the content was still hidden at 6.5 s.
+    const started = () =>
+      page.evaluate(() => {
+        const starts = document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              (animation as CSSAnimation).animationName ===
+              "motion-features-timeout",
+          )
+          .map((animation) => animation.startTime)
+          .filter((time): time is number => typeof time === "number");
+        return starts.length
+          ? { first: Math.min(...starts), last: Math.max(...starts) }
+          : null;
+      });
+    await expect.poll(started).not.toBeNull();
+    const { first, last } = (await started())!;
+
     // Not early: the features get the same 6 s as the backdrop.
-    await waitUntil(page, 4_500);
+    await waitUntil(page, first + 4_500);
     expect(await readableShare(page)).toBeLessThan(0.5);
     expect(await readableShare(page, EXPERIENCE)).toBeLessThan(0.5);
     expect(await logosAtScaleZero(page)).toBeGreaterThan(0);
-    await waitUntil(page, 6_500);
+    await waitUntil(page, last + 6_500);
     expect(await readableShare(page)).toBeGreaterThan(READABLE);
     expect(await readableShare(page, EXPERIENCE)).toBeGreaterThan(0.95);
     expect(await logosAtScaleZero(page)).toBe(0);
@@ -134,7 +157,7 @@ test.describe("Content behind framer's entrance animations", () => {
   test("shows at once when scripts are off", async ({ browser }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
-    await page.goto("/");
+    await gotoWithoutScripts(page);
     expect(await readableShare(page)).toBeGreaterThan(READABLE);
     expect(await readableShare(page, EXPERIENCE)).toBeGreaterThan(0.95);
     expect(await logosAtScaleZero(page)).toBe(0);

@@ -138,7 +138,7 @@ describe("PDFViewer's links", () => {
 
 // The GECCO paper's first citation, "ES-HyperNEAT [5]": its number printed
 // as an item of its own, so the test does not hang on character widths
-// (jsdom has no canvas to measure them).
+// (pdf-link-names.test.ts tests those).
 const at = (str: string, x: number, width: number): LinkTextItem => ({
   str,
   transform: [9, 0, 0, 9, x, 500],

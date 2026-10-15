@@ -14,6 +14,15 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(", ");
 
+/**
+ * The open dialogs, oldest first; only the last one answers keys. Each
+ * listens on document, the one beneath first: with the paper reader open
+ * over another dialog, the lower one pulled every Tab into itself and the
+ * reader pulled it back to its first control, so Tab never got past it,
+ * and an Escape from the page closed both.
+ */
+const openDialogs: object[] = [];
+
 interface ModalDialogOptions {
   /** Keep the page under the dialog from scrolling, and restore its place. */
   lockScroll?: boolean;
@@ -36,10 +45,10 @@ interface ModalDialogOptions {
  * The cycle is moved by hand on every press, not only at its ends: WebKit's
  * default Tab skips links (and on macOS buttons too), so a trap that only
  * wrapped at its first and last control let Safari's Tab walk out of the
- * dialog from any control in between. On close, focus goes back without
- * scrolling to it, and with `lockScroll` the page returns to where it was,
- * instantly ("auto" would follow globals.css's `scroll-behavior: smooth`
- * and glide there).
+ * dialog from any control in between. With dialogs stacked, only the one on
+ * top answers keys. On close, focus goes back without scrolling to it, and
+ * with `lockScroll` the page returns to where it was, instantly ("auto"
+ * would follow globals.css's `scroll-behavior: smooth` and glide there).
  */
 export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
   open: boolean,
@@ -64,8 +73,11 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
     // Counted: a dialog closing over another leaves the page locked.
     const release = lockScroll ? lockPageScroll() : null;
     dialogRef.current?.focus({ preventScroll: true });
+    const entry = {};
+    openDialogs.push(entry);
 
     const onKey = (event: KeyboardEvent) => {
+      if (openDialogs[openDialogs.length - 1] !== entry) return;
       if (event.key === "Escape") {
         // Not its own when it comes from an element outside the dialog: the
         // terminal, above the dialogs, lets Escape through for the panels it
@@ -82,8 +94,7 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
         }
         // Marked as used: listeners further along, such as the performance
         // monitor's on window, leave it alone, so one Escape closes one
-        // layer. Never checked here, as stacked dialogs register bottom
-        // first.
+        // layer.
         event.preventDefault();
         onCloseRef.current();
         return;
@@ -94,32 +105,59 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
       const focusable = [
         ...dialog.querySelectorAll<HTMLElement>(FOCUSABLE),
       ].filter(
-        // No positive tabindex. The only ones were pdf.js's, on the section
-        // it wraps around each link of a PDF, which the reader now resets
+        // Only what is in the Tab order: tabindex 0, which buttons and links
+        // have by default. Not -1, which a roving tabindex gives every item
+        // but one (the research map's): kept, Tab walked every item. And no
+        // positive tabindex: the only ones were pdf.js's, on the section it
+        // wraps around each link of a PDF, which the reader now resets
         // (pdf-links.ts); counted, every link would be two stops, the first
-        // on an empty box. Kept as a guard: the site sets none of its own.
-        (element) => element.tabIndex <= 0,
+        // on an empty box.
+        (element) => element.tabIndex === 0,
       );
       if (focusable.length === 0) {
         dialog.focus({ preventScroll: true });
         return;
       }
-      // From the dialog itself (where focus starts) or from anywhere outside
-      // it, Tab goes to the first control and Shift+Tab to the last.
-      const at = focusable.indexOf(document.activeElement as HTMLElement);
-      const step = event.shiftKey ? -1 : 1;
-      const next =
-        at === -1
-          ? event.shiftKey
-            ? focusable.length - 1
-            : 0
-          : (at + step + focusable.length) % focusable.length;
+      const active = document.activeElement as HTMLElement | null;
+      const at = active ? focusable.indexOf(active) : -1;
+      const last = focusable.length - 1;
+      let next: number;
+      if (at !== -1) {
+        next = event.shiftKey
+          ? at === 0
+            ? last
+            : at - 1
+          : (at + 1) % focusable.length;
+      } else if (active && active !== dialog && dialog.contains(active)) {
+        // On something Tab skips, such as a heading given focus to announce
+        // it: the control after it in the page's order, or before it. Not
+        // the dialog's first, as it was.
+        const after = focusable.findIndex(
+          (element) =>
+            active.compareDocumentPosition(element) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+        const before = (after === -1 ? focusable.length : after) - 1;
+        next = event.shiftKey
+          ? before < 0
+            ? last
+            : before
+          : after === -1
+            ? 0
+            : after;
+      } else {
+        // From the dialog itself (where focus starts) or from anywhere
+        // outside it, Tab goes to the first control and Shift+Tab to the
+        // last.
+        next = event.shiftKey ? last : 0;
+      }
       focusable[next].focus();
     };
     document.addEventListener("keydown", onKey);
 
     return () => {
       document.removeEventListener("keydown", onKey);
+      openDialogs.splice(openDialogs.indexOf(entry), 1);
       if (release) {
         release();
         window.scrollTo({ top: scrollY, behavior: "instant" });

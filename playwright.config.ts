@@ -99,9 +99,9 @@ export default defineConfig({
               "dom.max_chrome_script_run_time": 60,
               "browser.cache.disk.enable": false,
               "browser.cache.memory.enable": false,
-              // Additional Firefox stability settings
-              "dom.ipc.processCount": 1,
-              "browser.tabs.remote.autostart": false,
+              // No single-process prefs (dom.ipc.processCount 1,
+              // browser.tabs.remote.autostart false): axe crashed the tab
+              // with them in 10 of 10 runs, and the suites ran no better.
             },
           },
         }),
@@ -158,13 +158,21 @@ export default defineConfig({
     // },
   ],
 
-  /* Run dev server before starting the tests */
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true, // ALWAYS reuse to avoid port conflicts in CI
-    timeout: 120 * 1000, // 2 minutes to start
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  /* Run dev server before starting the tests, unless a server is named.
+     With PLAYWRIGHT_BASE_URL set (CI's jobs, a build on another port), the
+     tests go to that server; checking localhost:3000 anyway started
+     `npm run dev` in the checkout whenever that port was empty, which
+     rewrote its .next as a development build. */
+  ...(process.env.PLAYWRIGHT_BASE_URL
+    ? {}
+    : {
+        webServer: {
+          command: "npm run dev",
+          url: "http://localhost:3000",
+          reuseExistingServer: true, // ALWAYS reuse to avoid port conflicts
+          timeout: 120 * 1000, // 2 minutes to start
+          stdout: "pipe" as const,
+          stderr: "pipe" as const,
+        },
+      }),
 });

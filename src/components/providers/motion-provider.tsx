@@ -1,6 +1,6 @@
 "use client";
 
-import { LazyMotion } from "framer-motion";
+import { LazyMotion, MotionConfig } from "framer-motion";
 import { logError } from "@/lib/utils/dev-logger";
 
 /**
@@ -73,10 +73,20 @@ export function retryOnce<T>(
   );
 }
 
+/**
+ * framer-motion for the whole app. reducedMotion "user": for a visitor whose
+ * system asks for reduced motion, framer jumps what it would slide, scale or
+ * resize (x, y, scale, rotate, size and position) and still fades opacity
+ * and colour. framer's default is "never", so it ignored the setting
+ * everywhere a component did not check it itself. React context passes
+ * through portals, so the dialogs portalled to <body> follow it too.
+ */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
   return (
-    <LazyMotion features={loadFeatures} strict>
-      {children}
-    </LazyMotion>
+    <MotionConfig reducedMotion="user">
+      <LazyMotion features={loadFeatures} strict>
+        {children}
+      </LazyMotion>
+    </MotionConfig>
   );
 }

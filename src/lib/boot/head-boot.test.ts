@@ -3,6 +3,7 @@ import {
   HEAD_BOOT_SCRIPT,
   isSafariUserAgent,
   readStoredTheme,
+  wantsHighContrast,
 } from "./head-boot";
 import { memoryStorage } from "@/test/memory-storage";
 import { restoreNavigator, stubNavigator } from "@/test/navigator";
@@ -39,7 +40,18 @@ function boot() {
     theme: root.classList.contains("dark") ? "dark" : "light",
     safari: root.getAttribute("data-safari"),
     animations: root.classList.contains("enable-animations"),
+    highContrast: root.classList.contains("high-contrast"),
   };
+}
+
+/** A system that asks for more contrast, or not (prefers-contrast). */
+function systemAsksForMoreContrast(more: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: more && query === "(prefers-contrast: more)",
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
 }
 
 function setCookie(value: string) {
@@ -120,5 +132,43 @@ describe("head boot: browser", () => {
     expect(booted.safari).toBe(String(safari));
     expect(booted.animations).toBe(!safari);
     expect(isSafariUserAgent(userAgent)).toBe(safari);
+  });
+});
+
+describe("head boot: high contrast", () => {
+  it.each([
+    ["the visitor's choice to have it", "true", false, true],
+    ["the system when the visitor never chose", null, true, true],
+    ["the visitor's choice over the system", "false", true, false],
+    ["the system over a stored value it does not know", "1", true, true],
+    ["neither, when neither asks", null, false, false],
+  ])("follows %s", (_, stored, more, expected) => {
+    const storage = memoryStorage();
+    if (stored !== null) storage.setItem("highContrast", stored);
+    vi.stubGlobal("localStorage", storage);
+    systemAsksForMoreContrast(more);
+
+    expect(boot().highContrast).toBe(expected);
+    expect(wantsHighContrast()).toBe(expected);
+  });
+
+  it("follows the system where storage is blocked", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+    });
+    systemAsksForMoreContrast(true);
+
+    expect(boot().highContrast).toBe(true);
+    expect(wantsHighContrast()).toBe(true);
+  });
+
+  it("stays off where the browser has no matchMedia", () => {
+    vi.stubGlobal("localStorage", memoryStorage());
+    vi.stubGlobal("matchMedia", undefined);
+
+    expect(boot().highContrast).toBe(false);
+    expect(wantsHighContrast()).toBe(false);
   });
 });

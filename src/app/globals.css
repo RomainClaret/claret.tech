@@ -106,6 +106,14 @@
   color: color-mix(in srgb, var(--accent) 70%, white);
 }
 
+/* The research map's lane colours, given per element as --lane: on dots,
+   rings, spans and swatches, never on text. At least 3:1 against both
+   themes (research-map-data.test.ts); high contrast swaps them for the
+   text colour (styles/high-contrast.css). */
+.lane-ink {
+  --ink: var(--lane);
+}
+
 /* Custom utilities */
 @layer utilities {
   .text-balance {

@@ -1,4 +1,5 @@
 import { test, expect } from "./utils/fixtures";
+import { gotoWithoutScripts } from "./utils/no-script";
 
 test.describe("Performance", () => {
   test("should meet Core Web Vitals thresholds", async ({ page }) => {
@@ -512,8 +513,7 @@ test.describe("Performance", () => {
     });
     const page = await context.newPage();
 
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await gotoWithoutScripts(page);
 
     // Core content should still be visible without JavaScript
     const heading = page.locator("h1");

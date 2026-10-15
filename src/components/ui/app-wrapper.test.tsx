@@ -39,6 +39,12 @@ vi.mock("@/lib/terminal/terminal-context", () => ({
     isOpen: false,
     setIsOpen: vi.fn(),
   })),
+  // The research map's renderer: it puts the terminal aside while open.
+  useTerminal: vi.fn(() => ({
+    isOpen: false,
+    setAside: vi.fn(),
+    minimize: vi.fn(),
+  })),
 }));
 
 vi.mock("@/lib/hooks/useSafari", () => ({

@@ -135,6 +135,14 @@ const mockWindow = {
   location: { reload: vi.fn() },
 };
 
+/** The events a command sent. toHaveBeenCalledWith(new CustomEvent(x))
+ *  matches any CustomEvent at all, whatever its type or detail: eight
+ *  assertions here passed with every expected name replaced by a wrong
+ *  one. */
+const sentEvents = () =>
+  mockWindow.dispatchEvent.mock.calls.map(([event]) => event as CustomEvent);
+const sent = () => sentEvents().map((event) => event.type);
+
 const mockNavigator = {
   clipboard: {
     writeText: vi.fn().mockResolvedValue(undefined),
@@ -805,18 +813,61 @@ describe("Terminal Commands", () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain("FPS monitor activated");
       expect(result.output).toContain("lightweight mode");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("terminal-fps-command"),
-      );
+      expect(sent()).toEqual(["terminal-fps-command"]);
+    });
+  });
+
+  describe("research command", () => {
+    it("opens the research map with a fresh token", () => {
+      mockWindow.dispatchEvent.mockClear();
+      const before = Date.now();
+      const result = commands.research([], mockContext) as CommandResult;
+
+      expect(result).toEqual({ output: "Research map opened", success: true });
+      expect(sent()).toEqual(["terminal-research-map"]);
+      const { token, timestamp } = sentEvents()[0].detail as {
+        token: string;
+        timestamp: number;
+      };
+      expect(token).toMatch(/^[a-z0-9]+$/);
+      expect(timestamp).toBeGreaterThanOrEqual(before);
+
+      mockWindow.dispatchEvent.mockClear();
+      commands.research(["open"], mockContext);
+      expect(sent()).toEqual(["terminal-research-map"]);
+    });
+
+    it("closes the research map", () => {
+      mockWindow.dispatchEvent.mockClear();
+      const result = commands.research(["close"], mockContext) as CommandResult;
+
+      expect(result).toEqual({ output: "Research map closed", success: true });
+      expect(sent()).toEqual(["terminal-research-close"]);
+    });
+
+    it("lists its actions, and refuses one it does not know", () => {
+      mockWindow.dispatchEvent.mockClear();
+      const help = commands.research(["help"], mockContext) as CommandResult;
+      const unknown = commands.research(["zoom"], mockContext) as CommandResult;
+
+      expect(help.output).toContain("research close");
+      expect(unknown.success).toBe(false);
+      expect(unknown.output).toContain("research help");
+      expect(sent()).toEqual([]);
+    });
+
+    it("is in help, in man, and completes its actions", () => {
+      const help = commands.help([], mockContext) as CommandResult;
+      const man = commands.man(["research"], mockContext) as CommandResult;
+
+      expect(help.output).toContain("research [close]");
+      expect(man.output).toContain("research - open the research map");
+      expect(getCompletions("research c", mockContext)).toEqual(["close"]);
+      expect(getCompletions("man rese", mockContext)).toEqual(["research"]);
     });
   });
 
   describe("performance command", () => {
-    /** The types of the events a command sent: toHaveBeenCalledWith(new
-     *  CustomEvent(x)) matches any CustomEvent at all. */
-    const sent = () =>
-      mockWindow.dispatchEvent.mock.calls.map(([event]) => event.type);
-
     it("closes the dashboard and the report", () => {
       mockWindow.dispatchEvent.mockClear();
       const result = commands.performance(
@@ -891,12 +942,10 @@ describe("Terminal Commands", () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain("Heavy performance monitoring activated");
       expect(result.output).toContain("WARNING: This may impact performance");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("terminal-fps-command"),
-      );
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("terminal-enable-full-monitoring"),
-      );
+      expect(sent()).toEqual([
+        "terminal-fps-command",
+        "terminal-enable-full-monitoring",
+      ]);
     });
 
     it("hides monitoring", () => {
@@ -908,9 +957,9 @@ describe("Terminal Commands", () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain("Performance monitoring stopped");
       expect(result.output).toContain("Resources released");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("terminal-performance-close"),
-      );
+      // Hide, not close: it stops monitoring too. The old assertion asked
+      // for terminal-performance-close and passed against hide's event.
+      expect(sent()).toEqual(["terminal-performance-hide"]);
     });
 
     it("shows status", () => {
@@ -1298,9 +1347,10 @@ describe("Terminal Commands", () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toContain("Switched to battery saver mode");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("quality-change", { detail: { quality: "battery" } }),
+      const change = sentEvents().find(
+        (event) => event.type === "quality-change",
       );
+      expect(change?.detail).toEqual({ quality: "battery" });
     });
 
     it("starts animations", () => {
@@ -1311,9 +1361,7 @@ describe("Terminal Commands", () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toContain("Background animations started");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("animation-play"),
-      );
+      expect(sent()).toContain("animation-play");
     });
 
     it("stops animations", () => {
@@ -1324,9 +1372,7 @@ describe("Terminal Commands", () => {
 
       expect(result.success).toBe(true);
       expect(result.output).toContain("Background animations stopped");
-      expect(mockWindow.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("animation-stop"),
-      );
+      expect(sent()).toContain("animation-stop");
     });
 
     it("handles invalid subcommand", () => {

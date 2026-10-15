@@ -82,4 +82,29 @@ describe("TerminalProvider", () => {
     );
     expect(reads).toHaveLength(1);
   });
+
+  it("steps the terminal aside for the research map without storing it", () => {
+    // Aside is for the time the map is open: stored, a reload during it
+    // would bring the terminal back invisible.
+    let aside = false;
+    let setAside: (value: boolean) => void = () => {};
+    let move: Move = () => {};
+    const WindowReader = () => {
+      ({ aside, setAside, setPosition: move } = useTerminal());
+      return null;
+    };
+    render(
+      <TerminalProvider>
+        <WindowReader />
+      </TerminalProvider>,
+    );
+    expect(aside).toBe(false);
+
+    act(() => setAside(true));
+    act(() => move({ x: 120, y: 140 }));
+
+    expect(aside).toBe(true);
+    const stored = window.localStorage.getItem("terminal-state") ?? "{}";
+    expect(stored).not.toContain("aside");
+  });
 });

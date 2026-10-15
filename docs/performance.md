@@ -415,6 +415,25 @@ What a visitor sees: with animations off, a Safari visit keeps LOW's grid
 saver, where it no longer climbs and announces "quality restored" while
 the animations stay off.
 
+### Next 16.4.1 against 15.5.22 (2026-10-15)
+
+Both built in the Linux container (Node 20.20.2, clean `npm ci`, CI's env),
+webpack kept for both (`--webpack`: the custom webpack config does not
+apply under Turbopack).
+
+| Measure                                            | 15.5.22             | 16.4.1              | Change                                                                        |
+| -------------------------------------------------- | ------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| Homepage JS, gzipped                               | 298.7 KB            | 326.4 KB            | +27.7 KB (+9.3%), all in Next's framework chunk (React 19.2's vendored build) |
+| Homepage CSS and fonts                             |                     |                     | unchanged                                                                     |
+| Homepage HTML                                      |                     |                     | 5.5 KB smaller                                                                |
+| Image keys hung after a dropped request            | 92 of 160           | 0 of 320            | the optimizer bug below, fixed in 16.4.0                                      |
+| Lighthouse (desktop, two runs each, fresh servers) | 100, 96, 96, 92     | 100, 96, 96, 92     | same scores                                                                   |
+| FCP / LCP / Speed Index                            | 364 / 704 / 1692 ms | 363 / 750 / 1500 ms | LCP +46 ms, Speed Index -192 ms                                               |
+| TBT, CLS                                           | 0, 0                | 0, 0                |                                                                               |
+
+The Linux e2e set on 16.4.1: 347 passed, 0 failed, 7 skipped by design;
+mobile 20 of 20. Deprecated in 16, for later: React 18 support (removed in 17) and the Edge runtime of the og-image route.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
@@ -501,14 +520,20 @@ the animations stay off.
   computes to, in 0 to 1.
 - **Measure after the page settles.** `scroll-behavior: smooth` makes
   `focus()` and `scrollTo()` animate, so poll for the end or scroll
-  `instant`ly; and a dialog fading in reads to axe at its partial opacity
-  (a 6.7:1 badge measured 1.01). A panel that springs in moves under a
-  hit test: points taken from its box mid-spring fell on the terminal's
-  edge, so wait for its transform to settle. Colours too: right after an
-  arrow key, WebKit gave axe one frame of a tab whose `transition-colors`
-  had moved its background but not its text (#9ca3af on #1e40af, 3.43:1),
-  and with motion the scan read every change at its start. Wait for the
-  running animations inside what is scanned (skip endless ones).
+  `instant`ly; and a dialog fading in reads to axe at its partial opacity (a
+  6.7:1 badge measured 1.01). A panel that springs in moves under a hit
+  test: points taken from its box mid-spring fell on the terminal's edge, so
+  wait for its transform to settle. A click is a press and a release: in
+  Firefox the dashboard's close button was pressed mid-spring and released
+  after it had moved, and the click went to their common parent, which
+  neither closes nor minimizes (recorded in 4 of 10 runs; every box was read
+  at a scale between 0.9 and 0.99). Wait on the moving element itself: a
+  child's computed style does not show its parent's transform, and the close
+  test had waited on its static hint. Colours too: right after an arrow key,
+  WebKit gave axe one frame of a tab whose `transition-colors` had moved its
+  background but not its text (#9ca3af on #1e40af, 3.43:1), and with motion
+  the scan read every change at its start. Wait for the running animations
+  inside what is scanned (skip endless ones).
 - **The API's rate limit counted local test browsers as one client.** It
   keys a client by IP and the first 50 characters of its user agent, and
   locally no proxy sets an IP: all the test browsers of an engine shared
@@ -550,24 +575,64 @@ the animations stay off.
   that grows faster than its input keep a ceiling a loaded runner cannot
   reach (`sanitize.test.ts`, `markdown-server.test.ts`: 2,000 ms).
 - **Firefox and CI's Linux browsers run here in Playwright's image.**
-  Firefox does not start inside the macOS sandbox, and CI's WebKit is
-  Linux. Build a worktree as CI does (`SERVE_HTTP=true`,
-  `USE_GITHUB_DATA=false`, ...) and serve it with `SKIP_EXTERNAL_APIS=true`;
-  in `mcr.microsoft.com/playwright:v1.64.0-jammy` (arm64 here, Node 24),
-  copy `package.json`, the lockfile, `playwright.config.ts` and `tests/`
-  into the container and `npm ci --ignore-scripts` there (never into a
-  tree whose `node_modules` is the Mac's), start a small TCP forwarder so
-  `localhost:3000` reaches `host.docker.internal:3000` (the page stays a
-  secure context, and the config's `webServer` finds a server instead of
-  starting `npm run dev`), then run with `CI=true` and `--retries=0`.
-  Chromium and Firefox are dependable there; WebKit on arm64 is not (most
-  of its failures were "Page crashed" or clicks stuck on stability, on
-  the commit before as on the one after), so CI's x64 WebKit stays the
-  judge. Run the commit before too: on 2026-10-13 every failure the run
-  found was already there (PDF link names without their number in Linux
-  Firefox and WebKit, the fallback fonts differing; a Firefox flake on
-  the dashboard's close button; a Chromium flake in the reader's
-  fallback-fonts reload).
+  Firefox does not start inside the macOS sandbox, and CI's WebKit is Linux.
+  Build and serve inside the container, as CI does, so no request leaves
+  it. In `mcr.microsoft.com/playwright:v1.64.0-jammy` (or `-noble`: they
+  behave the same here; arm64, or x64 emulated at about half speed):
+  - unpack a `git archive` of the commit: tracked files only, as a local
+    `public/profile.json`, which CI never has, changes the Projects section;
+  - put Node 20 first on the PATH: the image's default is 24, and CI's
+    setup-node pins 20;
+  - run `npm ci --ignore-scripts`, since `canvas` has no linux-arm64 binary
+    for Node 20. The flag goes on that command only, so `prebuild` still
+    runs;
+  - run the postinstall by hand: `node scripts/setup-assets.js`, then
+    `node scripts/mirror-legacy-pdfs.js`. Without it `public/pyodide` is
+    missing and the Python terminal tests time out;
+  - build with CI's env (`SERVE_HTTP=true`, `USE_GITHUB_DATA=false`, ...)
+    and `npm start` with `SKIP_EXTERNAL_APIS=true`;
+  - wait for a 200 as CI does, then run with `CI=true` and `--retries=0`.
+    With no server answering, `playwright.config.ts` starts `npm run dev`
+    without a word.
+
+  Install, build and start take about 70 s on arm64. Run the commit before
+  too, and run many probes in one container through `docker exec`.
+
+  Serving from the Mac instead, through a forwarder to
+  `host.docker.internal` (until 2026-10-14), stalled 10 to 24 of the about
+  2,800 connects of a full run, for 2 to 68 s. The stalls fell at 2.1, 5.1,
+  7.1, 11.2, 19.3, 35.8 and 68.0 s: macOS's SYN retry schedule (1, 1, 1, 1,
+  1, 2, 4, 8, 16, 32 s), not Linux's. So the drops were on the Mac, between
+  Docker Desktop and a server whose listen queue never overflowed (0 in
+  `netstat -s`). Tests that waited 30 s on a request failed there and
+  nowhere else. Round 10's set of 354 tests failed 6 through the
+  forwarder, 4 of which passed 5 of 5 alone; served in the container, it
+  failed none (on `5d36b46`, which had also fixed one of the 6).
+
+  For CI itself, rehearse with `act`: a scratch workflow with CI's steps
+  (CI's x64 image, Node 20, `npm ci`, the build and the server inside the
+  container), run with `act workflow_dispatch -W <file>`, `--pull=false`,
+  `--reuse=false`, `--action-offline-mode` and an artifact directory
+  (`--artifact-server-path`). Offline mode uses the actions act has
+  cached: its own fetch of them timed out here.
+  - **One server per step.** Give each test step a fresh server, as CI's
+    jobs each start their own. One server for every step left three
+    no-script tests hanging at 60 s on both tries: Next's image optimizer
+    (Traps).
+  - **Emulated x64.** It runs at about half speed, which exposes
+    clock-bound tests. arm64 cannot stand in: `npm ci` with scripts fails
+    on `canvas`.
+  - **An idle Mac.** Round 11's rehearsal (a server per step) ran while
+    another project's jobs held the load average at 180 to 275. Every step
+    took 2.5 to 5 times as long as round 10's, and 15 tests failed (2 more
+    were flaky): 60 s test timeouts, and the stylesheet's fallback
+    beating the 4 s timer. Each passed natively in the arm64 container.
+    The three no-script tests that had hung passed.
+  - **Cache pruning.** On its first start, act's cache server prunes old
+    entries.
+  - **WebKit's "Page crashed".** It was neither arm64 nor the image
+    (Playwright #43070, closed with the advice to use a newer image, is
+    another crash): it was backdrop filters (Traps, below).
 
 ## Traps found on the way
 
@@ -730,37 +795,41 @@ the animations stay off.
   that callback would see them today, as those awaits are microtasks, but
   the observer relies on neither, and catches the layers every zoom
   rebuilds. `useModalDialog` still leaves positive tabindex out, as a guard.
-- **The text under a PDF link is in the page's text content, not the
-  DOM.** pdf.js merges a printed line into one text item, so joining the
-  items a link overlaps gave the right text for 16% of links. Each item is
-  split into characters, the item's width shared out by each character's
-  width in the text layer's fallback font (measured once per character on
-  a canvas: 85 measurements for all 28 PDFs), and a character belongs to
-  the link when its centre is inside the link's rectangle; words are kept
-  whole. Against the same centre test on PyMuPDF's glyph boxes (link
-  rectangles derotated), run in node over all 28 PDFs with pdf.js's own
-  text content and macOS's Times, Helvetica and Courier widths
-  (2026-10-11), that text is exact for 97.4% of the 3,400 links, and 98.9%
-  of names read as printed. Where the widths put a neighbouring word under
-  a link ("4.7 discusses", "Sybil[44", "traces" for a chapter's "7"), the
-  word is dropped, and a chapter, appendix, equation, theorem, proposition
-  or definition link with no number read takes its target's: those
-  targets' numbers matched the printed ones on every link of the 28 PDFs.
-  A bare number gets a type word from the target
-  ("cite." gives "Reference 5") or from the label printed before it ("Ch.
-  4"), or, for a year, its author's name ("Markram et al, 2004", also when
-  the citation wraps between the two links): 97.9% of them. The names come
-  from react-pdf's `onGetAnnotationsSuccess` and `onGetTextSuccess`, which
-  arrive in either order, carry no page number, and fire again for every
-  page on each zoom, so each page is named once per document; with
-  fallback fonts the text layer is off and the page's text is fetched on
-  its own. Cost in node: 34 to 37 ms warm for all 474 pages with internal
-  links, about 60 ms cold; one page takes at most 0.6 ms warm, and the
-  first page 3 ms cold. The PDF's own description (`/Contents`) wins when
-  there is one. The target's suffix is never checked against a printed
-  number, nor used for sections, figures, tables or algorithms: arXiv's and
-  IEEE's anchors (`section.42` printed "4", `table.1` printed "I") would
-  have stripped 110 correct numbers and caught none.
+- **The text under a PDF link is in the page's text content, not the DOM.**
+  pdf.js merges a printed line into one text item, so joining the items a
+  link overlaps gave the right text for 16% of links. Each item is split
+  into characters, the item's width shared out by each character's width in
+  the PDF core font of the item's family (Times-Roman, Helvetica or Courier,
+  from the metrics pdf.js ships: `pdf-font-widths.ts`, which
+  `scripts/pdf-font-widths.mjs` writes), and a character belongs to the link
+  when its centre is inside the link's rectangle; words are kept whole.
+  Against the same centre test on PyMuPDF's glyph boxes (link rectangles
+  derotated), run in node over all 28 PDFs with pdf.js's own text content
+  (2026-10-14), that text is exact for 3,313 of the 3,400 links (97.4%), and
+  98.9% of names read as printed. The widths were a canvas's until then, in
+  the generic families pdf.js names, which each system resolves to fonts of
+  its own: on Linux, Firefox and WebKit read "Section" where the page prints
+  "Section 4.2". macOS's Times, Helvetica and Courier carry Adobe's metrics,
+  so not one name changed there. Where the widths put a neighbouring word
+  under a link ("4.7 discusses", "Sybil[44", "traces" for a chapter's "7"),
+  the word is dropped, and a chapter, appendix, equation, theorem,
+  proposition or definition link with no number read takes its target's:
+  those targets' numbers matched the printed ones on every link of the 28
+  PDFs. A bare number gets a type word from the target ("cite." gives
+  "Reference 5") or from the label printed before it ("Ch. 4"), or, for a
+  year, its author's name ("Markram et al, 2004", also when the citation
+  wraps between the two links): 97.9% of them. The names come from
+  react-pdf's `onGetAnnotationsSuccess` and `onGetTextSuccess`, which arrive
+  in either order, carry no page number, and fire again for every page on
+  each zoom, so each page is named once per document; with fallback fonts
+  the text layer is off and the page's text is fetched on its own. Cost in
+  node: 34 to 37 ms warm for all 474 pages with internal links, about 60 ms
+  cold; one page takes at most 0.6 ms warm, and the first page 3 ms cold.
+  The PDF's own description (`/Contents`) wins when there is one. The
+  target's suffix is never checked against a printed number, nor used for
+  sections, figures, tables or algorithms: arXiv's and IEEE's anchors
+  (`section.42` printed "4", `table.1` printed "I") would have stripped 110
+  correct numbers and caught none.
 - **An observer on the whole document sees every text span.**
   SVGProtectionWrapper watched `document.documentElement` with `subtree`
   for circles added anywhere, and the PDF reader adds 53,486 text-layer
@@ -863,3 +932,214 @@ the animations stay off.
   is retired instead: the page removes it and its `claret-tech-*` caches
   (`service-worker-cleanup.tsx`), and `public/sw.js` removes itself from a
   browser that still runs an older one.
+- **framer-motion ignores reduced motion unless told.** Its
+  `reducedMotion` defaults to "never": a visitor who asked for less
+  motion still got every slide, scale and spring a component did not
+  check for itself, and the dashboard sprang in from 0.9 under the
+  reduced-motion terminal spec. `MotionProvider` sets
+  `<MotionConfig reducedMotion="user">` (2026-10-14): framer then jumps x,
+  y, scale, rotate, size and position, and still fades opacity and
+  colour. Context passes through portals, so the dialogs follow it. In
+  unit tests framer reads the system's setting once per process, and Node,
+  not vitest's per-file isolation, holds framer's modules: in the shared
+  fork an earlier file's render had already read "no preference", so a
+  test that mocked `matchMedia` to "reduce" passed alone and failed in its
+  batch. Test the config the provider hands framer instead.
+- **A backdrop filter ran Linux WebKit out of memory.** With Playwright
+  1.64, WebKit on Linux grew the homepage's page process by 250 to 470 MB
+  a second until it was killed ("Page crashed": 12 of 12 terminal tests
+  in a container), on arm64 and x64, Ubuntu 22.04 and 24.04 alike. 1.57's
+  WebKit, CI's until then, levels off at about 840 MB on the same build.
+  The cause was 24 elements with `backdrop-filter: blur(4px)`, the
+  education cards' skill chips: a bare page of 24 such chips grows the
+  same way, static or animated, and bare pages without the filter stay
+  flat. They blurred the card's own near-opaque background, which no one
+  could see (33 of 207,480 pixels changed, by 3/255 at most, in Chromium;
+  none in WebKit), so they went (2026-10-14), and the homepage stays at
+  800 to 870 MB. It then still drew at 1 frame a second (1.57: 42;
+  Chromium: 60), and the cost grows with the page's backdrop filters:
+  turning off any large group brought the frames back. The 21
+  certification badges' blur showed nothing either (a 3% tint over a plain
+  background: 45 of 132,804 pixels, by 13/255 at most, in Chromium; none
+  in WebKit), and without it the homepage draws at 42 fps; the Linux
+  WebKit specs went from 19 failures to 2, both older (the terminal's help
+  test, which read only the screen at 1 fps, passes). The contact cards
+  and the navigation keep their visible blur; any new backdrop filter is
+  a suspect. How it was found: hide parts of the page from the first
+  paint (`display: none` from an init script) and halve. For the memory,
+  count the runs whose page process passes 3 GB within 40 s (5 a variant,
+  a fresh browser each: WebKit keeps a closed page's process a while,
+  which muddles the reading; removing parts mid-leak misled, as the
+  growth starts and stops on its own). For the frames, count
+  `requestAnimationFrame` callbacks over 3 s, one run a variant.
+- **react-pdf's reload replaces the canvases.** New `options` (the
+  fallback fonts) start a second `getDocument` and keep the old document
+  until it resolves; then each `Page` resets and remounts its canvas, so
+  a test that watches a page's canvas sees it leave the document, not
+  hide and show again.
+- **A wait on the whole screen passes on the echo.** The Python spec's
+  `run()` polled the whole terminal for its pattern, so a pattern found in
+  the command itself, or on an earlier line, passed at once: four "still
+  responsive" checks after an interrupt or an exit checked nothing, and
+  "Ctrl+C stops a runaway one-shot run" waited for "spam", which its own
+  command holds, so its Ctrl+C could land while Python was still starting
+  (2 of 15 runs failed). Wait on what follows the command's echo (`below()`
+  in `python-terminal.spec.ts`), or on a line of its own.
+- **A cancelled command kept painting.** On Ctrl+C the terminal draws
+  "Command canceled by user" and a new prompt, and ignored the command's
+  result, but not its writer. A `python -c` cancelled while the
+  interpreter's code loaded went on to print "Downloading CPython..." and
+  its program's output after that prompt (the command listened for Ctrl+C
+  only once that code had loaded); a `python` REPL cancelled while CPython
+  downloaded erased the "^C" lines (its boot line's cursor restore) and
+  took the terminal over. The terminal now drops a cancelled command's
+  output, and the command checks the abort after every await and races
+  each boot against it: the client leaves an interrupted boot pending, by
+  design, so the command would otherwise wait forever.
+- **"Shown, then gone" assumes a splash that shows.** Five setups waited
+  for the splash's progress bar to show, then to go. When the 4 s timer
+  uncovers the page first, the splash skips itself, so on a slow load they
+  timed out on a page that was up (5 of 6 Linux WebKit runs of one setup).
+  `waitForSplashToEnd` (`tests/e2e/utils/splash.ts`) waits for the
+  backdrop, which only the running app removes, then for the progress bar.
+- **Under reduced motion every element transitions.** `globals.css` cuts
+  transitions to 0.01 ms, and `transition-property` defaults to `all`, so
+  every element transitions every change, inherited ones too. Linux
+  WebKit's clock stands still between frames, and a transition that a style
+  read starts shows its first frame until the next one: axe read the
+  monitor's Timeline badge gray-400 on its tab's new blue-800 (3.43:1), in
+  every run. A test about colours at rest turns transitions off.
+- **Firefox crashed when axe opened its blank page.** By default
+  `@axe-core/playwright` opens a blank page for each scan (its
+  `finishRun`) and closes it. In CI's Firefox, held to one content process
+  (`dom.ipc.processCount: 1` and `browser.tabs.remote.autostart: false`
+  in `playwright.config.ts`), the key press after that crashed the page's
+  process (signal 11): 10 of 10 runs, as the monitor's views were scanned
+  one after another. In legacy mode (`.setLegacyMode()`: axe runs in the
+  page and opens nothing), 0 of 20; with the default processes, 0 of 10.
+  The tools' scans run in legacy mode, which leaves out only cross-origin
+  frames, and Firefox scans every view again.
+- **xterm repaints on its next frame.** `fullScreen()` read the scrollback
+  a fixed 120 ms after each Shift+PageUp and stopped after two unchanged
+  screens; a slow renderer had not repainted yet, and the help and about
+  tests missed their first lines (3 of 30 Linux WebKit runs). It now waits
+  for the change, up to 1.5 s a press.
+- **Changing a backdrop filter under a hovered element crashes Linux
+  WebKit.** High contrast mode set `backdrop-filter: none` on every
+  element, and the click that turns it on leaves the pointer on the
+  toggle: Playwright 1.64's Linux WebKit then crashed the page. Measured
+  with that click, the page scrolled: taking the filter off, 10 of 10 runs;
+  a 2 px radius, 10 of 10; a zero radius, 60 of 60, with reduced motion or
+  without. Colour changes never crashed it. High contrast leaves every
+  filter alone and makes the blurred panels opaque instead
+  (`[class*="backdrop-blur"]`, in the page's colour; the dark ones keep
+  theirs): 0 of 60.
+- **Time a CSS fallback from its own clock.** "shows 6 s after the first
+  paint when the bundle never runs" checked 4.5 and 6.5 s after the
+  navigation, assuming a first paint within 0.5 s; under emulation it came
+  later and the content was still hidden at 6.5 s. The fallback
+  animations' start times (`document.getAnimations()`, on
+  `performance.now()`'s clock) say when its 6 s began, and need no app
+  script.
+- **High contrast's colours were RGB read as HSL.** The theme reads
+  `hsl(var(--token))`, and `high-contrast.css` set triples such as
+  `255 255 255`. Chromium and WebKit painted light high contrast yellow,
+  rgb(255, 255, 0), while Firefox clamped it to white; dark high contrast
+  had ochre and brown accents everywhere. The high-contrast scan had axe's
+  contrast rule off, so nothing saw it. A test now reads every token
+  through the same `hsl()` and expects greys, and scans the whole page in
+  both themes.
+- **`prefers-contrast: high` matches nothing.** The value is `more`. No
+  engine matched `high`, even with more contrast asked for.
+- **Playwright's Firefox drops colour scheme and contrast emulation under
+  COOP.** On a page sent with `Cross-Origin-Opener-Policy: same-origin`,
+  as every page here is, `matchMedia` answers no preference for
+  `colorScheme` and `contrast` (1.64). A bare server lost both with that
+  one header and kept them without it. `reducedMotion` holds either way.
+- **A check once a frame misses what goes before the first frame.**
+  static-shell's watcher looked for the splash's backdrop on each
+  animation frame. In Linux WebKit the backdrop was sometimes gone before
+  the first one, and the test read `undefined` (30 of 80 runs). A
+  MutationObserver from the document's start sees insertions and removals
+  as they happen: 0 of 80.
+- **A bound on the clock stood in for an order.** "skips the splash when
+  the 4 s timer showed the page" asserted that the backdrop went within
+  6 s of the navigation, meaning "before the stylesheet's fallback", which
+  counts its 6 s from the first paint. The app removes the backdrop only
+  after that animation ends, so its `animationend` tells which came first,
+  on no clock. With an 8x slower CPU the fallback did come first, and the
+  test now says so.
+- **Without scripts the load event waits for every image.**
+  `loading="lazy"` needs scripting (HTML spec), so a no-script page loads
+  all 13 of the homepage's images, and `page.goto` waits for them.
+  No-script tests wait for the HTML and its stylesheets instead
+  (`tests/e2e/utils/no-script.ts`).
+- **Next's image optimizer can hang an image for the server's lifetime.**
+  It reads a local image through a mocked request on the client's own
+  socket (`fetchInternalImage`). When the client drops the request, the
+  read never ends, and every later request for that image in that format
+  waits on it (Next 15.5.22, `next start`). One dropped request per
+  uncached image, 0 to 30 ms in, left 85 of 160 AVIF images hanging, while
+  their WebP twins (another cache key) and the stylesheet answered in
+  under 10 ms. Self-hosted servers have it, CI's among them. On Vercel,
+  `/_next/image` is served by Vercel's image service rather than this
+  code (to confirm at the Vercel check). Fixed in Next 16.4.0
+  (vercel/next.js#98168), never in 15.5; the site runs 16.4.1 since
+  2026-10-15 (0 of 320 keys hung). Lighthouse against a 15.5 server that
+  had had such requests timed out waiting for network idle, twice.
+- **A phone's first second was 4 px too wide, and not because of the
+  font.** Sampled every frame, a Pixel 5 page was 397 px wide from its
+  first frame to 0.6 s in Chromium and to 1.9 s in WebKit, with the web
+  fonts loaded or blocked alike (round 11 suspected the font). The cause:
+  the Contact section's avatar column enters from `x: 20`. On a phone it
+  is as wide as the screen inside 16 px of padding, and the server's HTML
+  paints its starting state until the bundle runs and the entrance ends;
+  without the bundle, for good. The fixed layers only stretched to the
+  wider page. The section clips sideways now (`overflow-x-clip`, not
+  `hidden`, so no scroll container), and static-shell's "fits a phone's
+  screen before the bundle runs" holds the page without its bundle. The
+  `<noscript>` style already resets these starting states when scripts
+  are off, which is why a no-script page never showed it.
+- **The config starts a dev server when port 3000 is empty.**
+  `playwright.config.ts` checks `localhost:3000` whatever
+  `PLAYWRIGHT_BASE_URL` says, so a run against a build on another port
+  also starts `npm run dev` in the checkout, which rewrites its `.next`
+  as a development build. Fixed: no `webServer` when `PLAYWRIGHT_BASE_URL`
+  is set (`src/app/playwright-config.test.ts`).
+
+- **`toHaveBeenCalledWith(new CustomEvent(x))` matches any CustomEvent**,
+  whatever its type or detail: equality on two events compares no fields
+  that differ. Eight assertions on the terminal's events passed with every
+  expected name replaced by a wrong one, and one expected an event the
+  command never sent. Read the type: `sent()` in `commands.test.ts`.
+- **Vitest's `mockReset: true` empties `vi.fn().mockImplementation(...)`
+  before each test**; `vi.fn(impl)` keeps its body. `setup.ts`'s
+  ResizeObserver stand-in, written the first way, returned `undefined` in
+  every test, and a component's `new ResizeObserver(...).observe` threw.
+- **`pkill -f pattern` matches the shell that runs it** when the pattern is
+  on that shell's command line: `bash -c "pkill -f 'next start'; npm run
+build"` killed itself before building. Put the commands in a script
+  file (`r11/rebuild.sh`).
+- **A hand-rolled Tab cycle must leave out tabindex -1.** `useModalDialog`
+  moves Tab itself (WebKit's own Tab skips links), and kept every button:
+  in a roving tabindex, as on the research map, Tab walked every item.
+  From an element Tab skips, such as a heading given focus to announce it,
+  Tab must go on from there, not back to the dialog's first control.
+- **Stacked dialogs each listened on document.** With the reader over the
+  research map, the lower dialog pulled each Tab into itself and the
+  reader pulled it back, so Tab never left the reader's first control, and
+  an Escape from the page closed both. Only the dialog on top answers keys
+  now (a module-level stack in `useModalDialog`).
+- **CI's single-process Firefox bought nothing.** `dom.ipc.processCount: 1`
+  and `browser.tabs.remote.autostart: false`, added unmeasured as
+  stability settings, made axe crash the tab (10 of 10). CI's Firefox
+  suites without them, alternating three runs each: 45 of 45 passed every
+  time, median 120 s against 118 s. Removed.
+- **The homepage does not reflow at 320 px** (WCAG 1.4.10), with scripts
+  or without: 19 px too wide on an iPhone SE. Four no-wrap rows or
+  columns: research cards' footer row (300 px), the footer's seven icons
+  (340 px), the Papers filter pills and stats rows (332 px with padding),
+  and Education's two-column skills grid of no-wrap pills ("Software
+  Engineering", 175 px; "JAX/TensorFlow" has no break) in a column left
+  176 px. Wrapping the first two fixed them when injected; Papers and
+  Education need more (and Education a design call). Not fixed yet.

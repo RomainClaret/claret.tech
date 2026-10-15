@@ -1585,6 +1585,55 @@ test.describe("Terminal", () => {
     expect(await coveredPoints(monitor)).toEqual([]);
   });
 
+  test("opens the dashboard without its spring, as motion is reduced", async ({
+    page,
+  }) => {
+    // framer ignored the setting (its default reducedMotion is "never"): the
+    // dashboard sprang in from 0.9 for visitors who asked for less motion.
+    await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+    // Its scale on every frame, from the moment it is in the page.
+    await page.evaluate(() => {
+      const scales: number[] = [];
+      (window as unknown as { dashboardScales: number[] }).dashboardScales =
+        scales;
+      new MutationObserver((_, observer) => {
+        const panel = document.querySelector(
+          '[role="dialog"][aria-label="Performance dashboard"]',
+        );
+        if (!panel) return;
+        observer.disconnect();
+        const start = performance.now();
+        const sample = () => {
+          const transform = getComputedStyle(panel).transform;
+          const matrix = new DOMMatrix(
+            transform === "none" ? undefined : transform,
+          );
+          scales.push(Math.hypot(matrix.a, matrix.b));
+          // 600 ms and 12 frames at least, however slow the frames come.
+          if (performance.now() - start < 600 || scales.length < 12) {
+            requestAnimationFrame(sample);
+          }
+        };
+        sample();
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    await runCommand(page, "performance", /Performance dashboard opened/);
+    const scales = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { dashboardScales: number[] }).dashboardScales,
+      );
+    await expect
+      .poll(async () => (await scales()).length)
+      .toBeGreaterThanOrEqual(12);
+
+    // At 0.9 for its first frame at most, then at 1: nothing in between.
+    expect(
+      (await scales()).filter((scale) => scale > 0.9005 && scale < 0.9995),
+    ).toEqual([]);
+  });
+
   test.describe("at 1280 by 720", () => {
     test.use({ viewport: { width: 1280, height: 720 } });
 
@@ -1603,19 +1652,15 @@ test.describe("Terminal", () => {
       });
       await expect(dashboard).toBeVisible();
 
-      // Once the hint has finished appearing.
-      const hint = page.getByText(/Press\s*ESC\s*to close/);
+      // Once the panel has settled. It waited on the hint, whose own style
+      // never moves: mid-spring, the button moved off the pointer between
+      // the press and the release, and in Firefox the click went to the
+      // header, which neither closes nor minimizes.
       await expect
         .poll(() =>
-          hint.evaluate((element) => {
-            const style = getComputedStyle(element);
-            return (
-              style.opacity === "1" &&
-              ["none", "matrix(1, 0, 0, 1, 0, 0)"].includes(style.transform)
-            );
-          }),
+          dashboard.evaluate((panel) => getComputedStyle(panel).transform),
         )
-        .toBe(true);
+        .toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
 
       const close = page.getByRole("button", {
         name: "Close performance dashboard",
@@ -1701,10 +1746,7 @@ test.describe("Terminal", () => {
             }),
         )
         .toBe(1);
-      // And its colours settled: right after an arrow key, transition-colors
-      // had moved the new tab's background but not its text (#9ca3af on
-      // #1e40af, 3.43:1, WebKit), and with motion the scan read each change
-      // at its start, never a selected tab's own colours.
+      // And its animations finished (transitions are off, below).
       await page
         .locator(selector)
         .first()
@@ -1723,9 +1765,16 @@ test.describe("Terminal", () => {
             running.map((animation) => animation.finished.catch(() => {})),
           );
         });
+      // Legacy mode: axe.run in the page itself. By default each scan also
+      // opened a blank page (axe's finishRun) and closed it, and in CI's
+      // Firefox, held to one content process, the key press after that
+      // crashed the page's process (signal 11): 10 of 10 runs, against 0
+      // of 20 in legacy mode, and 0 of 10 with the default processes.
+      // The tools hold no frames, all that legacy mode leaves out.
       const results = await new AxeBuilder({ page })
         .include(selector)
         .withRules(["color-contrast"])
+        .setLegacyMode()
         .analyze();
       return results.violations.flatMap((violation) =>
         violation.nodes.map(
@@ -1735,6 +1784,14 @@ test.describe("Terminal", () => {
       );
     };
 
+    // Colours at rest, which is what the test is about. Under reduced
+    // motion every element transitions every property for 0.01 ms
+    // (globals.css), and Linux WebKit, between frames, gave axe a
+    // transition's first frame: the Timeline tab's badge still gray-400 on
+    // the tab's new blue-800 (#9ca3af on #1e40af, 3.43:1), in every run.
+    await page.addStyleTag({
+      content: "*, *::before, *::after { transition: none !important; }",
+    });
     await runCommand(page, "fps", /FPS monitor activated/);
     const details = page.getByRole("button", { name: "Performance details" });
     await expect(details).toBeVisible();

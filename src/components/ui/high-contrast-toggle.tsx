@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { Contrast } from "lucide-react";
-import { readStorage, writeStorage } from "@/lib/utils/safe-storage";
+import { wantsHighContrast } from "@/lib/boot/head-boot";
+import { writeStorage } from "@/lib/utils/safe-storage";
 
 export function HighContrastToggle() {
   const [isHighContrast, setIsHighContrast] = useState(false);
 
   useEffect(() => {
-    // Check localStorage on mount. Guarded: where storage is blocked this
+    // The head script set the class before the first paint, from the
+    // visitor's choice or else the system's preference; this settles the
+    // button on the same answer. Guarded: where storage is blocked a read
     // threw in an effect, which takes the page down to the error boundary.
-    const savedHighContrast = readStorage("local", "highContrast") === "true";
-    setIsHighContrast(savedHighContrast);
-
-    if (savedHighContrast) {
-      document.documentElement.classList.add("high-contrast");
-    }
+    const on = wantsHighContrast();
+    setIsHighContrast(on);
+    document.documentElement.classList.toggle("high-contrast", on);
   }, []);
 
   const toggleHighContrast = () => {

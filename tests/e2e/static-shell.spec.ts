@@ -1,12 +1,12 @@
 import {
   test,
   expect,
-  type APIResponse,
   type Browser,
   type BrowserContext,
   type Page,
-  type Route,
 } from "./utils/fixtures";
+import { routeChunk, type ChunkHandler } from "./utils/chunks";
+import { gotoWithoutScripts } from "./utils/no-script";
 
 /**
  * The homepage is generated once, at build time, for every visitor. What
@@ -30,39 +30,6 @@ const backdropCoversCenter = (page: Page) =>
     ),
   );
 
-type ChunkHandler = (
-  route: Route,
-  response: APIResponse,
-  nth: number,
-) => Promise<void>;
-
-/**
- * Routes every chunk and hands each request for the one whose code contains
- * `marker` to `handle`, with its response and its number (1 for the first).
- * Returns the number of requests for it so far.
- *
- * A request counts once its response has been read, which is after the page
- * has asked for it: a stand-in shows its text as it mounts and starts its
- * try, so a count read the moment that text shows can still be 1 (1 run in
- * 10). Poll the count.
- */
-async function routeChunk(
-  context: BrowserContext,
-  marker: string,
-  handle: ChunkHandler,
-) {
-  let requests = 0;
-  await context.route(/\/_next\/static\/chunks\//, async (route) => {
-    const response = await route.fetch();
-    if ((await response.text()).includes(marker)) {
-      await handle(route, response, ++requests);
-      return;
-    }
-    await route.fulfill({ response });
-  });
-  return () => requests;
-}
-
 /** The splash's chunk, picked out by its label as in the 4 s timer test. */
 const routeSplashChunk = (context: BrowserContext, handle: ChunkHandler) =>
   routeChunk(context, "Loading portfolio", handle);
@@ -77,20 +44,63 @@ async function closeContext(context: BrowserContext) {
   await context.close();
 }
 
-/** Did the splash ever show, and when did the backdrop go? From the start. */
+type SplashWatch = {
+  splashSeen: boolean;
+  backdropGone?: number;
+  fallbackRunning: boolean;
+  fallbackFired: boolean;
+};
+
+/**
+ * From the document's start: did the splash ever show, when did the
+ * backdrop go, and did the stylesheet's 6 s fallback (globals.css) run on
+ * it and run out?
+ */
 async function watchSplash(context: BrowserContext) {
   await context.addInitScript(() => {
-    const seen = window as unknown as {
-      splashSeen: boolean;
-      backdropGone?: number;
-    };
+    const seen = window as unknown as SplashWatch;
     seen.splashSeen = false;
-    let backdropFound = false;
-    const check = () => {
-      if (document.querySelector("[data-splash-backdrop]")) {
-        backdropFound = true;
-      } else if (backdropFound && seen.backdropGone === undefined) {
+    seen.fallbackRunning = false;
+    seen.fallbackFired = false;
+    // The backdrop's arrival and removal, as they happen. A check once a
+    // frame missed a backdrop that went before Linux WebKit's first frame:
+    // 3 runs in 5 read backdropGone as undefined.
+    let backdrop: Element | null = null;
+    let found = false;
+    const observer = new MutationObserver(() => {
+      if (backdrop?.isConnected) return;
+      backdrop = document.querySelector("[data-splash-backdrop]");
+      if (backdrop) {
+        found = true;
+      } else if (found) {
         seen.backdropGone = performance.now();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
+    // The app removes the backdrop after the fallback's animation ends
+    // (app-wrapper.tsx), so this tells which came first, on no clock.
+    document.addEventListener(
+      "animationend",
+      (event) => {
+        if (event.animationName === "splash-backdrop-timeout") {
+          seen.fallbackFired = true;
+        }
+      },
+      true,
+    );
+    const check = () => {
+      if (
+        backdrop?.isConnected &&
+        backdrop
+          .getAnimations()
+          .some(
+            (animation) =>
+              (animation as CSSAnimation).animationName ===
+              "splash-backdrop-timeout",
+          )
+      ) {
+        seen.fallbackRunning = true;
       }
       const splash = document.querySelector('[aria-label="Loading portfolio"]');
       if (splash && getComputedStyle(splash).display !== "none") {
@@ -104,11 +114,9 @@ async function watchSplash(context: BrowserContext) {
 
 const splashWatch = (page: Page) =>
   page.evaluate(() => {
-    const { splashSeen, backdropGone } = window as unknown as {
-      splashSeen: boolean;
-      backdropGone?: number;
-    };
-    return { splashSeen, backdropGone };
+    const { splashSeen, backdropGone, fallbackRunning, fallbackFired } =
+      window as unknown as SplashWatch;
+    return { splashSeen, backdropGone, fallbackRunning, fallbackFired };
   });
 
 // The error screen of the boundary around the whole site (AppWrapper's).
@@ -164,6 +172,72 @@ test.describe("Static shell", () => {
       expect(first.dark).toBe(theme === "dark");
       expect(first.safari).toBe(String(isSafari(browserName)));
       expect(first.animations).toBe(!isSafari(browserName));
+      await closeContext(context);
+    });
+  }
+
+  // On a phone, the first paint is the server's HTML, every entrance in its
+  // starting state until the bundle runs. The Contact section's avatar
+  // column started 20 px to the right: as wide as the screen inside 16 px
+  // of padding, it stuck out 4 px, so the page panned sideways until the
+  // entrance ended (up to 2 s in WebKit), or for good without the bundle.
+  test("fits a phone's screen before the bundle runs", async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+    await closeContext(context);
+  });
+
+  // High contrast is settled by the same script: the visitor's choice, or
+  // else the system's preference. A stored choice used to wait for the
+  // bundle (the toggle's effect), and the system's was never read.
+  for (const [source, stored, contrast, expected] of [
+    ["the visitor's choice", "true", "no-preference", true],
+    ["the system's preference", null, "more", true],
+    ["neither: the visitor turned it off", "false", "more", false],
+  ] as const) {
+    test(`first paints high contrast from ${source}`, async ({
+      browser,
+      browserName,
+    }) => {
+      // Playwright's Firefox (1.64) drops its contrast and colour scheme
+      // emulation on a page sent with Cross-Origin-Opener-Policy:
+      // same-origin, as every page here is: a bare server lost it with that
+      // one header and kept it without, while reduced motion held.
+      test.skip(
+        browserName === "firefox" && contrast === "more",
+        "Playwright's Firefox drops prefers-contrast emulation under COOP",
+      );
+      const context = await browser.newContext({ contrast });
+      await context.addInitScript((value) => {
+        try {
+          if (value !== null) localStorage.setItem("highContrast", value);
+        } catch {
+          // Storage blocked: the system decides, which the test would show.
+        }
+      }, stored);
+      // No bundle runs: the HTML and the head script alone.
+      await context.route(/\/_next\/static\/chunks\//, (route) =>
+        route.abort(),
+      );
+      const page = await context.newPage();
+      await page.goto("/?playwright=true");
+
+      expect(
+        await page.evaluate(() =>
+          document.documentElement.classList.contains("high-contrast"),
+        ),
+      ).toBe(expected);
       await closeContext(context);
     });
   }
@@ -308,31 +382,7 @@ test.describe("Static shell", () => {
       }
       await route.fulfill({ response });
     });
-    // Did the splash ever show, and when did the backdrop go? Watched from
-    // the document's start.
-    await context.addInitScript(() => {
-      const seen = window as unknown as {
-        splashSeen: boolean;
-        backdropGone?: number;
-      };
-      seen.splashSeen = false;
-      let backdropFound = false;
-      const check = () => {
-        if (document.querySelector("[data-splash-backdrop]")) {
-          backdropFound = true;
-        } else if (backdropFound && seen.backdropGone === undefined) {
-          seen.backdropGone = performance.now();
-        }
-        const splash = document.querySelector(
-          '[aria-label="Loading portfolio"]',
-        );
-        if (splash && getComputedStyle(splash).display !== "none") {
-          seen.splashSeen = true;
-        }
-        requestAnimationFrame(check);
-      };
-      requestAnimationFrame(check);
-    });
+    await watchSplash(context);
     const page = await context.newPage();
     const requested: string[] = [];
     page.on("request", (request) => requested.push(request.url()));
@@ -343,18 +393,17 @@ test.describe("Static shell", () => {
       timeout: 20_000,
     });
 
-    const seen = await page.evaluate(() => {
-      const { splashSeen, backdropGone } = window as unknown as {
-        splashSeen: boolean;
-        backdropGone?: number;
-      };
-      return { splashSeen, backdropGone };
-    });
+    const seen = await splashWatch(page);
     expect(splashHeld).toBe(true);
-    // The timer uncovered the page, not the stylesheet: the backdrop was
-    // gone before the stylesheet's 6 s could run out. That needs hydration
-    // within 2 s: under 1 s here, 1.3 s with a 4x slower CPU.
-    expect(seen.backdropGone).toBeLessThan(6_000);
+    // The timer uncovered the page, not the stylesheet: the backdrop went
+    // while the stylesheet's fallback was still counting its 6 s, which
+    // start at the first paint. That needs hydration within 2 s of it:
+    // under 1 s here, 1.3 s with a 4x slower CPU; with an 8x slower one
+    // the fallback came first, which this says. A bound of 6 s after the
+    // navigation could not tell the two apart.
+    expect(seen.backdropGone).toBeDefined();
+    expect(seen.fallbackRunning).toBe(true);
+    expect(seen.fallbackFired).toBe(false);
     expect(seen.splashSeen).toBe(false);
     await expect(page.locator("h1").first()).toBeVisible();
     expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
@@ -473,7 +522,7 @@ test.describe("Static shell", () => {
   test("shows the page when scripts are off", async ({ browser }) => {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
-    await page.goto("/");
+    await gotoWithoutScripts(page);
 
     await expect(page.locator("[data-splash-backdrop]")).toBeHidden();
     await expect(page.locator("h1").first()).toBeVisible();
@@ -546,10 +595,10 @@ test.describe("A decoration whose chunk fails to load", () => {
     expectHeroWithout(browser, '"contour1"'));
 });
 
-test.describe("A performance tool whose chunk fails to load", () => {
-  // The terminal's `fps` and `performance` open these under the error
-  // boundary around the whole site, which replaced the page with its error
-  // screen until a reload.
+test.describe("A terminal tool whose chunk fails to load", () => {
+  // The terminal's `fps`, `performance` and `research` open these under the
+  // error boundary around the whole site, which replaced the page with its
+  // error screen until a reload.
   async function openWithChunkFailing(
     browser: Browser,
     marker: string,
@@ -628,6 +677,34 @@ test.describe("A performance tool whose chunk fails to load", () => {
         return element.closest("div.fixed")?.contains(hit) ?? false;
       }),
     ).toBe(false);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await closeContext(context);
+  });
+
+  test("keeps the page, and says the research map could not load", async ({
+    browser,
+  }) => {
+    const { context, page, requests } = await openWithChunkFailing(
+      browser,
+      // Only in the map's own chunk (its details panel).
+      "Choose an item on the map",
+      (page) =>
+        page.evaluate(() => {
+          window.dispatchEvent(
+            new CustomEvent("terminal-research-map", {
+              detail: { token: "e2e", timestamp: Date.now() },
+            }),
+          );
+        }),
+    );
+
+    const dialog = page.getByRole("dialog", { name: "Research map" });
+    await expect(dialog).toContainText("Could not load the research map.");
+    await expect(errorScreen(page)).toHaveCount(0);
+    await expect(page.locator("h1").first()).toBeVisible();
+    await expect.poll(requests).toBe(2);
 
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

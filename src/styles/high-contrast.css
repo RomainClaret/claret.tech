@@ -1,83 +1,49 @@
 /* High Contrast Mode Styles */
 
-/* Apply high contrast when user has system preference or manual toggle */
-@media (prefers-contrast: high) {
-  :root {
-    /* Increase contrast for light theme */
-    --background: 255 255 255;
-    --foreground: 0 0 0;
-    --card: 255 255 255;
-    --card-foreground: 0 0 0;
-    --primary: 0 0 0;
-    --primary-foreground: 255 255 255;
-    --secondary: 245 245 245;
-    --secondary-foreground: 0 0 0;
-    --muted: 230 230 230;
-    --muted-foreground: 0 0 0;
-    --accent: 220 220 220;
-    --accent-foreground: 0 0 0;
-    --border: 0 0 0;
-    --input: 0 0 0;
-    --ring: 0 0 0;
-  }
-
-  .dark {
-    /* Increase contrast for dark theme */
-    --background: 0 0 0;
-    --foreground: 255 255 255;
-    --card: 0 0 0;
-    --card-foreground: 255 255 255;
-    --primary: 255 255 255;
-    --primary-foreground: 0 0 0;
-    --secondary: 20 20 20;
-    --secondary-foreground: 255 255 255;
-    --muted: 40 40 40;
-    --muted-foreground: 255 255 255;
-    --accent: 60 60 60;
-    --accent-foreground: 255 255 255;
-    --border: 255 255 255;
-    --input: 255 255 255;
-    --ring: 255 255 255;
-  }
-}
-
-/* Manual high contrast mode toggle */
+/* The theme reads its colours as HSL components, hsl(var(--token))
+   (tailwind.config.ts), so these are greys written as HSL. Written as RGB
+   triples until 2026-10, they painted light high contrast yellow,
+   rgb(255, 255, 0), in Chromium and WebKit, and gave dark high contrast
+   yellow text with ochre and brown accents. High contrast is on when the
+   visitor chose it, or when nothing is stored and the system asks for
+   more contrast (lib/boot/head-boot.ts). A `prefers-contrast: high` block
+   here never matched: browsers accept `more`, not `high`. */
 .high-contrast {
   /* Light theme high contrast */
-  --background: 255 255 255 !important;
-  --foreground: 0 0 0 !important;
-  --card: 255 255 255 !important;
-  --card-foreground: 0 0 0 !important;
-  --primary: 0 0 0 !important;
-  --primary-foreground: 255 255 255 !important;
-  --secondary: 245 245 245 !important;
-  --secondary-foreground: 0 0 0 !important;
-  --muted: 230 230 230 !important;
-  --muted-foreground: 0 0 0 !important;
-  --accent: 220 220 220 !important;
-  --accent-foreground: 0 0 0 !important;
-  --border: 0 0 0 !important;
-  --input: 0 0 0 !important;
-  --ring: 0 0 0 !important;
+  --background: 0 0% 100% !important;
+  --foreground: 0 0% 0% !important;
+  --card: 0 0% 100% !important;
+  --card-foreground: 0 0% 0% !important;
+  --primary: 0 0% 0% !important;
+  --primary-foreground: 0 0% 100% !important;
+  --secondary: 0 0% 96.1% !important;
+  --secondary-foreground: 0 0% 0% !important;
+  --muted: 0 0% 90.2% !important;
+  --muted-foreground: 0 0% 0% !important;
+  --accent: 0 0% 86.3% !important;
+  --accent-foreground: 0 0% 0% !important;
+  --border: 0 0% 0% !important;
+  --input: 0 0% 0% !important;
+  --ring: 0 0% 0% !important;
 }
 
 .high-contrast.dark {
   /* Dark theme high contrast */
-  --background: 0 0 0 !important;
-  --foreground: 255 255 255 !important;
-  --card: 0 0 0 !important;
-  --card-foreground: 255 255 255 !important;
-  --primary: 255 255 255 !important;
-  --primary-foreground: 0 0 0 !important;
-  --secondary: 20 20 20 !important;
-  --secondary-foreground: 255 255 255 !important;
-  --muted: 40 40 40 !important;
-  --muted-foreground: 255 255 255 !important;
-  --accent: 60 60 60 !important;
-  --accent-foreground: 255 255 255 !important;
-  --border: 255 255 255 !important;
-  --input: 255 255 255 !important;
-  --ring: 255 255 255 !important;
+  --background: 0 0% 0% !important;
+  --foreground: 0 0% 100% !important;
+  --card: 0 0% 0% !important;
+  --card-foreground: 0 0% 100% !important;
+  --primary: 0 0% 100% !important;
+  --primary-foreground: 0 0% 0% !important;
+  --secondary: 0 0% 7.8% !important;
+  --secondary-foreground: 0 0% 100% !important;
+  --muted: 0 0% 15.7% !important;
+  --muted-foreground: 0 0% 100% !important;
+  --accent: 0 0% 23.5% !important;
+  --accent-foreground: 0 0% 100% !important;
+  --border: 0 0% 100% !important;
+  --input: 0 0% 100% !important;
+  --ring: 0 0% 100% !important;
 }
 
 /* Additional high contrast enhancements */
@@ -93,11 +59,46 @@
     outline-offset: 2px !important;
   }
 
-  /* Remove shadows and blur effects */
+  /* Remove shadows */
   * {
     box-shadow: none !important;
     text-shadow: none !important;
-    backdrop-filter: none !important;
+  }
+
+  /* Nothing blurred shows through: a panel that blurs what is behind it
+     turns opaque, in the page's colour. Its backdrop filter stays. Changing
+     one while the pointer is over the page, as a click on this toggle
+     does, crashed Linux WebKit's page (Playwright 1.64): taking it off, 10
+     of 10 runs; a zero radius, 60 of 60; these fills, 0 of 60. */
+  [class*="backdrop-blur"] {
+    background-image: none !important;
+    background-color: hsl(var(--background)) !important;
+  }
+
+  /* The dark ones under light text keep their colour, opaque: the cookie
+     notice, the performance monitor and the toasts. */
+  .bg-gray-900\/95 {
+    background-color: rgb(17 24 39) !important;
+  }
+
+  .bg-black\/90 {
+    background-color: rgb(0 0 0) !important;
+  }
+
+  .bg-blue-900\/90 {
+    background-color: rgb(30 58 138) !important;
+  }
+
+  .bg-green-900\/90 {
+    background-color: rgb(20 83 45) !important;
+  }
+
+  .bg-red-900\/90 {
+    background-color: rgb(127 29 29) !important;
+  }
+
+  .bg-yellow-900\/90 {
+    background-color: rgb(113 63 18) !important;
   }
 
   /* Ensure links are underlined */
@@ -138,4 +139,9 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* The research map's lane colours give way to the text colour. */
+.high-contrast .lane-ink {
+  --ink: hsl(var(--foreground));
 }

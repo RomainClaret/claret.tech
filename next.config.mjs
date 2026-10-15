@@ -16,20 +16,6 @@ const nextConfig = {
     BUILD_YEAR: String(new Date().getFullYear()),
   },
 
-  // ESLint configuration for build
-  eslint: {
-    // Ignore test files during production builds
-    ignoreDuringBuilds: false,
-    dirs: [
-      "src/app",
-      "src/components",
-      "src/lib",
-      "src/hooks",
-      "src/contexts",
-      "src/data",
-    ],
-  },
-
   // Disable source maps in production to prevent 404 errors for .map files
   productionBrowserSourceMaps: false,
 

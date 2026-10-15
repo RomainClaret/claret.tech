@@ -6,6 +6,7 @@ import {
   type Page,
 } from "./utils/fixtures";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSplashToEnd } from "./utils/splash";
 
 /**
  * A GitHub card's details open in one dialog above the page.
@@ -121,10 +122,7 @@ async function answerData(context: BrowserContext) {
 async function openSite(page: Page, { acceptCookies = true } = {}) {
   await answerData(page.context());
   await page.goto("/?playwright=true");
-  // Shown, then gone: a count of 0 alone passes before the splash mounts.
-  const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
-  await expect(splash).toBeVisible();
-  await expect(splash).toHaveCount(0, { timeout: 15_000 });
+  await waitForSplashToEnd(page);
   if (acceptCookies) {
     await page.getByRole("button", { name: "Accept cookie notice" }).click();
   }

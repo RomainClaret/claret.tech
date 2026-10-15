@@ -358,6 +358,78 @@ describe("python command", () => {
     });
   });
 
+  describe("Ctrl+C", () => {
+    // The terminal cancels a command by aborting its controller, draws
+    // "Command canceled by user" and a new prompt, and ignores the result.
+
+    it("stops before booting when it came while the interpreter loaded", async () => {
+      // Loading the interpreter's code can take a while on a first run, and
+      // the abort listener was only attached after it: the boot and the
+      // program ran anyway, after the new prompt.
+      await setMissing();
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await pythonCommand(
+        ["-c", '"print(1)"'],
+        context({ rawArgs: '-c "print(1)"', abortController: controller }),
+      );
+
+      expect(ensureReady).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+    });
+
+    it("settles a run whose boot it interrupted", async () => {
+      // An interrupted boot is never settled by the client (a superseded
+      // boot stays pending), so the command waited on it forever.
+      await setMissing();
+      ensureReady.mockReturnValue(new Promise(() => {}));
+      const controller = new AbortController();
+      const pending = pythonCommand(
+        ["print(1)"],
+        context({ rawArgs: "print(1)", abortController: controller }),
+      );
+      await vi.waitFor(() => expect(ensureReady).toHaveBeenCalled());
+
+      controller.abort();
+      const outcome = await Promise.race([
+        pending,
+        new Promise((resolve) => setTimeout(() => resolve("waiting"), 100)),
+      ]);
+
+      expect(outcome).toEqual(expect.objectContaining({ success: false }));
+      const { pythonClient } = await import("@/lib/python/pyodide-client");
+      expect(pythonClient.interrupt).toHaveBeenCalledWith("interrupt");
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it("does not hand the terminal to Python after it came during the boot", async () => {
+      // The REPL never looked at the abort: the boot finished, its clear()
+      // erased the "^C" lines, the banner printed, and Python took over.
+      let finishBoot: (info: typeof READY) => void = () => {};
+      ensureReady.mockReturnValue(
+        new Promise((resolve) => {
+          finishBoot = resolve;
+        }),
+      );
+      const controller = new AbortController();
+      const pending = pythonCommand(
+        [],
+        context({ rawArgs: "", abortController: controller }),
+      );
+      await vi.waitFor(() => expect(ensureReady).toHaveBeenCalled());
+
+      controller.abort();
+      finishBoot(READY);
+      const result = await pending;
+
+      expect(enterLineMode).not.toHaveBeenCalled();
+      expect(written.join("")).not.toContain(READY.python);
+      expect(result.success).toBe(false);
+    });
+  });
+
   it("declines when the terminal cannot stream output", async () => {
     await setMissing();
 

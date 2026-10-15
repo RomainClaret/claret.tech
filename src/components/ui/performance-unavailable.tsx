@@ -11,7 +11,7 @@ import { useModalDialog } from "@/lib/hooks/useModalDialog";
 // around the whole site, so a failed chunk replaced the page with its error
 // screen until a reload. These say what failed and offer a retry instead.
 
-interface Fallback {
+export interface Fallback {
   retry: () => void;
   retrying: boolean;
 }
@@ -83,7 +83,8 @@ interface DialogProps extends Fallback {
   onClose: () => void;
 }
 
-function ToolUnavailableDialog({
+/** A terminal tool's stand-in dialog, named; the research map's too. */
+export function ToolUnavailableDialog({
   name,
   isOpen,
   onClose,

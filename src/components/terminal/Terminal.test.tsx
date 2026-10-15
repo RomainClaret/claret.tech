@@ -13,10 +13,13 @@ import React from "react";
 // A stand-in xterm whose download a test holds until it releases it.
 const xterm = vi.hoisted(() => {
   type KeyHandler = (event: KeyboardEvent) => boolean;
+  type DataHandler = (data: string) => void;
   const instances: {
     parent: HTMLElement | null;
     disposed: boolean;
     keyHandler: KeyHandler | null;
+    dataHandler: DataHandler | null;
+    writes: string[];
   }[] = [];
   class FakeTerminal {
     cols = 80;
@@ -24,6 +27,8 @@ const xterm = vi.hoisted(() => {
     parent: HTMLElement | null = null;
     disposed = false;
     keyHandler: KeyHandler | null = null;
+    dataHandler: DataHandler | null = null;
+    writes: string[] = [];
     constructor() {
       instances.push(this);
     }
@@ -34,11 +39,16 @@ const xterm = vi.hoisted(() => {
       this.keyHandler = handler;
     }
     loadAddon() {}
-    write() {}
-    writeln() {}
+    write(text: string) {
+      this.writes.push(text);
+    }
+    writeln(text = "") {
+      this.writes.push(`${text}\n`);
+    }
     clear() {}
     focus() {}
-    onData() {
+    onData(handler: DataHandler) {
+      this.dataHandler = handler;
       return { dispose() {} };
     }
     dispose() {
@@ -80,8 +90,15 @@ vi.mock("@/lib/terminal/terminal-context", () => ({
     setIsDragging: () => {},
   }),
 }));
+// A test that types a command can take its context and hold its result.
+const commands = vi.hoisted(() => ({
+  run: null as null | ((command: string, context: unknown) => Promise<unknown>),
+}));
 vi.mock("@/lib/terminal/commands", () => ({
-  executeCommand: async () => ({ output: "" }),
+  executeCommand: (command: string, context: unknown) =>
+    commands.run
+      ? commands.run(command, context)
+      : Promise.resolve({ output: "" }),
   getCompletions: () => [],
 }));
 vi.mock("@/lib/hooks/useResizableWithHandles", () => ({
@@ -192,5 +209,42 @@ describe("Terminal keys", () => {
     ]) {
       expect(press(init)).toBe(true);
     }
+  });
+});
+
+describe("Terminal commands", () => {
+  afterEach(() => {
+    commands.run = null;
+  });
+
+  it("takes no more output from a command that Ctrl+C cancelled", async () => {
+    // The terminal draws "Command canceled by user" and a new prompt, but
+    // the command could still write: python went on booting and printed
+    // "Downloading CPython..." after that prompt.
+    let writer: ((text: string) => void) | undefined;
+    commands.run = (_command, context) => {
+      writer = (context as { writer?: (text: string) => void }).writer;
+      return new Promise(() => {});
+    };
+    xterm.release();
+    render(<Terminal isOpen onClose={() => {}} />);
+    advance(200);
+    await settle();
+    const term = xterm.instances.at(-1)!;
+    const type = (data: string) =>
+      act(() => {
+        for (const char of data) term.dataHandler!(char);
+      });
+
+    type("python\r");
+    expect(writer).toBeTypeOf("function");
+    act(() => writer!("while running"));
+    expect(term.writes.join("")).toContain("while running");
+
+    type("\u0003");
+    expect(term.writes.join("")).toContain("Command canceled by user");
+    act(() => writer!("after the cancel"));
+
+    expect(term.writes.join("")).not.toContain("after the cancel");
   });
 });

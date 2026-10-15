@@ -146,6 +146,9 @@ export default function RootLayout({
       lang="en"
       className="light enable-animations"
       data-safari="false"
+      // globals.css scrolls smoothly; this keeps Next.js setting that aside
+      // while it moves to a new route, as it did by default until 16.
+      data-scroll-behavior="smooth"
       // The head script below sets the theme class and the browser's
       // attributes before React hydrates, from the visitor's storage and
       // user agent: <html> legitimately differs from what was rendered.

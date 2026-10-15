@@ -6,16 +6,20 @@
  * 3,400 of the 3,590 links in the site's PDFs. Their text is printed under
  * them, in the page's text content, in PDF user space like the link's
  * rectangle. pdf.js merges a printed line into one text item, so each item is
- * split into characters, weighted by their width in the text layer's
- * fallback font, and a character belongs to the link when its centre is in
- * the rectangle; words are kept whole. A bare number ("5", "3.2") gets a type
- * word from the link's target ("cite." gives Reference) or from the word
- * before it ("Fig."): a citation reads "Reference 5", a contents entry reads
- * as printed. Measured against the glyph boxes of all 28 PDFs, the text under
- * a link matches what is printed there for about 98.6% of links.
+ * split into characters, weighted by their width in the PDF core font of the
+ * item's family (Times-Roman, Helvetica or Courier), and a character belongs
+ * to the link when its centre is in the rectangle; words are kept whole. A
+ * bare number ("5", "3.2") gets a type word from the link's target ("cite."
+ * gives Reference) or from the word before it ("Fig."): a citation reads
+ * "Reference 5", a contents entry reads as printed. Measured against the
+ * glyph boxes of all 28 PDFs, the text under a link is exactly what is
+ * printed there for 97.4% of links (3,313 of 3,400).
  *
- * Free of imports, so node can run it as is (the accuracy check does).
+ * Its one import is those fonts' widths, so node can run it with that file
+ * beside it (the accuracy check does).
  */
+
+import { COURIER, HELVETICA, TIMES_ROMAN } from "./pdf-font-widths";
 
 /** A character's width in a font family, in any unit: only ratios count. */
 export type MeasureChar = (char: string, family: string) => number;
@@ -45,41 +49,30 @@ export interface LinkAnnotationData {
   contentsObj?: { str?: string } | null;
 }
 
-let sharedMeasure: MeasureChar | null = null;
+/** A table's mean width over its letters and digits, for what it lacks. */
+function meanWidth(table: Readonly<Record<string, number>>): number {
+  const widths = Object.entries(table)
+    .filter(([char]) => /[\p{L}\p{N}]/u.test(char))
+    .map(([, width]) => width);
+  return widths.reduce((sum, width) => sum + width, 0) / widths.length;
+}
+
+const SERIF = { widths: TIMES_ROMAN, mean: meanWidth(TIMES_ROMAN) };
+const SANS_SERIF = { widths: HELVETICA, mean: meanWidth(HELVETICA) };
 
 /**
- * Character widths in the text layer's fallback fonts ("serif",
- * "sans-serif", "monospace"), measured on a canvas once per character. With
- * no 2D canvas (jsdom), every character weighs the same.
+ * A character's width in the PDF core font of the family pdf.js gives its
+ * text ("serif", "sans-serif" or "monospace"): Times-Roman, Helvetica or
+ * Courier. The same on every system: a canvas, in those generic families,
+ * measured each system's own fonts, and on Linux links read "Section" where
+ * the page prints "Section 4.2". A character the font lacks weighs the
+ * font's mean, and whitespace weighs a space.
  */
-export function canvasMeasure(): MeasureChar {
-  if (sharedMeasure) return sharedMeasure;
-  type Context = { font: string; measureText(text: string): { width: number } };
-  let context: Context | null = null;
-  try {
-    const canvas =
-      typeof OffscreenCanvas === "undefined"
-        ? document.createElement("canvas")
-        : new OffscreenCanvas(1, 1);
-    context = (canvas.getContext("2d") as Context | null) ?? null;
-  } catch {
-    context = null;
-  }
-  const widths = new Map<string, number>();
-  sharedMeasure = (char, family) => {
-    if (!context) return 1;
-    const key = `${family}\u0000${char}`;
-    let width = widths.get(key);
-    if (width === undefined) {
-      context.font = `100px ${family}`;
-      width = context.measureText(char).width;
-      if (!(width > 0)) width = 0;
-      widths.set(key, width);
-    }
-    return width;
-  };
-  return sharedMeasure;
-}
+export const coreFontMeasure: MeasureChar = (char, family) => {
+  if (family === "monospace") return COURIER;
+  const font = family === "serif" ? SERIF : SANS_SERIF;
+  return font.widths[char] ?? (/\s/.test(char) ? font.widths[" "] : font.mean);
+};
 
 /** A link to a place in the same document, the only kind named here. */
 function isInternal(annotation: LinkAnnotationData): boolean {
@@ -506,7 +499,7 @@ function gapBetween(
 export function nameLinks(
   annotations: readonly LinkAnnotationData[],
   text: LinkTextContent,
-  measure: MeasureChar = canvasMeasure(),
+  measure: MeasureChar = coreFontMeasure,
 ): Map<string, string> {
   const names = new Map<string, string>();
   const links = annotations.filter(isInternal);

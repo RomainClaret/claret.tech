@@ -47,6 +47,13 @@ interface TerminalContextType extends TerminalState {
   restore: () => void;
   isDragging: boolean;
   setIsDragging: (value: boolean) => void;
+  /**
+   * Out of sight while a tool it opened covers the page, the research map:
+   * still mounted, its output kept, but neither shown nor in the way of
+   * clicks. Not stored: a reload brings the terminal back as it was.
+   */
+  aside: boolean;
+  setAside: (aside: boolean) => void;
 }
 
 const STORAGE_KEY = "terminal-state";
@@ -207,6 +214,7 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     storedState.currentUser || "guest",
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [aside, setAside] = useState(false);
 
   // Use refs to track if we're already in a resize operation to prevent cascading updates
   const isResizingRef = useRef(false);
@@ -416,6 +424,8 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
     restore,
     isDragging,
     setIsDragging,
+    aside,
+    setAside,
   };
 
   return (

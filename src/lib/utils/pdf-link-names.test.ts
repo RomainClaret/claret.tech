@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { TIMES_ROMAN } from "./pdf-font-widths";
 import {
-  canvasMeasure,
+  coreFontMeasure,
   createLinkNameBook,
   nameLinks,
   type LinkAnnotationData,
@@ -406,10 +407,86 @@ describe("nameLinks", () => {
       ),
     ).toEqual({ "98R": "Reference 5" });
   });
+});
 
-  it("measures with uniform widths where there is no canvas", () => {
-    expect(() => canvasMeasure()("a", "serif")).not.toThrow();
-    expect(canvasMeasure()("a", "serif")).toBeGreaterThanOrEqual(0);
+describe("nameLinks' own widths", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("are the same on every system", async () => {
+    // They were a canvas's, in the generic family pdf.js names ("serif"),
+    // which each system resolves to a font of its own: on Linux, links read
+    // "Section" where the page prints "Section 4.2". Here a canvas measures
+    // every character alike, as a font far from the PDF's would.
+    const alike = { font: "", measureText: () => ({ width: 50 }) };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      alike as unknown as ReturnType<HTMLCanvasElement["getContext"]>,
+    );
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        getContext() {
+          return alike;
+        }
+      },
+    );
+    vi.resetModules();
+    const fresh = await import("./pdf-link-names");
+
+    // Printed in Times at 10 pt, the link over "4.2" alone.
+    const size = 10;
+    const advance = (text: string) =>
+      (Array.from(text).reduce((sum, char) => sum + TIMES_ROMAN[char], 0) *
+        size) /
+      1000;
+    const str =
+      "as will be illustrated in Section 4.2 when we compare MAP-Elites with NEAT";
+    const start = 72 + advance(str.slice(0, str.indexOf("4.2")));
+    const end = start + advance("4.2");
+    const line: LinkTextItem = {
+      str,
+      transform: [size, 0, 0, size, 72, 500],
+      width: advance(str),
+      height: size,
+      fontName: "f1",
+    };
+
+    expect(
+      Object.fromEntries(
+        fresh.nameLinks(
+          [link("7R", [start - 0.3, 498, end + 0.3, 507.5], "subsection.4.2")],
+          { items: [line], styles: { f1: { fontFamily: "serif" } } },
+        ),
+      ),
+    ).toEqual({ "7R": "Section 4.2" });
+  });
+
+  it("are the PDF core fonts' for pdf.js's three families", () => {
+    // Adobe's metrics, in thousandths of an em.
+    expect(coreFontMeasure("m", "serif")).toBe(778);
+    expect(coreFontMeasure("i", "serif")).toBe(278);
+    expect(coreFontMeasure("m", "sans-serif")).toBe(833);
+    expect(coreFontMeasure("i", "sans-serif")).toBe(222);
+    expect(coreFontMeasure("m", "monospace")).toBe(600);
+    expect(coreFontMeasure("i", "monospace")).toBe(600);
+  });
+
+  it("weigh what the fonts lack as a space or as an average character", () => {
+    // A no-break space is a space; a Greek letter weighs the mean of the
+    // font's letters and digits, between its narrowest and widest.
+    expect(coreFontMeasure("\u00a0", "serif")).toBe(
+      coreFontMeasure(" ", "serif"),
+    );
+    const alpha = coreFontMeasure("α", "serif");
+    expect(alpha).toBeGreaterThan(coreFontMeasure("i", "serif"));
+    expect(alpha).toBeLessThan(coreFontMeasure("W", "serif"));
+    // A family pdf.js does not name reads as sans-serif, its default.
+    expect(coreFontMeasure("m", "cursive")).toBe(
+      coreFontMeasure("m", "sans-serif"),
+    );
   });
 });
 

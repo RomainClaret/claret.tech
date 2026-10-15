@@ -23,6 +23,12 @@ interface CertificationTimelineProps {
   className?: string;
 }
 
+// The badges have no backdrop blur: their 3% tint lies over the section's
+// plain background, where blurring changed 45 of 132,804 pixels in Chromium
+// (by 13/255 at most) and none in WebKit. Their 21 filters, with the page's
+// other backdrop filters, held Linux WebKit (Playwright 1.64) at 1 frame a
+// second on the homepage; without them it draws 50.
+
 // Get icon for certification based on name
 const getCertIcon = (name: string) => {
   const lowerName = name.toLowerCase();
@@ -114,7 +120,7 @@ export function CertificationTimeline({
                 <m.div
                   className={cn(
                     "relative px-3 py-2.5 rounded-lg border transition-all duration-300",
-                    "backdrop-blur-sm cursor-default overflow-hidden",
+                    "cursor-default overflow-hidden",
                     "flex items-center gap-2",
                   )}
                   style={{
@@ -207,7 +213,7 @@ export function CertificationTimeline({
                 key={index}
                 className={cn(
                   "relative px-3 py-2.5 rounded-lg border",
-                  "backdrop-blur-sm flex items-center gap-2",
+                  "flex items-center gap-2",
                 )}
                 style={{
                   backgroundColor: `rgba(${color}, 0.03)`,
@@ -256,7 +262,7 @@ export function CertificationTimeline({
                 key={index}
                 className={cn(
                   "relative px-3 py-2.5 rounded-lg border",
-                  "backdrop-blur-sm flex items-center gap-3",
+                  "flex items-center gap-3",
                 )}
                 style={{
                   backgroundColor: `rgba(${color}, 0.03)`,

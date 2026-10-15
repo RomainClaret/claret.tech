@@ -19,6 +19,7 @@ import {
   PerformanceReportUnavailable,
 } from "./performance-unavailable";
 import { ServiceWorkerCleanup } from "./service-worker-cleanup";
+import { ResearchMapRenderer } from "@/components/research-map/research-map-renderer";
 import { ProjectsProvider } from "@/contexts/projects-context";
 import {
   PerformanceMonitorProvider,
@@ -274,6 +275,9 @@ export function AppWrapper({ children }: AppWrapperProps) {
 
           {/* Performance Report Modal - Terminal triggered */}
           <PerformanceReportRenderer />
+
+          {/* The research map, `research` in the terminal. */}
+          <ResearchMapRenderer />
         </ProjectsProvider>
       </PerformanceMonitorProvider>
     </ErrorBoundary>

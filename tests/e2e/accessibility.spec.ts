@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "./utils/fixtures";
 import { acknowledgeCookieNotice } from "./utils/cookie-notice";
+import { waitForSplashToEnd } from "./utils/splash";
 import AxeBuilder from "@axe-core/playwright";
 import {
   waitForScrollCompletion,
@@ -15,17 +16,10 @@ import {
 
 /**
  * The whole page, as a visitor sees it: the splash gone and every section
- * mounted, by scrolling through once, then back at the top. The splash's
- * backdrop is in the HTML and leaves only once the splash shows, so its
- * going, then the progress bar's, cannot pass before the splash mounts.
+ * mounted, by scrolling through once, then back at the top.
  */
 async function showWholePage(page: Page): Promise<void> {
-  await expect(page.locator("[data-splash-backdrop]")).toHaveCount(0, {
-    timeout: 15_000,
-  });
-  await expect(
-    page.getByRole("progressbar", { name: "Loading portfolio" }),
-  ).toHaveCount(0, { timeout: 15_000 });
+  await waitForSplashToEnd(page);
   const height = await page.evaluate(
     () => document.documentElement.scrollHeight,
   );
@@ -55,6 +49,25 @@ function contrastFailures(results: { violations: AxeViolation[] }): string[] {
       ),
     );
 }
+
+/** The theme colours high-contrast.css sets, as Tailwind reads them. */
+const HIGH_CONTRAST_TOKENS = [
+  "background",
+  "foreground",
+  "card",
+  "card-foreground",
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "muted",
+  "muted-foreground",
+  "accent",
+  "accent-foreground",
+  "border",
+  "input",
+  "ring",
+];
 
 type AxeViolation = {
   id: string;
@@ -300,11 +313,42 @@ test.describe("Accessibility", () => {
 
     await page.waitForTimeout(1000); // Wait for mode transition
 
+    // Nothing blurred shows through in high contrast: every panel that
+    // blurs what is behind it is opaque, and keeps its backdrop filter.
+    // Changing a backdrop filter while the pointer is over the page, as
+    // this click does, crashed Linux WebKit's page (Playwright 1.64).
+    // Polled: the fills transition, and Linux WebKit moves a transition
+    // only as it draws frames.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            [...document.querySelectorAll('[class*="backdrop-blur"]')]
+              .filter((element) => {
+                const style = getComputedStyle(element);
+                return (
+                  style.backgroundImage !== "none" ||
+                  style.backgroundColor.startsWith("rgba(")
+                );
+              })
+              .map((element) =>
+                [element.tagName.toLowerCase(), ...element.classList]
+                  .slice(0, 5)
+                  .join("."),
+              ),
+          ),
+        {
+          message: "panels that still show what is behind them",
+          timeout: 10_000,
+        },
+      )
+      .toEqual([]);
+
     // Run axe accessibility tests with more lenient rules for high contrast
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa"])
       .disableRules([
-        "color-contrast", // High contrast mode can cause false positives
+        "color-contrast", // Scanned, page-wide, by the test below
         "color-contrast-enhanced", // Enhanced contrast checks
         "focus-order-semantics", // Can be affected by theme changes
       ])
@@ -344,6 +388,58 @@ test.describe("Accessibility", () => {
 
     expect(seriousViolations.length).toBeLessThanOrEqual(10); // Allow up to 10 serious violations
   });
+
+  // High contrast's colours are the greys high-contrast.css writes, in
+  // both themes. They were RGB triples where the theme reads HSL
+  // (hsl(var(--token))): light high contrast painted the page yellow,
+  // rgb(255, 255, 0), in Chromium and WebKit, and dark high contrast its
+  // text yellow and its accents ochre and brown. And its text has the
+  // contrast the mode is for (WCAG 1.4.3, as on the normal page).
+  for (const theme of ["light", "dark"]) {
+    test(`uses greys in high contrast, with enough contrast, ${theme} theme`, async ({
+      browser,
+    }) => {
+      // A whole-page scroll and scan, as the theme tests do: the dark run
+      // took 20.5 s on macOS under load, past the spec's 20 s local limit.
+      test.slow();
+      const context = await browser.newContext();
+      await acknowledgeCookieNotice(context);
+      await context.addInitScript((value) => {
+        try {
+          localStorage.setItem("theme", value);
+          localStorage.setItem("highContrast", "true");
+        } catch {
+          // Storage blocked: no high contrast, which the test would show.
+        }
+      }, theme);
+      const page = await context.newPage();
+      await page.goto("/");
+      await expect(page.locator("html")).toHaveClass(/\bhigh-contrast\b/);
+
+      const notGrey = await page.evaluate((tokens) => {
+        const probe = document.createElement("div");
+        document.body.appendChild(probe);
+        const found = tokens.flatMap((token) => {
+          probe.style.backgroundColor = `hsl(var(--${token}))`;
+          const colour = getComputedStyle(probe).backgroundColor;
+          const [r, g, b] = (colour.match(/[\d.]+/g) ?? []).map(Number);
+          return colour.startsWith("rgb(") && r === g && g === b
+            ? []
+            : [`${token}: ${colour}`];
+        });
+        probe.remove();
+        return found;
+      }, HIGH_CONTRAST_TOKENS);
+      expect(notGrey, `${theme} theme`).toEqual([]);
+
+      await showWholePage(page);
+      const results = await new AxeBuilder({ page })
+        .withRules(["color-contrast"])
+        .analyze();
+      expect(contrastFailures(results), `${theme} theme`).toEqual([]);
+      await context.close();
+    });
+  }
 
   test("should have proper heading hierarchy", async ({ page }) => {
     await page.goto("/");
@@ -1276,11 +1372,7 @@ test.describe("The cookie notice", () => {
       const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
       await page.setViewportSize(viewport);
       await page.goto("/?playwright=true");
-      const splash = page.getByRole("progressbar", {
-        name: "Loading portfolio",
-      });
-      await expect(splash).toBeVisible();
-      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+      await waitForSplashToEnd(page);
       const notice = page.getByRole("region", {
         name: "Cookies on claret.tech",
       });
@@ -1307,12 +1399,7 @@ test.describe("The cookie notice", () => {
     }) => {
       await page.setViewportSize(viewport);
       await page.goto("/?playwright=true");
-      // Shown, then gone: a count of 0 alone passes before it mounts.
-      const splash = page.getByRole("progressbar", {
-        name: "Loading portfolio",
-      });
-      await expect(splash).toBeVisible();
-      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+      await waitForSplashToEnd(page);
       await expect(
         page.getByRole("button", { name: /Accept cookie notice/ }),
       ).toBeVisible();

@@ -370,33 +370,6 @@ export interface MockMatchMedia extends Mock {
   <T extends string>(query: T): MockMediaQueryList;
 }
 
-// Neural Network graph types for useNeuralNetwork tests
-export interface MockGraphNode {
-  id: string;
-  title: string;
-  authors: string[];
-  year: string;
-  citations?: number;
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
-  influence: number;
-}
-
-export interface MockGraphEdge {
-  source: string;
-  target: string;
-  strength: number;
-  bidirectional: boolean;
-}
-
-export interface MockGraph {
-  nodes: Map<string, MockGraphNode>;
-  edges: MockGraphEdge[];
-  clusters: Map<string, string[]>;
-}
-
 // Window stand-in for browser-detection tests
 export interface MockWindow {
   addEventListener: Mock;

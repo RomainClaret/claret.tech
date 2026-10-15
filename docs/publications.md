@@ -83,3 +83,7 @@ Nothing refreshes automatically. There is no cron.
 ## Fields the APIs never supply
 
 `bibtex`, `shortDescription`, `starred`, `status`, `month`, `arxivVariant`, and the three PDF paths are hand-written. Semantic Scholar and ORCID do not return them, and the merge only overlays non-empty fetched values, so they are safe. `openAccessUrl` is deliberately emitted as `""` by the fetch layer for the same reason. `arxivId` is different: Semantic Scholar does return it, but only on uncurated entries. Both fetch paths drop the fetched copy of a curated paper by title before anything is merged, so a curated paper's `arxivId` is added by hand, in `static-publications.json` and `public/publications.json` alike. On an uncurated entry the arXiv line is not shown unless `arxivVariant` is set, since an uncurated paper, an arXiv-only preprint for one, must not be labelled as published. A curated paper whose title Semantic Scholar spells differently is not matched, and comes back as a separate uncurated duplicate, which the sync test catches.
+
+## The research map
+
+A paper added here is also on the research map (`research` in the terminal) from then on, joined to the others by its code, co-authors and venue. To give it a short label there, or put it in another line of work, see `docs/research-map.md`.

@@ -131,6 +131,63 @@ describe("useModalDialog", () => {
     expect(document.activeElement).toBe(zoomIn);
   });
 
+  it("leaves out controls taken out of the Tab order", () => {
+    // A roving tabindex, as on the research map, keeps one item at 0 and
+    // the rest at -1. The cycle kept every button whatever its tabindex,
+    // so Tab walked through every item.
+    function Roving() {
+      const ref = useModalDialog(true, () => {});
+      return (
+        <div ref={ref} role="dialog" aria-label="Map" tabIndex={-1}>
+          <button type="button">Close</button>
+          <button type="button" tabIndex={-1}>
+            First item
+          </button>
+          <button type="button">Current item</button>
+          <button type="button" tabIndex={-1}>
+            Last item
+          </button>
+          <a href="#read">Read</a>
+        </div>
+      );
+    }
+    render(<Roving />);
+
+    tab();
+    expect(names()).toBe("Close");
+    tab();
+    expect(names()).toBe("Current item");
+    tab();
+    expect(names()).toBe("Read");
+    tab();
+    expect(names()).toBe("Close");
+  });
+
+  it("goes on from what Tab skips, in the page's order", () => {
+    // Focus put on a heading to announce it (tabIndex -1): Tab went back
+    // to the dialog's first control instead of the one after the heading.
+    function Details() {
+      const ref = useModalDialog(true, () => {});
+      return (
+        <div ref={ref} role="dialog" aria-label="Details" tabIndex={-1}>
+          <button type="button">Close</button>
+          <h3 tabIndex={-1}>Title</h3>
+          <button type="button">Read Paper</button>
+          <button type="button">Code</button>
+        </div>
+      );
+    }
+    render(<Details />);
+    const title = screen.getByRole("heading", { name: "Title" });
+
+    title.focus();
+    tab();
+    expect(names()).toBe("Read Paper");
+    title.focus();
+    tab(true);
+    expect(names()).toBe("Close");
+  });
+
   it("brings focus back in from outside the dialog", () => {
     render(<Dialog onClose={() => {}} />);
     (document.activeElement as HTMLElement).blur();
@@ -211,6 +268,43 @@ describe("useModalDialog", () => {
 
     first.unmount();
     expect(document.body.style.overflow).toBe("");
+  });
+
+  it("leaves the keys to the dialog on top, then gives them back", () => {
+    // Every open dialog listened on document, the one beneath first: with
+    // the paper reader open over another dialog, the lower one pulled each
+    // Tab into itself and the reader pulled it back to its first control,
+    // so Tab never got past that control; and an Escape from the page
+    // closed both.
+    const below = vi.fn();
+    const above = vi.fn();
+    function Reader() {
+      const ref = useModalDialog(true, above);
+      return (
+        <div ref={ref} role="dialog" aria-label="Paper" tabIndex={-1}>
+          <button type="button">Zoom in</button>
+          <button type="button">Zoom out</button>
+        </div>
+      );
+    }
+    render(<Dialog onClose={below} />);
+    const reader = render(<Reader />);
+
+    tab();
+    expect(names()).toBe("Zoom in");
+    tab();
+    expect(names()).toBe("Zoom out");
+    tab();
+    expect(names()).toBe("Zoom in");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(above).toHaveBeenCalledTimes(1);
+    expect(below).not.toHaveBeenCalled();
+
+    reader.unmount();
+    tab();
+    expect(names()).toBe("Close");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(below).toHaveBeenCalledTimes(1);
   });
 
   it("returns focus to the opener it is given", () => {

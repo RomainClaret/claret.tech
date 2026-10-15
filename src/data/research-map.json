@@ -1,0 +1,62 @@
+{
+  "owner": "Romain Claret",
+  "lanes": [
+    {
+      "id": "geenns",
+      "label": "GEENNS",
+      "color": "#8b5cf6",
+      "members": ["geenns", "claret2023geenns", "emerging-behaviors"]
+    },
+    {
+      "id": "emr",
+      "label": "EMR-HyperNEAT",
+      "color": "#3b82f6",
+      "repos": [
+        "https://github.com/RomainClaret/emr-hyperneat",
+        "https://github.com/RomainClaret/jax-es-hyperneat"
+      ],
+      "members": ["evolvable-vocabulary"]
+    },
+    {
+      "id": "phd",
+      "label": "PhD thesis",
+      "color": "#0d9488",
+      "members": ["phd-thesis"]
+    },
+    {
+      "id": "es-opt",
+      "label": "ES-HyperNEAT optimization",
+      "color": "#d97706",
+      "repos": [
+        "https://github.com/RomainClaret/es-hyperneat-optimization-studies"
+      ]
+    },
+    {
+      "id": "earlier",
+      "label": "Earlier work",
+      "color": "#64748b",
+      "fallback": true
+    }
+  ],
+  "labels": {
+    "claret2026activations": "Activations",
+    "claret2026emr": "EMR-HyperNEAT",
+    "claret2026bio": "Bio palettes",
+    "claret2026neuromodulation": "Neuromodulation",
+    "claret2026pruner": "Early stopping",
+    "claret2026partitioned": "Partitioned",
+    "claret2024tpe": "TPE study",
+    "claret2026quadtree": "JAX quadtree",
+    "claret2023geenns": "GEENNS poster",
+    "claret2016blockchain": "Blockchain",
+    "karmali2010perceptual": "Vestibular poster",
+    "geenns": "GEENNS",
+    "emerging-behaviors": "Emerging behaviors",
+    "evolvable-vocabulary": "Evolvable vocabulary",
+    "phd-thesis": "PhD thesis",
+    "graphqa": "GraphQA",
+    "overclouds": "Overclouds",
+    "vestibular-integration": "Vestibular integration"
+  },
+  "relations": []
+}

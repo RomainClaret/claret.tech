@@ -119,6 +119,28 @@ function makeBootReporter(write: (text: string) => void) {
   };
 }
 
+/**
+ * Settles when Ctrl+C aborts the command, and never without one. An
+ * interrupted boot is never settled by the client (it leaves a superseded
+ * boot pending), so a command waits on this alongside it, or it would wait
+ * forever.
+ */
+function whenAborted(signal: AbortSignal | undefined): Promise<"aborted"> {
+  return new Promise((resolve) => {
+    if (!signal) return;
+    if (signal.aborted) {
+      resolve("aborted");
+      return;
+    }
+    signal.addEventListener("abort", () => resolve("aborted"), {
+      once: true,
+    });
+  });
+}
+
+/** What a cancelled run hands back; the terminal ignores it. */
+const cancelled = (): CommandResult => ({ output: "", success: false });
+
 export const pythonCommand = async (
   args: string[],
   context: CommandContext,
@@ -159,6 +181,13 @@ export const pythonCommand = async (
     isPythonAborted,
   } = await loadPython();
 
+  // The terminal cancels a command on Ctrl+C by aborting this signal, and
+  // it may already have: loading the interpreter's code takes a while on a
+  // first run. The listener below came too late for that, and the boot and
+  // the program ran anyway, after the terminal's new prompt.
+  const abortSignal = context.abortController?.signal;
+  if (abortSignal?.aborted) return cancelled();
+
   const boot = makeBootReporter(write);
 
   if (invocation.mode === "repl") {
@@ -173,7 +202,16 @@ export const pythonCommand = async (
     try {
       // The REPL cannot predict what will be typed, and packages must be
       // resident before the sandbox hardens, so everything vendored loads now.
-      const info = await client.ensureReady(VENDORED_PACKAGES, boot.report);
+      // Not interrupted on Ctrl+C: nothing runs yet, and tearing the boot
+      // down would only download it again. It finishes unseen (the terminal
+      // takes no more output from a cancelled command), and the command
+      // stops waiting: before, the boot's clear() erased the "^C" lines and
+      // Python took the terminal over.
+      const info = await Promise.race([
+        client.ensureReady(VENDORED_PACKAGES, boot.report),
+        whenAborted(abortSignal),
+      ]);
+      if (info === "aborted") return cancelled();
       boot.clear();
       write(pythonBanner(info.python, info.pyodide));
       if (info.missing.length > 0) {
@@ -211,7 +249,6 @@ export const pythonCommand = async (
   // Ctrl+C has to reach the interpreter. The terminal aborts this controller
   // and redraws the prompt, but without this the worker kept running for the
   // full timeout and went on painting output over the shell.
-  const abortSignal = context.abortController?.signal;
   const onAbort = () => client.interrupt("interrupt");
   abortSignal?.addEventListener("abort", onAbort, { once: true });
 
@@ -220,10 +257,11 @@ export const pythonCommand = async (
     // packages that source imports. Getting this right here matters: asking for
     // a package later forces a respawn, because wheels are unpacked by
     // machinery the sandbox prelude removes.
-    await client.ensureReady(
-      detectRequiredPackages(invocation.code),
-      boot.report,
-    );
+    const booted = await Promise.race([
+      client.ensureReady(detectRequiredPackages(invocation.code), boot.report),
+      whenAborted(abortSignal),
+    ]);
+    if (booted === "aborted") return cancelled();
     boot.clear();
 
     const result = await client.run(invocation.code, {

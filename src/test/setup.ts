@@ -277,11 +277,14 @@ afterEach(() => {
     thresholds: [],
   })) as unknown as typeof IntersectionObserver;
 
-  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  // Its body passed to vi.fn(), not through mockImplementation(): the
+  // mockReset before each test empties the latter, and observe() was gone
+  // inside every test (src/app/test-setup-globals.test.ts).
+  global.ResizeObserver = vi.fn(() => ({
     observe: vi.fn(),
     unobserve: vi.fn(),
     disconnect: vi.fn(),
-  }));
+  })) as unknown as typeof ResizeObserver;
 
   // Re-establish matchMedia mock for framer-motion tests
   if (typeof window !== "undefined") {
@@ -485,12 +488,14 @@ global.IntersectionObserver = vi.fn().mockImplementation((_callback) => ({
   thresholds: [],
 })) as unknown as typeof IntersectionObserver;
 
-// Mock ResizeObserver globally
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
+// Mock ResizeObserver globally. The body goes to vi.fn() itself, as for
+// IntersectionObserver: a mockImplementation() would not survive the
+// mockReset before each test.
+global.ResizeObserver = vi.fn(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
-}));
+})) as unknown as typeof ResizeObserver;
 
 // Mock matchMedia - ensure it's always available
 if (typeof window !== "undefined") {

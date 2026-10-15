@@ -65,9 +65,18 @@ export async function fullScreen(page: Page): Promise<string> {
   // reaching the top ends the walk on its own.
   let unchanged = 0;
   for (let press = 0; press < 12 && unchanged < 2; press++) {
+    const before = await screen(page);
     await page.keyboard.press("Shift+PageUp");
-    await page.waitForTimeout(120);
-    const current = await screen(page);
+    // xterm repaints on its next animation frame, which a slow renderer gives
+    // late: read after a fixed 120 ms, Linux WebKit showed the old screen
+    // twice and the walk stopped at the bottom (3 of 30 runs). So wait for
+    // the change, and count a press as showing nothing only after 1.5 s.
+    let current = before;
+    const deadline = Date.now() + 1500;
+    while (current === before && Date.now() < deadline) {
+      await page.waitForTimeout(50);
+      current = await screen(page);
+    }
     if (chunks.includes(current)) unchanged++;
     else {
       unchanged = 0;

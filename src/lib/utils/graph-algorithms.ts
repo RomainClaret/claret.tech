@@ -1,404 +1,643 @@
-import { Publication } from "@/lib/api/fetch-publications";
-import { ResearchNodeData } from "@/components/ui/research-node";
-import { Paper } from "@/data/sections/papers";
+import type { Publication } from "@/lib/api/fetch-publications";
+import type { Paper } from "@/data/sections/papers";
+import { isDisplayed, type ResearchProject } from "@/data/sections/research";
 
-export interface CitationEdge {
+/**
+ * The research map's graph: the owner's papers and projects as nodes, and
+ * the reasons they belong together as edges. Pure: the dialog builds it
+ * from the section data and src/data/research-map.json, and nothing here
+ * reads the page.
+ *
+ * Every edge says why it exists. A curated relation (extends, companion,
+ * precursor, part of) comes from the map's data file, which the owner
+ * reviews; the others are derived from the data itself: the same code
+ * repository, a co-author other than the owner who is not on every paper
+ * of the group, the same venue, or a project that links the item.
+ */
+
+export type MapNodeKind = "publication" | "other-work" | "project";
+export type RelationKind = "extends" | "companion" | "precursor" | "part-of";
+export type DerivedKind =
+  | "same-repository"
+  | "co-authors"
+  | "same-venue"
+  | "project-link";
+export type ReasonKind = RelationKind | DerivedKind;
+
+export const RELATION_KINDS: readonly RelationKind[] = [
+  "extends",
+  "companion",
+  "precursor",
+  "part-of",
+];
+export const DERIVED_KINDS: readonly DerivedKind[] = [
+  "same-repository",
+  "co-authors",
+  "same-venue",
+  "project-link",
+];
+
+/** Curated kinds that point from one item to another. */
+const DIRECTED: ReadonlySet<ReasonKind> = new Set([
+  "extends",
+  "precursor",
+  "part-of",
+]);
+
+export interface MapLane {
+  id: string;
+  label: string;
+  color: string;
+  repos: string[];
+  members: string[];
+  fallback: boolean;
+}
+
+export interface MapRelation {
+  from: string;
+  to: string;
+  kind: RelationKind;
+  note: string;
+}
+
+export interface MapConfig {
+  owner: string;
+  lanes: MapLane[];
+  labels: Record<string, string>;
+  relations: MapRelation[];
+}
+
+/** A PDF the site's reader opens, named as its card names it. */
+export interface MapDocument {
+  name: string;
+  url: string;
+}
+
+export interface MapLink {
+  label: string;
+  url: string;
+}
+
+export interface MapNode {
+  /** The id the page already uses as a deep link (#id). */
+  id: string;
+  kind: MapNodeKind;
+  title: string;
+  label: string;
+  year: number;
+  /** 1 to 12 when known. */
+  month?: number;
+  /** For work still running: the year it runs to (today). */
+  until?: number;
+  /** Work still running ("2020-Present"). */
+  ongoing?: boolean;
+  lane: string;
+  venue?: string;
+  /** A paper's state when it is not simply published. */
+  status?: "to-appear" | "presented" | "preprint";
+  /** A project's kind of work, such as "PhD Thesis". */
+  subtitle?: string;
+  coAuthors: string[];
+  summary: string;
+  documents: MapDocument[];
+  links: MapLink[];
+  /** Every URL the item names, to match a project's links against. */
+  urls: string[];
+  repos: string[];
+}
+
+export interface EdgeReason {
+  kind: ReasonKind;
+  origin: "curated" | "derived";
+  /** The reason as a sentence: the curated note, or the evidence. */
+  text: string;
+  /** The note, or the evidence alone: a repository, a name, a venue. */
+  detail: string;
+  /** For a directed curated reason: where it points. */
+  from?: string;
+}
+
+export interface MapEdge {
+  id: string;
   source: string;
   target: string;
-  strength: number;
-  bidirectional: boolean;
+  /** Points from source to target (a directed curated reason). */
+  directed: boolean;
+  reasons: EdgeReason[];
 }
 
-export interface CitationGraph {
-  nodes: Map<string, ResearchNodeData>;
-  edges: CitationEdge[];
-  clusters: Map<string, string[]>; // topic -> node ids
+export interface ResearchGraph {
+  lanes: MapLane[];
+  nodes: MapNode[];
+  edges: MapEdge[];
 }
 
-// Research areas and their associated keywords/venues
-const RESEARCH_AREAS = {
-  neuroevolution: {
-    keywords: ["neural", "evolution", "neuroevolution", "evolving", "genetic"],
-    color: "rgb(139, 92, 246)", // Purple
-  },
-  ml: {
-    keywords: [
-      "machine learning",
-      "deep learning",
-      "neural network",
-      "ai",
-      "artificial intelligence",
-    ],
-    color: "rgb(59, 130, 246)", // Blue
-  },
-  nlp: {
-    keywords: [
-      "natural language",
-      "nlp",
-      "text",
-      "language model",
-      "chatbot",
-      "question",
-      "answering",
-    ],
-    color: "rgb(34, 197, 94)", // Green
-  },
-  blockchain: {
-    keywords: [
-      "blockchain",
-      "distributed",
-      "ledger",
-      "decentralized",
-      "crypto",
-    ],
-    color: "rgb(245, 158, 11)", // Amber
-  },
-  neuroscience: {
-    keywords: [
-      "vestibular",
-      "perception",
-      "neuroscience",
-      "brain",
-      "cognitive",
-    ],
-    color: "rgb(236, 72, 153)", // Pink
-  },
-  general: {
-    keywords: [],
-    color: "rgb(107, 114, 128)", // Gray
-  },
-};
+const isString = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0;
+const stringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter(isString) : [];
 
-// Detect research area from publication or paper
-function detectResearchArea(
-  pub: Publication | Paper,
-): keyof typeof RESEARCH_AREAS {
-  const title = pub.title;
-  const abstract =
-    "abstract" in pub ? pub.abstract : "subtitle" in pub ? pub.subtitle : "";
-  const venue = "venue" in pub ? pub.venue : "";
-  const text = `${title} ${abstract || ""} ${venue || ""}`.toLowerCase();
-
-  for (const [area, config] of Object.entries(RESEARCH_AREAS)) {
-    if (area === "general") continue;
-
-    const hasKeyword = config.keywords.some((keyword) =>
-      text.includes(keyword),
+/**
+ * The map's data file, checked. Entries that cannot be used are left out
+ * rather than thrown: the page keeps working, and the data file's own test
+ * fails instead.
+ */
+export function parseMapConfig(raw: unknown): MapConfig {
+  const data = (raw ?? {}) as Record<string, unknown>;
+  const lanes = (Array.isArray(data.lanes) ? data.lanes : [])
+    .map((lane) => lane as Record<string, unknown>)
+    .filter((lane) => isString(lane.id) && isString(lane.label))
+    .map(
+      (lane): MapLane => ({
+        id: lane.id as string,
+        label: lane.label as string,
+        color: isString(lane.color) ? lane.color : "#64748b",
+        repos: stringList(lane.repos),
+        members: stringList(lane.members),
+        fallback: lane.fallback === true,
+      }),
     );
-    if (hasKeyword) {
-      return area as keyof typeof RESEARCH_AREAS;
+  const labels: Record<string, string> = {};
+  if (data.labels && typeof data.labels === "object") {
+    for (const [id, label] of Object.entries(data.labels)) {
+      if (isString(label)) labels[id] = label;
     }
   }
-
-  return "general";
+  const relations = (Array.isArray(data.relations) ? data.relations : [])
+    .map((relation) => relation as Record<string, unknown>)
+    .filter(
+      (relation) =>
+        isString(relation.from) &&
+        isString(relation.to) &&
+        relation.from !== relation.to &&
+        RELATION_KINDS.includes(relation.kind as RelationKind),
+    )
+    .map(
+      (relation): MapRelation => ({
+        from: relation.from as string,
+        to: relation.to as string,
+        kind: relation.kind as RelationKind,
+        note: isString(relation.note) ? relation.note : "",
+      }),
+    );
+  return {
+    owner: isString(data.owner) ? data.owner : "",
+    lanes,
+    labels,
+    relations,
+  };
 }
 
-// Calculate influence score based on citations and connections
-function calculateInfluence(pub: Publication | Paper): number {
-  const citations = "citations" in pub ? pub.citations : 0;
-  const year =
-    "year" in pub
-      ? pub.year
-      : "date" in pub
-        ? pub.date.split(".")[1]
-        : new Date().getFullYear().toString();
+/** "Genetic and Evolutionary Computation Conference (GECCO)" -> "GECCO". */
+export function venueAcronym(venue: string | undefined): string | undefined {
+  if (!venue) return undefined;
+  const match = /\(([A-Z][A-Za-z]*)(?:\s[^)]*)?\)/.exec(venue);
+  return match ? match[1].toUpperCase() : undefined;
+}
 
-  const citationScore = Math.min(1, (citations || 0) / 100);
-  const recencyScore = Math.max(
-    0,
-    1 - (new Date().getFullYear() - parseInt(year)) / 20,
+/** "2026" or "07.2026" -> { year: 2026, month: 7 }. */
+export function parsePaperDate(
+  date: string,
+): { year: number; month?: number } | null {
+  const match = /^(?:(\d{1,2})\.)?(\d{4})$/.exec(date.trim());
+  if (!match) return null;
+  const month = match[1] ? Number(match[1]) : undefined;
+  return {
+    year: Number(match[2]),
+    month: month && month >= 1 && month <= 12 ? month : undefined,
+  };
+}
+
+/** A project's start: researchStart ("2026-07"), else its year ("2020-Present"). */
+export function parseProjectSpan(
+  project: Pick<ResearchProject, "researchStart" | "year">,
+  now: number,
+): { year: number; month?: number; until?: number; ongoing: boolean } | null {
+  const start = /^(\d{4})-(\d{2})$/.exec(project.researchStart ?? "");
+  const range = /^(\d{4})(?:\s*-\s*(\d{4}|Present))?$/i.exec(
+    (project.year ?? "").trim(),
   );
-  const connectionScore = 0.5; // Placeholder - would be calculated from actual connections
-
-  return citationScore * 0.5 + recencyScore * 0.3 + connectionScore * 0.2;
+  if (!start && !range) return null;
+  const year = start ? Number(start[1]) : Number(range![1]);
+  const month = start ? Number(start[2]) : undefined;
+  const end = range?.[2];
+  const ongoing = end !== undefined && /present/i.test(end);
+  const until = !end
+    ? undefined
+    : ongoing
+      ? now
+      : Number(end) > year
+        ? Number(end)
+        : undefined;
+  return { year, month, until, ongoing };
 }
 
-// Create citation graph from publications
-export function createCitationGraph(
-  publications: Publication[],
-  staticPapers: Paper[],
-): CitationGraph {
-  const nodes = new Map<string, ResearchNodeData>();
-  const edges: CitationEdge[] = [];
-  const clusters = new Map<string, string[]>();
+const isRepo = (url: string) =>
+  /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url);
+const normalizeUrl = (url: string) => url.replace(/\/+$/, "");
+const isPdf = (url: string) => /^\/pdfs\/.+\.pdf$/i.test(url);
 
-  // Initialize clusters
-  for (const area of Object.keys(RESEARCH_AREAS)) {
-    clusters.set(area, []);
+/** A shared URL, named for people: a repository, a document or a site. */
+function linkName(url: string): string {
+  if (isRepo(url)) return url.split("/").pop() ?? url;
+  if (isPdf(url)) return documentKind(url);
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
   }
+}
 
-  // Convert publications to nodes
-  publications.forEach((pub) => {
-    const area = detectResearchArea(pub);
-    const influence = calculateInfluence(pub);
+/** What a PDF is, from its file name. */
+function documentKind(url: string): string {
+  const name = url.toLowerCase();
+  if (name.includes("poster")) return "poster";
+  if (name.includes("presentation") || name.includes("slides")) return "slides";
+  if (name.includes("thesis")) return "thesis";
+  return "paper";
+}
 
-    const node: ResearchNodeData = {
-      ...pub,
-      x: 0, // Will be set by layout algorithm
-      y: 0,
-      radius: 20 + influence * 30,
-      color: RESEARCH_AREAS[area].color,
-      influence,
-    };
+function shortLabel(config: MapConfig, id: string, title: string): string {
+  if (config.labels[id]) return config.labels[id];
+  const words = title.split(/\s+/).slice(0, 3).join(" ");
+  return words.length > 24 ? `${words.slice(0, 23)}...` : words;
+}
 
-    nodes.set(pub.id, node);
-    clusters.get(area)?.push(pub.id);
-  });
+function itemDocuments(item: {
+  paperPdf?: string;
+  posterPdf?: string;
+  presentationPdf?: string;
+}): MapDocument[] {
+  const documents: MapDocument[] = [];
+  // The chips' own words on the cards.
+  if (item.paperPdf) documents.push({ name: "Read Paper", url: item.paperPdf });
+  if (item.posterPdf) {
+    documents.push({ name: "Read Poster", url: item.posterPdf });
+  }
+  if (item.presentationPdf) {
+    documents.push({ name: "Read Presentation", url: item.presentationPdf });
+  }
+  return documents;
+}
 
-  // Convert static papers to nodes
-  staticPapers.forEach((paper, index) => {
-    const area = detectResearchArea(paper);
-    const influence = calculateInfluence(paper);
-    const id = `static-${index}`;
+function publicationNode(pub: Publication, config: MapConfig): MapNode {
+  const links: MapLink[] = [];
+  if (pub.doi) links.push({ label: "DOI", url: `https://doi.org/${pub.doi}` });
+  if (pub.arxivId) {
+    links.push({ label: "arXiv", url: `https://arxiv.org/abs/${pub.arxivId}` });
+  }
+  if (pub.codeUrl) links.push({ label: "Code", url: pub.codeUrl });
+  if (pub.videoUrl) links.push({ label: "Video", url: pub.videoUrl });
+  const documents = itemDocuments(pub);
+  const urls = [
+    ...links.map((link) => link.url),
+    ...documents.map((document) => document.url),
+  ].map(normalizeUrl);
+  return {
+    id: pub.id,
+    kind: "publication",
+    title: pub.title,
+    label: shortLabel(config, pub.id, pub.title),
+    year: Number(pub.year),
+    month: pub.month,
+    lane: "",
+    venue: pub.venue,
+    status: pub.status,
+    coAuthors: pub.authors.filter((author) => author !== config.owner),
+    summary: pub.shortDescription ?? "",
+    documents,
+    links,
+    urls,
+    repos: pub.codeUrl ? [normalizeUrl(pub.codeUrl)] : [],
+  };
+}
 
-    // Convert Paper to Publication-like structure
-    const node: ResearchNodeData = {
-      id,
-      title: paper.title,
-      authors: [], // Papers don't have authors array
-      year: paper.date.split(".")[1] || new Date().getFullYear().toString(),
-      venue: undefined,
-      citations: 0,
-      abstract: paper.subtitle,
-      pdfUrl: paper.footerLink.find((link) => link.name === "Paper")?.url,
-      source: "static" as const,
-      x: 0, // Will be set by layout algorithm
-      y: 0,
-      radius: 20 + influence * 30,
-      color: RESEARCH_AREAS[area].color,
-      influence,
-    };
+function paperNode(paper: Paper, config: MapConfig): MapNode | null {
+  const date = parsePaperDate(paper.date);
+  if (!paper.anchorId || !date) return null;
+  const links: MapLink[] = paper.footerLink
+    .filter((link) => isString(link.url) && !isPdf(link.url))
+    .map((link) => ({
+      // A card may call its arXiv page "Paper", next to its "Read Paper".
+      label: link.url.includes("arxiv.org/") ? "arXiv" : link.name,
+      url: link.url,
+    }));
+  if (paper.arxivId && !links.some((link) => link.url.includes("arxiv.org"))) {
+    links.push({
+      label: "arXiv",
+      url: `https://arxiv.org/abs/${paper.arxivId}`,
+    });
+  }
+  if (paper.videoUrl) links.push({ label: "Video", url: paper.videoUrl });
+  const documents = itemDocuments(paper);
+  const urls = [
+    ...links.map((link) => link.url),
+    ...documents.map((document) => document.url),
+  ].map(normalizeUrl);
+  return {
+    id: paper.anchorId,
+    kind: "other-work",
+    title: paper.title,
+    label: shortLabel(config, paper.anchorId, paper.title),
+    year: date.year,
+    month: date.month,
+    lane: "",
+    status: paper.status,
+    coAuthors: (paper.authors ?? []).filter(
+      (author) => author !== config.owner,
+    ),
+    summary: paper.shortDescription ?? paper.subtitle,
+    documents,
+    links,
+    urls,
+    repos: links.map((link) => normalizeUrl(link.url)).filter(isRepo),
+  };
+}
 
-    nodes.set(id, node);
-    clusters.get(area)?.push(id);
-  });
+function projectNode(
+  project: ResearchProject,
+  config: MapConfig,
+  now: number,
+): MapNode | null {
+  const span = parseProjectSpan(project, now);
+  if (!project.anchorId || !span) return null;
+  const all = (project.links ?? []).filter((link) => isString(link.url));
+  const documents: MapDocument[] = all
+    .filter((link) => isPdf(link.url))
+    .map((link) => ({ name: link.name, url: link.url }));
+  const links: MapLink[] = all
+    .filter((link) => !isPdf(link.url))
+    .map((link) => ({ label: link.name, url: link.url }));
+  return {
+    id: project.anchorId,
+    kind: "project",
+    title: project.title,
+    label: shortLabel(config, project.anchorId, project.title),
+    year: span.year,
+    month: span.month,
+    until: span.until,
+    ongoing: span.ongoing,
+    lane: "",
+    subtitle: project.subtitle,
+    coAuthors: [],
+    summary: project.shortDescription ?? "",
+    documents,
+    links,
+    urls: all.map((link) => normalizeUrl(link.url)),
+    repos: links.map((link) => normalizeUrl(link.url)).filter(isRepo),
+  };
+}
 
-  // Create edges based on various heuristics
-  const nodeArray = Array.from(nodes.values());
+/** Earlier first: year, then month (unknown months first), then id. */
+export function byTime(a: MapNode, b: MapNode): number {
+  return (
+    a.year - b.year ||
+    (a.month ?? 0) - (b.month ?? 0) ||
+    a.id.localeCompare(b.id)
+  );
+}
 
-  for (let i = 0; i < nodeArray.length; i++) {
-    const node1 = nodeArray[i];
+function assignLane(node: MapNode, lanes: MapLane[]): string {
+  const member = lanes.find((lane) => lane.members.includes(node.id));
+  if (member) return member.id;
+  const byRepo = lanes.find((lane) =>
+    lane.repos.some((repo) => node.repos.includes(normalizeUrl(repo))),
+  );
+  if (byRepo) return byRepo.id;
+  return (
+    (lanes.find((lane) => lane.fallback) ?? lanes[lanes.length - 1])?.id ?? ""
+  );
+}
 
-    for (let j = i + 1; j < nodeArray.length; j++) {
-      const node2 = nodeArray[j];
+const pairId = (a: string, b: string) => (a < b ? `${a}--${b}` : `${b}--${a}`);
 
-      // Connect papers by same authors
-      const sharedAuthors = node1.authors.filter((a1) =>
-        node2.authors.some(
-          (a2) =>
-            a1
-              .toLowerCase()
-              .includes(a2.split(" ").pop()?.toLowerCase() || "") ||
-            a2.toLowerCase().includes(a1.split(" ").pop()?.toLowerCase() || ""),
-        ),
-      );
+/**
+ * Members of a group joined one after the next, in time: a group of five
+ * draws four links, not ten.
+ */
+function chain(nodes: MapNode[]): [MapNode, MapNode][] {
+  const ordered = [...nodes].sort(byTime);
+  const pairs: [MapNode, MapNode][] = [];
+  for (let i = 1; i < ordered.length; i++) {
+    pairs.push([ordered[i - 1], ordered[i]]);
+  }
+  return pairs;
+}
 
-      if (sharedAuthors.length > 0) {
-        edges.push({
-          source: node1.id,
-          target: node2.id,
-          strength: Math.min(1, sharedAuthors.length / 3),
-          bidirectional: true,
-        });
-        continue;
-      }
-
-      // Connect papers in same venue
-      if (node1.venue && node2.venue && node1.venue === node2.venue) {
-        edges.push({
-          source: node1.id,
-          target: node2.id,
-          strength: 0.3,
-          bidirectional: true,
-        });
-        continue;
-      }
-
-      // Connect papers with similar topics (simplified)
-      const area1 = detectResearchArea(node1);
-      const area2 = detectResearchArea(node2);
-      if (area1 === area2 && area1 !== "general") {
-        edges.push({
-          source: node1.id,
-          target: node2.id,
-          strength: 0.2,
-          bidirectional: true,
-        });
-      }
+/**
+ * Co-authors who tell items apart. Within each group of items joined by
+ * shared co-authors, someone on every item says nothing about which of them
+ * belong together when others are on only some: on the owner's
+ * neuroevolution papers, the two co-authors on all eight drop out and the
+ * ones on some of them stay. A group with no such author, two items with
+ * the same two co-authors say, keeps them all: they are what joins it.
+ */
+function distinctiveCoAuthors(items: MapNode[]): Map<string, MapNode[]> {
+  const byAuthor = new Map<string, MapNode[]>();
+  for (const item of items) {
+    for (const author of item.coAuthors) {
+      byAuthor.set(author, [...(byAuthor.get(author) ?? []), item]);
     }
   }
-
-  return { nodes, edges, clusters };
+  // Groups: items joined by any shared co-author (union-find over ids).
+  const parent = new Map<string, string>(
+    items.map((item) => [item.id, item.id]),
+  );
+  const find = (id: string): string => {
+    let root = id;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    return root;
+  };
+  for (const group of byAuthor.values()) {
+    for (let i = 1; i < group.length; i++) {
+      parent.set(find(group[i].id), find(group[0].id));
+    }
+  }
+  const groupSize = new Map<string, number>();
+  for (const item of items) {
+    const root = find(item.id);
+    groupSize.set(root, (groupSize.get(root) ?? 0) + 1);
+  }
+  const shared = [...byAuthor].filter(([, group]) => group.length > 1);
+  const onEvery = ([, group]: [string, MapNode[]]) =>
+    group.length === groupSize.get(find(group[0].id));
+  // The groups where someone is on only some of the items.
+  const structured = new Set(
+    shared
+      .filter((entry) => !onEvery(entry))
+      .map(([, group]) => find(group[0].id)),
+  );
+  return new Map(
+    shared.filter(
+      (entry) => !onEvery(entry) || !structured.has(find(entry[1][0].id)),
+    ),
+  );
 }
 
-// Force-directed layout algorithm
-export function forceDirectedLayout(
-  graph: CitationGraph,
-  width: number,
-  height: number,
-  iterations: number = 100,
-): CitationGraph {
-  const nodes = Array.from(graph.nodes.values());
-  const nodeMap = graph.nodes;
+/**
+ * The graph for the map: nodes from the section data, lanes from the data
+ * file, edges from the curated relations and the derived links.
+ */
+export function buildResearchGraph({
+  publications,
+  papers,
+  projects,
+  config,
+  now,
+}: {
+  publications: Publication[];
+  papers: Paper[];
+  projects: ResearchProject[];
+  config: MapConfig;
+  now: number;
+}): ResearchGraph {
+  const nodes: MapNode[] = [];
+  const seen = new Set<string>();
+  const add = (node: MapNode | null) => {
+    if (!node || seen.has(node.id) || !Number.isFinite(node.year)) return;
+    seen.add(node.id);
+    nodes.push(node);
+  };
+  for (const pub of publications) add(publicationNode(pub, config));
+  for (const paper of papers) add(paperNode(paper, config));
+  for (const project of projects.filter(isDisplayed)) {
+    add(projectNode(project, config, now));
+  }
+  for (const node of nodes) node.lane = assignLane(node, config.lanes);
 
-  // Initialize random positions
-  nodes.forEach((node) => {
-    node.x = Math.random() * width;
-    node.y = Math.random() * height;
-  });
+  const edges = new Map<string, MapEdge>();
+  const addReason = (a: MapNode, b: MapNode, reason: EdgeReason) => {
+    const id = pairId(a.id, b.id);
+    const edge = edges.get(id) ?? {
+      id,
+      source: a.id,
+      target: b.id,
+      directed: false,
+      reasons: [],
+    };
+    if (
+      !edge.reasons.some(
+        (r) => r.kind === reason.kind && r.text === reason.text,
+      )
+    ) {
+      edge.reasons.push(reason);
+    }
+    if (reason.from && DIRECTED.has(reason.kind) && !edge.directed) {
+      edge.directed = true;
+      edge.source = reason.from;
+      edge.target = reason.from === a.id ? b.id : a.id;
+    }
+    edges.set(id, edge);
+  };
+  const byId = new Map(nodes.map((node) => [node.id, node]));
 
-  // Force simulation parameters
-  const repulsionStrength = 5000;
-  const attractionStrength = 0.1;
-  const centerStrength = 0.01;
-  const damping = 0.85;
-
-  // Run simulation
-  for (let iter = 0; iter < iterations; iter++) {
-    // Apply forces to each node
-    nodes.forEach((node) => {
-      let fx = 0;
-      let fy = 0;
-
-      // Center attraction
-      fx += (width / 2 - node.x) * centerStrength;
-      fy += (height / 2 - node.y) * centerStrength;
-
-      // Repulsion from other nodes
-      nodes.forEach((other) => {
-        if (node.id === other.id) return;
-
-        const dx = node.x - other.x;
-        const dy = node.y - other.y;
-        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        const force = repulsionStrength / (distance * distance);
-        fx += (dx / distance) * force;
-        fy += (dy / distance) * force;
-      });
-
-      // Attraction along edges
-      graph.edges.forEach((edge) => {
-        if (edge.source !== node.id && edge.target !== node.id) return;
-
-        const otherId = edge.source === node.id ? edge.target : edge.source;
-        const other = nodeMap.get(otherId);
-        if (!other) return;
-
-        const dx = other.x - node.x;
-        const dy = other.y - node.y;
-        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        const force = distance * attractionStrength * edge.strength;
-        fx += (dx / distance) * force;
-        fy += (dy / distance) * force;
-      });
-
-      // Cluster cohesion
-      const nodeCluster = Array.from(graph.clusters.entries()).find(
-        ([_, ids]) => ids.includes(node.id),
-      );
-
-      if (nodeCluster) {
-        const [, clusterNodes] = nodeCluster;
-        let clusterCenterX = 0;
-        let clusterCenterY = 0;
-        let count = 0;
-
-        clusterNodes.forEach((id) => {
-          const clusterNode = nodeMap.get(id);
-          if (clusterNode && clusterNode.id !== node.id) {
-            clusterCenterX += clusterNode.x;
-            clusterCenterY += clusterNode.y;
-            count++;
-          }
-        });
-
-        if (count > 0) {
-          clusterCenterX /= count;
-          clusterCenterY /= count;
-
-          fx += (clusterCenterX - node.x) * 0.05;
-          fy += (clusterCenterY - node.y) * 0.05;
-        }
-      }
-
-      // Apply forces with damping
-      node.x += fx * damping;
-      node.y += fy * damping;
-
-      // Keep within bounds
-      node.x = Math.max(50, Math.min(width - 50, node.x));
-      node.y = Math.max(50, Math.min(height - 50, node.y));
+  // Curated first, so their direction and kind lead.
+  for (const relation of config.relations) {
+    const from = byId.get(relation.from);
+    const to = byId.get(relation.to);
+    if (!from || !to) continue;
+    addReason(from, to, {
+      kind: relation.kind,
+      origin: "curated",
+      text: relation.note,
+      detail: relation.note,
+      from: DIRECTED.has(relation.kind) ? from.id : undefined,
     });
   }
 
-  // Update the node positions in the graph
-  nodes.forEach((node) => {
-    nodeMap.set(node.id, node);
-  });
+  const items = nodes.filter((node) => node.kind !== "project");
 
-  return graph;
-}
-
-// Filter graph based on criteria
-export function filterGraph(
-  graph: CitationGraph,
-  filters: {
-    yearRange: [number, number];
-    minCitations: number;
-    searchQuery: string;
-    showTheses: boolean;
-    showPapers: boolean;
-    showPosters: boolean;
-  },
-): CitationGraph {
-  const filteredNodes = new Map<string, ResearchNodeData>();
-  const filteredEdges: CitationEdge[] = [];
-  const filteredClusters = new Map<string, string[]>();
-
-  // Filter nodes
-  graph.nodes.forEach((node, id) => {
-    const year = parseInt(node.year);
-    const citations = node.citations || 0;
-    const title = node.title.toLowerCase();
-    const isThesis = title.includes("thesis");
-    const isPoster = title.includes("poster");
-    const isPaper = !isThesis && !isPoster;
-
-    // Check filters
-    if (year < filters.yearRange[0] || year > filters.yearRange[1]) return;
-    if (citations < filters.minCitations) return;
-    if (
-      filters.searchQuery &&
-      !title.includes(filters.searchQuery.toLowerCase())
-    )
-      return;
-    if (isThesis && !filters.showTheses) return;
-    if (isPaper && !filters.showPapers) return;
-    if (isPoster && !filters.showPosters) return;
-
-    filteredNodes.set(id, node);
-  });
-
-  // Filter edges
-  graph.edges.forEach((edge) => {
-    if (filteredNodes.has(edge.source) && filteredNodes.has(edge.target)) {
-      filteredEdges.push(edge);
+  const byRepo = new Map<string, MapNode[]>();
+  for (const item of items) {
+    for (const repo of item.repos) {
+      byRepo.set(repo, [...(byRepo.get(repo) ?? []), item]);
     }
-  });
-
-  // Filter clusters
-  graph.clusters.forEach((nodeIds, area) => {
-    const filtered = nodeIds.filter((id) => filteredNodes.has(id));
-    if (filtered.length > 0) {
-      filteredClusters.set(area, filtered);
+  }
+  for (const [repo, group] of byRepo) {
+    const name = repo.split("/").pop() ?? repo;
+    for (const [a, b] of chain(group)) {
+      addReason(a, b, {
+        kind: "same-repository",
+        origin: "derived",
+        text: `Same code repository: ${name}`,
+        detail: name,
+      });
     }
-  });
+  }
+
+  for (const [author, group] of distinctiveCoAuthors(items)) {
+    for (const [a, b] of chain(group)) {
+      addReason(a, b, {
+        kind: "co-authors",
+        origin: "derived",
+        text: `Co-author: ${author}`,
+        detail: author,
+      });
+    }
+  }
+
+  const byVenue = new Map<string, MapNode[]>();
+  for (const item of items) {
+    const acronym = venueAcronym(item.venue);
+    if (acronym) byVenue.set(acronym, [...(byVenue.get(acronym) ?? []), item]);
+  }
+  for (const [acronym, group] of byVenue) {
+    for (const [a, b] of chain(group)) {
+      addReason(a, b, {
+        kind: "same-venue",
+        origin: "derived",
+        text: `Same venue: ${acronym}`,
+        detail: acronym,
+      });
+    }
+  }
+
+  for (const project of nodes.filter((node) => node.kind === "project")) {
+    for (const item of items) {
+      const shared = item.urls.filter((url) => project.urls.includes(url));
+      if (shared.length === 0) continue;
+      addReason(project, item, {
+        kind: "project-link",
+        origin: "derived",
+        text: `Linked from the ${project.label} card: ${shared.map(linkName).join(", ")}`,
+        detail: shared.map(linkName).join(", "),
+      });
+    }
+  }
 
   return {
-    nodes: filteredNodes,
-    edges: filteredEdges,
-    clusters: filteredClusters,
+    lanes: config.lanes,
+    nodes: nodes.sort(byTime),
+    edges: [...edges.values()].sort((a, b) => a.id.localeCompare(b.id)),
+  };
+}
+
+/**
+ * The graph with only the chosen lanes and link kinds. An edge keeps the
+ * reasons of the chosen kinds and goes when none is left.
+ */
+export function filterGraph(
+  graph: ResearchGraph,
+  { lanes, kinds }: { lanes?: string[]; kinds?: ReasonKind[] },
+): ResearchGraph {
+  const laneSet = lanes ? new Set(lanes) : null;
+  const kindSet = kinds ? new Set(kinds) : null;
+  const nodes = graph.nodes.filter(
+    (node) => !laneSet || laneSet.has(node.lane),
+  );
+  const kept = new Set(nodes.map((node) => node.id));
+  const edges = graph.edges
+    .filter((edge) => kept.has(edge.source) && kept.has(edge.target))
+    .map((edge) => ({
+      ...edge,
+      reasons: edge.reasons.filter(
+        (reason) => !kindSet || kindSet.has(reason.kind),
+      ),
+    }))
+    .filter((edge) => edge.reasons.length > 0);
+  return {
+    lanes: graph.lanes.filter((lane) => !laneSet || laneSet.has(lane.id)),
+    nodes,
+    edges,
   };
 }

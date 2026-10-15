@@ -381,9 +381,13 @@ describe("PerformanceMonitorContext", () => {
 
       expect(result.current.isGeneratingReport).toBe(true);
       expect(result.current.isReportModalOpen).toBe(true);
-      expect(global.window.dispatchEvent).toHaveBeenCalledWith(
-        new CustomEvent("terminal-generate-performance-report"),
-      );
+      // By type: toHaveBeenCalledWith(new CustomEvent(x)) matches any
+      // CustomEvent at all.
+      expect(
+        vi
+          .mocked(global.window.dispatchEvent)
+          .mock.calls.map(([event]) => event.type),
+      ).toContain("terminal-generate-performance-report");
     });
 
     it("shows report modal", () => {

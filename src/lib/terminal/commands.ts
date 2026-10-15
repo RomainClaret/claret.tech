@@ -93,6 +93,7 @@ export const commands: Record<string, CommandFunction> = {
 
     const websiteCommands = [
       { cmd: "goto <section>", desc: "Navigate to any website section" },
+      { cmd: "research [close]", desc: "Open the research map" },
       { cmd: "resume", desc: "Display resume/CV information" },
       { cmd: "contact", desc: "Show contact information" },
       { cmd: "email", desc: "Copy email to clipboard" },
@@ -385,6 +386,43 @@ ${formatCommands(aiCommands)}
           }),
         );
         return { output: "Performance dashboard opened", success: true };
+    }
+  },
+
+  research: (args) => {
+    const action = args[0]?.toLowerCase();
+    switch (action) {
+      case undefined:
+      case "":
+      case "open": {
+        // A token and a time, as the performance dashboard's: the map only
+        // opens for a fresh one (ResearchMapRenderer).
+        const token = Math.random().toString(36).substring(2, 15);
+        window.dispatchEvent(
+          new CustomEvent("terminal-research-map", {
+            detail: { token, timestamp: Date.now() },
+          }),
+        );
+        return { output: "Research map opened", success: true };
+      }
+      case "close":
+        window.dispatchEvent(new CustomEvent("terminal-research-close"));
+        return { output: "Research map closed", success: true };
+      case "help":
+        return {
+          output: [
+            "Research Map Commands:",
+            "  research          Open the map: papers and projects by line of work, over time",
+            "  research close    Close the map",
+            "  research help     Show this help",
+          ].join("\n"),
+          success: true,
+        };
+      default:
+        return {
+          output: `Unknown action: ${action}\nUse 'research help' to see the actions`,
+          success: false,
+        };
     }
   },
 
@@ -1243,6 +1281,35 @@ ${formatCommands(aiCommands)}
         "    performance report      Generate performance report",
       ],
 
+      research: [
+        "\x1b[1mNAME\x1b[0m",
+        "    research - open the research map",
+        "",
+        "\x1b[1mSYNOPSIS\x1b[0m",
+        "    research [ACTION]",
+        "",
+        "\x1b[1mDESCRIPTION\x1b[0m",
+        "    Open the research map: the papers and research projects on this",
+        "    site, one line of work per row, time running left to right. A line",
+        "    joins two items and says why: shared code, co-authors, a venue, or",
+        "    a research card that links them. Each item opens its details, its",
+        "    PDFs and its card on the page. The terminal steps aside while the",
+        "    map is open and comes back when it closes.",
+        "",
+        "\x1b[1mACTIONS\x1b[0m",
+        "    (none), open    Open the map",
+        "    close           Close the map",
+        "    help            List these actions",
+        "",
+        "\x1b[1mKEYS\x1b[0m",
+        "    Arrow keys      Move between items on the map",
+        "    Enter, Space    Show an item's details",
+        "    Escape          Close the map",
+        "",
+        "\x1b[1mEXAMPLE\x1b[0m",
+        "    research",
+      ],
+
       socialmedia: [
         "\x1b[1mNAME\x1b[0m",
         "    socialmedia - display social media commands",
@@ -1701,6 +1768,13 @@ export function getCompletions(
     return subcommands.filter((sub) => sub.startsWith(partial)).sort();
   }
 
+  // Research map command completion
+  if (command === "research") {
+    const subcommands = ["open", "close", "help"];
+    const partial = parts[1]?.toLowerCase() || "";
+    return subcommands.filter((sub) => sub.startsWith(partial)).sort();
+  }
+
   // AI command completion
   if (command === "ai") {
     const subcommands = [
@@ -1728,6 +1802,7 @@ export function getCompletions(
       "clear",
       "fps",
       "performance",
+      "research",
       "echo",
       "whoami",
       "date",
