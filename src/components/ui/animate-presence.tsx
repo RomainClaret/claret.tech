@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Children,
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Children } from "react";
 
 interface AnimatePresenceProps {
   children: React.ReactNode;
@@ -15,40 +8,15 @@ interface AnimatePresenceProps {
 }
 
 /**
- * Simplified AnimatePresence replacement that handles exit animations
- * using CSS transitions instead of framer-motion
+ * The site's stand-in for framer-motion's AnimatePresence, without its exit
+ * animations: children show and leave in the commit that adds or removes
+ * them. In "wait" mode only the first child shows. (It copied them into
+ * state after each commit, one commit late.)
  */
 export function AnimatePresence({
   children,
   mode = "sync",
 }: AnimatePresenceProps) {
-  const [visibleChildren, setVisibleChildren] = useState<React.ReactNode[]>([]);
-  const childrenRef = useRef<React.ReactNode[]>([]);
-
-  useEffect(() => {
-    const currentChildren = Children.toArray(children);
-
-    // For 'wait' mode, only show one child at a time
-    if (mode === "wait" && currentChildren.length > 0) {
-      setVisibleChildren([currentChildren[0]]);
-    } else {
-      setVisibleChildren(currentChildren);
-    }
-
-    childrenRef.current = currentChildren;
-  }, [children, mode]);
-
-  return (
-    <>
-      {visibleChildren.map((child) => {
-        if (!isValidElement(child)) return child;
-
-        // Clone the child and add exit animation class when needed
-        return cloneElement(child, {
-          key: child.key,
-          ...child.props,
-        });
-      })}
-    </>
-  );
+  const current = Children.toArray(children);
+  return <>{mode === "wait" ? current.slice(0, 1) : current}</>;
 }

@@ -1,11 +1,3 @@
-// Miscellaneous configuration data
-export const isHireable = false;
-
-export const openSource = {
-  display: true,
-  showGithubProfile: true,
-};
-
 export const terminalConfig = {
   enabled: true,
   welcomeMessages: [

@@ -36,23 +36,3 @@ export function getBlurDataURL(): string {
 
   return `data:image/svg+xml;base64,${toBase64(shimmer(700, 475))}`;
 }
-
-/**
- * Image optimization config for Next/Image
- */
-export const imageOptimizationConfig = {
-  quality: 85,
-  formats: ["image/avif", "image/webp"] as const,
-  minimumCacheTTL: 31536000, // 1 year
-};
-
-/**
- * Common image sizes for responsive loading
- */
-export const imageSizes = {
-  thumbnail: { width: 150, height: 150 },
-  small: { width: 320, height: 240 },
-  medium: { width: 640, height: 480 },
-  large: { width: 1024, height: 768 },
-  full: { width: 1920, height: 1080 },
-};

@@ -1,0 +1,34 @@
+// knip reports files no import reaches, exports nothing imports, and
+// dependencies nothing uses (`npm run knip`; CI's quick checks run it).
+// Exports used inside their own file are not reported: round 14 kept them.
+{
+  "entry": [
+    // Run by npm scripts, CI or by hand, outside the import graph.
+    "scripts/**/*.{js,mjs,cjs}",
+    ".github/scripts/**/*.mjs",
+    // Loaded by URL at runtime: the service worker, the Python and CPU
+    // benchmark workers, the animated favicon. Pyodide's files are copied
+    // in by the postinstall.
+    "public/**/*.js",
+    "!public/pyodide/**",
+    // The tests.
+    "src/**/*.test.{ts,tsx}",
+    "src/test/{setup,polyfills}.ts",
+    "tests/e2e/**/*.spec.ts",
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,css}",
+    "tests/**/*.ts",
+    "scripts/**/*.{js,mjs,cjs}",
+    ".github/scripts/**/*.mjs",
+  ],
+  "ignoreDependencies": [
+    // Copied out of node_modules by path in the postinstall
+    // (scripts/setup-assets.js): pdf.js's worker and Pyodide's runtime.
+    "pdfjs-dist",
+    "pyodide",
+    // Reached through next.config.mjs's alias to its light build.
+    "lottie-web",
+  ],
+  "ignoreExportsUsedInFile": true,
+}

@@ -22,13 +22,16 @@ export function NeuralSignal({
   onComplete,
   className,
 }: NeuralSignalProps) {
-  const [pathLength, setPathLength] = useState(0);
-  // When the particles' SMIL animations start, on their SVG's own clock.
-  // A begin offset counts from that SVG's start, not from the moment the
-  // element is inserted: added to a grid that had been running for seconds,
-  // "0s" was long past, so every particle was frozen at the end of the path,
-  // fully opaque, instead of travelling along it.
-  const [particleStart, setParticleStart] = useState(0);
+  // The path's length, and when the particles' SMIL animations start, on
+  // their SVG's own clock, both measured from the mounted group. A begin
+  // offset counts from that SVG's start, not from the moment the element is
+  // inserted: added to a grid that had been running for seconds, "0s" was
+  // long past, so every particle was frozen at the end of the path, fully
+  // opaque, instead of travelling along it.
+  const [{ length: pathLength, start: particleStart }, setMeasured] = useState({
+    length: 0,
+    start: 0,
+  });
   const groupRef = useRef<SVGGElement>(null);
   const [uniqueId] = useState(
     () => `signal-${Math.random().toString(36).substr(2, 9)}`,
@@ -38,20 +41,22 @@ export function NeuralSignal({
   const config = getConfig(NEURAL_SIGNAL_PROFILE);
 
   useEffect(() => {
-    // Calculate path length for animation
+    // Measured even with animations off (no group mounted yet), so the
+    // particles can draw as soon as they are switched on.
+    const group = groupRef.current;
     const tempPath = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "path",
     );
     tempPath.setAttribute("d", path);
-    const length = tempPath.getTotalLength();
-    setPathLength(length);
     // Read with the length: the particles render on the next commit, a frame
     // from now, so they start that much into their animation at most.
-    const svg = groupRef.current?.ownerSVGElement;
-    setParticleStart(
-      typeof svg?.getCurrentTime === "function" ? svg.getCurrentTime() : 0,
-    );
+    const svg = group?.ownerSVGElement;
+    setMeasured({
+      length: tempPath.getTotalLength(),
+      start:
+        typeof svg?.getCurrentTime === "function" ? svg.getCurrentTime() : 0,
+    });
   }, [path]);
 
   // Handle static signal completion callback

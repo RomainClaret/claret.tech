@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
+import precomputedColors from "@/lib/utils/precomputed-colors.json";
+import { adjustColorBrightness } from "@/lib/hooks/useColorExtraction";
+import { workExperiences } from "@/data/sections/experience";
+import { researchSection } from "@/data/sections/research";
+import { languageColors } from "@/lib/utils/language-colors";
 
 /**
  * Text in a colour that comes from data (a paper's status, a project's
@@ -84,4 +89,113 @@ describe("accent text", () => {
       }
     });
   }
+});
+
+const rgb = (color: string): Rgb => {
+  const match = /rgb\((\d+), (\d+), (\d+)\)/.exec(color);
+  if (!match) throw new Error(`Not an rgb() colour: ${color}`);
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+};
+
+describe("accent text in a company's colour", () => {
+  // Experience cards write dates, links and tags in their company's logo
+  // colour (precomputed-colors.json), doubled in brightness on the dark
+  // theme (ExperienceTimeline.tsx). The navy brands need that doubling to
+  // read on the dark background even through the mix.
+  const light = mix(".accent-text");
+  const dark = mix(".dark .accent-text");
+  const logos = new Set(
+    workExperiences.experience.map((role) => role.companyLogo),
+  );
+
+  for (const logo of logos) {
+    it(`reads at 4.5:1 or more for ${logo}, both themes`, () => {
+      const color = precomputedColors[logo as keyof typeof precomputedColors];
+      expect(color).toBeDefined();
+
+      const onLight = blend(rgb(color), light.share, light.toward);
+      for (const surface of [WHITE, SLATE_50]) {
+        expect(contrast(onLight, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+      const doubled = rgb(adjustColorBrightness(color, 2.0));
+      const onDark = blend(doubled, dark.share, dark.toward);
+      expect(contrast(onDark, DARK)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});
+
+// The surfaces a colour's text sits on: the page and its own 10 and 20%
+// tints (a chip's or a card's background), for each theme.
+function worstContrast(
+  color: Rgb,
+  light: ReturnType<typeof mix>,
+  dark: ReturnType<typeof mix>,
+) {
+  const onLight = blend(color, light.share, light.toward);
+  const onDark = blend(color, dark.share, dark.toward);
+  return Math.min(
+    ...[
+      WHITE,
+      SLATE_50,
+      blend(color, 0.1, WHITE),
+      blend(color, 0.2, WHITE),
+    ].map((surface) => contrast(onLight, surface)),
+    ...[DARK, blend(color, 0.1, DARK), blend(color, 0.2, DARK)].map((surface) =>
+      contrast(onDark, surface),
+    ),
+  );
+}
+
+describe("accent text in a research project's colour", () => {
+  // Research cards write their technologies in the project's colour
+  // (research.ts), on a tint of it: read from the data, so a new colour
+  // there is checked here.
+  const light = mix(".accent-text");
+  const dark = mix(".dark .accent-text");
+
+  for (const project of researchSection.projects) {
+    it(`reads at 4.5:1 or more for ${project.title}, both themes`, () => {
+      const color = rgb(`rgb(${project.color ?? "139, 92, 246"})`);
+
+      expect(worstContrast(color, light, dark)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});
+
+describe("accent text in any colour", () => {
+  // The project dialog writes topics in the repository's language colour,
+  // which GitHub gives: no list here can hold them all. .accent-text-any is
+  // checked on every colour of a 16-step sample of the colour cube, its
+  // corners included (white on light and black on dark are the worst).
+  const light = mix(".accent-text-any");
+  const dark = mix(".dark .accent-text-any");
+  const steps = Array.from({ length: 16 }, (_, i) => i * 17);
+
+  it("reads at 4.5:1 or more for any colour, both themes", () => {
+    const short: string[] = [];
+    for (const r of steps) {
+      for (const g of steps) {
+        for (const b of steps) {
+          const worst = worstContrast([r, g, b], light, dark);
+          if (worst < 4.5) short.push(`${r}, ${g}, ${b}: ${worst.toFixed(2)}`);
+        }
+      }
+    }
+
+    expect(short).toEqual([]);
+  });
+
+  it("is needed: .accent-text falls short for some language colours", () => {
+    // Lua's navy, Crystal's black and Ruby's dark red on the dark theme,
+    // JSON's near-white on the light one.
+    const light = mix(".accent-text");
+    const dark = mix(".dark .accent-text");
+    const short = Object.entries(languageColors)
+      .filter(
+        ([, color]) => worstContrast(rgb(`rgb(${color})`), light, dark) < 4.5,
+      )
+      .map(([name]) => name);
+
+    expect(short.length).toBeGreaterThan(0);
+  });
 });

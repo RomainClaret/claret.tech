@@ -1,7 +1,9 @@
 import { ImageResponse } from "next/og";
 import { logError } from "@/lib/utils/dev-logger";
 
-export const runtime = "edge";
+// The same picture for every request: built once, at build time. (On the
+// Edge runtime, deprecated in Next 16, it was drawn again on each request.)
+export const dynamic = "force-static";
 
 export async function GET() {
   try {
@@ -19,7 +21,10 @@ export async function GET() {
             padding: "40px",
           }}
         >
-          {/* Background pattern */}
+          {/* Background pattern: solid white marks. The Edge runtime drew
+              them solid, ignoring the 0.05 fill-opacity this SVG had, and
+              that is the preview social cards show; the Node.js runtime
+              honours the opacity, so it is 1 here to keep that look. */}
           <div
             style={{
               position: "absolute",
@@ -27,7 +32,7 @@ export async function GET() {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
             }}
           />
 

@@ -13,38 +13,11 @@ export const devLog = (...args: unknown[]): void => {
 };
 
 /**
- * Development-only console.warn
- */
-export const devWarn = (...args: unknown[]): void => {
-  if (process.env.NODE_ENV === "development") {
-    console.warn(...args);
-  }
-};
-
-/**
  * Development-only console.error
  */
 export const devError = (...args: unknown[]): void => {
   if (process.env.NODE_ENV === "development") {
     console.error(...args);
-  }
-};
-
-/**
- * Development-only console.info
- */
-export const devInfo = (...args: unknown[]): void => {
-  if (process.env.NODE_ENV === "development") {
-    console.info(...args);
-  }
-};
-
-/**
- * Development-only console.debug
- */
-export const devDebug = (...args: unknown[]): void => {
-  if (process.env.NODE_ENV === "development") {
-    console.debug(...args);
   }
 };
 
@@ -81,16 +54,3 @@ export const logWarning = (message: string, context?: string): void => {
     console.warn(`[${context || "Warning"}]:`, message);
   }
 };
-
-// Export a default logger object for convenience
-export const devLogger = {
-  log: devLog,
-  warn: devWarn,
-  error: devError,
-  info: devInfo,
-  debug: devDebug,
-  logError,
-  logWarning,
-};
-
-export default devLogger;

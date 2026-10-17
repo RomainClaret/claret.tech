@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  logError,
-  logWarning,
-  logInfo,
-  logApiError,
-  logPerformanceIssue,
-} from "./error-logger";
+import { logError } from "./error-logger";
 
 // Mock the dev-logger module to prevent it from interfering
 vi.mock("./dev-logger", () => ({
@@ -18,8 +12,6 @@ vi.mock("./dev-logger", () => ({
 
 // Mock console methods - these will be set up in beforeEach
 let mockConsoleError: ReturnType<typeof vi.spyOn>;
-let mockConsoleWarn: ReturnType<typeof vi.spyOn>;
-let mockConsoleInfo: ReturnType<typeof vi.spyOn>;
 
 // Mock environment
 const originalWindow = global.window;
@@ -29,8 +21,8 @@ describe("Privacy-First Error Logger", () => {
     vi.clearAllMocks();
     // Set up console spies fresh for each test
     mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockConsoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockConsoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "info").mockImplementation(() => {});
     // Simulate server environment (no window)
     delete (global as Record<string, unknown>).window;
     // Reset NODE_ENV to test default
@@ -127,86 +119,6 @@ describe("Privacy-First Error Logger", () => {
 
       expect(logEntry.context.longData).toHaveLength(514); // 500 + "...[TRUNCATED]"
       expect(logEntry.context.longData).toContain("[TRUNCATED]");
-    });
-  });
-
-  describe("logWarning", () => {
-    it("logs warnings in production", () => {
-      (process.env as any).NODE_ENV = "production";
-
-      logWarning("Test warning", { component: "TestComponent" });
-
-      expect(mockConsoleWarn).toHaveBeenCalledOnce();
-      const logCall = mockConsoleWarn.mock.calls[0];
-      const logEntry = JSON.parse(logCall[1] as string);
-
-      expect(logEntry.level).toBe("warn");
-      expect(logEntry.message).toBe("Test warning");
-      expect(logEntry.context.component).toBe("TestComponent");
-    });
-  });
-
-  describe("logInfo", () => {
-    it("only logs in production environment", () => {
-      (process.env as any).NODE_ENV = "production";
-
-      logInfo("Test info", { event: "startup" });
-
-      expect(mockConsoleInfo).toHaveBeenCalledOnce();
-      const logCall = mockConsoleInfo.mock.calls[0];
-      const logEntry = JSON.parse(logCall[1] as string);
-
-      expect(logEntry.level).toBe("info");
-      expect(logEntry.message).toBe("Test info");
-    });
-
-    it("does not log in development", () => {
-      (process.env as any).NODE_ENV = "development";
-
-      logInfo("Test info");
-
-      expect(mockConsoleInfo).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("API Error Logging", () => {
-    it("logs API errors with route context", () => {
-      (process.env as any).NODE_ENV = "production";
-
-      const error = new Error("API Error");
-      logApiError(error, "/api/test", "GET", 500);
-
-      expect(mockConsoleError).toHaveBeenCalledOnce();
-      const logCall = mockConsoleError.mock.calls[0];
-      const logEntry = JSON.parse(logCall[1] as string);
-
-      expect(logEntry.context.type).toBe("api_error");
-      expect(logEntry.context.route).toBe("/api/test");
-      expect(logEntry.context.method).toBe("GET");
-      expect(logEntry.context.statusCode).toBe(500);
-    });
-  });
-
-  describe("Performance Issue Logging", () => {
-    it("logs performance issues as warnings", () => {
-      (process.env as any).NODE_ENV = "production";
-
-      logPerformanceIssue("response_time", 5000, 2000, {
-        endpoint: "/api/slow",
-      });
-
-      expect(mockConsoleWarn).toHaveBeenCalledOnce();
-      const logCall = mockConsoleWarn.mock.calls[0];
-      const logEntry = JSON.parse(logCall[1] as string);
-
-      expect(logEntry.message).toContain(
-        "Performance issue: response_time (5000) exceeded threshold (2000)",
-      );
-      expect(logEntry.context.type).toBe("performance_issue");
-      expect(logEntry.context.metric).toBe("response_time");
-      expect(logEntry.context.value).toBe(5000);
-      expect(logEntry.context.threshold).toBe(2000);
-      expect(logEntry.context.endpoint).toBe("/api/slow");
     });
   });
 });

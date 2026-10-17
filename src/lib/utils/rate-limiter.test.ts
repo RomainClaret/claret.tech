@@ -9,17 +9,8 @@ vi.mock("./dev-logger", () => ({
   devLog: vi.fn(),
   devWarn: vi.fn(),
   devError: vi.fn(),
-  devInfo: vi.fn(),
-  devDebug: vi.fn(),
   logError: vi.fn(),
   logWarning: vi.fn(),
-  devLogger: {
-    log: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
 }));
 
 import { rateLimit, withRateLimit, RATE_LIMIT_CONFIG } from "./rate-limiter";

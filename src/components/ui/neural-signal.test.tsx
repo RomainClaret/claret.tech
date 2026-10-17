@@ -10,11 +10,12 @@ import React from "react";
  * of its path instead of travelling.
  */
 
+const quality = vi.hoisted(() => ({ animate: true }));
 vi.mock("@/contexts/quality-context", () => ({
   NEURAL_SIGNAL_PROFILE: {},
   useQuality: () => ({
     getConfig: () => ({
-      animate: true,
+      animate: quality.animate,
       particleCount: 3,
       strokeWidth: 6,
       opacity: 1,
@@ -33,6 +34,7 @@ const prototypes = {
 };
 
 beforeEach(() => {
+  quality.animate = true;
   // jsdom has neither.
   Object.defineProperty(SVGElement.prototype, "getTotalLength", {
     value: () => 100,
@@ -79,5 +81,24 @@ describe("NeuralSignal particles", () => {
       ...container.querySelectorAll('animate[attributeName="opacity"]'),
     ].map((fade) => fade.getAttribute("begin"));
     expect(fades).toEqual(["42s", "42s", "42s"]);
+  });
+
+  it("travel once animations come on, though they were off when it appeared", () => {
+    quality.animate = false;
+    const { container, rerender } = render(
+      <svg>
+        <NeuralSignal path="M0,0 L100,0" duration={1.5} />
+      </svg>,
+    );
+    expect(container.querySelectorAll("animateMotion")).toHaveLength(0);
+
+    quality.animate = true;
+    rerender(
+      <svg>
+        <NeuralSignal path="M0,0 L100,0" duration={1.5} />
+      </svg>,
+    );
+
+    expect(container.querySelectorAll("animateMotion")).toHaveLength(3);
   });
 });

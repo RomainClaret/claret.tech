@@ -33,6 +33,9 @@ interface PerformanceMetrics {
   gpuLayers: number;
   isLagging: boolean;
   browserInfo: string;
+  /** When the last FPS reading was taken (Date.now()), for durations shown
+   * beside it without reading the clock while rendering. */
+  sampledAt: number;
 }
 
 interface EnhancedPerformanceMetrics extends PerformanceMetrics {
@@ -88,6 +91,40 @@ interface EnhancedPerformanceMetrics extends PerformanceMetrics {
  * Tracks FPS, GPU layers, animations, and browser-specific metrics
  * Only consumes resources when isMonitoring is true
  */
+type WebVital = "lcp" | "inp" | "cls" | "fcp" | "ttfb";
+
+// web-vitals registers each on* callback for the page's lifetime and gives
+// no way to remove it (its on* functions return nothing), so the page
+// subscribes once, the first time a monitor asks, and each report goes to
+// the monitors listening then. A monitor that starts later gets the values
+// reported so far: the LCP, for one, is reported only once.
+const reportedVitals = new Map<WebVital, number>();
+const vitalListeners = new Set<(name: WebVital, value: number) => void>();
+let vitalsSubscribed = false;
+
+function listenToWebVitals(
+  listener: (name: WebVital, value: number) => void,
+): () => void {
+  if (!vitalsSubscribed) {
+    vitalsSubscribed = true;
+    const report = (metric: Metric) => {
+      const name = metric.name.toLowerCase() as WebVital;
+      reportedVitals.set(name, metric.value);
+      vitalListeners.forEach((listen) => listen(name, metric.value));
+    };
+    onLCP(report);
+    onINP(report);
+    onCLS(report);
+    onFCP(report);
+    onTTFB(report);
+  }
+  vitalListeners.add(listener);
+  reportedVitals.forEach((value, name) => listener(name, value));
+  return () => {
+    vitalListeners.delete(listener);
+  };
+}
+
 export function usePerformanceMonitor(
   isMonitoring: boolean = true,
   options: Partial<MonitoringOptions> = {},
@@ -107,6 +144,15 @@ export function usePerformanceMonitor(
   };
   const { isSafari, isChrome, isFirefox, isEdge, shouldReduceAnimations } =
     useSafari();
+  const browserInfo = isSafari
+    ? "Safari"
+    : isChrome
+      ? "Chrome"
+      : isFirefox
+        ? "Firefox"
+        : isEdge
+          ? "Edge"
+          : "Unknown";
 
   const [metrics, setMetrics] = useState<EnhancedPerformanceMetrics>({
     // Basic metrics
@@ -118,6 +164,7 @@ export function usePerformanceMonitor(
     gpuLayers: 0,
     isLagging: false,
     browserInfo: "Unknown",
+    sampledAt: 0,
 
     // Core Web Vitals
     lcp: null,
@@ -166,63 +213,18 @@ export function usePerformanceMonitor(
     gpuHistory: [],
   });
 
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const longTaskObserverRef = useRef<PerformanceObserver | null>(null);
-  const webVitalsInitialized = useRef(false);
-  const webVitalsCleanup = useRef<(() => void)[]>([]);
   const cpuWorkerRef = useRef<Worker | null>(null);
   const gpuEstimatorRef = useRef<GpuEstimator | null>(null);
   const hardwareDetectorRef = useRef<HardwareDetector | null>(null);
 
-  // Initialize Web Vitals monitoring
+  // Web Vitals, from the page's one subscription (listenToWebVitals).
   useEffect(() => {
-    if (!isMonitoring || !monitoringOptions.webVitals) {
-      // Clean up any existing Web Vitals listeners
-      webVitalsCleanup.current.forEach((cleanup) => cleanup());
-      webVitalsCleanup.current = [];
-      webVitalsInitialized.current = false;
-      return;
-    }
-
-    if (webVitalsInitialized.current) return;
-    webVitalsInitialized.current = true;
-
-    const handleMetric = (metric: Metric) => {
-      setMetrics((prev) => ({
-        ...prev,
-        [metric.name.toLowerCase()]: metric.value,
-      }));
-    };
-
-    // Core Web Vitals monitoring with cleanup functions
-    const lcpCleanup = onLCP(handleMetric);
-    const inpCleanup = onINP(handleMetric);
-    const clsCleanup = onCLS(handleMetric);
-    const fcpCleanup = onFCP(handleMetric);
-    const ttfbCleanup = onTTFB(handleMetric);
-
-    // Store cleanup functions (filter out undefined/void returns)
-    const cleanups = [
-      lcpCleanup,
-      inpCleanup,
-      clsCleanup,
-      fcpCleanup,
-      ttfbCleanup,
-    ];
-
-    webVitalsCleanup.current = cleanups.filter(
-      (cleanup) =>
-        cleanup !== undefined &&
-        cleanup !== null &&
-        typeof cleanup === "function",
-    ) as (() => void)[];
-
-    return () => {
-      // Clean up Web Vitals listeners
-      webVitalsCleanup.current.forEach((cleanup) => cleanup());
-      webVitalsCleanup.current = [];
-      webVitalsInitialized.current = false;
-    };
+    if (!isMonitoring || !monitoringOptions.webVitals) return;
+    return listenToWebVitals((name, value) => {
+      setMetrics((prev) => ({ ...prev, [name]: value }));
+    });
   }, [isMonitoring, monitoringOptions.webVitals]);
 
   // Initialize long task monitoring
@@ -465,20 +467,6 @@ export function usePerformanceMonitor(
   }, [isMonitoring, monitoringOptions.hardware]);
 
   useEffect(() => {
-    // Set browser info immediately
-    const browserInfo = isSafari
-      ? "Safari"
-      : isChrome
-        ? "Chrome"
-        : isFirefox
-          ? "Firefox"
-          : isEdge
-            ? "Edge"
-            : "Unknown";
-
-    // Update browser info in metrics
-    setMetrics((prev) => ({ ...prev, browserInfo }));
-
     // Only start performance monitoring if requested
     if (!isMonitoring || !monitoringOptions.fps) {
       return;
@@ -550,7 +538,8 @@ export function usePerformanceMonitor(
           activeAnimations,
           gpuLayers,
           isLagging: currentFPS < (isSafari ? 30 : 45), // Lower threshold for Safari
-          browserInfo,
+          browserInfo: prev.browserInfo,
+          sampledAt: Date.now(),
 
           // Keep existing Web Vitals data
           lcp: prev.lcp,
@@ -628,6 +617,7 @@ export function usePerformanceMonitor(
 
   return {
     ...metrics,
+    browserInfo,
     shouldReduceAnimations,
 
     // Helper methods

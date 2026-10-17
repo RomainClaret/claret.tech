@@ -31,7 +31,7 @@ export function ShootingStars({
   className,
 }: ShootingStarsProps) {
   const [stars, setStars] = useState<Star[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const starTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const isPageVisible = usePageVisibility();
   const prefersReducedMotion = useReducedMotion();
@@ -39,29 +39,19 @@ export function ShootingStars({
   const { getConfig } = useQuality();
   const config = getConfig(SHOOTING_STARS_PROFILE);
 
-  // Hydration-safe visibility state to prevent mismatch errors
-  const [hydratedVisibility, setHydratedVisibility] = useState(true);
+  // Mounted on the client only (the hero's animation layer), so this is
+  // decided in render, with nothing to hydrate.
+  const shouldShowStars =
+    !prefersReducedMotion && areAnimationsPlaying && config.animate;
 
-  // Update visibility state after hydration to sync with actual animation state
-  useEffect(() => {
-    setHydratedVisibility(
-      !prefersReducedMotion && areAnimationsPlaying && config.animate,
-    );
-  }, [prefersReducedMotion, areAnimationsPlaying, config.animate]);
-
-  // Clean up all stars when quality config changes to prevent key duplication
-  useEffect(() => {
-    // Clear all existing stars when quality changes
+  // A quality change drops the stars on screen, in the render it happens in.
+  // Their timers stop with the effect below, which restarts on it.
+  const quality = `${config.animate}:${config.updateFrequency}`;
+  const [starsQuality, setStarsQuality] = useState(quality);
+  if (quality !== starsQuality) {
+    setStarsQuality(quality);
     setStars([]);
-    starTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
-    starTimeoutsRef.current.clear();
-
-    // Clear main timeout as well
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = undefined;
-    }
-  }, [config.animate, config.updateFrequency]);
+  }
 
   useEffect(() => {
     // Store ref values at effect start for cleanup
@@ -193,9 +183,6 @@ export function ShootingStars({
     config.animate,
     config.updateFrequency,
   ]);
-
-  // Use hydration-safe visibility state for rendering
-  const shouldShowStars = hydratedVisibility;
 
   return (
     <div

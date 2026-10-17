@@ -69,12 +69,11 @@ export function useRowsAboveCover(
 ): number | null {
   const element = useSyncExternalStore(subscribe, getCover, getServerCover);
   const [rows, setRows] = useState<number | null>(null);
+  // Off, or no cover: no count, from this render on.
+  if ((!enabled || !element) && rows !== null) setRows(null);
 
   useEffect(() => {
-    if (!enabled || !element) {
-      setRows(null);
-      return;
-    }
+    if (!enabled || !element) return;
 
     const clip = element.parentElement;
     let frame = 0;

@@ -73,14 +73,15 @@ describe("ResearchMapRenderer", () => {
     expect(terminal.setAside).not.toHaveBeenCalled();
   });
 
-  it("closes on research close, and from the dialog itself", () => {
+  it("closes from the dialog itself, and only from it", () => {
+    // `research close` is gone: the terminal steps aside while the map is
+    // open, so it could never be typed then.
     render(<ResearchMapRenderer />);
     open();
 
     send("terminal-research-close");
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
 
-    open();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -137,6 +138,6 @@ describe("ResearchMapRenderer", () => {
     expect(types(remove.mock.calls).sort()).toEqual(
       types(add.mock.calls).sort(),
     );
-    expect(types(add.mock.calls)).toHaveLength(2);
+    expect(types(add.mock.calls)).toEqual(["terminal-research-map"]);
   });
 });

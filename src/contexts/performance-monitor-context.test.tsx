@@ -78,7 +78,6 @@ describe("PerformanceMonitorContext", () => {
         }
         eventListeners.get(event)!.push(handlerFn);
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ) as any;
 
     global.window.removeEventListener = vi.fn(
@@ -93,7 +92,6 @@ describe("PerformanceMonitorContext", () => {
           }
         }
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ) as any;
 
     global.window.dispatchEvent = vi.fn((event: Event) => {

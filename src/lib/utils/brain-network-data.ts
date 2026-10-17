@@ -205,12 +205,6 @@ export function generateInternalConnections(): BrainConnection[] {
   return connections;
 }
 
-// Combine static contour with dynamic internal connections
-export const BRAIN_CONNECTIONS: BrainConnection[] = [
-  ...BRAIN_CONTOUR_CONNECTIONS,
-  ...generateInternalConnections(),
-];
-
 // Transform coordinates to canvas coordinates
 export function transformToCanvas(
   x: number,

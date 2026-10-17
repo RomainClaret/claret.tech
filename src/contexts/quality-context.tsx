@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useEffectEvent,
   ReactNode,
   useCallback,
   useMemo,
@@ -167,17 +168,19 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     setIsAutoState(!manual);
     setRestored(true);
     // The values a test-mode switch below sets, it sets after this.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // An end-to-end run's test mode is read from the URL after hydration too
-  // (test-mode-provider.tsx): balanced, without automatic changes, as soon
-  // as it is known.
-  useEffect(() => {
-    if (!isTestMode) return;
-    setQualityState(QualityMode.BALANCED);
-    setIsAutoState(false);
-  }, [isTestMode]);
+  // (test-mode-provider.tsx): balanced, without automatic changes, in the
+  // render it becomes known.
+  const [wasTestMode, setWasTestMode] = useState(isTestMode);
+  if (isTestMode !== wasTestMode) {
+    setWasTestMode(isTestMode);
+    if (isTestMode) {
+      setQualityState(QualityMode.BALANCED);
+      setIsAutoState(false);
+    }
+  }
 
   // The loop below measures the page while it animates. With animations
   // off (Safari's default, the terminal's "animations stop", auto-disable)
@@ -205,18 +208,14 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   // and rounds to zero; the old fallback turned that worst-case sample into a
   // perfect score and triggered an upgrade. decideQuality discards implausible
   // readings instead, which is only possible if it sees the real value.
-  const latestFpsRef = useRef(0);
-  latestFpsRef.current = fpsData.fps;
-  // The sampler publishes once a second on its own clock; the tick below
-  // feeds only a sample it has not fed yet, never the same one twice.
-  const latestSampleRef = useRef(0);
-  latestSampleRef.current = fpsData.sample;
+  //
+  // Its sample number: the sampler publishes once a second on its own clock,
+  // and the tick below feeds only a sample it has not fed yet, never the same
+  // one twice. And the refresh rate: what the display can do, as opposed to
+  // what the page is achieving; the gap between the two is the headroom the
+  // upgrade gate is really asking about.
+  const latestReading = useEffectEvent(() => fpsData);
   const fedSampleRef = useRef(0);
-  // What the display can do, as opposed to what the page is achieving. The
-  // gap between the two is the headroom the upgrade gate is really asking
-  // about.
-  const refreshRateRef = useRef<number | null>(null);
-  refreshRateRef.current = fpsData.refreshRate;
   // All the auto-adjust bookkeeping (sample window, consecutive counts, per
   // tier backoff, toast rate limit) lives in a ref rather than state: none of
   // it should trigger a render, and keeping it out of the dependency array is
@@ -295,14 +294,15 @@ export function QualityProvider({ children }: { children: ReactNode }) {
         getMotionGate().suspended;
       // Visible but no new sample since the last tick (the two clocks drift,
       // and the sampler restarts after a pause): nothing to decide on.
-      if (!hidden && latestSampleRef.current === fedSampleRef.current) return;
-      fedSampleRef.current = latestSampleRef.current;
+      const reading = latestReading();
+      if (!hidden && reading.sample === fedSampleRef.current) return;
+      fedSampleRef.current = reading.sample;
 
       const decision = decideQuality(current, {
-        fps: latestFpsRef.current,
+        fps: reading.fps,
         now,
         hidden,
-        measuredRefreshRate: refreshRateRef.current,
+        measuredRefreshRate: reading.refreshRate,
       });
       setDecision(decision.state);
 
@@ -353,12 +353,10 @@ export function QualityProvider({ children }: { children: ReactNode }) {
   }, [quality, restored]);
 
   // Read by the startup check's idle callback, which runs after the visitor
-  // may have picked a tier by hand.
-  const isAutoRef = useRef(isAuto);
-  isAutoRef.current = isAuto;
-  // And the tier running then, to label the state it saves.
-  const qualityRef = useRef(quality);
-  qualityRef.current = quality;
+  // may have picked a tier by hand; and the tier running then, to label the
+  // state it saves.
+  const readIsAuto = useEffectEvent(() => isAuto);
+  const readQuality = useEffectEvent(() => quality);
 
   // Machines that may not keep up (software rendering, no WebGL, Save Data)
   // start at LOW instead of measuring seconds of stutter first. Probed once
@@ -376,7 +374,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
     return whenIdle(() => {
       // A tier picked by hand since mount wins. Forced to LOW anyway, the
       // pick was then saved as LOW, the visitor's "choice".
-      if (!isAutoRef.current) return;
+      if (!readIsAuto()) return;
       const probe = probeDeviceOnce();
       if (!probe.weak) return;
       // Start at LOW. Where the browser reports software rendering, stay
@@ -413,7 +411,7 @@ export function QualityProvider({ children }: { children: ReactNode }) {
       // LOW). Labelled LOW whatever ran, a session restored at battery
       // saver was re-based on the next tick, which cleared the recovery the
       // visitor was still owed.
-      const running = qualityRef.current;
+      const running = readQuality();
       const tier =
         running === QualityMode.BALANCED || running === QualityMode.MAXIMUM
           ? QualityMode.LOW

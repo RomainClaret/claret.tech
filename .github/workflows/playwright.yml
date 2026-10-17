@@ -8,14 +8,14 @@ on:
         type: boolean
         default: false
   push:
-    branches: [ main, master ]
+    branches: [ main ]
     paths-ignore:
       - '**.md'          # Skip documentation changes
       - '.github/workflows/ci.yml'  # Skip CI-only changes
       - 'LICENSE'
       - '.gitignore'
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
     paths-ignore:
       - '**.md'          # Skip documentation changes
       - '.github/workflows/ci.yml'  # Skip CI-only changes
@@ -44,18 +44,13 @@ env:
 # `npm ci` could compile the `canvas` devDependency from source, and it had
 # become the single largest cost in this workflow: 8-18 minutes per job against
 # ~1 minute of actual tests, and on 2026-08-04 it hit the 30-minute job timeout
-# and cancelled three firefox jobs before they ran a single test.
-#
-# It was never needed. canvas 2.11.2 publishes a prebuilt binary for Node 20 on
-# linux-glibc-x64 (node-v115), so it installs without any dev headers. Verified
-# in mcr.microsoft.com/playwright:v1.57.0-jammy with Node 20.19.0 and no apt
-# packages: full `npm ci` succeeds in 86s and canvas, sharp and jsdom all load.
-# Nothing else in the tree compiles from source.
+# and cancelled three firefox jobs before they ran a single test. canvas
+# itself went in 2026-10 (the tests stub the canvas), so nothing in the tree
+# compiles from source.
 #
 # The images follow @playwright/test (pinned exactly in package.json): the
-# browsers in the image are the ones that version drives. Both v1.57.0-jammy
-# and v1.64.0-jammy (2026-10-12) default to Node 24, which has no canvas
-# binary; the prebuilt one installs only because setup-node below pins Node 20.
+# browsers in the image are the ones that version drives. v1.64.0-jammy
+# defaults to Node 24, the major setup-node below pins too.
 #
 # QUOTA OPTIMIZATION FEATURES:
 # - workflow_dispatch: Manual triggering to control usage
@@ -114,7 +109,6 @@ jobs:
               - 'src/**/nav*.{ts,tsx}'
               - 'src/**/header*.{ts,tsx}'
               - 'src/**/menu*.{ts,tsx}'
-              - 'src/components/layout/**'
               # Shared helpers every spec imports. Without this a fix to
               # tests/e2e/utils/ skips the very suite it was written for:
               # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
@@ -123,6 +117,7 @@ jobs:
             accessibility:
               - 'tests/e2e/accessibility.spec.ts'
               - 'tests/e2e/project-details.spec.ts'
+              - 'tests/e2e/keyboard-paths.spec.ts'
               - 'src/**/*aria*.{ts,tsx}'
               - 'src/**/*a11y*.{ts,tsx}'
               - 'src/**/*accessibility*.{ts,tsx}'
@@ -186,14 +181,13 @@ jobs:
             src:
               - 'src/**'
               - 'public/**'
-              - 'styles/**'
+              # postinstall, prebuild and next.config's plugin.
+              - 'scripts/**'
               # next.config.mjs, tailwind.config.ts, playwright.config.ts...
               - '*.config.{js,mjs,ts}'
             dependencies:
               - 'package.json'
               - 'package-lock.json'
-              - 'yarn.lock'
-              - 'pnpm-lock.yaml'
             workflows:
               - '.github/workflows/**'
               - '.github/scripts/**'
@@ -204,6 +198,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.ref == 'refs/heads/main' ||
+       github.event.inputs.force_all_tests == 'true' ||
        needs.detect-changes.outputs.navigation == 'true' ||
        needs.detect-changes.outputs.src == 'true' ||
        needs.detect-changes.outputs.dependencies == 'true' ||
@@ -225,7 +220,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -239,7 +234,7 @@ jobs:
             playwright-report/
             test-results/
             .playwright-cache/
-          key: playwright-navigation-${{ matrix.browser }}-${{ hashFiles('tests/e2e/navigation.spec.ts', 'src/**/nav*.{ts,tsx}', 'src/**/header*.{ts,tsx}', 'src/**/menu*.{ts,tsx}', 'src/components/layout/**', 'package-lock.json') }}
+          key: playwright-navigation-${{ matrix.browser }}-${{ hashFiles('tests/e2e/navigation.spec.ts', 'src/**/nav*.{ts,tsx}', 'src/**/header*.{ts,tsx}', 'src/**/menu*.{ts,tsx}', 'package-lock.json') }}
           restore-keys: |
             playwright-navigation-${{ matrix.browser }}-${{ github.ref_name }}-
             playwright-navigation-${{ matrix.browser }}-
@@ -264,17 +259,13 @@ jobs:
           # https-forcing directives.
           SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
           USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
         run: |
           npm start &
           SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
           for i in {1..30}; do
@@ -306,7 +297,7 @@ jobs:
         if: always()
         run: |
           if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
+            kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
@@ -323,6 +314,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       (github.ref == 'refs/heads/main' ||
+       github.event.inputs.force_all_tests == 'true' ||
        needs.detect-changes.outputs.accessibility == 'true' ||
        needs.detect-changes.outputs.src == 'true' ||
        needs.detect-changes.outputs.dependencies == 'true' ||
@@ -344,7 +336,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -370,17 +362,13 @@ jobs:
           # https-forcing directives.
           SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
           USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
         run: |
           npm start &
           SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
           for i in {1..30}; do
@@ -404,8 +392,9 @@ jobs:
         # project-details: a GitHub card's details open in one dialog above
         # the page (focus, Tab, Escape, the links take their own clicks), on
         # desktop and a 390 px phone, with the GitHub APIs answered by
-        # fixtures since CI builds have no GitHub data.
-        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        # fixtures since CI builds have no GitHub data. keyboard-paths: what
+        # showed on hover or opened on a click, reached from the keyboard.
+        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts tests/e2e/keyboard-paths.spec.ts --project=${{ matrix.browser }} --max-failures=3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -416,7 +405,7 @@ jobs:
         if: always()
         run: |
           if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
+            kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
@@ -449,7 +438,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -475,17 +464,13 @@ jobs:
           # https-forcing directives.
           SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
           USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
         run: |
           npm start &
           SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
           for i in {1..30}; do
@@ -514,7 +499,7 @@ jobs:
         # off, and waits for its animation otherwise. pdf-reader: the reader
         # draws a canvas only for the pages near the view, and its counter
         # names the page in view after a scroll, a zoom and a reload.
-        run: npx playwright test tests/e2e/performance.spec.ts tests/e2e/static-shell.spec.ts tests/e2e/motion-fallback.spec.ts tests/e2e/pdf-reader.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse|Safari-Specific"
+        run: npx playwright test tests/e2e/performance.spec.ts tests/e2e/static-shell.spec.ts tests/e2e/motion-fallback.spec.ts tests/e2e/pdf-reader.spec.ts --project=chromium --max-failures=2 --grep-invert "Lighthouse"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -525,7 +510,7 @@ jobs:
         if: always()
         run: |
           if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
+            kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
@@ -564,7 +549,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -603,17 +588,13 @@ jobs:
           # https-forcing directives.
           SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
           USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
         run: |
           npm start &
           SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
           for i in {1..30}; do
@@ -653,7 +634,7 @@ jobs:
         if: always()
         run: |
           if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
+            kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
@@ -668,10 +649,12 @@ jobs:
   # Mobile testing
   mobile-tests:
     needs: detect-changes
-    # Only run if mobile-specific files or critical dependencies changed
+    # On any change to the site too: the 320 px reflow test goes through the
+    # whole homepage, and the mobile filter alone matched almost no file.
     if: |
       github.event.inputs.force_all_tests == 'true' ||
       needs.detect-changes.outputs.mobile == 'true' ||
+      needs.detect-changes.outputs.src == 'true' ||
       needs.detect-changes.outputs.dependencies == 'true' ||
       needs.detect-changes.outputs.navigation == 'true' ||
       needs.detect-changes.outputs.workflows == 'true'
@@ -688,7 +671,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
@@ -714,17 +697,13 @@ jobs:
           # https-forcing directives.
           SERVE_HTTP: "true"
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
           USE_GITHUB_DATA: false
-          MEDIUM_USERNAME: mock_username
 
       - name: Start Next.js Application
         run: |
           npm start &
           SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
           for i in {1..30}; do
@@ -761,7 +740,7 @@ jobs:
         if: always()
         run: |
           if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID || true
+            kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
           fi
 
@@ -798,7 +777,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install dependencies

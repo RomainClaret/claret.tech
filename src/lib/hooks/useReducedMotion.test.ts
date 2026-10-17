@@ -12,10 +12,15 @@ describe("useReducedMotion", () => {
   let mockMatchMedia: MockMatchMedia;
   let listeners: Record<string, ((e: MockMediaQueryListEvent) => void)[]>;
 
+  // What the system says. A browser updates a list's matches before it
+  // fires the change; these tests' lists read it from here.
+  const system = { reduced: false };
+
   beforeEach(() => {
     vi.clearAllMocks();
     originalMatchMedia = window.matchMedia;
     listeners = {};
+    system.reduced = false;
 
     mockMatchMedia = vi.fn(
       (query: string): MockMediaQueryList => ({
@@ -93,7 +98,9 @@ describe("useReducedMotion", () => {
       let changeHandler: ((e: MockMediaQueryListEvent) => void) | null = null;
 
       mockMatchMedia.mockReturnValue({
-        matches: false,
+        get matches() {
+          return system.reduced;
+        },
         media: "(prefers-reduced-motion: reduce)",
         addEventListener: vi.fn(
           (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
@@ -113,6 +120,7 @@ describe("useReducedMotion", () => {
       // Simulate preference change
       act(() => {
         if (changeHandler) {
+          system.reduced = true;
           changeHandler({ matches: true });
         }
       });
@@ -235,7 +243,9 @@ describe("useReducedMotion", () => {
       const changeHandlers: ((e: MockMediaQueryListEvent) => void)[] = [];
 
       mockMatchMedia.mockReturnValue({
-        matches: false,
+        get matches() {
+          return system.reduced;
+        },
         media: "(prefers-reduced-motion: reduce)",
         addEventListener: vi.fn(
           (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
@@ -257,6 +267,7 @@ describe("useReducedMotion", () => {
       // Change preference - each instance has its own handler
       act(() => {
         changeHandlers.forEach((handler) => {
+          system.reduced = true;
           handler({ matches: true });
         });
       });
@@ -272,7 +283,9 @@ describe("useReducedMotion", () => {
       let changeHandler: ((e: MockMediaQueryListEvent) => void) | null = null;
 
       mockMatchMedia.mockReturnValue({
-        matches: false,
+        get matches() {
+          return system.reduced;
+        },
         media: "(prefers-reduced-motion: reduce)",
         addEventListener: vi.fn(
           (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
@@ -289,10 +302,15 @@ describe("useReducedMotion", () => {
       // Rapid changes
       act(() => {
         if (changeHandler) {
+          system.reduced = true;
           changeHandler({ matches: true });
+          system.reduced = false;
           changeHandler({ matches: false });
+          system.reduced = true;
           changeHandler({ matches: true });
+          system.reduced = false;
           changeHandler({ matches: false });
+          system.reduced = true;
           changeHandler({ matches: true });
         }
       });
@@ -304,7 +322,9 @@ describe("useReducedMotion", () => {
       let changeHandler: ((e: MockMediaQueryListEvent) => void) | null = null;
 
       mockMatchMedia.mockReturnValue({
-        matches: false,
+        get matches() {
+          return system.reduced;
+        },
         media: "(prefers-reduced-motion: reduce)",
         addEventListener: vi.fn(
           (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
@@ -324,6 +344,7 @@ describe("useReducedMotion", () => {
       // Send valid event with true
       act(() => {
         if (changeHandler) {
+          system.reduced = true;
           changeHandler({ matches: true });
         }
       });
@@ -333,6 +354,7 @@ describe("useReducedMotion", () => {
       // Send valid event with false
       act(() => {
         if (changeHandler) {
+          system.reduced = false;
           changeHandler({ matches: false });
         }
       });
@@ -342,6 +364,7 @@ describe("useReducedMotion", () => {
       // Send another true event
       act(() => {
         if (changeHandler) {
+          system.reduced = true;
           changeHandler({ matches: true });
         }
       });

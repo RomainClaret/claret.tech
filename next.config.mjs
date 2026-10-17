@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import RemoveProblematicSourceMapUrlsPlugin from "./scripts/webpack-remove-sourcemap-plugin.js";
 
@@ -11,9 +13,24 @@ const nextConfig = {
 
   // Inlined at build time. The homepage is generated once, when the site is
   // built, and must hydrate with the same text: the footer shows this year
-  // first and corrects it once the page runs.
+  // first and corrects it once the page runs. BUILD_DATE is the footer's
+  // "Updated": the built commit's day (the build day where git is missing,
+  // as in a git archive), so it says what is deployed.
   env: {
     BUILD_YEAR: String(new Date().getFullYear()),
+    BUILD_DATE: (() => {
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const committed = execSync("git log -1 --format=%cs", {
+          stdio: ["ignore", "pipe", "ignore"],
+        })
+          .toString()
+          .trim();
+        return committed || today;
+      } catch {
+        return today;
+      }
+    })(),
   },
 
   // Disable source maps in production to prevent 404 errors for .map files
@@ -167,6 +184,19 @@ const nextConfig = {
           },
         },
       };
+    }
+
+    // Next keys its webpack cache on its own version and on this file. The
+    // browser targets (package.json's browserslist) and the PostCSS config
+    // shape the CSS too, and cached stylesheets from node_modules (xterm's,
+    // pdf.js's) kept an older target list's output after the list changed.
+    // Either file changing now rebuilds the cache.
+    if (config.cache?.buildDependencies) {
+      config.cache.buildDependencies.config = [
+        ...(config.cache.buildDependencies.config ?? []),
+        fileURLToPath(new URL("./package.json", import.meta.url)),
+        fileURLToPath(new URL("./postcss.config.js", import.meta.url)),
+      ];
     }
 
     return config;

@@ -80,7 +80,6 @@ vi.mock("@/lib/utils/dev-logger", () => ({
   devLog: vi.fn(),
   devWarn: vi.fn(),
   devError: vi.fn(),
-  devInfo: vi.fn(),
 }));
 
 // Mock Hardware Detector
@@ -124,9 +123,7 @@ interface MockWorker {
 }
 
 describe("usePerformanceMonitor", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRAF: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockCAF: any;
   let mockWorker: MockWorker;
   let mockPerformanceObserver: MockPerformanceObserver;

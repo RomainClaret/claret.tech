@@ -36,10 +36,14 @@ export function LanguageSpectrum({
           return (
             <m.div
               key={lang.language}
+              // Focusable: the proficiency shows on focus or a tap, as on
+              // hover, which alone kept it from keyboards and touch screens.
+              tabIndex={0}
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
                 "text-xs font-medium transition-all duration-200 cursor-default",
                 "border border-transparent",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isHovered
                   ? "bg-muted/50 border-muted-foreground/20 text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -49,9 +53,17 @@ export function LanguageSpectrum({
               transition={{ delay: 0.3 + index * 0.05 }}
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
+              onFocus={() => setHoveredIndex(index)}
+              onBlur={() => setHoveredIndex(null)}
             >
-              <span className="text-sm">{lang.flag}</span>
+              <span className="text-sm" aria-hidden="true">
+                {lang.flag}
+              </span>
               <span>{lang.language}</span>
+              {/* Always there for a screen reader; shown when pointed at. */}
+              {!isHovered && (
+                <span className="sr-only">({lang.proficiency})</span>
+              )}
               {isHovered && (
                 <m.span
                   className="text-[10px] ml-1"

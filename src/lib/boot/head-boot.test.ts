@@ -3,7 +3,6 @@ import {
   HEAD_BOOT_SCRIPT,
   isSafariUserAgent,
   readStoredTheme,
-  wantsHighContrast,
 } from "./head-boot";
 import { memoryStorage } from "@/test/memory-storage";
 import { restoreNavigator, stubNavigator } from "@/test/navigator";
@@ -106,6 +105,36 @@ describe("head boot: theme", () => {
     expect(readStoredTheme()).toBe("dark");
   });
 
+  it.each([
+    ["the system's dark", { local: null, system: true }, "dark"],
+    ["the system's light", { local: null, system: false }, "light"],
+    [
+      "a stored light over a dark system",
+      { local: "light", system: true },
+      "light",
+    ],
+    [
+      "a stored dark over a light system",
+      { local: "dark", system: false },
+      "dark",
+    ],
+  ])(
+    "takes %s when the visitor never chose otherwise",
+    (_, { local, system }, expected) => {
+      const storage = memoryStorage();
+      if (local) storage.setItem("theme", local);
+      vi.stubGlobal("localStorage", storage);
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query === "(prefers-color-scheme: dark)" && system,
+        media: query,
+      }));
+      setCookie("");
+
+      expect(boot().theme).toBe(expected);
+      expect(readStoredTheme()).toBe(expected);
+    },
+  );
+
   it("lets the provider name its own last resort", () => {
     vi.stubGlobal("localStorage", memoryStorage());
     setCookie("");
@@ -149,7 +178,6 @@ describe("head boot: high contrast", () => {
     systemAsksForMoreContrast(more);
 
     expect(boot().highContrast).toBe(expected);
-    expect(wantsHighContrast()).toBe(expected);
   });
 
   it("follows the system where storage is blocked", () => {
@@ -161,7 +189,6 @@ describe("head boot: high contrast", () => {
     systemAsksForMoreContrast(true);
 
     expect(boot().highContrast).toBe(true);
-    expect(wantsHighContrast()).toBe(true);
   });
 
   it("stays off where the browser has no matchMedia", () => {
@@ -169,6 +196,5 @@ describe("head boot: high contrast", () => {
     vi.stubGlobal("matchMedia", undefined);
 
     expect(boot().highContrast).toBe(false);
-    expect(wantsHighContrast()).toBe(false);
   });
 });

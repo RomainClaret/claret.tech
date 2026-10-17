@@ -32,18 +32,6 @@ interface GitHubUser {
   };
 }
 
-interface MediumPost {
-  title: string;
-  pubDate: string;
-  link: string;
-  guid: string;
-  author: string;
-  thumbnail: string;
-  description: string;
-  content: string;
-  categories: string[];
-}
-
 interface FetchConfig {
   githubToken?: string;
   githubUsername?: string;
@@ -189,67 +177,4 @@ export async function fetchGitHubData(
     logError(error, "GitHub fetch error");
     throw error;
   }
-}
-
-// Fetch Medium blog posts
-export async function fetchMediumData(
-  config: FetchConfig,
-): Promise<MediumPost[] | null> {
-  if (!config.mediumUsername) {
-    return null;
-  }
-
-  const options: https.RequestOptions = {
-    hostname: "api.rss2json.com",
-    path: `/v1/api.json?rss_url=https://medium.com/feed/@${config.mediumUsername}`,
-    port: 443,
-    method: "GET",
-  };
-
-  try {
-    const response = await httpsRequest(options);
-    const data = JSON.parse(response);
-
-    if (data.status !== "ok") {
-      throw new Error(ERROR_MESSAGES.requestFailedMedium);
-    }
-
-    // Save to file for build-time usage
-    await fs.writeFile("./public/blogs.json", JSON.stringify(data, null, 2));
-
-    return data.items;
-  } catch (error) {
-    logError(error, "Medium fetch error");
-    throw error;
-  }
-}
-
-// Main fetch function to be called during build
-export async function fetchExternalData(): Promise<void> {
-  const config: FetchConfig = {
-    githubToken: process.env.REACT_APP_GITHUB_TOKEN || process.env.GITHUB_TOKEN,
-    githubUsername: process.env.GH_USERNAME,
-    useGithubData: process.env.USE_GITHUB_DATA,
-    mediumUsername: process.env.MEDIUM_USERNAME,
-  };
-
-  const promises: Promise<unknown>[] = [];
-
-  if (config.useGithubData === "true") {
-    promises.push(fetchGitHubData(config));
-  }
-
-  if (config.mediumUsername) {
-    promises.push(fetchMediumData(config));
-  }
-
-  await Promise.all(promises);
-}
-
-// For Next.js build process
-if (require.main === module) {
-  fetchExternalData().catch((error) => {
-    logError(error, "Error fetching external data");
-    process.exit(1);
-  });
 }

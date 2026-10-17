@@ -55,41 +55,50 @@ export function useAnimationGate<T extends Element = HTMLDivElement>({
   rootMargin = "200px",
 }: AnimationGateOptions = {}) {
   const [element, setElement] = useState<T | null>(null);
-  const ref = useCallback((node: T | null) => setElement(node), []);
+  // Whether an IntersectionObserver can watch it, checked as the element
+  // arrives. Where none can (an old browser, or a stub in tests), the element
+  // counts as in view rather than freezing.
+  const [observable, setObservable] = useState(true);
+  const ref = useCallback((node: T | null) => {
+    setElement(node);
+    if (node) setObservable(canObserve());
+  }, []);
   const [inView, setInView] = useState(false);
   const gate = useMotionGate();
   const animationState = useAnimationStateOptional();
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    if (!element) return;
-    let observer: IntersectionObserver | undefined;
-    try {
-      observer = new IntersectionObserver(
-        (entries) => setInView(latestEntry(entries).isIntersecting),
-        { rootMargin },
-      );
-    } catch {
-      observer = undefined;
-    }
-    // No usable observer (old browser, or a stubbed one in tests): treat the
-    // element as visible rather than freezing it.
-    if (!observer || typeof observer.observe !== "function") {
-      setInView(true);
-      return;
-    }
+    if (!element || !observable) return;
+    const observer = new IntersectionObserver(
+      (entries) => setInView(latestEntry(entries).isIntersecting),
+      { rootMargin },
+    );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [element, rootMargin]);
+  }, [element, observable, rootMargin]);
 
+  const visible = inView || (element !== null && !observable);
   const playing =
     !respectPlaying || (animationState?.areAnimationsPlaying ?? true);
   const active =
-    inView &&
+    visible &&
     !gate.suspended &&
     playing &&
     !prefersReducedMotion &&
     !(decorative && gate.tier === "battery");
 
-  return { ref, inView, active };
+  return { ref, inView: visible, active };
+}
+
+/** Whether this browser gives an IntersectionObserver that can observe. */
+function canObserve(): boolean {
+  try {
+    const probe = new IntersectionObserver(() => {});
+    if (typeof probe.observe !== "function") return false;
+    probe.disconnect?.();
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  fitScale,
-  pageSizes,
-  widestPageWidth,
-  MIN_SCALE,
-  MAX_SCALE,
-} from "./pdf-fit";
+import { fitScale, pageSizes, MIN_SCALE, MAX_SCALE } from "./pdf-fit";
 
 /**
  * Numbers here are the real ones measured in the reader: an A4 portrait page
@@ -80,54 +74,6 @@ describe("fitScale", () => {
     ["NaN available", 595, Number.NaN],
   ])("leaves the scale untouched for %s", (_label, content, available) => {
     expect(fitScale(content, available, 1)).toBe(1);
-  });
-});
-
-describe("widestPageWidth", () => {
-  const pdfOf = (widths: number[]) => ({
-    numPages: widths.length,
-    getPage: (n: number) =>
-      Promise.resolve({
-        getViewport: () => ({ width: widths[n - 1] }),
-      }),
-  });
-
-  it("finds a landscape page buried in a portrait document", async () => {
-    // The actual shape of the thesis: portrait throughout, landscape at 56.
-    const widths = Array.from({ length: 60 }, (_, i) => (i === 55 ? 841 : 595));
-
-    await expect(widestPageWidth(pdfOf(widths))).resolves.toBe(841);
-  });
-
-  it("does not just read the first page", async () => {
-    await expect(widestPageWidth(pdfOf([595, 595, 841]))).resolves.toBe(841);
-  });
-
-  it("returns the page width for a uniform document", async () => {
-    await expect(widestPageWidth(pdfOf([595, 595, 595]))).resolves.toBe(595);
-  });
-
-  it("ignores pages it cannot read rather than failing the whole scan", async () => {
-    const pdf = {
-      numPages: 3,
-      getPage: (n: number) =>
-        n === 2
-          ? Promise.reject(new Error("corrupt page"))
-          : Promise.resolve({ getViewport: () => ({ width: 595 }) }),
-    };
-
-    await expect(widestPageWidth(pdf)).resolves.toBe(595);
-  });
-
-  it("reports 0 when the document cannot be measured at all", async () => {
-    const pdf = {
-      numPages: 2,
-      getPage: vi.fn(() => {
-        throw new Error("no document");
-      }),
-    };
-
-    await expect(widestPageWidth(pdf)).resolves.toBe(0);
   });
 });
 

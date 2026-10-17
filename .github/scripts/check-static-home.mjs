@@ -2,7 +2,7 @@
 //
 // / is generated once, at build time, and served from the edge cache.
 // Anything that makes it depend on the request (cookies(), headers(),
-// searchParams, a no-store fetch while rendering, a middleware) quietly turns
+// searchParams, a no-store fetch while rendering, a middleware or proxy) turns
 // every page view back into a function call: 200-350 ms before the first
 // byte on the live site, about a second when the function was cold.
 //
@@ -27,6 +27,18 @@ const middleware = Object.keys(
 if (middleware.length) {
   problems.push(`a middleware runs on: ${middleware.join(", ")}`);
 }
+// A proxy.ts (Next 16's name for a middleware), or a middleware on the
+// Node.js runtime, is recorded here instead: the manifest above stays empty.
+const nodeMiddleware = read("server/functions-config-manifest.json")
+  .functions?.["/_middleware"];
+if (nodeMiddleware) {
+  const paths = (nodeMiddleware.matchers ?? []).map(
+    (matcher) => matcher.originalSource,
+  );
+  problems.push(
+    `a proxy or Node.js middleware runs on: ${paths.join(", ") || "every path"}`,
+  );
+}
 
 if (problems.length) {
   console.error(
@@ -34,4 +46,4 @@ if (problems.length) {
   );
   process.exit(1);
 }
-console.log("/ is prerendered, and no middleware runs.");
+console.log("/ is prerendered, and no middleware or proxy runs.");

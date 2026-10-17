@@ -104,9 +104,6 @@ export function ProgressRing({
         width={validSize}
         height={validSize}
         className="transform -rotate-90"
-        style={{
-          filter: `drop-shadow(0 0 10px ${color}40)`,
-        }}
       >
         {/* Background circle */}
         <circle
@@ -200,10 +197,7 @@ export function ProgressRing({
       {animatedProgress === 100 && size > 60 && (
         <div
           className="absolute top-0 right-0 w-5 h-5 rounded-full flex items-center justify-center animate-scale-in"
-          style={{
-            backgroundColor: color,
-            boxShadow: `0 0 10px ${color}60`,
-          }}
+          style={{ backgroundColor: color }}
         >
           <svg
             className="w-3 h-3 text-white"

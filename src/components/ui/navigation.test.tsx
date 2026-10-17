@@ -365,7 +365,7 @@ describe("Navigation", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId("mobile-menu-button"));
       });
-      const contact = screen.getByRole("button", { name: "Contact me" });
+      const contact = screen.getByRole("button", { name: "Get In Touch" });
 
       // React's onBlur listens to focusout, which bubbles to the nav
       await act(async () => {
@@ -384,7 +384,7 @@ describe("Navigation", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId("mobile-menu-button"));
       });
-      const contact = screen.getByRole("button", { name: "Contact me" });
+      const contact = screen.getByRole("button", { name: "Get In Touch" });
 
       await act(async () => {
         fireEvent.focusOut(contact, { relatedTarget: null });
@@ -656,7 +656,25 @@ describe("Navigation", () => {
       expect(mobileButton).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("provides proper aria-label for contact button", async () => {
+    it("says whether the terminal is open on its toggle", async () => {
+      const { useTerminalToggle } = await import(
+        "@/lib/terminal/terminal-context"
+      );
+      vi.mocked(useTerminalToggle).mockReturnValue({
+        isOpen: true,
+        toggleTerminal: vi.fn(),
+      } as unknown as ReturnType<typeof useTerminalToggle>);
+
+      render(<Navigation />);
+
+      expect(
+        screen.getByRole("button", { name: "Toggle terminal" }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("names the contact button by what it says", async () => {
+      // It was labelled "Contact me" while it says "Get In Touch": a voice
+      // command naming what is on screen did not match it (WCAG 2.5.3).
       render(<Navigation />);
 
       const mobileButton = screen.getByTestId("mobile-menu-button");
@@ -664,8 +682,10 @@ describe("Navigation", () => {
         fireEvent.click(mobileButton);
       });
 
-      const contactButton = screen.getByLabelText("Contact me");
-      expect(contactButton).toBeInTheDocument();
+      const contactButton = screen.getByRole("button", {
+        name: "Get In Touch",
+      });
+      expect(contactButton).not.toHaveAttribute("aria-label");
     });
   });
 

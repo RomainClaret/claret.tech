@@ -187,9 +187,10 @@ export function Skills() {
                             }
                             aria-label={
                               expandedActivity === index
-                                ? "Show less details"
-                                : "Read more details"
+                                ? `Show less about ${activity.title}`
+                                : `Read more about ${activity.title}`
                             }
+                            aria-expanded={expandedActivity === index}
                           >
                             {expandedActivity === index
                               ? "Show less"
@@ -199,6 +200,7 @@ export function Skills() {
                                 "w-3 h-3 transition-transform duration-300",
                                 expandedActivity === index && "rotate-180",
                               )}
+                              aria-hidden="true"
                             />
                           </button>
                         </div>
@@ -423,6 +425,7 @@ export function Skills() {
                                   ? `Show less about ${category}`
                                   : `Read more about ${category}`
                               }
+                              aria-expanded={expandedInterest === index}
                             >
                               {expandedInterest === index
                                 ? "Show less"
@@ -432,6 +435,7 @@ export function Skills() {
                                   "w-3 h-3 transition-transform duration-300",
                                   expandedInterest === index && "rotate-180",
                                 )}
+                                aria-hidden="true"
                               />
                             </button>
                           </div>

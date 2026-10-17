@@ -379,7 +379,6 @@ describe("ErrorBoundary", () => {
     it("handles null error gracefully", () => {
       // Simulate a scenario where error is null (shouldn't happen in practice)
       class TestBoundary extends ErrorBoundary {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         constructor(props: any) {
           super(props);
           this.state = { hasError: true, error: null };

@@ -1,19 +1,3 @@
-/**
- * Tunables for the in-browser Python sandbox.
- *
- * Everything a reviewer might want to change lives here rather than being
- * scattered through the worker and the client: resource ceilings, the module
- * denylist, and the JS globals the worker strips before running user code.
- *
- * The denylist and the strip list are consumed by public/python-worker.js,
- * which is plain untranspiled JS and cannot import this module. They are
- * duplicated there deliberately, and worker-contract.test.ts asserts the two
- * copies stay in sync.
- */
-
-/** Where the vendored runtime is served from. Must stay same-origin. */
-export const PYODIDE_BASE_URL = "/pyodide/";
-
 /** Worker script path. Same-origin, so `worker-src 'self'` covers it. */
 export const PYTHON_WORKER_URL = "/python-worker.js";
 

@@ -6,6 +6,7 @@ import {
 } from "@/lib/utils/medium-scraper";
 import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
+import { mediumUsername } from "@/lib/utils/medium-username";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 interface MediumPost {
@@ -23,8 +24,7 @@ interface MediumPost {
 }
 
 async function handler(request: NextRequest) {
-  const mediumUsername =
-    process.env.NEXT_PUBLIC_MEDIUM_USERNAME || "romainclaret";
+  const username = mediumUsername();
 
   // Check if this is a test environment (playwright only, not unit tests)
   const url = new URL(request.url);
@@ -102,7 +102,7 @@ async function handler(request: NextRequest) {
     const data = await fetchMediumFeed<{
       items?: MediumPost[];
       cachedColors?: unknown;
-    }>(mediumUsername);
+    }>(username);
 
     // Enrich posts with scraped images and colors
     if (data.items && Array.isArray(data.items)) {

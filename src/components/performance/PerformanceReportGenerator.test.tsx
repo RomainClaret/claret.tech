@@ -107,6 +107,31 @@ describe("PerformanceReportGenerator", () => {
     expect(result.current.phases[4].status).toBe("error");
   });
 
+  it("stops a cancelled run, and posts nothing", async () => {
+    // The dialog closed mid-run and the run went on: it posted its report
+    // to the API all the same.
+    const post = vi.fn(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({ report: {} }),
+        }) as unknown as Response,
+    );
+    vi.stubGlobal("fetch", post);
+    const { result } = renderHook(() => PerformanceReportGenerator({}));
+
+    await act(async () => {
+      const run = result.current.generateReport();
+      result.current.cancel();
+      await vi.runAllTimersAsync();
+      await run;
+    });
+
+    expect(post).not.toHaveBeenCalled();
+    expect(result.current.error).toBeNull();
+    expect(result.current.isGenerating).toBe(false);
+  });
+
   it("names the status when the answer is not the API's", async () => {
     // A platform's own error page, not JSON.
     const result = await generate(failed(502, "<html>Bad gateway</html>"));

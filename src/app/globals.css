@@ -95,15 +95,45 @@
 /* Text in a colour that comes from data (accent-text.ts): darkened on the
    light theme, lightened on the dark one. Over the site's data colours it
    reads at 5.07:1 or more on white, slate-50 and the colour's own 10 to 20%
-   tints, and at 5.71:1 or more on the dark ones (accent-text.test.ts);
-   used as they were, the colours read at 1.5 to 4.3:1 on their own light
-   tints (WCAG 1.4.3 asks 4.5 for small text). */
+   tints, and at 5.71:1 or more on the dark ones; over the companies' logo
+   colours on Experience cards, at 5.21:1 or more on light and, doubled in
+   brightness first (ExperienceTimeline.tsx), 4.73:1 or more on dark
+   (accent-text.test.ts). Used as they were, the colours read at 1.5 to
+   4.3:1 on their own light tints (WCAG 1.4.3 asks 4.5 for small text). */
 .accent-text {
   color: color-mix(in srgb, var(--accent) 50%, black);
 }
 
 .dark .accent-text {
   color: color-mix(in srgb, var(--accent) 70%, white);
+}
+
+/* The same for a colour no test can list, a GitHub language's: a deeper mix
+   that reads at 4.5:1 or more for any colour, on the same surfaces (white,
+   slate-50 and its own light tints; the dark background and its own dark
+   tints). The worst cases are white on the light theme, at 5.7:1, and black
+   on the dark one, at 5.0:1 (accent-text.test.ts samples the colour cube).
+   Through .accent-text, 5 of the 37 fallback language colours fell short:
+   Lua's navy read at 2.7:1 on the dark theme. */
+.accent-text-any {
+  color: color-mix(in srgb, var(--accent) 40%, black);
+}
+
+.dark .accent-text-any {
+  color: color-mix(in srgb, var(--accent) 50%, white);
+}
+
+/* A card's brand colour, chosen by theme in CSS: each Experience card sets
+   --brand (its logo colour) and --brand-dark (the same, doubled in
+   brightness), as "r, g, b", and its parts use rgb(var(--c)). The server's
+   HTML paints the right one as soon as the head script sets .dark, where the
+   theme's state in JavaScript only settles after hydration. */
+.brand-colour {
+  --c: var(--brand);
+}
+
+.dark .brand-colour {
+  --c: var(--brand-dark);
 }
 
 /* The research map's lane colours, given per element as --lane: on dots,

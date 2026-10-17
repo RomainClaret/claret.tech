@@ -1,8 +1,8 @@
 # ACT Configuration for local GitHub Actions testing
 # https://github.com/nektos/act
 
-# Use Node.js 20 image for consistency with production
---platform ubuntu-latest=node:20-bullseye
+# The Node major CI and the production build run (package.json engines)
+--platform ubuntu-latest=node:24-bookworm
 
 # Container architecture for Apple Silicon compatibility
 --container-architecture linux/amd64

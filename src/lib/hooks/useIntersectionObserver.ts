@@ -10,7 +10,7 @@ interface UseIntersectionObserverOptions {
 
 export function useIntersectionObserver(
   options: UseIntersectionObserverOptions = {},
-): [RefObject<HTMLDivElement>, boolean] {
+): [RefObject<HTMLDivElement | null>, boolean] {
   const [isIntersecting, setIsIntersecting] = useState(false);
   const targetRef = useRef<HTMLDivElement>(null);
 

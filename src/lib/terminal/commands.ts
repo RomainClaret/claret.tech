@@ -93,7 +93,7 @@ export const commands: Record<string, CommandFunction> = {
 
     const websiteCommands = [
       { cmd: "goto <section>", desc: "Navigate to any website section" },
-      { cmd: "research [close]", desc: "Open the research map" },
+      { cmd: "research", desc: "Open the research map" },
       { cmd: "resume", desc: "Display resume/CV information" },
       { cmd: "contact", desc: "Show contact information" },
       { cmd: "email", desc: "Copy email to clipboard" },
@@ -405,15 +405,11 @@ ${formatCommands(aiCommands)}
         );
         return { output: "Research map opened", success: true };
       }
-      case "close":
-        window.dispatchEvent(new CustomEvent("terminal-research-close"));
-        return { output: "Research map closed", success: true };
       case "help":
         return {
           output: [
             "Research Map Commands:",
             "  research          Open the map: papers and projects by line of work, over time",
-            "  research close    Close the map",
             "  research help     Show this help",
           ].join("\n"),
           success: true,
@@ -838,6 +834,9 @@ ${formatCommands(aiCommands)}
     // on the homepage rather than reporting a section that plainly exists as
     // missing.
     if (typeof window !== "undefined") {
+      // A full load on purpose: the terminal runs outside React here, and
+      // the homepage scrolls to its hash as it loads.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = `/#${section === "blog" ? "blogs" : section}`;
       return { output: `Navigating to ${section}...`, success: true };
     }
@@ -1291,14 +1290,14 @@ ${formatCommands(aiCommands)}
         "\x1b[1mDESCRIPTION\x1b[0m",
         "    Open the research map: the papers and research projects on this",
         "    site, one line of work per row, time running left to right. A line",
-        "    joins two items and says why: shared code, co-authors, a venue, or",
-        "    a research card that links them. Each item opens its details, its",
-        "    PDFs and its card on the page. The terminal steps aside while the",
-        "    map is open and comes back when it closes.",
+        "    joins two items and says why: one builds on, led to or is part of",
+        "    the other, they are companion work, they share code, co-authors or",
+        "    a venue, or a research card links them. Each item opens its",
+        "    details, its PDFs and its card on the page. The terminal steps",
+        "    aside while the map is open and comes back when it closes.",
         "",
         "\x1b[1mACTIONS\x1b[0m",
         "    (none), open    Open the map",
-        "    close           Close the map",
         "    help            List these actions",
         "",
         "\x1b[1mKEYS\x1b[0m",
@@ -1770,7 +1769,7 @@ export function getCompletions(
 
   // Research map command completion
   if (command === "research") {
-    const subcommands = ["open", "close", "help"];
+    const subcommands = ["open", "help"];
     const partial = parts[1]?.toLowerCase() || "";
     return subcommands.filter((sub) => sub.startsWith(partial)).sort();
   }

@@ -166,6 +166,27 @@ describe("Medium Posts API Route", () => {
       );
     });
 
+    // The URL has its own "@", and the old .env.example asked for one in
+    // the variable too: the feed was then requested for "@@testuser".
+    it("drops a leading @ from the configured username", async () => {
+      process.env.NEXT_PUBLIC_MEDIUM_USERNAME = "@testuser";
+
+      mockCleanMediumCache.mockResolvedValueOnce(undefined);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockRss2JsonResponse),
+      });
+      mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
+      mockGetCachedColors.mockResolvedValueOnce({});
+
+      await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@testuser",
+        expect.any(Object),
+      );
+    });
+
     it("handles RSS2JSON API errors gracefully", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce({

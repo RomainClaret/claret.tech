@@ -296,7 +296,6 @@ test.describe("Navigation", () => {
 
       // Enable debug logging in the page context
       await page.evaluate(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).DEBUG_CI = true;
       });
 

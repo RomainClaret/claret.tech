@@ -183,8 +183,10 @@ export function useResizableWithHandles({
     document.removeEventListener("mouseup", handleMouseUpRef.current!, true);
   }, []);
 
-  // Store the handleMouseUp ref
-  handleMouseUpRef.current = handleMouseUp;
+  // Written after commit, not during render; a press can only come later.
+  useEffect(() => {
+    handleMouseUpRef.current = handleMouseUp;
+  }, [handleMouseUp]);
 
   // Store current props in refs for stable access
   const sizeRef = useRef(size);
@@ -257,8 +259,5 @@ export function useResizableWithHandles({
     };
   }, []);
 
-  return {
-    startResize,
-    isResizing: isResizingRef.current,
-  };
+  return { startResize };
 }

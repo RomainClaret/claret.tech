@@ -8,13 +8,15 @@ downloads. Measured with `scripts/perf/measure.mjs`.
 Measure a production build. `next dev` is much slower and not representative.
 
 ```
-SERVE_HTTP=true npx next build
+SERVE_HTTP=true npx next build --webpack
 SERVE_HTTP=true npx next start -p 3000
 node scripts/perf/measure.mjs --label <name> --runs 3
 ```
 
 - `SERVE_HTTP=true` is needed at build and start time on plain http. Without it the
   HTTPS-forcing headers blank the page in WebKit (commit f36b93e).
+- `--webpack`: Next 16 builds with Turbopack by default, and the custom
+  webpack config does not apply there (`npm run build` passes it too).
 - `npx next build` skips the `prebuild` scripts. Those regenerate colour data
   from the network, which you don't want between two measurements.
 - `--scenarios S1,S8` picks scenarios, `--settle` sets the wait after load in ms
@@ -25,9 +27,10 @@ node scripts/perf/measure.mjs --label <name> --runs 3
 
 The browser is headless Chromium. Its software GPU (SwiftShader) stands in for
 a machine without a graphics card, and the DevTools protocol throttles the CPU.
-WebKit runs for frame pacing only. Firefox can't be launched from the sandbox
-this was developed in, so check it by hand: the Firefox Profiler's idle view,
-before and after a change.
+WebKit runs for frame pacing only. The harness does not drive Firefox, and
+Firefox does not start inside the macOS sandbox this was developed in: run
+its tests in Playwright's Linux image (below), and check its costs by hand,
+with the Firefox Profiler's idle view before and after a change.
 
 ## Scenarios
 
@@ -285,7 +288,10 @@ How it holds together:
   unchanged: one request, and the splash shows at a median of 346 ms
   against 351 ms before (Chromium).
 - **Guards:** `.github/scripts/check-static-home.mjs` fails the build job if
-  `/` stops being prerendered or a middleware returns;
+  `/` stops being prerendered or a middleware or proxy returns (Next 16
+  records a `proxy.ts`, or any Node.js middleware, in
+  `functions-config-manifest.json`, not `middleware-manifest.json`: the guard
+  reads both since round 14);
   `tests/e2e/static-shell.spec.ts` pins the first paint, a clean hydration,
   the no-script page, the page when the bundle never runs or the splash,
   its player or the hero's brains cannot be fetched, and no splash over a
@@ -421,18 +427,83 @@ Both built in the Linux container (Node 20.20.2, clean `npm ci`, CI's env),
 webpack kept for both (`--webpack`: the custom webpack config does not
 apply under Turbopack).
 
-| Measure                                            | 15.5.22             | 16.4.1              | Change                                                                        |
-| -------------------------------------------------- | ------------------- | ------------------- | ----------------------------------------------------------------------------- |
-| Homepage JS, gzipped                               | 298.7 KB            | 326.4 KB            | +27.7 KB (+9.3%), all in Next's framework chunk (React 19.2's vendored build) |
-| Homepage CSS and fonts                             |                     |                     | unchanged                                                                     |
-| Homepage HTML                                      |                     |                     | 5.5 KB smaller                                                                |
-| Image keys hung after a dropped request            | 92 of 160           | 0 of 320            | the optimizer bug below, fixed in 16.4.0                                      |
-| Lighthouse (desktop, two runs each, fresh servers) | 100, 96, 96, 92     | 100, 96, 96, 92     | same scores                                                                   |
-| FCP / LCP / Speed Index                            | 364 / 704 / 1692 ms | 363 / 750 / 1500 ms | LCP +46 ms, Speed Index -192 ms                                               |
-| TBT, CLS                                           | 0, 0                | 0, 0                |                                                                               |
+| Measure                                            | 15.5.22             | 16.4.1              | Change                                                                                                                  |
+| -------------------------------------------------- | ------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Homepage JS, gzipped                               | 298.7 KB            | 326.4 KB            | +27.7 KB (+9.3%), all in Next's framework chunk: its own React went from 19.2.0-canary to 19.3.0-canary, and its router |
+| Homepage CSS and fonts                             |                     |                     | unchanged                                                                                                               |
+| Homepage HTML                                      |                     |                     | 5.5 KB smaller                                                                                                          |
+| Image keys hung after a dropped request            | 92 of 160           | 0 of 320            | the optimizer bug below, fixed in 16.4.0                                                                                |
+| Lighthouse (desktop, two runs each, fresh servers) | 100, 96, 96, 92     | 100, 96, 96, 92     | same scores                                                                                                             |
+| FCP / LCP / Speed Index                            | 364 / 704 / 1692 ms | 363 / 750 / 1500 ms | LCP +46 ms, Speed Index -192 ms                                                                                         |
+| TBT, CLS                                           | 0, 0                | 0, 0                |                                                                                                                         |
 
 The Linux e2e set on 16.4.1: 347 passed, 0 failed, 7 skipped by design;
-mobile 20 of 20. Deprecated in 16, for later: React 18 support (removed in 17) and the Edge runtime of the og-image route.
+mobile 20 of 20. Its two deprecation warnings went in round 13 (2026-10-15):
+React 18, which only the unit tests ran (the site runs Next's own React
+build, 19.3.0-canary in 16.4.1), is 19.3 now; the og-image route runs on
+Node.js and is built once (`dynamic = "force-static"`; on Edge it was drawn
+on every request). Homepage bytes did not move with either (Linux build of
+`193ece7` against `bcc716a`: JS 326.5 KB gzipped, CSS 19.1, HTML 511.7).
+
+### Round 14: the React Compiler fixes, `eb2e966` against `92e347d` (2026-10-16)
+
+ESLint 9 brought the React Compiler's rules, and fixing their 84 findings
+touched canvas and animation code: browser values through
+`useSyncExternalStore`, latest values through effect events, state derived
+in render. Both builds served side by side (`:3002`, `:3003`), alternated,
+two runs per scenario per round.
+
+| Scenario | Measure                | `92e347d` | `eb2e966` | Runs per side |
+| -------- | ---------------------- | --------- | --------- | ------------- |
+| S1       | main thread            | 18.06%    | 17.50%    | 10            |
+| S1       | layout                 | 1.34%     | 1.12%     | 10            |
+| S1M      | main thread            | 23.60%    | 22.01%    | 4             |
+| S1M      | style recalcs          | 1537/s    | 835/s     | 4             |
+| S6       | main thread            | 32.13%    | 31.62%    | 4             |
+| S7       | blocking time          | 177.5 ms  | 181 ms    | 10            |
+| S7       | long tasks             | 5.5       | 5.0       | 10            |
+| S7       | main thread            | 37.79%    | 35.55%    | 10            |
+| S8       | blocking time          | 151.5 ms  | 149 ms    | 4             |
+| S8       | main thread            | 57.07%    | 56.48%    | 4             |
+| W1       | fps, frames over 20 ms | 59.6, 2   | 59.8, 2   | 4             |
+
+No regression; S1M's style recalcs halved. The first round ran under a load
+average of about 70 and is left out. At four runs per side, S1's layout
+share (0.87 against 1.48%) and S7's blocking time (166 against 181.5 ms)
+looked like regressions; three more rounds of those two put both inside the
+noise (S7: the head's time was higher in 61 of 100 pairs of runs, where 50
+is no difference).
+
+### Round 15: Next 16.4.2 and ESLint 10 (2026-10-17)
+
+Two webpack builds in this checkout with CI's e2e env, Next 16.4.1 and then
+16.4.2, compared file by file with build IDs and renamed files mapped:
+
+| Output files (503) | Count | What differs                                                                                                       |
+| ------------------ | ----- | ------------------------------------------------------------------------------------------------------------------ |
+| Identical          | 494   |                                                                                                                    |
+| Version string     | 5     | Next's version, in four client chunks and a server chunk                                                           |
+| Noise              | 2     | the sitemap's `lastmod` and the key order of `app-paths-manifest.json`, as between two 16.4.1 builds               |
+| Stylesheets        | 2     | xterm's and pdf.js's, from a stale webpack cache (round 15 traps): a cache-free 16.4.1 build emits the 16.4.2 ones |
+
+ESLint 10.13 against 9.39.5, same config: the same 85 rules with the same
+options for a `.tsx` file, 0 problems in `src` (4.8 s), and the same
+findings on a file with a violation planted for each plugin
+(`src/app/lint-rules.test.ts`).
+
+Linux WebKit r2370, the build in Playwright 1.64.x, renders pages with
+`backdrop-filter` slowly on few CPUs (microsoft/playwright#43426, WebKit
+bug 327850). `requestAnimationFrame` callbacks per second in the 1.64.0
+image (arm64), by the CPUs the container may use:
+
+| Page                          | 2 CPUs | 4 CPUs | 16 CPUs |
+| ----------------------------- | ------ | ------ | ------- |
+| The issue's 12 cards, blur on | 1      | 1      | 22      |
+| Homepage, top                 | 9      | 17     | 14      |
+| Homepage, scrolled 1500 px    | 30     | 31     | 30      |
+
+The homepage's rate does not fall with the CPUs, so CI's WebKit jobs
+should not stall on it.
 
 ## Measuring well
 
@@ -581,14 +652,13 @@ mobile 20 of 20. Deprecated in 16, for later: React 18 support (removed in 17) a
   behave the same here; arm64, or x64 emulated at about half speed):
   - unpack a `git archive` of the commit: tracked files only, as a local
     `public/profile.json`, which CI never has, changes the Projects section;
-  - put Node 20 first on the PATH: the image's default is 24, and CI's
-    setup-node pins 20;
-  - run `npm ci --ignore-scripts`, since `canvas` has no linux-arm64 binary
-    for Node 20. The flag goes on that command only, so `prebuild` still
-    runs;
-  - run the postinstall by hand: `node scripts/setup-assets.js`, then
-    `node scripts/mirror-legacy-pdfs.js`. Without it `public/pyodide` is
-    missing and the Python terminal tests time out;
+  - use the image's Node 24, CI's too since 2026-10-15 (until then CI
+    pinned 20 and this recipe put Node 20 first on the PATH);
+  - run `npm ci`. Its postinstall (`setup-assets.js`,
+    `mirror-legacy-pdfs.js`) makes `public/pyodide`, without which the
+    Python terminal tests time out. (`npm ci --ignore-scripts` and a
+    postinstall by hand were needed while `canvas`, which had no
+    linux-arm64 binary for Node 20, was installed; it went in round 14.)
   - build with CI's env (`SERVE_HTTP=true`, `USE_GITHUB_DATA=false`, ...)
     and `npm start` with `SKIP_EXTERNAL_APIS=true`;
   - wait for a 200 as CI does, then run with `CI=true` and `--retries=0`.
@@ -1011,9 +1081,9 @@ mobile 20 of 20. Deprecated in 16, for later: React 18 support (removed in 17) a
   every run. A test about colours at rest turns transitions off.
 - **Firefox crashed when axe opened its blank page.** By default
   `@axe-core/playwright` opens a blank page for each scan (its
-  `finishRun`) and closes it. In CI's Firefox, held to one content process
-  (`dom.ipc.processCount: 1` and `browser.tabs.remote.autostart: false`
-  in `playwright.config.ts`), the key press after that crashed the page's
+  `finishRun`) and closes it. In CI's Firefox, then held to one content
+  process (`dom.ipc.processCount: 1` and `browser.tabs.remote.autostart:
+false`, since removed: below), the key press after that crashed the page's
   process (signal 11): 10 of 10 runs, as the monitor's views were scanned
   one after another. In legacy mode (`.setLegacyMode()`: axe runs in the
   page and opens nothing), 0 of 20; with the default processes, 0 of 10.
@@ -1056,6 +1126,8 @@ mobile 20 of 20. Deprecated in 16, for later: React 18 support (removed in 17) a
   as every page here is, `matchMedia` answers no preference for
   `colorScheme` and `contrast` (1.64). A bare server lost both with that
   one header and kept them without it. `reducedMotion` holds either way.
+  Fixed upstream for 1.65 (microsoft/playwright#43287); two static-shell
+  tests skip Firefox until that bump.
 - **A check once a frame misses what goes before the first frame.**
   static-shell's watcher looked for the splash's backdrop on each
   animation frame. In Linux WebKit the backdrop was sometimes gone before
@@ -1135,11 +1207,206 @@ build"` killed itself before building. Put the commands in a script
   stability settings, made axe crash the tab (10 of 10). CI's Firefox
   suites without them, alternating three runs each: 45 of 45 passed every
   time, median 120 s against 118 s. Removed.
-- **The homepage does not reflow at 320 px** (WCAG 1.4.10), with scripts
-  or without: 19 px too wide on an iPhone SE. Four no-wrap rows or
-  columns: research cards' footer row (300 px), the footer's seven icons
-  (340 px), the Papers filter pills and stats rows (332 px with padding),
-  and Education's two-column skills grid of no-wrap pills ("Software
-  Engineering", 175 px; "JAX/TensorFlow" has no break) in a column left
-  176 px. Wrapping the first two fixed them when injected; Papers and
-  Education need more (and Education a design call). Not fixed yet.
+- **The homepage did not reflow at 320 px** (WCAG 1.4.10), with scripts
+  or without: 19 px too wide in Chromium, 18 in WebKit. Four no-wrap rows
+  or columns: research cards' footer row (300 px), the footer's seven
+  icons (340 px), the Papers filter pills and stats rows (332 px with
+  padding), and Education's two-column skills grid of no-wrap pills
+  ("Software Engineering", 175 px; "JAX/TensorFlow" has no break) in a
+  column left 176 px. Fixed in round 13: the rows wrap, and under 400 px
+  Education hides its rail (Romain's choice) while its skills are tags that
+  wrap on every phone. No overflow from 320 to 414 px, scripts on or off;
+  mobile-accessibility.spec.ts goes through the whole page at 320 px.
+- **The unit tests ran a React the site never ran.** The App Router ships
+  Next's own React build (the homepage's framework chunk said
+  19.3.0-canary), and the installed react-dom 18.3.1 reached only the
+  pages-router fallback chunk, which `/` never loads. So 2,347 tests ran
+  React 18 for a site on 19. `src/app/react-version.test.ts` now holds the
+  installed major to Next's.
+- **A colour table keyed by file name missed the format the site loads.**
+  `scripts/extract-colors-simple.js` named `unine_logo.jpg`; the site loads
+  `unine_logo.webp`, which got the default grey, and a table hit stops the
+  runtime extraction. Every Experience, Education and Other Work card was
+  grey from the first commit. Keyed by base name now, with a coverage test.
+- **A hex alpha after `rgb()` is not a colour.** `${color}20` with
+  `color = "rgb(0, 102, 255)"` gives `rgb(0, 102, 255)20`; browsers drop
+  the declaration without a word, and so does jsdom (`style.x === ""`).
+  Nine tints and glows never rendered; they are deleted. Short hex fails
+  the same way: `#333` + `30` is `#33330`.
+- **A test file's saved stand-in can be the reset-prone one.** Six test
+  files keep the IntersectionObserver they find at load to restore it in
+  afterEach: setup.ts's load-time one, written as
+  `vi.fn().mockImplementation()`, which mockReset empties (its beforeEach
+  installs a good one later). On React 19 the PDF reader's pending
+  observer effect ran while unmounting, after that restore, and threw.
+- **axe passes what it cannot judge.** In the Experience section it rated
+  46 texts "incomplete" (background gradient), 2 passed, none failed, with
+  the raw brand colours (Libacy 2.15:1 on white) as with the fixed ones.
+  The colour arithmetic lives in `src/app/accent-text.test.ts`.
+- **A route handler on Node.js is dynamic unless it says `force-static`**,
+  and the Edge renderer drew the og-image differently: it ignored the
+  background pattern's `fill-opacity`, so the shipped preview has solid
+  white marks; on Node.js the opacity applies, hence `fill-opacity='1'`.
+- **A local build without `SERVE_HTTP=true` cannot be tested in WebKit
+  over http.** Production's CSP has `upgrade-insecure-requests`; Chromium
+  ignores it for localhost, WebKit upgrades every subresource to https and
+  gets none: an unstyled page whose splash never ends. CI and the container
+  harness build with it; a hand-made host build must too.
+- **Lint passed with a warning for months.** `npm run lint` runs with
+  `--max-warnings 0` now, so CI fails on the next one.
+- **Keywords matched as substrings misfile.** The Papers area guess read
+  "revolution" and "evolutionary paths" as neuroevolution (the Blockchain
+  paper) and an "ai" inside a word as machine learning (the vestibular
+  poster). `src/lib/utils/research-area.ts` matches whole words, with
+  HyperNEAT and NEAT as neuroevolution's own.
+
+Round 14 (2026-10-15/16):
+
+- **`--write` beats `--check`.** CI's format check ran
+  `prettier --write ... --check`, and Prettier sets no failing exit code
+  while `--write` is on: the check rewrote CI's copy and passed. It runs
+  `format:check` (`--check` alone) now, and `ci-workflows.test.ts` fails on
+  a `--write` in CI.
+- **Hand-kept lists drift.** Seven test files ran in no CI job, and a spec
+  only runs once a Playwright job names it. `ci-test-lists.test.ts` and
+  `ci-workflows.test.ts` read the workflows and fail on what no job runs.
+- **A change under `scripts/` skipped the build**, which runs it
+  (`prebuild`, `postinstall`, `next.config`'s plugin): no path filter named
+  the folder.
+- **There is no Vercel check.** `vercel.json` turns the Git integration
+  off: production deploys only through the "Deploy to Vercel" workflow,
+  which runs CI first.
+- **The splash hides the window before hydration.** A colour or icon that
+  depends on the theme's state in JavaScript is wrong until hydration, and
+  the splash's backdrop covers that window (0.5 s locally, 3.6 s on Fast 3G
+  with a 4x slower CPU). It shows only on a load slower than the backdrop's
+  6 s fallback, a failed bundle, or a page without the splash (`/pdf/*`).
+  Let CSS choose from the class the head script sets.
+- **`useSyncExternalStore` keeps hydration identical.** The server snapshot
+  renders during hydration, and the client's applies in a synchronous
+  re-render right after. It merges that re-render into the effects' task,
+  where an effect's `setState` ran as a task of its own; at ten runs per
+  side, S7's blocking time did not move (round 14 results).
+- **ESLint 8 could not see what React 19's compiler rules catch.** With
+  eslint-config-next 15 it knew neither effect events (`useEffectEvent`)
+  nor the compiler's rules. ESLint 9 with config 16 found 84 sites: state
+  copied by effects, refs read during render, clock reads in render.
+- **web-vitals 5's `on*` return nothing.** Their return values kept as
+  cleanups made an empty list: observers stacked on each toggle. Subscribe
+  once per page.
+- **Next 16 records a proxy elsewhere.** `proxy.ts` (or a Node.js
+  middleware) is in `functions-config-manifest.json` under `/_middleware`;
+  `middleware-manifest.json` stays empty.
+- **Browserslist's defaults follow usage data.** An `npm audit fix` updated
+  caniuse-lite, Safari 17 left the defaults, and autoprefixer dropped
+  `-webkit-backdrop-filter`. `package.json` names the targets now (Next's
+  own, and iOS 16.4).
+- **Four runs per side cannot call a 10% change.** Two regressions at four
+  runs vanished at ten. Interleave, then add rounds before bisecting.
+
+Round 15 (2026-10-17):
+
+- **The webpack cache keeps third-party CSS built for old targets.** After
+  round 14 pinned the browser targets, local builds still served xterm's and
+  pdf.js's stylesheets as `.next/cache` held them from before: prefixes the
+  targets no longer need, and no `-webkit-backdrop-filter` for Safari 16.4
+  in pdf.js's forced-colors rule. Our own CSS was current. CI and the deploy
+  build without a cache, so they never shipped it. Fixed in round 16:
+  next.config.mjs adds `package.json` and `postcss.config.js` to the
+  cache's `buildDependencies`.
+- **ESLint 10 runs three plugins outside their peer range.**
+  eslint-config-next wraps react and import for the context methods ESLint
+  10 removed; jsx-a11y needs none. npm warns, and `npm ls` calls the pair
+  invalid. A rule that loads but stops reporting would pass lint without a
+  word: `lint-rules.test.ts` plants a violation for each plugin.
+- **An env var nothing reads passes every check.** deploy.yml passed
+  `MEDIUM_USERNAME` and the code read `NEXT_PUBLIC_MEDIUM_USERNAME`, so the
+  secret never reached the site, and six CI mocks of it changed nothing.
+  `ci-workflows.test.ts` now fails on a workflow env var that no code, test,
+  config, shell script, step or tool reads.
+- **Names follow the same rule as colours.** An `aria-label` from React's
+  state is wrong until hydration, as the icon was: the theme toggle told
+  dark visitors "current: light". Hold both names in `sr-only` spans and
+  let the class on `<html>` hide one: a hidden span is left out of the
+  accessible name. A description inside the button must then be `hidden`
+  too (`aria-describedby` still reads it), or it joins the name.
+- **Search upstream before drafting a report.** Both reports drafted in
+  round 12 were filed by others and fixed by the time they were ready
+  (microsoft/playwright#43287, #43426). `gh search issues` with several
+  words found neither; `gh api search/issues -f q='repo:… is:issue …'` did.
+- **A lockfile from another npm can fail `npm ci`.** ESLint 10's lockfile,
+  written by npm 11.6.2 (Node 25 on the Mac), left out the required peers
+  of an optional dependency (`@napi-rs/wasm-runtime`'s `@emnapi/core` and
+  `@emnapi/runtime`), and npm 11.19 (Node 24.21, as in CI) refused it as
+  out of sync. Since round 16 the Mac has Node 24 from nvm (`.nvmrc`;
+  `nvm use` in the repo gives CI's npm); still run `npm ci` in the
+  container before trusting a lockfile.
+- **macOS `tar` adds `._` files.** An archive of the working tree made with
+  macOS `tar` carries AppleDouble `._*` files for extended attributes.
+  ESLint lints dotfiles and failed on each with "Invalid character", while
+  tsc and Next skip them. Archive with `git archive`.
+- **Search the specs for selectors on an attribute before removing it.**
+  The toggles' `aria-label`s went, and a terminal test still found the
+  toggle by `button[aria-label*="theme" i]`. A search for the old names
+  missed it; the e2e gate caught it.
+
+Round 16 (2026-10-17):
+
+- **A name match is not a use.** Round 15's sweep for dead test helpers
+  matched names, so a same-named local (`mockApiCache` in three route
+  tests), a commented-out import and a same-named type elsewhere all
+  counted as uses, and five dead helpers stayed. knip follows imports:
+  it found those, 5 e2e helper files nothing imported since the first
+  commit (825 lines) and 25 more dead exports and re-exports. It runs in
+  CI's quick checks now (`knip.jsonc` explains each setting).
+- **knip cannot see a namespace object passed along.**
+  `const [webllm] = await Promise.all([import("@/lib/webllm")])` then
+  `webllm.webLLMClient` read as unused, and deleting it would have broken
+  the terminal's AI commands. Destructure where you import
+  (`const [{ webLLMClient }] = ...`): knip traces that. type-check is the
+  backstop: a deleted export that is still read fails to compile.
+- **Linting the tests found what the dead-code pass left.** With tests in
+  lint, the helper whose only export went still imported `vi`. The test
+  rules turn off `no-explicit-any`, `react-hooks/globals` and
+  `no-img-element`, and every disable comment for them then counts as an
+  unused directive: 25 went with that change. `eslint --fix` removes such
+  a comment's text but leaves its blank line.
+- **The Mac ran an unsupported Node.** Homebrew's Node 25.2.1 (end of life
+  2026-06-01) with npm 11.6.2, while CI and the deploy run Node 24 and npm
+  11.19: the source of round 15's broken lockfile. nvm (its default is
+  16.20.2) has Node 24.22.0 for `.nvmrc`, and `ci-workflows.test.ts` holds
+  the file to the same major as CI. But the Mac's shell never loads nvm
+  (round 17), so its terminals stayed on Node 25.
+- **Previews built without production's env.** The preview job passed
+  `vercel build` none of it (no GitHub token, no `USE_GITHUB_DATA`, no
+  Medium account). One env block now serves both, through a YAML anchor
+  (GitHub reads anchors since 2025-09-18; actionlint 1.7.12 accepts it).
+  actionlint's only other findings were 12 info-level shellcheck notes
+  (unquoted variables, SC2086) in three workflows, quoted in round 17.
+
+Round 17 (2026-10-17):
+
+- **`.nvmrc` does nothing where nvm is not loaded.** Neither `~/.zshrc`
+  nor `~/.zprofile` sources nvm, so `nvm use` did not exist in the Mac's
+  terminals. The Mac's own Node is Homebrew's `node@24` now (24.22.0, npm
+  11.19.1, as CI), so lockfiles come from CI's npm by default.
+- **Homebrew 7.0.9 fails to install `node@24` on its own lock** ("A brew
+  install node@24 process has already locked
+  /opt/homebrew/Cellar/openssl@3") while pouring the new `openssl@4`
+  dependency: Homebrew/brew#24204, fixed by #24207 on 2026-10-10, 35
+  commits after 7.0.9, the latest release. Installing `openssl@4` on its
+  own first, then `node@24`, works. That install also upgraded six shared
+  libraries `node@24` needs (simdjson 4 to 5 among them), after which the
+  unlinked Node 25 keg cannot start (`libsimdjson.29.dylib` is gone from
+  `opt/simdjson`): `brew upgrade node` (26) or `brew uninstall node`.
+- **Chain a destructive step after a fallible one with `&&`.**
+  `brew install node@24; brew unlink node` unlinked Node 25 although the
+  install had failed, and the Mac had no `node` until it was relinked a
+  few seconds later.
+- **`brew uninstall` removes more than you name.** Its autoremove also
+  uninstalled `hdrhistogram_c`, as no installed formula needed it. Set
+  `HOMEBREW_NO_AUTOREMOVE=1` to remove only what you name.
+- **actionlint checks the workflows in CI** (`npm run lint:workflows`, from
+  its Docker image pinned by digest): syntax, expressions, job references,
+  and shellcheck on every run step. It needs the repository mounted, not
+  only `.github`, to find the workflows itself.

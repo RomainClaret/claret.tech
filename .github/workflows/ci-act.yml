@@ -3,12 +3,11 @@ name: CI-ACT
 # This is a modified CI workflow for testing with ACT
 # Removes sudo commands that don't work in Docker containers
 
+# For act only: `act workflow_dispatch -W .github/workflows/ci-act.yml`.
+# GitHub runs ci.yml; with push and pull_request triggers here, every push
+# ran the unit suites a second time.
 on:
-  push:
-    branches: ['*']  # Run on all branches including main
-  pull_request:
-    branches: ['*']  # Run on all pull requests
-  workflow_call:  # Allow this workflow to be called by other workflows
+  workflow_dispatch:
 
 # Least privilege: these workflows only read the repo and run tests.
 # Without this they inherit the repo default, which is write.
@@ -16,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   # CI environment detection variables
   CI: true
   CONTINUOUS_INTEGRATION: true

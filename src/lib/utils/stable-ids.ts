@@ -32,31 +32,3 @@ export function generateStableId(
   const baseId = `${componentType}-${counters[componentType]}`;
   return suffix !== undefined ? `${baseId}-${suffix}` : baseId;
 }
-
-/**
- * Resets a specific counter (use sparingly - only on major state changes)
- *
- * @param componentType - The counter to reset
- */
-export function resetCounter(componentType: ComponentType): void {
-  counters[componentType] = 0;
-}
-
-/**
- * Resets all counters (use only on page refresh or major app state reset)
- */
-export function resetAllCounters(): void {
-  Object.keys(counters).forEach((key) => {
-    counters[key as ComponentType] = 0;
-  });
-}
-
-/**
- * Gets current counter value without incrementing
- *
- * @param componentType - The counter type to check
- * @returns Current counter value
- */
-export function getCounterValue(componentType: ComponentType): number {
-  return counters[componentType];
-}

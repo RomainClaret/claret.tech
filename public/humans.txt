@@ -8,10 +8,10 @@ University of Neuchâtel for supporting my research
 Open source community for the tools and libraries this site runs on
 
 /* SITE */
-Last update: 2026-10-04
+Last update: 2026-10-16
 Language: English
 Standards: HTML5, CSS3, JavaScript ES6+
-Components: Next.js 15, React 18, TypeScript, Tailwind CSS
+Components: Next.js 16, React 19, TypeScript, Tailwind CSS
 Software: VS Code, Git, Node.js
 
 /* RESEARCH */

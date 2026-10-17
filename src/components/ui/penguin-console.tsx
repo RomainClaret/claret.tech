@@ -21,7 +21,6 @@ export function PenguinConsole() {
       " \\___)=(___/",
     ].join("\n");
 
-    // eslint-disable-next-line no-console
     console.log(
       `%c🐧 curious, are we?\n%c${art}\n%cThe colony approves. Type 'penguin' in the site terminal.`,
       "font-size:14px;font-weight:bold;color:#38bdf8",

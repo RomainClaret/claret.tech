@@ -7,7 +7,13 @@ import {
   afterEach,
   afterAll,
 } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { ExperienceTimeline } from "./ExperienceTimeline";
 
 /**
@@ -41,13 +47,13 @@ vi.mock("@/components/ui/optimized-image", () => ({
   OptimizedImage: ({ alt }: { alt: string }) => <img alt={alt} />,
 }));
 
-vi.mock("@/components/ui/theme-provider", () => ({
-  useTheme: () => ({ theme: "light" }),
+const brightness = vi.hoisted(() => ({
+  adjust: (color: string, _factor: number) => color,
 }));
-
 vi.mock("@/lib/hooks/useColorExtraction", () => ({
   useColorExtraction: () => ({ color: "rgb(59, 130, 246)" }),
-  adjustColorBrightness: (color: string) => color,
+  adjustColorBrightness: (color: string, factor: number) =>
+    brightness.adjust(color, factor),
 }));
 
 // Surfaces forceHover so the held-glow assertion has something to read.
@@ -182,6 +188,63 @@ describe("ExperienceTimeline", () => {
 
     expect(document.getElementById("ucd-teaching-specialist")).toBeTruthy();
     expect(document.getElementById("artificialkind-founder")).toBeTruthy();
+  });
+
+  it("writes its coloured text through the contrast helper", () => {
+    // Dates, links and buttons take the company's logo colour. As it was,
+    // the light brands (Libacy, Versicherix, Manufacture Claret) read at 1.5
+    // to 2.5:1 on white, and the navy ones fail on the dark theme:
+    // accent-text darkens the colour on light and lightens it on dark.
+    render(<ExperienceTimeline />);
+
+    for (const text of [
+      screen.getAllByText("2010")[0],
+      screen.getAllByRole("link", { name: /Website/ })[0],
+      screen.getAllByRole("button", { name: /^View details,/ })[0],
+    ]) {
+      expect(text).toHaveClass("accent-text");
+      expect(text.style.getPropertyValue("--accent")).toBe("rgb(var(--c))");
+      expect(text.style.color).toBe("");
+    }
+  });
+
+  it("names its details button by what it says, and says whether it is open", () => {
+    render(<ExperienceTimeline />);
+    const [details] = screen.getAllByRole("button", { name: /^View details,/ });
+    expect(details).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(details);
+
+    expect(details).toHaveAttribute("aria-expanded", "true");
+    expect(details.getAttribute("aria-label")).toMatch(/^Show less, /);
+  });
+
+  it("opens a company's website without opening or closing its card", () => {
+    render(<ExperienceTimeline />);
+    const card = screen
+      .getAllByRole("link", { name: /Website/ })[0]
+      .closest(".brand-colour") as HTMLElement;
+    const details = within(card).getByRole("button", {
+      name: /^View details,/,
+    });
+
+    fireEvent.click(within(card).getByRole("link", { name: /Website/ }));
+
+    expect(details).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("gives each card both theme colours, for CSS to pick from", () => {
+    // The dark theme's colour, doubled in brightness, came from the theme's
+    // state, which only settles after hydration: until then a dark visitor
+    // read the light theme's. Both are on the card now (globals.css picks).
+    brightness.adjust = (color, factor) =>
+      factor === 2 ? "rgb(118, 255, 255)" : color;
+    const { container } = render(<ExperienceTimeline />);
+    brightness.adjust = (color) => color;
+
+    const card = container.querySelector(".brand-colour") as HTMLElement;
+    expect(card.style.getPropertyValue("--brand")).toBe("59, 130, 246");
+    expect(card.style.getPropertyValue("--brand-dark")).toBe("118, 255, 255");
   });
 
   it("keeps details hidden until a card is opened", () => {

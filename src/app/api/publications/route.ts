@@ -20,7 +20,8 @@ interface CachedData {
 
 // Publications are manually curated: the committed publications.json is
 // authoritative regardless of age. A rebuild from the academic APIs happens
-// only on an explicit ?refresh=true (or when the cache file is missing).
+// only for a request carrying the refresh key (x-refresh-key, refresh-key.ts),
+// or when the cache file is missing.
 async function getCachedPublications(): Promise<CachedData | null> {
   try {
     const data = await fs.readFile(CACHE_FILE, "utf-8");

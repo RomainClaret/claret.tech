@@ -20,6 +20,9 @@ import { cn } from "@/lib/utils";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { latestEntry } from "@/lib/utils/intersection";
 import { accentStyle } from "@/components/ui/accent-text";
+import { useOpenOnDeepLink } from "@/lib/hooks/useOpenOnDeepLink";
+import { showToast } from "@/components/ui/toast";
+import { mediumUsername } from "@/lib/utils/medium-username";
 
 interface BlogCardHolographicProps {
   title: string;
@@ -120,6 +123,35 @@ function detectArticleStatus(date?: string): {
   return { status: "archive", label: "Archive", color: "107, 114, 128" }; // Gray
 }
 
+/**
+ * The system's share sheet where there is one. Elsewhere (Firefox on a
+ * computer has none) the link goes to the clipboard, with a toast to say so;
+ * the button did nothing there. A sheet closed without sharing rejects: the
+ * visitor's choice, so nothing follows.
+ */
+async function shareArticle(data: {
+  title: string;
+  text: string;
+  url: string;
+}) {
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share(data);
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // Refused by the browser: copy the link instead.
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(data.url);
+  } catch {
+    // Clipboard denied or unavailable (plain http): nothing happened to say.
+    return;
+  }
+  showToast("Link copied to the clipboard", "success", 2500);
+}
+
 export function BlogCardHolographic({
   title,
   description,
@@ -134,13 +166,9 @@ export function BlogCardHolographic({
   anchorId,
   isDeepLinked = false,
 }: BlogCardHolographicProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Arriving via a deep link opens it.
+  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
   const [imageError, setImageError] = useState(false);
-
-  // Arriving via a deep link opens the full description.
-  useEffect(() => {
-    if (isDeepLinked) setIsExpanded(true);
-  }, [isDeepLinked]);
 
   // Determine color based on category or use provided color
   const category = detectBlogCategory(title, description);
@@ -308,9 +336,7 @@ export function BlogCardHolographic({
           )}
 
           {/* Title */}
-          <h3 className="text-lg font-semibold mb-3 line-clamp-2 bg-gradient-to-r from-foreground to-foreground group-hover:from-primary group-hover:to-purple-600 bg-clip-text text-transparent transition-all duration-500">
-            {title}
-          </h3>
+          <h3 className="text-lg font-semibold mb-3 line-clamp-2">{title}</h3>
 
           {/* Author and stats */}
           <div className="space-y-1 mb-3">
@@ -358,6 +384,7 @@ export function BlogCardHolographic({
                 aria-label={
                   isExpanded ? "Show less description" : "Read more description"
                 }
+                aria-expanded={isExpanded}
               >
                 {isExpanded ? "Show less" : "Read more"}
                 <ChevronDown
@@ -365,6 +392,7 @@ export function BlogCardHolographic({
                     "w-3 h-3 transition-transform duration-300",
                     isExpanded && "rotate-180",
                   )}
+                  aria-hidden="true"
                 />
               </button>
             )}
@@ -395,14 +423,7 @@ export function BlogCardHolographic({
             <button
               onClick={(e) => {
                 e.preventDefault();
-                // Share functionality
-                if (navigator.share) {
-                  navigator.share({
-                    title,
-                    text: description,
-                    url,
-                  });
-                }
+                void shareArticle({ title, text: description, url });
               }}
               className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border accent-text"
               style={{
@@ -422,7 +443,7 @@ export function BlogCardHolographic({
               <Share2 className="relative z-10 w-3 h-3 group-hover:rotate-12 transition-transform duration-300" />
             </button>
             <a
-              href={`https://medium.com/@romainclaret`}
+              href={`https://medium.com/@${mediumUsername()}`}
               target="_blank"
               rel="noopener noreferrer"
               className="relative overflow-hidden flex items-center justify-center gap-1 text-xs px-3 py-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 group border accent-text"

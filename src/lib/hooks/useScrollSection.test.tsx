@@ -52,6 +52,8 @@ describe("useScrollSection", () => {
         renders++;
         return useScrollSection();
       });
+      // The first detection runs on the first frame.
+      act(() => frames.splice(0).forEach((callback) => callback(0)));
       await waitFor(() => expect(result.current.isInitialized).toBe(true));
       const settled = renders;
 

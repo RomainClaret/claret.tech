@@ -102,7 +102,6 @@ vi.mock("next/image", () => ({
     if (placeholder !== undefined) imgProps.placeholder = placeholder;
     if (blurDataURL !== undefined) imgProps.blurDataURL = blurDataURL;
 
-    // eslint-disable-next-line @next/next/no-img-element
     return <img {...imgProps} alt={(imgProps.alt as string) || "Image"} />;
   },
 }));

@@ -54,12 +54,16 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
   open: boolean,
   onClose: () => void,
   { lockScroll = false, returnFocus }: ModalDialogOptions = {},
-): RefObject<T> {
+): RefObject<T | null> {
   const dialogRef = useRef<T>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
   const returnFocusRef = useRef(returnFocus);
-  returnFocusRef.current = returnFocus;
+  // The latest of each, written at every commit rather than during render.
+  // Layout effects run in order, so the one below already sees them.
+  useIsomorphicLayoutEffect(() => {
+    onCloseRef.current = onClose;
+    returnFocusRef.current = returnFocus;
+  });
 
   // Before the browser paints the dialog, not after: mounted from a lazily
   // loaded chunk, a passive effect ran a frame or more later, and a key

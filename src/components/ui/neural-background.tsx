@@ -30,6 +30,8 @@ import {
   ComponentConfig,
 } from "@/contexts/quality-context";
 import { latestEntry } from "@/lib/utils/intersection";
+import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useWindowSize } from "@/lib/hooks/useWindowSize";
 
 interface NeuralBackgroundProps {
   className?: string;
@@ -252,7 +254,7 @@ const NeuralNode = memo(
 NeuralNode.displayName = "NeuralNode";
 
 export function NeuralBackground({ className }: NeuralBackgroundProps) {
-  const [dimensions, setDimensions] = useState({ width: 1152, height: 768 });
+  const dimensions = useWindowSize();
   const { backgroundData } = useBackground();
   const [spikingNodes, setSpikingNodes] = useState<Map<string, SpikingNode>>(
     new Map(),
@@ -268,12 +270,12 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
   // Splash, modals or a hidden tab: nothing on the page needs to move.
   const { suspended } = useMotionGate();
   const pendingSignalRemovals = useRef<string[]>([]);
-  const signalUpdateFrameRef = useRef<number>();
+  const signalUpdateFrameRef = useRef<number | undefined>(undefined);
   const spikeTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const spikingNodesRef = useRef<Map<string, SpikingNode>>(new Map());
   // Lets the node setup wake the spike scheduler for nodes it replaces.
   const wakeSchedulerRef = useRef<(() => void) | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useHydrated();
   const { areAnimationsPlaying } = useAnimationState();
   const { getConfig } = useQuality();
   const qualityConfig = getConfig(NEURAL_BACKGROUND_PROFILE);
@@ -311,20 +313,6 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     }
   }, [areAnimationsPlaying]);
 
-  useEffect(() => {
-    setIsMounted(true);
-    const updateDimensions = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
-
   // Intersection Observer for visibility-based pausing
   useEffect(() => {
     const container = containerRef.current;
@@ -346,10 +334,12 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
   }, []);
 
   const gridCellSize = 64;
+  const neuralPatterns = backgroundData?.neuralPatterns;
+  const backgroundConnections = backgroundData?.connections;
 
   // Get neural patterns from context with viewport culling
   const patterns = useMemo(() => {
-    if (!backgroundData?.neuralPatterns) return [];
+    if (!neuralPatterns) return [];
 
     // Add viewport culling to only render visible patterns
     const viewportPadding = 100; // Render patterns slightly outside viewport
@@ -358,7 +348,7 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     const minY = -viewportPadding / gridCellSize;
     const maxY = (dimensions.height + viewportPadding) / gridCellSize;
 
-    return backgroundData.neuralPatterns.filter((pattern) => {
+    return neuralPatterns.filter((pattern) => {
       // Check if any node of the pattern is within viewport
       return pattern.nodes.some(
         (node) =>
@@ -368,10 +358,10 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
           node.gridY <= maxY,
       );
     });
-  }, [backgroundData?.neuralPatterns, dimensions, gridCellSize]);
+  }, [neuralPatterns, dimensions, gridCellSize]);
 
   const connections = useMemo(() => {
-    if (!backgroundData?.connections) return [];
+    if (!backgroundConnections) return [];
 
     // Add viewport culling for connections
     const viewportPadding = 100;
@@ -380,7 +370,7 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     const minY = -viewportPadding / gridCellSize;
     const maxY = (dimensions.height + viewportPadding) / gridCellSize;
 
-    return backgroundData.connections.filter((conn) => {
+    return backgroundConnections.filter((conn) => {
       // Check if either endpoint is within viewport
       return (
         (conn.fromX >= minX &&
@@ -393,7 +383,7 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
           conn.toY <= maxY)
       );
     });
-  }, [backgroundData?.connections, dimensions, gridCellSize]);
+  }, [backgroundConnections, dimensions, gridCellSize]);
 
   // Initialize spiking nodes - ALWAYS create nodes when patterns exist
   useEffect(() => {
@@ -418,12 +408,13 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
         }
       });
     });
-    setSpikingNodes(nodes);
     // The scheduler reads the ref, which the sync effect updates only after
     // the next render: with the nodes made twice on mount (the first size
     // update), it kept a timer set for the first set, and the second set's
-    // earlier spikes waited for it and fired together. Hand them over now.
+    // earlier spikes waited for it and fired together. Hand them over now,
+    // and render what the scheduler holds.
     spikingNodesRef.current = nodes;
+    setSpikingNodes(spikingNodesRef.current);
     wakeSchedulerRef.current?.();
   }, [patterns]); // Only depend on patterns, not animation state
 
@@ -494,30 +485,24 @@ export function NeuralBackground({ className }: NeuralBackgroundProps) {
     // they all spiked in the same tick: one synchronized flash, and a burst
     // of updates, instead of the staggered rhythm.
     const startedAt = Date.now();
-    const retimed = new Map<string, number>();
-    spikingNodesRef.current.forEach((node, key) => {
-      if (!node.isSpiking && node.nextSpikeTime <= startedAt) {
-        retimed.set(
-          key,
-          startedAt +
+    const overdue = [...spikingNodesRef.current].filter(
+      ([, node]) => !node.isSpiking && node.nextSpikeTime <= startedAt,
+    );
+    if (overdue.length > 0) {
+      const updated = new Map(spikingNodesRef.current);
+      overdue.forEach(([key, node]) =>
+        updated.set(key, {
+          ...node,
+          nextSpikeTime:
+            startedAt +
             getRandomInterval(
               DEFAULT_SPIKING_CONFIG.minInterval * 1000,
               DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
             ),
-        );
-      }
-    });
-    if (retimed.size) {
-      const retime = (nodes: Map<string, SpikingNode>) => {
-        const updated = new Map(nodes);
-        retimed.forEach((nextSpikeTime, key) => {
-          const node = updated.get(key);
-          if (node) updated.set(key, { ...node, nextSpikeTime });
-        });
-        return updated;
-      };
-      spikingNodesRef.current = retime(spikingNodesRef.current);
-      setSpikingNodes(retime);
+        }),
+      );
+      spikingNodesRef.current = updated;
+      setSpikingNodes(spikingNodesRef.current);
     }
 
     let timer: ReturnType<typeof setTimeout> | undefined;

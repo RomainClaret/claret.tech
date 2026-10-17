@@ -53,9 +53,6 @@ export const users: Record<string, User> = {
   },
 };
 
-// Get the default guest user
-export const defaultUser = users.guest;
-
 // Function to get user by username (case-insensitive)
 export function getUser(username: string): User | null {
   const lowerUsername = username.toLowerCase();

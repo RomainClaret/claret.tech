@@ -38,6 +38,7 @@ The following libraries are licensed under the Apache License 2.0:
 - **[@mlc-ai/web-llm](https://github.com/mlc-ai/web-llm)** - High-performance in-browser LLM inference engine
 - **[Web Vitals](https://github.com/GoogleChrome/web-vitals)** - Library for measuring web performance metrics
 - **[PDF.js](https://github.com/mozilla/pdf.js)** (via react-pdf) - JavaScript PDF viewer
+- **[Sharp](https://github.com/lovell/sharp)** - Image processing for Next.js's image optimization (on the server)
 
 ### ISC License
 
@@ -46,12 +47,17 @@ The following libraries are licensed under the Apache License 2.0:
 ### Mozilla Public License 2.0
 
 - **[@vercel/analytics](https://github.com/vercel/analytics)** - Privacy-friendly analytics for Vercel
+- **[Pyodide](https://github.com/pyodide/pyodide)** - Python in the browser, for the terminal (served from `/pyodide`)
+- **[DOMPurify](https://github.com/cure53/DOMPurify)** - HTML sanitizer (dual licensed: MPL 2.0 or Apache 2.0)
+
+### BSD-3-Clause License
+
+- **[NumPy](https://github.com/numpy/numpy)** - Numerical computing for Python, served with Pyodide
 
 ### SIL Open Font License 1.1
 
 The following fonts are licensed under the SIL Open Font License 1.1:
 
-- **[Inter](https://github.com/rsms/inter)** - Modern variable font family (via Google Fonts)
 - **[Montserrat](https://github.com/JulietaUla/Montserrat)** - Geometric sans-serif font family
 
 ---
@@ -72,9 +78,7 @@ These libraries are used during development and testing but are not included in 
 - **[Autoprefixer](https://github.com/postcss/autoprefixer)** - CSS vendor prefix tool
 - **[TailwindCSS](https://github.com/tailwindlabs/tailwindcss)** - Utility-first CSS framework
 - **[playwright-lighthouse](https://github.com/abhinaba-ghosh/playwright-lighthouse)** - Lighthouse integration for Playwright
-- **[Canvas](https://github.com/Automattic/node-canvas)** - Node.js canvas implementation
 - **[JSDOM](https://github.com/jsdom/jsdom)** - DOM implementation for Node.js
-- **[Happy DOM](https://github.com/capricorn86/happy-dom)** - DOM implementation for testing
 - **[@next/bundle-analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer)** - Bundle analysis tool
 - **[@commitlint](https://github.com/conventional-changelog/commitlint)** - Commit message linting
 
@@ -87,13 +91,10 @@ These libraries are used during development and testing but are not included in 
 - **[Playwright](https://github.com/microsoft/playwright)** - End-to-end testing framework
 - **[Lighthouse](https://github.com/GoogleChrome/lighthouse)** - Performance auditing tool
 - **[TypeScript](https://github.com/microsoft/TypeScript)** - Typed superset of JavaScript
-- **[Puppeteer](https://github.com/puppeteer/puppeteer)** - Headless Chrome automation
-- **[Sharp](https://github.com/lovell/sharp)** - High-performance image processing
 
 ### Mozilla Public License 2.0 (Development)
 
 - **[Axe-core Playwright](https://github.com/dequelabs/axe-core-npm)** - Accessibility testing integration
-- **[Artillery](https://github.com/artilleryio/artillery)** - Load testing toolkit
 
 ---
 
@@ -111,9 +112,9 @@ The Apache License 2.0 is a permissive license that allows for commercial use, m
 
 The ISC License is similar to MIT but uses simpler language. It's a permissive license allowing commercial use with minimal restrictions.
 
-### BSD-2-Clause License
+### BSD-2-Clause and BSD-3-Clause Licenses
 
-The BSD-2-Clause License (also known as the "Simplified BSD License") is a permissive license similar to MIT that allows commercial use with minimal restrictions, requiring only attribution and license notice preservation.
+The BSD-2-Clause License (also known as the "Simplified BSD License") is a permissive license similar to MIT that allows commercial use with minimal restrictions, requiring only attribution and license notice preservation. The BSD-3-Clause License adds one condition: the copyright holders' names may not be used to endorse derived products without permission.
 
 ### Mozilla Public License 2.0
 
@@ -133,9 +134,10 @@ Full license texts for each license type can be found at:
 - **Apache License 2.0**: https://www.apache.org/licenses/LICENSE-2.0
 - **ISC License**: https://opensource.org/licenses/ISC
 - **BSD-2-Clause License**: https://opensource.org/licenses/BSD-2-Clause
+- **BSD-3-Clause License**: https://opensource.org/licenses/BSD-3-Clause
 - **Mozilla Public License 2.0**: https://www.mozilla.org/en-US/MPL/2.0/
 - **SIL Open Font License 1.1**: https://opensource.org/licenses/OFL-1.1
 
 ---
 
-_This attribution file was last updated: September 2025_
+_This attribution file was last updated: October 2026_

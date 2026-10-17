@@ -16,10 +16,7 @@ vi.mock("js-cookie", () => ({
 
 // Mock theme-cookie module
 vi.mock("@/lib/theme-cookie", () => ({
-  getTheme: vi.fn(() => "light"),
   setTheme: vi.fn(),
-  getSystemTheme: vi.fn(() => "light"),
-  getResolvedTheme: vi.fn((theme: string) => theme),
 }));
 
 // Mock Lucide icons
@@ -265,60 +262,61 @@ describe("Theme Management System", () => {
       );
     };
 
-    it("renders theme toggle button", () => {
+    it("names its state by CSS, from the class on <html>", () => {
+      // The name came from React's theme state, "current: light" until
+      // hydration whatever the theme. Both names are in the button now, and
+      // the class the head script put on <html> hides one. jsdom applies no
+      // stylesheet, so this checks the classes; static-shell.spec.ts checks
+      // the name a browser computes, before the bundle runs.
       renderThemeToggle();
 
-      const button = screen.getByRole("button");
-      expect(button).toBeInTheDocument();
-      expect(button).toHaveAttribute(
+      expect(screen.getByTestId("theme-toggle")).not.toHaveAttribute(
         "aria-label",
-        "Toggle theme (current: light)",
+      );
+      expect(screen.getByText("Toggle theme (current: light)")).toHaveClass(
+        "sr-only",
+        "dark:hidden",
+      );
+      expect(screen.getByText("Toggle theme (current: dark)")).toHaveClass(
+        "sr-only",
+        "hidden",
+        "dark:inline",
       );
     });
 
-    it("shows sun icon for light theme", () => {
+    it("shows the sun on the light theme and the moon on the dark, by CSS", () => {
+      // Both icons are in the page, and the class the head script put on
+      // <html> before the first paint picks one: right from the first paint,
+      // where the theme's state in React only settles after hydration.
+      // (The stylesheet does the picking; jsdom has none, so this checks the
+      // classes, and the e2e checks what shows.)
       renderThemeToggle("light");
 
-      expect(screen.getByTestId("sun-icon")).toBeInTheDocument();
-      expect(screen.queryByTestId("moon-icon")).not.toBeInTheDocument();
-    });
-
-    it("shows moon icon for dark theme", () => {
-      renderThemeToggle("dark");
-
-      expect(screen.getByTestId("moon-icon")).toBeInTheDocument();
-      expect(screen.queryByTestId("sun-icon")).not.toBeInTheDocument();
+      expect(screen.getByTestId("sun-icon")).toHaveClass("dark:hidden");
+      expect(screen.getByTestId("moon-icon")).toHaveClass(
+        "hidden",
+        "dark:block",
+      );
     });
 
     it("toggles from light to dark theme", () => {
       renderThemeToggle("light");
 
-      const button = screen.getByRole("button");
-      fireEvent.click(button);
+      fireEvent.click(screen.getByRole("button"));
 
-      expect(screen.getByTestId("moon-icon")).toBeInTheDocument();
-      expect(screen.queryByTestId("sun-icon")).not.toBeInTheDocument();
+      // (documentElement is this file's mock: its classList records calls.)
+      expect(document.documentElement.classList.add).toHaveBeenLastCalledWith(
+        "dark",
+      );
     });
 
     it("toggles from dark to light theme", () => {
       renderThemeToggle("dark");
 
-      const button = screen.getByRole("button");
-      fireEvent.click(button);
+      fireEvent.click(screen.getByRole("button"));
 
-      expect(screen.getByTestId("sun-icon")).toBeInTheDocument();
-      expect(screen.queryByTestId("moon-icon")).not.toBeInTheDocument();
-    });
-
-    it("updates aria-label when theme changes", () => {
-      renderThemeToggle("light");
-
-      const button = screen.getByRole("button");
-      fireEvent.click(button);
-
-      expect(button).toHaveAttribute(
-        "aria-label",
-        "Toggle theme (current: dark)",
+      expect(document.documentElement.classList.add).toHaveBeenLastCalledWith(
+        "light",
       );
     });
 
@@ -359,9 +357,7 @@ describe("Theme Management System", () => {
       expect(screen.getByTestId("sun-icon")).toBeInTheDocument();
 
       // Toggle theme using the theme toggle button specifically
-      const toggleButton = screen.getByLabelText(
-        "Toggle theme (current: light)",
-      );
+      const toggleButton = screen.getByTestId("theme-toggle");
       fireEvent.click(toggleButton);
 
       // Verify both components updated

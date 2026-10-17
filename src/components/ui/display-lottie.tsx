@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { LottieRefCurrentProps } from "lottie-react";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
 import { logError } from "@/lib/utils/dev-logger";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 interface DisplayLottieProps {
   animationData: object;
@@ -50,11 +51,7 @@ export function DisplayLottie({
   style = {},
 }: DisplayLottieProps) {
   const lottieRef = useRef<LottieRefCurrentProps>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const isClient = useHydrated();
 
   useEffect(() => {
     if (lottieRef.current && !autoplay) {

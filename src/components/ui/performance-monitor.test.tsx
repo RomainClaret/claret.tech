@@ -198,6 +198,30 @@ describe("PerformanceMonitor", () => {
     });
   });
 
+  describe("Performance test", () => {
+    it("counts its time to the last reading, not the clock while rendering", () => {
+      const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
+      const { rerender } = render(<PerformanceMonitor />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Performance details" }),
+      );
+      fireEvent.click(screen.getByRole("tab", { name: /Timeline/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Start Test" }));
+
+      mockUsePerformanceMonitor.mockReturnValue({
+        ...defaultPerformanceData,
+        sampledAt: 6000,
+      });
+      clock.mockReturnValue(9000);
+      rerender(<PerformanceMonitor />);
+
+      expect(screen.getByRole("button", { name: /^Stop/ })).toHaveTextContent(
+        "Stop (5s)",
+      );
+      clock.mockRestore();
+    });
+  });
+
   describe("Controls from the keyboard", () => {
     it("opens its details with a real, stated button", () => {
       // The expand control was a div: no keyboard, no name, no state.

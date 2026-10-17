@@ -99,34 +99,3 @@ export function extractMediumThumbnail(item: RSSItem): string | null {
 
   return null;
 }
-
-/**
- * Validates if a URL is a valid image URL
- */
-export function isValidImageUrl(url: string | null): boolean {
-  if (!url) return false;
-
-  try {
-    const urlObj = new URL(url);
-    // Check if URL has image extension
-    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
-    const hasImageExtension = imageExtensions.some((ext) =>
-      urlObj.pathname.toLowerCase().endsWith(ext),
-    );
-
-    // Check if it's from known image CDNs
-    const imageCDNs = [
-      "cdn-images-1.medium.com",
-      "cdn-images-2.medium.com",
-      "miro.medium.com",
-      "cdn.jsdelivr.net",
-    ];
-    const isFromImageCDN = imageCDNs.some((cdn) =>
-      urlObj.hostname.includes(cdn),
-    );
-
-    return hasImageExtension || isFromImageCDN;
-  } catch {
-    return false;
-  }
-}

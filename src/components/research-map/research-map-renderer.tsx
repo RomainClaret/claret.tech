@@ -1,7 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { useTerminal } from "@/lib/terminal/terminal-context";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
 import { logError } from "@/lib/utils/dev-logger";
@@ -20,9 +26,11 @@ const ResearchMapDialog = dynamic(
 );
 
 /**
- * Opens the research map on the terminal's `research` and closes it on
- * `research close`. An open event counts only with a token less than ten
- * seconds old, as the performance dashboard's does.
+ * Opens the research map on the terminal's `research`. An open event counts
+ * only with a token less than ten seconds old, as the performance
+ * dashboard's does. The map closes from itself (Escape, its close button,
+ * the backdrop): there is no `research close`, since the terminal is out of
+ * the way while the map is open.
  *
  * The terminal steps aside while the map is open: it sits above every
  * dialog, and its window would cover the map and take its clicks (its
@@ -33,8 +41,8 @@ const ResearchMapDialog = dynamic(
 export function ResearchMapRenderer() {
   const [open, setOpen] = useState(false);
   const { isOpen: terminalOpen, setAside, minimize } = useTerminal();
-  const terminalOpenRef = useRef(terminalOpen);
-  terminalOpenRef.current = terminalOpen;
+  // Read when the map opens; the listener stays as it is.
+  const terminalIsOpen = useEffectEvent(() => terminalOpen);
   const tookTerminal = useRef(false);
 
   const close = useCallback(
@@ -57,8 +65,6 @@ export function ResearchMapRenderer() {
     },
     [setAside, minimize],
   );
-  const closeRef = useRef(close);
-  closeRef.current = close;
 
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -67,18 +73,13 @@ export function ResearchMapRenderer() {
         {};
       if (!token || !timestamp || Date.now() - timestamp >= 10000) return;
       setOpen(true);
-      if (terminalOpenRef.current && !tookTerminal.current) {
+      if (terminalIsOpen() && !tookTerminal.current) {
         tookTerminal.current = true;
         setAside(true);
       }
     };
-    const onClose = () => closeRef.current("dismiss");
     window.addEventListener("terminal-research-map", onOpen);
-    window.addEventListener("terminal-research-close", onClose);
-    return () => {
-      window.removeEventListener("terminal-research-map", onOpen);
-      window.removeEventListener("terminal-research-close", onClose);
-    };
+    return () => window.removeEventListener("terminal-research-map", onOpen);
   }, [setAside]);
 
   if (!open) return null;

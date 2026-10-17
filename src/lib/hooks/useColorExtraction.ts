@@ -6,33 +6,44 @@ import { logError, logWarning } from "@/lib/utils/dev-logger";
 // Cache for extracted colors to avoid re-processing
 const colorCache = new Map<string, string>();
 
+// An image's precomputed color, by path: a logo URL may carry a ?v= version
+// (conference-logos.ts), which the keys do not.
+const precomputedColorOf = (imageSrc: string): string | undefined =>
+  precomputedColors[imageSrc.split("?")[0] as keyof typeof precomputedColors];
+// Or the color extracted for it earlier in this visit. The cache is empty
+// until an extraction finishes after mount, so hydration still agrees.
+const knownColorOf = (imageSrc: string): string | undefined =>
+  precomputedColorOf(imageSrc) ?? colorCache.get(imageSrc);
+
 export function useColorExtraction(
   imageSrc: string,
   fallbackColor: string = "rgb(85, 25, 139)",
 ): { color: string; isLoading: boolean } {
-  const [extractedColor, setExtractedColor] = useState<string>(fallbackColor);
-  const [isLoading, setIsLoading] = useState(true);
+  // The table's color from the first render, so the prerendered HTML and a
+  // page without scripts have it too, not the fallback until an effect runs.
+  // Server and client read the same table, so hydration agrees.
+  const [extractedColor, setExtractedColor] = useState<string>(
+    () => knownColorOf(imageSrc) ?? fallbackColor,
+  );
+  const [isLoading, setIsLoading] = useState(() => !knownColorOf(imageSrc));
   const imgRef = useRef<HTMLImageElement | null>(null);
   const colorThiefRef = useRef<ColorThief | null>(null);
 
-  useEffect(() => {
-    // Check precomputed colors first, by path: a logo URL may carry a ?v=
-    // version (conference-logos.ts), which the keys do not, and a miss
-    // loads ColorThief to extract the color at runtime.
-    const path = imageSrc.split("?")[0] as keyof typeof precomputedColors;
-    if (precomputedColors[path]) {
-      const precomputedColor = precomputedColors[path];
-      setExtractedColor(precomputedColor);
+  // A later image (a theme's logo variant) whose color is known: in the
+  // render that brings it. An unknown one is extracted by the effect below.
+  const [colorFor, setColorFor] = useState(imageSrc);
+  if (imageSrc !== colorFor) {
+    setColorFor(imageSrc);
+    const known = knownColorOf(imageSrc);
+    if (known) {
+      setExtractedColor(known);
       setIsLoading(false);
-      return;
     }
+  }
 
-    // Check cache second
-    if (colorCache.has(imageSrc)) {
-      setExtractedColor(colorCache.get(imageSrc)!);
-      setIsLoading(false);
-      return;
-    }
+  useEffect(() => {
+    // A miss loads ColorThief to extract the color at runtime.
+    if (knownColorOf(imageSrc)) return;
 
     const extractColor = async () => {
       try {
@@ -186,86 +197,6 @@ export function useColorExtraction(
   }, [imageSrc, fallbackColor]);
 
   return { color: extractedColor, isLoading };
-}
-
-// Additional helper to extract color palette if needed
-export function useColorPalette(
-  imageSrc: string,
-  colorCount: number = 5,
-): { palette: string[]; isLoading: boolean } {
-  const [palette, setPalette] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const colorThiefRef = useRef<ColorThief | null>(null);
-
-  useEffect(() => {
-    const extractPalette = async () => {
-      try {
-        setIsLoading(true);
-
-        // Same on-demand load as useColorExtraction above.
-        if (!colorThiefRef.current) {
-          const { default: ColorThiefLib } = await import("colorthief");
-          colorThiefRef.current = new ColorThiefLib();
-        }
-
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-
-        img.onload = () => {
-          try {
-            if (colorThiefRef.current) {
-              const colorPalette = colorThiefRef.current.getPalette(
-                img,
-                colorCount,
-              );
-
-              if (colorPalette && colorPalette.length > 0) {
-                const rgbStrings = colorPalette.map(
-                  (color) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
-                );
-                setPalette(rgbStrings);
-              }
-            }
-          } catch (error) {
-            logWarning(
-              `Palette extraction failed: ${error}`,
-              "color-extraction:palette",
-            );
-          } finally {
-            setIsLoading(false);
-          }
-        };
-
-        img.onerror = () => {
-          setIsLoading(false);
-        };
-
-        img.src = imageSrc;
-      } catch (error) {
-        logError(error, "color-extraction:palette-setup");
-        setIsLoading(false);
-      }
-    };
-
-    extractPalette();
-  }, [imageSrc, colorCount]);
-
-  return { palette, isLoading };
-}
-
-// Helper to determine if a color is light or dark
-export function isLightColor(rgbString: string): boolean {
-  const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-  if (!match) return false;
-
-  const r = parseInt(match[1]);
-  const g = parseInt(match[2]);
-  const b = parseInt(match[3]);
-
-  // Calculate relative luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  return luminance > 0.5;
 }
 
 // Helper to darken or lighten a color

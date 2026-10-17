@@ -186,6 +186,29 @@ describe("QualityProvider frame sampling", () => {
     expect(sampling()).toBe(false);
   });
 
+  it("turns balanced and manual when an end-to-end run is known after mount", () => {
+    // Test mode is read from the URL after hydration (test-mode-provider):
+    // the tier the visitor had must give way to the fixed one.
+    chooseTier(QualityMode.MAXIMUM);
+    const view = render(
+      <QualityProvider>
+        <Probe />
+      </QualityProvider>,
+    );
+    expect(screen.getByTestId("tier").textContent).toBe("maximum");
+
+    testMode.on = true;
+    view.rerender(
+      <QualityProvider>
+        <Probe />
+      </QualityProvider>,
+    );
+
+    expect(screen.getByTestId("tier").textContent).toBe("balanced");
+    expect(quality!.isAuto).toBe(false);
+    expect(sampling()).toBe(false);
+  });
+
   it("does not sample in an end-to-end run, where the tier is fixed", () => {
     testMode.on = true;
 

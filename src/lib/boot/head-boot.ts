@@ -22,8 +22,21 @@ export type Theme = "light" | "dark";
 const isTheme = (value: unknown): value is Theme =>
   value === "light" || value === "dark";
 
+/**
+ * The theme the system asks for, for a visitor who never chose one. Read at
+ * load, as high contrast is: a change of the system's setting applies on the
+ * next load.
+ */
+export function systemTheme(): Theme {
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
 /** The stored theme: localStorage, then the cookie, then `fallback`. */
-export function readStoredTheme(fallback: Theme = "light"): Theme {
+export function readStoredTheme(fallback: Theme = systemTheme()): Theme {
   try {
     const stored = window.localStorage.getItem("theme");
     if (isTheme(stored)) return stored;
@@ -61,28 +74,7 @@ export function isSafariUserAgent(userAgent: string): boolean {
 }
 
 /**
- * High contrast: the visitor's own choice (the toggle stores "true" or
- * "false"), or else what the system asks for. Until 2026-10 the toggle
- * applied a stored choice in an effect, after the page had shown without
- * it, and a system preference never: the stylesheet's own
- * `prefers-contrast: high` rule matched no browser, as the value is `more`.
- */
-export function wantsHighContrast(): boolean {
-  let stored: string | null = null;
-  try {
-    stored = window.localStorage.getItem("highContrast");
-  } catch {
-    // Storage blocked: the system's preference decides.
-  }
-  if (stored === "true" || stored === "false") return stored === "true";
-  return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-contrast: more)").matches
-  );
-}
-
-/**
  * Applies the theme class, for Safari the data-safari attribute and the
  * missing enable-animations class, and high contrast, to <html>.
  */
-export const HEAD_BOOT_SCRIPT = `(function(){var d=document.documentElement;var t=null;try{t=window.localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark"){var m=/(?:^|;\\s*)theme=(light|dark)(?:;|$)/.exec(document.cookie);t=m?m[1]:"light"}d.classList.remove("light","dark");d.classList.add(t);var u=navigator.userAgent;var s=u.indexOf("Safari")!==-1&&u.indexOf("Version/")!==-1&&u.indexOf("Chrome")===-1&&u.indexOf("Chromium")===-1&&u.indexOf("Edge")===-1&&u.indexOf("Edg/")===-1&&u.indexOf("CriOS")===-1&&u.indexOf("FxiOS")===-1;d.setAttribute("data-safari",s?"true":"false");if(s){d.classList.remove("enable-animations")}else{d.classList.add("enable-animations")}var h=null;try{h=window.localStorage.getItem("highContrast")}catch(e){}if(h==="true"||(h!=="false"&&typeof window.matchMedia==="function"&&window.matchMedia("(prefers-contrast: more)").matches)){d.classList.add("high-contrast")}})();`;
+export const HEAD_BOOT_SCRIPT = `(function(){var d=document.documentElement;var t=null;try{t=window.localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark"){var m=/(?:^|;\\s*)theme=(light|dark)(?:;|$)/.exec(document.cookie);t=m?m[1]:(typeof window.matchMedia==="function"&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}d.classList.remove("light","dark");d.classList.add(t);var u=navigator.userAgent;var s=u.indexOf("Safari")!==-1&&u.indexOf("Version/")!==-1&&u.indexOf("Chrome")===-1&&u.indexOf("Chromium")===-1&&u.indexOf("Edge")===-1&&u.indexOf("Edg/")===-1&&u.indexOf("CriOS")===-1&&u.indexOf("FxiOS")===-1;d.setAttribute("data-safari",s?"true":"false");if(s){d.classList.remove("enable-animations")}else{d.classList.add("enable-animations")}var h=null;try{h=window.localStorage.getItem("highContrast")}catch(e){}if(h==="true"||(h!=="false"&&typeof window.matchMedia==="function"&&window.matchMedia("(prefers-contrast: more)").matches)){d.classList.add("high-contrast")}})();`;

@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
@@ -53,13 +53,23 @@ jobs:
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
+        # The production build's env, which deploy-production's build step
+        # takes from here (a YAML anchor), so a preview builds what
+        # production would.
+        env: &build-env
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          USE_GITHUB_DATA: true
+          # The blog's Medium account; a leading @ is dropped
+          # (src/lib/utils/medium-username.ts). Unset, romainclaret.
+          NEXT_PUBLIC_MEDIUM_USERNAME: ${{ secrets.MEDIUM_USERNAME }}
+          NEXT_PUBLIC_SITE_URL: https://claret.tech
         run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel Preview
         id: deploy
         run: |
           url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> $GITHUB_OUTPUT
+          echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview URL: $url"
 
   deploy-production:
@@ -87,16 +97,8 @@ jobs:
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
-        env:
-          # Production environment variables
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          GITHUB_USERNAME: ${{ secrets.GH_USERNAME }}
-          USE_GITHUB_DATA: true
-          MEDIUM_USERNAME: ${{ secrets.MEDIUM_USERNAME }}
-          NEXT_PUBLIC_SITE_URL: https://claret.tech
-          NEXT_PUBLIC_ENABLE_TERMINAL: true
-          NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-          NEXT_PUBLIC_ENABLE_AI_FEATURES: true
+        # The env block defined in deploy-preview's build step above.
+        env: *build-env
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel Production

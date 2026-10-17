@@ -157,36 +157,6 @@ export async function fetchKudosImage(
   }
 }
 
-// Batch fetch images for multiple Kudos URLs
-export async function fetchKudosImages(
-  kudosUrls: string[],
-): Promise<Map<string, string | null>> {
-  const results = new Map<string, string | null>();
-
-  // Process in parallel but with a limit to avoid rate limiting
-  const BATCH_SIZE = 3;
-  for (let i = 0; i < kudosUrls.length; i += BATCH_SIZE) {
-    const batch = kudosUrls.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batch.map(async (url) => {
-        const image = await fetchKudosImage(url);
-        return { url, image };
-      }),
-    );
-
-    batchResults.forEach(({ url, image }) => {
-      results.set(url, image);
-    });
-
-    // Small delay between batches to be respectful
-    if (i + BATCH_SIZE < kudosUrls.length) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-
-  return results;
-}
-
 // Clear expired cache entries
 export async function cleanCache(): Promise<void> {
   const cache = await loadCache();

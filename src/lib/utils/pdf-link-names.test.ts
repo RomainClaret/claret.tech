@@ -513,6 +513,22 @@ describe("createLinkNameBook", () => {
     expect(other.nameOf("98R")).toBe("Reference 5");
   });
 
+  it("tells a listener the pages named while it listens", () => {
+    const book = createLinkNameBook({ measure });
+    const listener = vi.fn();
+    const stop = book.listen(listener);
+
+    book.pageCallbacks(1).onGetAnnotationsSuccess(annotations);
+    book.pageCallbacks(1).onGetTextSuccess(text);
+    expect(listener).toHaveBeenCalledWith(1, book.nameOf);
+
+    stop();
+    book.pageCallbacks(2).onGetAnnotationsSuccess(annotations);
+    book.pageCallbacks(2).onGetTextSuccess(text);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(book.nameOf("98R")).toBe("Reference 5");
+  });
+
   it("does no work again when a zoom hands the page over again", () => {
     const onNamed = vi.fn();
     const book = createLinkNameBook({ onNamed, measure });

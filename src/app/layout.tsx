@@ -264,7 +264,6 @@ export default function RootLayout({
         />
         {/* Additional SEO meta tags */}
         <meta name="author" content="Romain Claret" />
-        <meta name="generator" content="Next.js 15" />
         <link rel="author" href="/humans.txt" />
 
         {/* Safari polyfill for requestIdleCallback */}
@@ -316,7 +315,7 @@ export default function RootLayout({
 
         <TestModeProvider>
           <MotionProvider>
-            <ThemeProvider initialTheme="light">
+            <ThemeProvider>
               <SafariProvider initialSafari={false}>
                 <AnimationStateProvider>
                   <QualityProvider>

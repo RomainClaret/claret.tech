@@ -80,10 +80,24 @@ beforeEach(() => {
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver;
+  // The orbit is drawn once its root has a width, as it has on a laid-out
+  // page from md up; jsdom lays nothing out.
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: 1000,
+    bottom: 1000,
+    width: 1000,
+    height: 1000,
+    toJSON: () => ({}),
+  });
 });
 
 afterEach(() => {
   globalThis.ResizeObserver = OriginalResizeObserver;
+  vi.restoreAllMocks();
 });
 
 describe("InterestConstellation hovered label", () => {
@@ -101,5 +115,24 @@ describe("InterestConstellation hovered label", () => {
 
     expect(box).toEqual({ y: [0, -2, 0], repeat: "Infinity" });
     expect(box).toEqual(label);
+  });
+});
+
+describe("InterestConstellation labels", () => {
+  it("writes each label in its colour through the contrast helper", () => {
+    // Raw, the green labels read at 2.3:1 on the light theme.
+    const { container } = render(
+      <InterestConstellation interests={interests} isVisible />,
+    );
+    const labels = [...container.querySelectorAll("text")].filter((text) =>
+      interests.some(({ interestName }) => text.textContent === interestName),
+    );
+
+    expect(labels).toHaveLength(interests.length);
+    for (const label of labels) {
+      expect(label).toHaveClass("accent-text");
+      expect(label).toHaveAttribute("fill", "currentColor");
+      expect(label.style.getPropertyValue("--accent")).toMatch(/^rgb\(/);
+    }
   });
 });

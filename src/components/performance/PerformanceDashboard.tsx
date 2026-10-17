@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { m } from "framer-motion";
 // Deep per-icon imports; see the note in pdf-viewer.tsx (lazy-chunk barrel bug).
-import Activity from "lucide-react/dist/esm/icons/activity";
 import Zap from "lucide-react/dist/esm/icons/zap";
 import Monitor from "lucide-react/dist/esm/icons/monitor";
 import Smartphone from "lucide-react/dist/esm/icons/smartphone";
@@ -204,7 +203,8 @@ export function PerformanceDashboard() {
     return () => observer.disconnect();
   }, []);
 
-  // Mock data for demonstration (in real app, this would come from PerformanceTracker)
+  // Sample data for the dashboard's charts: the site keeps no performance
+  // history.
   interface PerformanceHistory {
     crossBrowserComparison: {
       timestamp: string;
@@ -234,67 +234,47 @@ export function PerformanceDashboard() {
       };
     };
   }
-  const [performanceHistory, setPerformanceHistory] =
-    useState<PerformanceHistory | null>(null);
-
-  useEffect(() => {
-    // Simulate loading performance history
-    const mockHistory = {
-      crossBrowserComparison: {
-        timestamp: new Date().toISOString(),
-        browsers: {
-          chromium: {
-            scores: {
-              performance: 92,
-              accessibility: 96,
-              bestPractices: 91,
-              seo: 98,
-            },
-            vitals: { fcp: 1650, lcp: 2100, cls: 0.08, tbt: 180, tti: 3200 },
+  // Fixed from the first render: it never changes.
+  const [performanceHistory] = useState<PerformanceHistory>(() => ({
+    crossBrowserComparison: {
+      timestamp: new Date().toISOString(),
+      browsers: {
+        chromium: {
+          scores: {
+            performance: 92,
+            accessibility: 96,
+            bestPractices: 91,
+            seo: 98,
           },
-          webkit: {
-            scores: {
-              performance: 87,
-              accessibility: 94,
-              bestPractices: 89,
-              seo: 96,
-            },
-            vitals: { fcp: 1850, lcp: 2650, cls: 0.12, tbt: 290, tti: 3800 },
-          },
-          firefox: {
-            scores: {
-              performance: 89,
-              accessibility: 95,
-              bestPractices: 90,
-              seo: 97,
-            },
-            vitals: { fcp: 1720, lcp: 2350, cls: 0.09, tbt: 220, tti: 3450 },
-          },
+          vitals: { fcp: 1650, lcp: 2100, cls: 0.08, tbt: 180, tti: 3200 },
         },
-        summary: {
-          bestPerformance: "chromium",
-          worstPerformance: "webkit",
-          avgPerformanceScore: 89.3,
-          criticalIssues: [],
+        webkit: {
+          scores: {
+            performance: 87,
+            accessibility: 94,
+            bestPractices: 89,
+            seo: 96,
+          },
+          vitals: { fcp: 1850, lcp: 2650, cls: 0.12, tbt: 290, tti: 3800 },
+        },
+        firefox: {
+          scores: {
+            performance: 89,
+            accessibility: 95,
+            bestPractices: 90,
+            seo: 97,
+          },
+          vitals: { fcp: 1720, lcp: 2350, cls: 0.09, tbt: 220, tti: 3450 },
         },
       },
-    };
-    setPerformanceHistory(mockHistory);
-  }, []);
-
-  if (!performanceHistory) {
-    return (
-      <div
-        id="performance-dashboard"
-        className="min-h-[400px] flex items-center justify-center"
-      >
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Activity className="w-5 h-5 animate-pulse" />
-          Loading performance data...
-        </div>
-      </div>
-    );
-  }
+      summary: {
+        bestPerformance: "chromium",
+        worstPerformance: "webkit",
+        avgPerformanceScore: 89.3,
+        criticalIssues: [],
+      },
+    },
+  }));
 
   const currentBrowserData = performanceHistory.crossBrowserComparison.browsers;
 

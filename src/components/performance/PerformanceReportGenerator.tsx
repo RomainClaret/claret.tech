@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { usePerformanceMonitor } from "@/lib/hooks/usePerformanceMonitor";
 import {
   MultiPhaseProgress,
@@ -98,6 +98,13 @@ export function PerformanceReportGenerator({
   const [error, setError] = useState<string | null>(null);
 
   const performanceData = usePerformanceMonitor(true);
+
+  // The run in flight, for cancel(): the dialog stops it when it closes, or
+  // the run went on and posted its report to the API all the same.
+  const run = useRef<AbortController | null>(null);
+  const cancel = useCallback(() => {
+    run.current?.abort();
+  }, []);
 
   const [phases, setPhases] = useState<ReportPhase[]>([
     {
@@ -328,6 +335,10 @@ export function PerformanceReportGenerator({
 
     setIsGenerating(true);
     setError(null);
+    const controller = new AbortController();
+    run.current = controller;
+    // Called after each wait: a cancelled run goes no further.
+    const goOn = () => controller.signal.throwIfAborted();
     // The phase in progress, for the catch: `currentPhase` there was the
     // value this callback had closed over (0), not the phase that failed.
     let phase = 0;
@@ -341,20 +352,24 @@ export function PerformanceReportGenerator({
       // Phase 0: Initialize
       updatePhaseProgress(0, 50, "active");
       await new Promise((resolve) => setTimeout(resolve, 300));
+      goOn();
       updatePhaseProgress(0, 100, "completed");
       enter(1);
 
       // Phase 1: Collect browser metrics
       enter(1);
       const performanceMetrics = await collectBrowserMetrics();
+      goOn();
       enter(2);
 
       // Phase 2: Collect Core Web Vitals
       const vitals = await collectWebVitals();
+      goOn();
       enter(3);
 
       // Phase 3: Analyze resources
       const resources = await analyzeResources();
+      goOn();
       enter(4);
 
       // Phase 4: Generate recommendations
@@ -400,6 +415,7 @@ export function PerformanceReportGenerator({
           "Content-Type": "application/json",
         },
         body: JSON.stringify(reportData),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -420,12 +436,14 @@ export function PerformanceReportGenerator({
       }
 
       const result = await response.json();
+      goOn();
       updatePhaseProgress(4, 100, "completed");
       enter(5);
 
       // Phase 5: Finalize
       updatePhaseProgress(5, 50, "active");
       await new Promise((resolve) => setTimeout(resolve, 200));
+      goOn();
       updatePhaseProgress(5, 100, "completed");
 
       setReport(result.report);
@@ -434,6 +452,8 @@ export function PerformanceReportGenerator({
         onReportGenerated(result.report);
       }
     } catch (err) {
+      // Cancelled: nothing went wrong, and no one is waiting for the error.
+      if (controller.signal.aborted) return;
       const errorMessage =
         err instanceof Error ? err.message : "Unknown error occurred";
       setError(errorMessage);
@@ -444,6 +464,7 @@ export function PerformanceReportGenerator({
       }
     } finally {
       setIsGenerating(false);
+      if (run.current === controller) run.current = null;
     }
   }, [
     isGenerating,
@@ -578,6 +599,7 @@ export function PerformanceReportGenerator({
 
     // Actions
     generateReport,
+    cancel,
 
     // Formatters
     formatReportForTerminal,

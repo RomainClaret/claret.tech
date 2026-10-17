@@ -12,6 +12,8 @@ interface SkillManifestoProps {
 }
 
 type DisplayMode = "compact" | "expanded" | "list";
+// The control that takes focus after a switch between modes.
+type SwitchControl = "show-all" | "close-list";
 
 export function SkillManifesto({
   skills,
@@ -20,7 +22,16 @@ export function SkillManifesto({
 }: SkillManifestoProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>("compact");
+  // Each mode renders its own controls, so the button just pressed leaves the
+  // page and focus would fall back to <body>: a switch also names the control
+  // that takes focus in the next mode (autoFocus, applied as it mounts). Each
+  // mode's root has its own key, so a switch mounts the next mode's controls
+  // rather than reusing the previous mode's buttons in place.
+  const [view, setView] = useState<{
+    mode: DisplayMode;
+    focus?: SwitchControl;
+  }>({ mode: "compact" });
+  const displayMode = view.mode;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-play logic
@@ -62,7 +73,10 @@ export function SkillManifesto({
   // List Mode - Static list of all skills
   if (displayMode === "list") {
     return (
-      <div className={cn("relative w-full max-w-3xl mx-auto", className)}>
+      <div
+        key="list"
+        className={cn("relative w-full max-w-3xl mx-auto", className)}
+      >
         <div className="space-y-2">
           {/* Header with close button */}
           <div className="flex items-center justify-between mb-3">
@@ -70,7 +84,8 @@ export function SkillManifesto({
               All {skills.length} skills
             </span>
             <button
-              onClick={() => setDisplayMode("compact")}
+              onClick={() => setView({ mode: "compact", focus: "show-all" })}
+              autoFocus={view.focus === "close-list"}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Close list view"
             >
@@ -94,7 +109,7 @@ export function SkillManifesto({
                   className="flex items-start gap-2 py-1 text-sm text-muted-foreground hover:text-foreground/80 transition-colors cursor-pointer"
                   onClick={() => {
                     setCurrentIndex(index);
-                    setDisplayMode("expanded");
+                    setView({ mode: "expanded" });
                   }}
                 >
                   {skillEmoji && (
@@ -113,7 +128,10 @@ export function SkillManifesto({
   // Expanded Mode - Clean card view
   if (displayMode === "expanded") {
     return (
-      <div className={cn("relative w-full max-w-3xl mx-auto", className)}>
+      <div
+        key="expanded"
+        className={cn("relative w-full max-w-3xl mx-auto", className)}
+      >
         <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -125,7 +143,7 @@ export function SkillManifesto({
             {/* Mode switchers */}
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setDisplayMode("compact")}
+                onClick={() => setView({ mode: "compact", focus: "show-all" })}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
                 aria-label="Compact view"
                 title="Compact view"
@@ -133,7 +151,7 @@ export function SkillManifesto({
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setDisplayMode("list")}
+                onClick={() => setView({ mode: "list", focus: "close-list" })}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
                 aria-label="List view"
                 title="List all"
@@ -200,7 +218,10 @@ export function SkillManifesto({
 
   // Compact Mode (Default) - Centered layout with controls on top
   return (
-    <div className={cn("relative w-full max-w-3xl mx-auto", className)}>
+    <div
+      key="compact"
+      className={cn("relative w-full max-w-3xl mx-auto", className)}
+    >
       <div className="flex flex-col items-center gap-2 text-sm">
         {/* Minimal controls - now centered above */}
         <div className="flex items-center gap-2 opacity-50 hover:opacity-100 transition-opacity">
@@ -248,8 +269,9 @@ export function SkillManifesto({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setDisplayMode("list");
+              setView({ mode: "list", focus: "close-list" });
             }}
+            autoFocus={view.focus === "show-all"}
             className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Show all"
             title="Show all"
@@ -267,7 +289,7 @@ export function SkillManifesto({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="flex items-center justify-center gap-2 cursor-pointer group"
-            onClick={() => setDisplayMode("expanded")}
+            onClick={() => setView({ mode: "expanded" })}
           >
             {emoji && (
               <span className="opacity-50 group-hover:opacity-70 transition-opacity">

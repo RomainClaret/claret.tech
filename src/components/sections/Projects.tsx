@@ -129,11 +129,12 @@ export function Projects() {
     fetchPinnedProjects();
   }, []);
 
-  // Fetch all projects when switching to "all" view
+  // All repositories, asked for when "All" is chosen. Once asked, only the
+  // next click on "All" asks again: an effect that re-ran on a failed (or
+  // empty) answer asked again at once, for as long as that lasted.
+  const [allAsked, setAllAsked] = useState(false);
   const fetchAllProjects = useCallback(async () => {
-    // If already loaded from context or currently loading, skip
-    if (allProjects.length > 0 || loadingAll || contextLoading) return;
-
+    setAllAsked(true);
     setLoadingAll(true);
     try {
       const response = await fetch("/api/fetch-all-repos");
@@ -147,13 +148,28 @@ export function Projects() {
     } finally {
       setLoadingAll(false);
     }
-  }, [allProjects.length, loadingAll, contextLoading, setAllProjects]);
+  }, [setAllProjects]);
+  const canFetchAll =
+    allProjects.length === 0 && !loadingAll && !contextLoading;
 
+  const showAllProjects = () => {
+    setViewMode("all");
+    if (canFetchAll) fetchAllProjects();
+  };
+
+  // "All" already showing when the splash's own fetch (contextLoading) ends
+  // without the repositories: ask once, after this commit.
+  const fetchAllNow = viewMode === "all" && canFetchAll && !allAsked;
   useEffect(() => {
-    if (viewMode === "all") {
-      fetchAllProjects();
-    }
-  }, [viewMode, fetchAllProjects]);
+    if (!fetchAllNow) return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) fetchAllProjects();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAllNow, fetchAllProjects]);
 
   // Convert pinned projects to match Repository interface for unified handling
   const normalizedPinnedProjects: Repository[] = useMemo(() => {
@@ -382,7 +398,7 @@ export function Projects() {
               <button
                 type="button"
                 aria-pressed={viewMode === "all"}
-                onClick={() => setViewMode("all")}
+                onClick={showAllProjects}
                 className={cn(
                   "px-4 py-2 rounded-lg font-medium transition-all duration-200",
                   viewMode === "all"
@@ -909,9 +925,9 @@ export function Projects() {
                         <div className="p-3 sm:p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h3 className="text-base sm:text-lg font-semibold group-hover:text-primary transition-colors flex items-center gap-1 sm:gap-2">
+                              <h3 className="text-base sm:text-lg font-semibold group-hover:text-primary group-focus-within:text-primary transition-colors flex items-center gap-1 sm:gap-2">
                                 {project.name}
-                                <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex-shrink-0" />
                               </h3>
                               <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-1">
                                 {project.description ||

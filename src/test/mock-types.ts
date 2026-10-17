@@ -77,109 +77,12 @@ export interface OptimizedImageProps {
   blurDataURL?: string;
 }
 
-export interface EducationStyleCardProps extends BaseMockProps {
-  onClick?: () => void;
-  "data-testid"?: string;
-}
-
-export interface ProjectCardProps extends BaseMockProps {
-  project?: {
-    id?: string;
-    title?: string;
-    description?: string;
-    technologies?: string[];
-    githubUrl?: string;
-    liveUrl?: string;
-    imageUrl?: string;
-    featured?: boolean;
-    category?: string;
-    year?: number;
-  };
-  onClick?: () => void;
-  "data-testid"?: string;
-}
-
-export interface SkillCardProps extends BaseMockProps {
-  skill?: {
-    name?: string;
-    level?: number;
-    category?: string;
-    icon?: string;
-  };
-  "data-testid"?: string;
-}
-
 // Modal and viewer component props
 export interface PDFViewerModalProps extends BaseMockProps {
   isOpen?: boolean;
   onClose?: () => void;
   pdfUrl?: string;
   title?: string;
-}
-
-export interface ModalProps extends BaseMockProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-  title?: string;
-  size?: "sm" | "md" | "lg" | "xl" | "full";
-}
-
-// Navigation component props
-export interface NavigationProps extends BaseMockProps {
-  isOpen?: boolean;
-  onToggle?: () => void;
-  activeSection?: string;
-}
-
-export interface ThemeToggleProps extends BaseMockProps {
-  onClick?: () => void;
-  "aria-label"?: string;
-}
-
-// Canvas and context props
-export interface CanvasProps extends BaseMockProps {
-  width?: number;
-  height?: number;
-  onMouseMove?: (event: React.MouseEvent<HTMLCanvasElement>) => void;
-  onMouseLeave?: () => void;
-  style?: React.CSSProperties;
-}
-
-export interface CanvasContextMock {
-  fillRect: Mock;
-  clearRect: Mock;
-  getContext: Mock;
-  toDataURL: Mock;
-  [key: string]: Mock;
-}
-
-// Form component props
-export interface FormFieldProps extends BaseMockProps {
-  name?: string;
-  label?: string;
-  type?: "text" | "email" | "textarea" | "select";
-  value?: string;
-  onChange?: (value: string) => void;
-  required?: boolean;
-  placeholder?: string;
-  error?: string;
-}
-
-// Performance and monitoring props
-export interface PerformanceMetricProps extends BaseMockProps {
-  value?: number;
-  label?: string;
-  unit?: string;
-  status?: "good" | "fair" | "poor";
-}
-
-// Terminal component props
-export interface TerminalProps extends BaseMockProps {
-  isOpen?: boolean;
-  onToggle?: () => void;
-  onClose?: () => void;
-  commands?: string[];
-  output?: string[];
 }
 
 // Dynamic import and utility types
@@ -240,11 +143,6 @@ export interface LucideIconProps {
   [key: string]: unknown;
 }
 
-// Utility function types
-export interface UtilityFunction {
-  (...args: unknown[]): string;
-}
-
 // Test-specific mock types
 export interface MockedFetch {
   mockResolvedValue: (value: MockedFetchResponse) => MockedFetch;
@@ -258,55 +156,6 @@ export interface MockedFetchResponse {
   ok: boolean;
   status?: number;
   json: () => Promise<unknown>;
-}
-
-export interface GitHubProject {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  stargazers_count: number;
-  forks_count: number;
-  language: string | null;
-  topics: string[];
-  updated_at: string;
-  size: number;
-}
-
-export interface ProjectsApiResponse {
-  success: boolean;
-  data: {
-    pinnedItems: {
-      nodes: GitHubProject[];
-    };
-    repositories: {
-      nodes: GitHubProject[];
-    };
-  };
-}
-
-// DOM API mock types
-export interface MockDOMRect {
-  top: number;
-  left: number;
-  bottom: number;
-  right: number;
-  width: number;
-  height: number;
-  x: number;
-  y: number;
-  toJSON: () => Omit<MockDOMRect, "toJSON">;
-}
-
-// Mock function types for testing
-export interface MockFunction {
-  mock: {
-    calls: unknown[][];
-    results: { type: "return" | "throw"; value: unknown }[];
-  };
-  mockImplementation: (fn: (...args: unknown[]) => unknown) => MockFunction;
-  mockReturnValue: (value: unknown) => MockFunction;
 }
 
 // Skills-specific component props
@@ -370,47 +219,6 @@ export interface MockMatchMedia extends Mock {
   <T extends string>(query: T): MockMediaQueryList;
 }
 
-// Window stand-in for browser-detection tests
-export interface MockWindow {
-  addEventListener: Mock;
-  removeEventListener: Mock;
-  dispatchEvent: Mock;
-  [key: string]: unknown;
-}
-
-// Framer Motion types for conditional-motion.tsx
-export interface MotionVariants {
-  [key: string]: {
-    [property: string]: string | number | boolean;
-  };
-}
-
-export interface MotionTransition {
-  duration?: number;
-  delay?: number;
-  ease?: string | number[];
-  type?: "spring" | "tween" | "inertia";
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  when?: "beforeChildren" | "afterChildren" | false;
-  delayChildren?: number;
-  staggerChildren?: number;
-  staggerDirection?: number;
-  [key: string]: unknown;
-}
-
-export interface MotionAnimateProps {
-  x?: string | number | (string | number)[];
-  y?: string | number | (string | number)[];
-  scale?: number | number[];
-  rotate?: number | number[];
-  opacity?: number | number[];
-  [key: string]: string | number | boolean | (string | number)[] | undefined;
-}
-
-export type MotionValue = string | number | MotionVariants | MotionAnimateProps;
-
 // PDF Viewer hook types for Papers.test.tsx
 export interface MockPDFViewerHook {
   isOpen: boolean;
@@ -454,24 +262,4 @@ export interface CommandFunction {
 
 export interface CommandsObject {
   [commandName: string]: CommandFunction;
-}
-
-// User mock types for commands.test.ts
-export interface MockUser {
-  username: string;
-  displayName: string;
-  isAdmin: boolean;
-  homeDirectory:
-    | string
-    | {
-        name: string;
-        type: "directory";
-        children: Record<string, unknown>;
-      };
-}
-
-// WebLLM Client type for ai-commands.ts
-export interface WebLLMClientClass {
-  isSupported: () => boolean;
-  new (...args: unknown[]): unknown;
 }

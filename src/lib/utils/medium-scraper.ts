@@ -494,39 +494,6 @@ export async function fetchMediumArticle(articleUrl: string): Promise<{
   }
 }
 
-// Batch fetch articles
-export async function fetchMediumArticles(
-  articleUrls: string[],
-): Promise<Map<string, { image: string | null; color: string | null }>> {
-  const results = new Map<
-    string,
-    { image: string | null; color: string | null }
-  >();
-
-  // Process in parallel but with a limit to avoid rate limiting
-  const BATCH_SIZE = 3;
-  for (let i = 0; i < articleUrls.length; i += BATCH_SIZE) {
-    const batch = articleUrls.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batch.map(async (url) => {
-        const data = await fetchMediumArticle(url);
-        return { url, data };
-      }),
-    );
-
-    batchResults.forEach(({ url, data }) => {
-      results.set(url, data);
-    });
-
-    // Small delay between batches to be respectful
-    if (i + BATCH_SIZE < articleUrls.length) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  }
-
-  return results;
-}
-
 // Clear expired cache entries
 export async function cleanMediumCache(): Promise<void> {
   const cache = await loadCache();

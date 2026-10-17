@@ -3,10 +3,11 @@ import { timingSafeEqual } from "node:crypto";
 /**
  * Whether a request may force an expensive cache-bypassing refresh.
  *
- * Two routes accept a `?fresh`/`?refresh` flag that skips their cache and goes
- * out to a third party: publications hits Semantic Scholar, ORCID and Crossref
- * with in-request sleeps, and fetch-all-repos spends one authenticated GitHub
- * GraphQL call per 100 repositories against the owner's token. Neither is a
+ * Two routes can skip their cache and go out to a third party: publications
+ * for a request with the key, fetch-all-repos for `?fresh=true` with it.
+ * Publications hits Semantic Scholar, ORCID and Crossref with in-request
+ * sleeps, and fetch-all-repos spends one authenticated GitHub GraphQL call
+ * per 100 repositories against the owner's token. Neither is a
  * mutation, so this is not authentication; it is there so an anonymous caller
  * cannot make the site spend someone else's quota on demand, which the rate
  * limiter cannot prevent because it is per-instance and its key includes the

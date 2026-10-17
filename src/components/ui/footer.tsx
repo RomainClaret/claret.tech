@@ -1,8 +1,7 @@
 "use client";
 
 import { footerNote, socialMediaLinks } from "@/data/portfolio";
-import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   GitHubIcon,
   LinkedInIcon,
@@ -14,44 +13,24 @@ import {
 } from "@/components/icons";
 import { useLegalModals } from "@/components/ui/legal-modals-provider";
 import { legalTextsIntent } from "@/components/legal/load-legal-texts";
-import { logError } from "@/lib/utils/dev-logger";
+
+const subscribeNever = () => () => {};
 
 export function Footer() {
-  const shouldReduceAnimations = useShouldReduceAnimations();
   // The year the page was built, which is what its HTML says: the page is
   // generated once, at build time, and must hydrate with the same text.
   // Corrected once it runs, so a page built in December says the new year
   // in January.
-  const [currentYear, setCurrentYear] = useState(() =>
-    Number(process.env.BUILD_YEAR || new Date().getFullYear()),
+  const currentYear = useSyncExternalStore(
+    subscribeNever,
+    () => new Date().getFullYear(),
+    () => Number(process.env.BUILD_YEAR || new Date().getFullYear()),
   );
-  useEffect(() => {
-    setCurrentYear(new Date().getFullYear());
-  }, []);
-  const [lastCommitDate, setLastCommitDate] = useState<string>(
-    footerNote.update,
-  );
-  const [isLoading, setIsLoading] = useState(true);
+  // The deployed commit's day, set by the build (next.config.mjs), so the
+  // HTML has it: no request on each visit, and right without scripts.
+  const lastUpdate = process.env.BUILD_DATE;
   const { openPrivacyModal, openTermsModal, openLicenseModal } =
     useLegalModals();
-
-  useEffect(() => {
-    // Fetch the last commit date from the API
-    fetch("/api/last-commit")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.lastCommitDate && !data.error) {
-          setLastCommitDate(data.lastCommitDate);
-        }
-      })
-      .catch((error) => {
-        logError(error, "Footer.fetchLastCommitDate");
-        // Keep the fallback date from footerNote
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, []);
 
   return (
     <footer className="bg-muted/50 border-t border-border">
@@ -59,7 +38,7 @@ export function Footer() {
         <div className="max-w-6xl mx-auto">
           {/* Social Links */}
           {socialMediaLinks.display && (
-            <div className="flex justify-center gap-6 mb-8">
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-6 mb-8">
               {socialMediaLinks.github && (
                 <a
                   href={socialMediaLinks.github}
@@ -159,15 +138,7 @@ export function Footer() {
                 >
                   GNU GPLv3 or later
                 </button>{" "}
-                • Updated{" "}
-                <span
-                  className={
-                    isLoading && !shouldReduceAnimations ? "animate-pulse" : ""
-                  }
-                >
-                  {lastCommitDate}
-                </span>{" "}
-                • Hosted on{" "}
+                • Updated <span>{lastUpdate}</span> • Hosted on{" "}
                 <a
                   href={footerNote.hosturl}
                   target="_blank"

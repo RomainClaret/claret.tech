@@ -23,6 +23,8 @@ import {
   GRID_BACKGROUND_PROFILE,
 } from "@/contexts/quality-context";
 import { latestEntry } from "@/lib/utils/intersection";
+import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useWindowSize } from "@/lib/hooks/useWindowSize";
 
 interface GridBackgroundProps {
   className?: string;
@@ -92,7 +94,7 @@ function GridBackgroundImpl({
   covers = false,
   restUnderCover = false,
 }: GridBackgroundProps) {
-  const [dimensions, setDimensions] = useState({ width: 1152, height: 768 });
+  const dimensions = useWindowSize();
   const { backgroundData } = useBackground();
   const [spikingGridNodes, setSpikingGridNodes] = useState<
     Map<string, GridNodeSpike>
@@ -104,13 +106,13 @@ function GridBackgroundImpl({
   const { areAnimationsPlaying } = useAnimationState();
   // Splash, modals or a hidden tab: nothing on the page needs to move.
   const { suspended } = useMotionGate();
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useHydrated();
   const activeSignalsRef = useRef<GridSignal[]>([]);
   const { getConfig, quality } = useQuality();
   const config = getConfig(GRID_BACKGROUND_PROFILE);
   const spikeTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const pendingSignalsRef = useRef<string[]>([]);
-  const signalUpdateFrameRef = useRef<number>();
+  const signalUpdateFrameRef = useRef<number | undefined>(undefined);
   const spikingGridNodesRef = useRef<Map<string, GridNodeSpike>>(new Map());
   // When the current set of pulses started: the origin of their shared phase.
   const pulseOriginRef = useRef(0);
@@ -127,20 +129,6 @@ function GridBackgroundImpl({
   useEffect(() => {
     spikingGridNodesRef.current = spikingGridNodes;
   }, [spikingGridNodes]);
-
-  useEffect(() => {
-    setIsMounted(true);
-    const updateDimensions = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
 
   // Intersection Observer for visibility-based pausing
   useEffect(() => {
@@ -256,12 +244,13 @@ function GridBackgroundImpl({
         pulseDelay: baseDelay,
       });
     });
-    setSpikingGridNodes(spikingNodes);
     // The scheduler reads the ref, which the sync effect above would update
     // only after the next render. It re-runs right after this effect, and
     // with only the old nodes, all parked, it would set no timer and miss
-    // these. The wake covers a scheduler that does not re-run.
+    // these. The wake covers a scheduler that does not re-run. Rendered
+    // from what the scheduler holds.
     spikingGridNodesRef.current = spikingNodes;
+    setSpikingGridNodes(spikingGridNodesRef.current);
     wakeSchedulerRef.current?.();
   }, [
     nodes,
@@ -362,23 +351,16 @@ function GridBackgroundImpl({
     // they all spiked in the same tick: one synchronized flash, and a burst
     // of updates, instead of the staggered rhythm.
     const startedAt = Date.now();
-    const retimed = new Map<string, number>();
-    spikingGridNodesRef.current.forEach((node, key) => {
-      if (!node.isSpiking && node.nextSpikeTime <= startedAt) {
-        retimed.set(key, nextGridSpikeTime());
-      }
-    });
-    if (retimed.size) {
-      const retime = (nodes: Map<string, GridNodeSpike>) => {
-        const updated = new Map(nodes);
-        retimed.forEach((nextSpikeTime, key) => {
-          const node = updated.get(key);
-          if (node) updated.set(key, { ...node, nextSpikeTime });
-        });
-        return updated;
-      };
-      spikingGridNodesRef.current = retime(spikingGridNodesRef.current);
-      setSpikingGridNodes(retime);
+    const overdue = [...spikingGridNodesRef.current].filter(
+      ([, node]) => !node.isSpiking && node.nextSpikeTime <= startedAt,
+    );
+    if (overdue.length > 0) {
+      const updated = new Map(spikingGridNodesRef.current);
+      overdue.forEach(([key, node]) =>
+        updated.set(key, { ...node, nextSpikeTime: nextGridSpikeTime() }),
+      );
+      spikingGridNodesRef.current = updated;
+      setSpikingGridNodes(spikingGridNodesRef.current);
     }
 
     const MAX_ACTIVE_SIGNALS = 10; // Limit simultaneous animations

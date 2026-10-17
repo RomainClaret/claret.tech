@@ -183,7 +183,6 @@ vi.mock("@/components/ui/holographic-card", () => ({
 // Mock Next.js components
 vi.mock("next/image", () => ({
   default: ({ src, alt, className, ...props }: NextImageProps) => (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InRyYW5zcGFyZW50Ii8+PC9zdmc+"
       alt={alt}
@@ -206,7 +205,6 @@ vi.mock("next/link", () => ({
 // Mock OptimizedImage
 vi.mock("@/components/ui/optimized-image", () => ({
   OptimizedImage: ({ src, alt, className }: OptimizedImageProps) => (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
@@ -486,6 +484,34 @@ describe("Papers", () => {
   });
 
   describe("Filtering", () => {
+    it("says which filter is on", () => {
+      render(<Papers />);
+      const filters = screen.getByRole("group", {
+        name: "Filter publications",
+      });
+      const states = () =>
+        within(filters)
+          .getAllByRole("button")
+          .map(
+            (button) =>
+              `${button.textContent}: ${button.getAttribute("aria-pressed")}`,
+          );
+
+      expect(states()).toEqual([
+        "All: true",
+        "Papers Only: false",
+        "Other Work: false",
+      ]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Other Work" }));
+
+      expect(states()).toEqual([
+        "All: false",
+        "Papers Only: false",
+        "Other Work: true",
+      ]);
+    });
+
     it("renders filter buttons", () => {
       render(<Papers />);
 
@@ -753,6 +779,50 @@ describe("Papers", () => {
   });
 
   describe("Card Interactions", () => {
+    // The nearest ancestor of a card's title that holds its Read more toggle.
+    const cardOf = (title: string) => {
+      let node: HTMLElement | null = screen.getByText(title);
+      while (
+        node &&
+        !within(node).queryByRole("button", { name: /Read more|Show less/ })
+      ) {
+        node = node.parentElement;
+      }
+      return node!;
+    };
+
+    it("says whether each card's description is open", async () => {
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              publications: [
+                { ...mockPublications[0], shortDescription: "A teaser." },
+              ],
+              totalCitations: 15,
+              count: 1,
+            }),
+        } as Response),
+      );
+      render(<Papers />);
+      await screen.findByText("A teaser.");
+
+      for (const title of [
+        "Blockchain, a techie overview",
+        "Neuroevolution Research Paper",
+      ]) {
+        const toggle = within(cardOf(title)).getByRole("button", {
+          name: "Read more",
+        });
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveTextContent("Show less");
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+      }
+    });
+
     it("expands paper cards to show full content", async () => {
       render(<Papers />);
 

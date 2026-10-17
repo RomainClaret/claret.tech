@@ -507,7 +507,6 @@ describe("ErrorFallback", () => {
 
     it("handles error without name", () => {
       const noNameError = new Error("Test message");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (noNameError as any).name = undefined;
 
       vi.stubEnv("NODE_ENV", "development");

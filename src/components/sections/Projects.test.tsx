@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -161,13 +162,19 @@ vi.mock("@/lib/utils/formatters", () => ({
   formatFileSizeDisplay: (size: number) => `${Math.round(size / 1024)}KB`,
 }));
 
-vi.mock("@/lib/utils/language-colors", () => ({
-  getProjectColor: (color: string | null, _name: string | undefined) =>
-    color || "59, 130, 246",
-  getLanguageIcon: (name: string | undefined) => (props: LucideIconProps) => (
+vi.mock("@/lib/utils/language-colors", () => {
+  const icon = (name: string | undefined) => (props: LucideIconProps) => (
     <div data-testid={`language-icon-${name}`} {...props} />
-  ),
-}));
+  );
+  return {
+    getProjectColor: (color: string | null, _name: string | undefined) =>
+      color || "59, 130, 246",
+    getLanguageIcon: icon,
+    // The project dialog looks its icon up rather than calling for it.
+    languageIcons: new Proxy({}, { get: (_icons, name) => icon(String(name)) }),
+    defaultLanguageIcon: icon(undefined),
+  };
+});
 
 // Mock portfolio data
 vi.mock("@/data/portfolio", () => ({
@@ -480,6 +487,107 @@ describe("Projects Component", () => {
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith("/api/fetch-all-repos");
       });
+    });
+  });
+
+  describe("All projects request", () => {
+    it("asks once while the API fails, and again on the next click", async () => {
+      // A failed answer changed the fetch's identity, which re-ran the
+      // effect that called it: the browser asked again at once, for as long
+      // as the API kept failing.
+      let allRequests = 0;
+      (global.fetch as unknown as MockedFetch).mockImplementation(
+        async (url: unknown) => {
+          if (url === "/api/fetch-all-repos") {
+            allRequests++;
+            return { ok: true, json: async () => ({ success: false }) };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { pinnedItems: { edges: [] } },
+            }),
+          };
+        },
+      );
+      render(<Projects />);
+      const all = await screen.findByText("All Projects");
+
+      fireEvent.click(all);
+      await waitFor(() => expect(allRequests).toBe(1));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(allRequests).toBe(1);
+
+      fireEvent.click(all);
+      await waitFor(() => expect(allRequests).toBe(2));
+    });
+
+    it("asks by itself once the splash's fetch ends empty while All shows", async () => {
+      let allRequests = 0;
+      (global.fetch as unknown as MockedFetch).mockImplementation(
+        async (url: unknown) => {
+          if (url === "/api/fetch-all-repos") {
+            allRequests++;
+            return { ok: true, json: async () => ({ success: false }) };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { pinnedItems: { edges: [] } },
+            }),
+          };
+        },
+      );
+      mockProjectsContext.isLoading = true; // the splash is fetching them
+      try {
+        const { rerender } = render(<Projects />);
+        fireEvent.click(await screen.findByText("All Projects"));
+        expect(allRequests).toBe(0);
+
+        mockProjectsContext.isLoading = false; // ...and came back empty
+        rerender(<Projects />);
+        await waitFor(() => expect(allRequests).toBe(1));
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        });
+        expect(allRequests).toBe(1);
+      } finally {
+        mockProjectsContext.isLoading = false;
+      }
+    });
+
+    it("asks once when the API answers with no repositories", async () => {
+      let allRequests = 0;
+      (global.fetch as unknown as MockedFetch).mockImplementation(
+        async (url: unknown) => {
+          if (url === "/api/fetch-all-repos") {
+            allRequests++;
+            return {
+              ok: true,
+              json: async () => ({ success: true, data: [] }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { pinnedItems: { edges: [] } },
+            }),
+          };
+        },
+      );
+      render(<Projects />);
+
+      fireEvent.click(await screen.findByText("All Projects"));
+      await waitFor(() => expect(allRequests).toBe(1));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(allRequests).toBe(1);
     });
   });
 
@@ -1255,6 +1363,26 @@ describe("Projects Component", () => {
         screen.getByRole("link", { name: /cool-library/ }),
       ).toHaveAttribute("href", "https://github.com/user/cool-library");
       expect(screen.queryByRole("button", { name: "cool-library" })).toBeNull();
+    });
+
+    it("shows a list row's link hint on keyboard focus, as on hover", async () => {
+      render(<Projects />);
+      await screen.findByText("A cool library for developers");
+
+      fireEvent.click(screen.getByLabelText("List view"));
+
+      // jsdom applies no :focus-within styles; the classes are the contract.
+      const title = screen.getByRole("heading", { name: /cool-library/ });
+      expect(title).toHaveClass(
+        "group-hover:text-primary",
+        "group-focus-within:text-primary",
+      );
+      expect(
+        title.querySelector('[data-testid="external-link-icon"]'),
+      ).toHaveClass(
+        "group-hover:opacity-100",
+        "group-focus-within:opacity-100",
+      );
     });
   });
 });

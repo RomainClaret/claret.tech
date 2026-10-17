@@ -15,8 +15,13 @@ import { useModalDialog } from "@/lib/hooks/useModalDialog";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
+import { accentStyle } from "@/components/ui/accent-text";
 import { formatFileSizeDisplay } from "@/lib/utils/formatters";
-import { getLanguageIcon, getProjectColor } from "@/lib/utils/language-colors";
+import {
+  defaultLanguageIcon,
+  getProjectColor,
+  languageIcons,
+} from "@/lib/utils/language-colors";
 
 interface ProjectDetailsDialogProps {
   project: Repository;
@@ -99,7 +104,9 @@ export function ProjectDetailsDialog({
     project.primaryLanguage?.color,
     project.primaryLanguage?.name,
   );
-  const LanguageIcon = getLanguageIcon(project.primaryLanguage?.name);
+  // A lookup, not a call: the icons are module-level components.
+  const LanguageIcon =
+    languageIcons[project.primaryLanguage?.name ?? ""] || defaultLanguageIcon;
   const topics = project.topics?.edges.map((edge) => edge.node.topic.name);
   const languages = languageShares(project);
   const created = formatDate(project.createdAt, {
@@ -201,10 +208,10 @@ export function ProjectDetailsDialog({
                 {topics.map((topic) => (
                   <li
                     key={topic}
-                    className="max-w-full break-words rounded-lg px-2.5 py-1 text-xs font-medium"
+                    className="accent-text-any max-w-full break-words rounded-lg px-2.5 py-1 text-xs font-medium"
                     style={{
+                      ...accentStyle(`rgb(${color})`),
                       backgroundColor: `rgba(${color}, 0.1)`,
-                      color: `rgb(${color})`,
                       border: `1px solid rgba(${color}, 0.3)`,
                     }}
                   >

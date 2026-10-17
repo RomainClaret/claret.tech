@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { NAV_OFFSET, scrollToSection } from "@/lib/utils/scroll-to-section";
@@ -28,9 +28,8 @@ export function useCardDeepLink(
   const [deepLinkedId, setDeepLinkedId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
-  // Track the latest onMatch without retriggering the hash effect.
-  const onMatchRef = useRef(options?.onMatch);
-  onMatchRef.current = options?.onMatch;
+  // The latest onMatch, without retriggering the hash effect.
+  const onMatch = useEffectEvent((id: string) => options?.onMatch?.(id));
 
   // Key the effect on content, not array identity: callers rebuild the array
   // every render (ids never contain a newline).
@@ -67,7 +66,7 @@ export function useCardDeepLink(
         return;
       }
 
-      onMatchRef.current?.(hash);
+      onMatch(hash);
       setDeepLinkedId(hash);
       setHighlightedId(hash);
       if (highlightTimer) clearTimeout(highlightTimer);

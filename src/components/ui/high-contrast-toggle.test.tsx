@@ -39,6 +39,27 @@ function systemAskedForMoreContrast(): Storage {
 }
 
 describe("HighContrastToggle", () => {
+  it("names its state by CSS, from the class on <html>", () => {
+    // The name said "currently off" until hydration, whatever the class.
+    // jsdom applies no stylesheet: this checks the classes, and
+    // static-shell.spec.ts the name a browser computes before the bundle.
+    render(<HighContrastToggle />);
+
+    expect(screen.getByRole("button")).not.toHaveAttribute("aria-label");
+    expect(
+      screen.getByText("Toggle high contrast mode (currently off)"),
+    ).toHaveClass("sr-only", "[.high-contrast_&]:hidden");
+    expect(
+      screen.getByText("Toggle high contrast mode (currently on)"),
+    ).toHaveClass("sr-only", "hidden", "[.high-contrast_&]:inline");
+    // Out of the name, still the button's description.
+    expect(screen.getByText(/improves visibility/)).toHaveAttribute("hidden");
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "aria-describedby",
+      "high-contrast-desc",
+    );
+  });
+
   it("works for the page view when the browser blocks storage", () => {
     unblock = blockStorage();
 

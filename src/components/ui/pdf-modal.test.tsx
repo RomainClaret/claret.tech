@@ -77,9 +77,7 @@ describe("PDFModal", () => {
     });
 
     it("renders backdrop", () => {
-      const { container } = render(
-        <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
-      );
+      render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
 
       const backdrop = document.querySelector(".backdrop-blur-sm");
       expect(backdrop).toBeInTheDocument();
@@ -129,9 +127,7 @@ describe("PDFModal", () => {
     it("closes when backdrop is clicked", () => {
       const onClose = vi.fn();
 
-      const { container } = render(
-        <PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />,
-      );
+      render(<PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />);
 
       const backdrop = document.querySelector(".backdrop-blur-sm");
       if (backdrop) {
@@ -363,9 +359,7 @@ describe("PDFModal", () => {
     });
 
     it("has aria-hidden on backdrop", () => {
-      const { container } = render(
-        <PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />,
-      );
+      render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
 
       const backdrop = document.querySelector(".backdrop-blur-sm");
       expect(backdrop).toHaveAttribute("aria-hidden", "true");

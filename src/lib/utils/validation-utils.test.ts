@@ -64,12 +64,7 @@ vi.mock("./image-utils", async () => {
   };
 });
 
-import {
-  getOptimizedImagePath,
-  getBlurDataURL,
-  imageOptimizationConfig,
-  imageSizes,
-} from "./image-utils";
+import { getOptimizedImagePath, getBlurDataURL } from "./image-utils";
 
 describe("Utility Validation Functions", () => {
   describe("SVG Validation", () => {
@@ -229,100 +224,6 @@ describe("Utility Validation Functions", () => {
         const result1 = getBlurDataURL();
         const result2 = getBlurDataURL();
         expect(result1).toBe(result2);
-      });
-    });
-
-    describe("imageOptimizationConfig", () => {
-      it("has correct quality setting", () => {
-        expect(imageOptimizationConfig.quality).toBe(85);
-      });
-
-      it("includes modern image formats", () => {
-        expect(imageOptimizationConfig.formats).toEqual([
-          "image/avif",
-          "image/webp",
-        ]);
-      });
-
-      it("has proper cache TTL", () => {
-        expect(imageOptimizationConfig.minimumCacheTTL).toBe(31536000); // 1 year in seconds
-      });
-
-      it("formats array is readonly", () => {
-        // This tests the 'as const' assertion
-        expect(Array.isArray(imageOptimizationConfig.formats)).toBe(true);
-      });
-    });
-
-    describe("imageSizes", () => {
-      it("has thumbnail size", () => {
-        expect(imageSizes.thumbnail).toEqual({ width: 150, height: 150 });
-      });
-
-      it("has small size", () => {
-        expect(imageSizes.small).toEqual({ width: 320, height: 240 });
-      });
-
-      it("has medium size", () => {
-        expect(imageSizes.medium).toEqual({ width: 640, height: 480 });
-      });
-
-      it("has large size", () => {
-        expect(imageSizes.large).toEqual({ width: 1024, height: 768 });
-      });
-
-      it("has full size", () => {
-        expect(imageSizes.full).toEqual({ width: 1920, height: 1080 });
-      });
-
-      it("maintains aspect ratios for responsive sizes", () => {
-        // Check that most sizes maintain 4:3 aspect ratio (except thumbnail which is square)
-        const checkAspectRatio = (
-          size: { width: number; height: number },
-          expected: number,
-        ) => {
-          const ratio = size.width / size.height;
-          expect(Math.abs(ratio - expected)).toBeLessThan(0.01);
-        };
-
-        expect(imageSizes.thumbnail.width).toBe(imageSizes.thumbnail.height); // Square
-        checkAspectRatio(imageSizes.small, 4 / 3);
-        checkAspectRatio(imageSizes.medium, 4 / 3);
-        checkAspectRatio(imageSizes.large, 4 / 3);
-        checkAspectRatio(imageSizes.full, 16 / 9);
-      });
-
-      it("sizes increase progressively", () => {
-        const sizes = [
-          imageSizes.thumbnail,
-          imageSizes.small,
-          imageSizes.medium,
-          imageSizes.large,
-          imageSizes.full,
-        ];
-
-        for (let i = 1; i < sizes.length; i++) {
-          if (i === 1) {
-            // Skip thumbnail to small comparison since thumbnail is square
-            continue;
-          }
-          expect(sizes[i].width).toBeGreaterThan(sizes[i - 1].width);
-          expect(sizes[i].height).toBeGreaterThan(sizes[i - 1].height);
-        }
-      });
-
-      it("all sizes have positive dimensions", () => {
-        Object.values(imageSizes).forEach((size) => {
-          expect(size.width).toBeGreaterThan(0);
-          expect(size.height).toBeGreaterThan(0);
-        });
-      });
-
-      it("all dimensions are integers", () => {
-        Object.values(imageSizes).forEach((size) => {
-          expect(Number.isInteger(size.width)).toBe(true);
-          expect(Number.isInteger(size.height)).toBe(true);
-        });
       });
     });
   });

@@ -233,6 +233,10 @@ test.describe("Accessibility", () => {
       "theme toggle (src/components/ui/theme-toggle.tsx) failed to switch the page to dark",
     ).toBe(true);
     await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+    // The name follows <html>'s class, which the click just changed.
+    await expect(themeToggle).toHaveAccessibleName(
+      "Toggle theme (current: dark)",
+    );
 
     // Wait for any theme animation to complete
     await waitForAnimationCompletion(page, "body", 3000);

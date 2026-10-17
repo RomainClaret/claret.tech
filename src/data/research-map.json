@@ -58,5 +58,126 @@
     "overclouds": "Overclouds",
     "vestibular-integration": "Vestibular integration"
   },
-  "relations": []
+  "relations": [
+    {
+      "from": "claret2024tpe",
+      "to": "phd-thesis",
+      "kind": "part-of",
+      "note": "Chapter 3 of the PhD thesis."
+    },
+    {
+      "from": "claret2026pruner",
+      "to": "phd-thesis",
+      "kind": "part-of",
+      "note": "Chapter 3 of the PhD thesis."
+    },
+    {
+      "from": "claret2026partitioned",
+      "to": "phd-thesis",
+      "kind": "part-of",
+      "note": "Chapter 4 of the PhD thesis."
+    },
+    {
+      "from": "claret2026quadtree",
+      "to": "phd-thesis",
+      "kind": "part-of",
+      "note": "Chapter 5 of the PhD thesis."
+    },
+    {
+      "from": "claret2026emr",
+      "to": "phd-thesis",
+      "kind": "part-of",
+      "note": "Chapter 6 of the PhD thesis."
+    },
+    {
+      "from": "phd-thesis",
+      "to": "geenns",
+      "kind": "part-of",
+      "note": "The PhD is the proof of concept for GEENNS (thesis Chapter 7)."
+    },
+    {
+      "from": "claret2023geenns",
+      "to": "geenns",
+      "kind": "precursor",
+      "note": "An early sketch of what became GEENNS."
+    },
+    {
+      "from": "claret2026quadtree",
+      "to": "claret2026emr",
+      "kind": "companion",
+      "note": "The quadtree paper names the bottleneck; EMR-HyperNEAT resolves it."
+    },
+    {
+      "from": "claret2026emr",
+      "to": "claret2026activations",
+      "kind": "extends",
+      "note": "Per-node activation functions become columns appended to the tensor substrate."
+    },
+    {
+      "from": "claret2026emr",
+      "to": "claret2026neuromodulation",
+      "kind": "extends",
+      "note": "Neuromodulation becomes columns appended to the tensor substrate."
+    },
+    {
+      "from": "claret2026activations",
+      "to": "claret2026neuromodulation",
+      "kind": "extends",
+      "note": "Adds per-task activation selection: one evolved genotype solves all five tasks."
+    },
+    {
+      "from": "claret2026activations",
+      "to": "claret2026bio",
+      "kind": "extends",
+      "note": "Evolves the palette that per-node activation evolution draws from."
+    },
+    {
+      "from": "phd-thesis",
+      "to": "emerging-behaviors",
+      "kind": "extends",
+      "note": "The thesis made these systems fast enough to study their behavior at scale."
+    },
+    {
+      "from": "vestibular-integration",
+      "to": "geenns",
+      "kind": "precursor",
+      "note": "\"Specialized components (the senses), weighting by reliability, and integration that emerges instead of being engineered.\""
+    },
+    {
+      "from": "graphqa",
+      "to": "phd-thesis",
+      "kind": "precursor",
+      "note": "GraphQA \"was my last attempt at building intelligence top-down.\""
+    },
+    {
+      "from": "overclouds",
+      "to": "geenns",
+      "kind": "precursor",
+      "note": "Overclouds \"planted the seed: evolve systems instead of building them.\""
+    },
+    {
+      "from": "claret2016blockchain",
+      "to": "overclouds",
+      "kind": "companion",
+      "note": "Both from 2016, both about consensus."
+    },
+    {
+      "from": "claret2026bio",
+      "to": "evolvable-vocabulary",
+      "kind": "extends",
+      "note": "The breeder asks the paper's palette question with images: does what is in a palette matter more than how much is in it?"
+    },
+    {
+      "from": "claret2024tpe",
+      "to": "claret2026partitioned",
+      "kind": "extends",
+      "note": "Partitioning takes up the MNIST ceiling that the TPE study's search could not break."
+    },
+    {
+      "from": "claret2024tpe",
+      "to": "claret2026pruner",
+      "kind": "extends",
+      "note": "Early stopping cuts the cost of searches like the TPE study's, where most configurations stagnate at random guessing."
+    }
+  ]
 }

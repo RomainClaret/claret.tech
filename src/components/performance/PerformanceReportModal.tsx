@@ -104,6 +104,14 @@ export function PerformanceReportModal({
     reportGenerator.generateReport();
   }, [isOpen, reportData, reportGenerator]);
 
+  // Closing the dialog, or leaving the page with it open, stops the run in
+  // flight: it went on and posted its report to the API all the same.
+  const { cancel } = reportGenerator;
+  useEffect(() => {
+    if (!isOpen) return;
+    return cancel;
+  }, [isOpen, cancel]);
+
   // Listen for report generation trigger
   useEffect(() => {
     const handleGenerateReport = () => {
@@ -154,13 +162,8 @@ export function PerformanceReportModal({
     };
   }, [isOpen, onClose]);
 
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setReportData(null);
-    }
-  }, [isOpen]);
-
+  // A closed modal forgets its report, so the next opening starts afresh.
+  if (!isOpen && reportData !== null) setReportData(null);
   if (!isOpen) return null;
 
   const downloadReport = (format: "json" | "html" | "csv") => {

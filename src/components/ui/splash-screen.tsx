@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useEffectEvent, useState, useRef } from "react";
 import { DisplayLottie } from "./display-lottie";
 import { splashScreen } from "@/data/portfolio";
 import { useTheme } from "./theme-provider";
@@ -17,6 +17,7 @@ import {
 import { logError, logWarning } from "@/lib/utils/dev-logger";
 import { useOverlayLock } from "@/lib/hooks/useMotionGate";
 import { lockPageScroll } from "@/lib/utils/scroll-lock";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -35,8 +36,7 @@ export function SplashScreen({
   onShow,
   skip = false,
 }: SplashScreenProps) {
-  const onShowRef = useRef(onShow);
-  onShowRef.current = onShow;
+  const notifyShown = useEffectEvent(() => onShow?.());
   const shouldReduceAnimations = useShouldReduceAnimations();
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -47,7 +47,8 @@ export function SplashScreen({
   const progressRootRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const progressTextRef = useRef<HTMLSpanElement>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  // Client-only (loaded with ssr: false), so true from its first render.
+  const isMounted = useHydrated();
   // The opaque splash covers the page: nothing behind it needs to move.
   useOverlayLock(isVisible && !isExiting);
   const [animationData, setAnimationData] = useState<object | null>(null);
@@ -59,8 +60,6 @@ export function SplashScreen({
   const browserDetectionRef = useRef(false);
 
   useEffect(() => {
-    setIsMounted(true);
-
     // Perform early browser detection and store in localStorage
     if (!browserDetectionRef.current) {
       browserDetectionRef.current = true;
@@ -171,13 +170,10 @@ export function SplashScreen({
     // page had: it wrote "auto" there, which then stayed on the body.
     const releaseScroll = lockPageScroll();
 
-    // Reset progress to 0
-    setIsReady(false);
-
     // Small delay to ensure proper mounting
     const showTimer = setTimeout(() => {
       setIsVisible(true);
-      onShowRef.current?.();
+      notifyShown();
     }, 10);
 
     // Animations are now controlled by the unified animation state system

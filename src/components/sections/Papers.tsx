@@ -43,6 +43,8 @@ import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { logError } from "@/lib/utils/dev-logger";
 import { accentStyle } from "@/components/ui/accent-text";
+import { researchAreaOf } from "@/lib/utils/research-area";
+import { useOpenOnDeepLink } from "@/lib/hooks/useOpenOnDeepLink";
 
 // Fetched on intent and mounted only while open (pdf-reader-preload.ts).
 const PDFModal = dynamic(loadPdfModal, {
@@ -59,54 +61,6 @@ const RESEARCH_COLORS: Record<string, string> = {
   neuroscience: "236, 72, 153", // Pink
   general: "107, 114, 128", // Gray
 };
-
-// Detect research area from publication
-function detectResearchArea(
-  pub: Publication | (typeof papersSection.papersCards)[0],
-): string {
-  const title = pub.title.toLowerCase();
-  const content =
-    "abstract" in pub ? pub.abstract : "subtitle" in pub ? pub.subtitle : "";
-  const text = `${title} ${content}`.toLowerCase();
-
-  if (
-    text.includes("neural") ||
-    text.includes("evolution") ||
-    text.includes("neuroevolution")
-  ) {
-    return "neuroevolution";
-  }
-  if (
-    text.includes("machine learning") ||
-    text.includes("deep learning") ||
-    text.includes("ai")
-  ) {
-    return "ml";
-  }
-  if (
-    text.includes("language") ||
-    text.includes("nlp") ||
-    text.includes("chatbot") ||
-    text.includes("question")
-  ) {
-    return "nlp";
-  }
-  if (
-    text.includes("blockchain") ||
-    text.includes("distributed") ||
-    text.includes("ledger")
-  ) {
-    return "blockchain";
-  }
-  if (
-    text.includes("vestibular") ||
-    text.includes("perception") ||
-    text.includes("brain")
-  ) {
-    return "neuroscience";
-  }
-  return "general";
-}
 
 // Detect publication status
 function detectPublicationStatus(
@@ -300,13 +254,9 @@ function PaperCard({
   shouldReduceAnimations,
   isDeepLinked = false,
 }: PaperCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Arriving via a deep link opens it.
+  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
   const [bibtexCopied, setBibtexCopied] = useState(false);
-
-  // Arriving via a deep link opens the full description.
-  useEffect(() => {
-    if (isDeepLinked) setIsExpanded(true);
-  }, [isDeepLinked]);
 
   const handleBibTeXClick = async () => {
     if (!paper.bibtex) return;
@@ -321,7 +271,7 @@ function PaperCard({
     setTimeout(() => setBibtexCopied(false), 2000);
   };
 
-  const researchArea = detectResearchArea(paper);
+  const researchArea = researchAreaOf(paper);
   const fallbackColor = RESEARCH_COLORS[researchArea];
   const publicationStatus = detectPublicationStatus(paper);
 
@@ -584,7 +534,9 @@ function PaperCard({
               </p>
               {paper.subtitle && paper.subtitle.length > 100 && (
                 <button
+                  type="button"
                   onClick={() => setIsExpanded(!isExpanded)}
+                  aria-expanded={isExpanded}
                   className="text-xs text-primary hover:underline mt-1"
                 >
                   {isExpanded ? "Show less" : "Read more"}
@@ -652,18 +604,15 @@ function DynamicPaperCard({
   isDeepLinked?: boolean;
 }) {
   const [bibtexCopied, setBibtexCopied] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Arriving via a deep link opens it.
+  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
 
-  // Arriving via a deep link opens the full abstract.
-  useEffect(() => {
-    if (isDeepLinked) setIsExpanded(true);
-  }, [isDeepLinked]);
   const { logoUrl } = useConferenceLogo(
     publication.venue
       ? `${publication.venue} • ${publication.year}`
       : undefined,
   );
-  const researchArea = detectResearchArea(publication);
+  const researchArea = researchAreaOf(publication);
   const fallbackColor = RESEARCH_COLORS[researchArea];
   const publicationStatus = detectPublicationStatus(publication);
 
@@ -939,7 +888,9 @@ function DynamicPaperCard({
                 return (
                   (hasLongContent || hasDifferentContent) && (
                     <button
+                      type="button"
                       onClick={() => setIsExpanded(!isExpanded)}
+                      aria-expanded={isExpanded}
                       className="text-xs text-primary hover:underline mt-1"
                     >
                       {isExpanded ? "Show less" : "Read more"}
@@ -1136,7 +1087,7 @@ export function Papers() {
               {" • "}
               {papersSection.subtitle.normalText}
             </p>
-            <div className="flex items-center justify-center gap-6 mt-4 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <FileText className="w-4 h-4" />
                 {totalWorks} academic works
@@ -1155,11 +1106,17 @@ export function Papers() {
           </div>
 
           {/* Filter pills */}
-          <div className="flex justify-center gap-2 mb-8">
+          <div
+            role="group"
+            aria-label="Filter publications"
+            className="flex flex-wrap justify-center gap-2 mb-8"
+          >
             <button
+              type="button"
               onClick={() => setFilterType("all")}
+              aria-pressed={filterType === "all"}
               className={cn(
-                "px-4 py-2 rounded-full text-sm transition-all",
+                "px-3 sm:px-4 py-2 rounded-full text-sm transition-all",
                 filterType === "all"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80",
@@ -1168,9 +1125,11 @@ export function Papers() {
               All
             </button>
             <button
+              type="button"
               onClick={() => setFilterType("papers")}
+              aria-pressed={filterType === "papers"}
               className={cn(
-                "px-4 py-2 rounded-full text-sm transition-all",
+                "px-3 sm:px-4 py-2 rounded-full text-sm transition-all",
                 filterType === "papers"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80",
@@ -1179,9 +1138,11 @@ export function Papers() {
               Papers Only
             </button>
             <button
+              type="button"
               onClick={() => setFilterType("theses")}
+              aria-pressed={filterType === "theses"}
               className={cn(
-                "px-4 py-2 rounded-full text-sm transition-all",
+                "px-3 sm:px-4 py-2 rounded-full text-sm transition-all",
                 filterType === "theses"
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80",

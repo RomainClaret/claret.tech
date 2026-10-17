@@ -36,8 +36,3 @@ export function generateShimmerPlaceholder(
  * Default blur placeholder for square images (e.g., logos)
  */
 export const DEFAULT_BLUR_PLACEHOLDER = generateShimmerPlaceholder(64, 64);
-
-/**
- * Default blur placeholder for rectangular images
- */
-export const RECTANGLE_BLUR_PLACEHOLDER = generateShimmerPlaceholder(320, 180);

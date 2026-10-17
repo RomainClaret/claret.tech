@@ -333,12 +333,13 @@ export function SkillsNeuralCloud({
       },
     );
 
-    setConceptNodes(mappedConcepts);
     // The scheduler reads the ref, which the sync effect updates only after
     // the next render: with the nodes made twice on mount (the first size
     // update), it kept a timer set for the first set, and the second set's
-    // earlier spikes waited for it and fired together. Hand them over now.
+    // earlier spikes waited for it and fired together. Hand them over now,
+    // and render what the scheduler holds.
     conceptNodesRef.current = mappedConcepts;
+    setConceptNodes(conceptNodesRef.current);
     wakeSchedulerRef.current?.();
   }, [
     backgroundData,
@@ -373,26 +374,26 @@ export function SkillsNeuralCloud({
     // they all spiked in the same tick: one synchronized flash, and a burst
     // of updates, instead of the staggered rhythm.
     const startedAt = Date.now();
-    const retimed = new Map<string, number>();
-    conceptNodesRef.current.forEach((node) => {
-      if (!node.isSpiking && node.nextSpikeTime <= startedAt) {
-        retimed.set(
+    const overdue = conceptNodesRef.current.filter(
+      (node) => !node.isSpiking && node.nextSpikeTime <= startedAt,
+    );
+    if (overdue.length > 0) {
+      const retimed = new Map(
+        overdue.map((node) => [
           node.nodeKey,
           startedAt +
             getRandomInterval(
               DEFAULT_SPIKING_CONFIG.minInterval * 1000,
               DEFAULT_SPIKING_CONFIG.maxInterval * 1000,
             ),
-        );
-      }
-    });
-    if (retimed.size) {
+        ]),
+      );
       const retime = (node: ConceptNode): ConceptNode => {
         const nextSpikeTime = retimed.get(node.nodeKey);
         return nextSpikeTime === undefined ? node : { ...node, nextSpikeTime };
       };
       conceptNodesRef.current = conceptNodesRef.current.map(retime);
-      setConceptNodes((nodes) => nodes.map(retime));
+      setConceptNodes(conceptNodesRef.current);
     }
 
     let timer: ReturnType<typeof setTimeout> | undefined;

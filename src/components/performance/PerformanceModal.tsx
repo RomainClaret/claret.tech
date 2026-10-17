@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
 import { createPortal } from "react-dom";
 import { m, AnimatePresence, LazyMotion, domMax } from "framer-motion";
@@ -57,13 +57,16 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
     };
   }, [isOpen, onClose]);
 
-  // Reset position when opening
-  useEffect(() => {
+  // Reset position when opening: during the render that opens it, so it
+  // never shows, even for a frame, where it was last dragged.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setPosition({ x: 0, y: 0 });
       setIsMinimized(false);
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

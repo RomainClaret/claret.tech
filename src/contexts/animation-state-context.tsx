@@ -23,6 +23,7 @@ import {
 } from "@/lib/utils/safari-detection";
 import { useFpsOnly } from "@/lib/hooks/useFpsOnly";
 import { useFpsAutoDisable } from "@/lib/hooks/useFpsAutoDisable";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 interface AnimationStateContextType {
   areAnimationsPlaying: boolean;
@@ -91,36 +92,48 @@ export function AnimationStateProvider({ children }: { children: ReactNode }) {
       },
     },
   );
-  useEffect(() => {
+  if (autoDisabled !== autoDisableState.isAutoDisabled) {
     setAutoDisabled(autoDisableState.isAutoDisabled);
-  }, [autoDisableState.isAutoDisabled]);
+  }
 
   // The actual animation state is user preference AND not auto-disabled
   const areAnimationsPlaying =
     userAnimationPreference && !autoDisableState.isAutoDisabled;
 
-  // Once the browser is settled (the Safari provider's mount, which sets
-  // isHydrated with the detected browser): the stored choice, or the
-  // browser's default. Before that, a check for a changed browser would
-  // compare a Safari visitor's stored choice with the page's default and
-  // throw it away.
+  // Once the browser is settled (the Safari provider, which reports
+  // isHydrated with the detected browser), in that render: the choice stored
+  // for this browser, or its default (Safari: stopped; others: playing).
+  // Before that, a check for a changed browser would compare a Safari
+  // visitor's stored choice with the page's default and throw it away.
+  const hydrated = useHydrated();
+  const settledBrowser =
+    hydrated && isHydrated ? (isSafari ? "safari" : "other") : null;
+  const [preferenceBrowser, setPreferenceBrowser] = useState<string | null>(
+    null,
+  );
+  if (settledBrowser !== preferenceBrowser) {
+    setPreferenceBrowser(settledBrowser);
+    if (settledBrowser) {
+      const stored = getAnimationPreference();
+      setUserAnimationPreference(
+        stored?.browser === settledBrowser
+          ? stored.value
+          : settledBrowser !== "safari",
+      );
+    }
+  }
+  // A choice stored for another browser goes. (shouldResetAnimationPreference
+  // makes the same comparison; the stored entry is checked too, as before.)
   useEffect(() => {
-    if (!isHydrated) return;
-    if (shouldResetAnimationPreference(isSafari)) {
+    if (!settledBrowser) return;
+    const stored = getAnimationPreference();
+    if (
+      shouldResetAnimationPreference(settledBrowser === "safari") ||
+      (stored && stored.browser !== settledBrowser)
+    ) {
       clearAnimationPreference();
     }
-    const preference = getAnimationPreference();
-    const currentBrowser = isSafari ? "safari" : "other";
-    if (preference?.isUserPreference) {
-      setUserAnimationPreference(preference.value);
-    } else if (preference && preference.browser === currentBrowser) {
-      // A browser default stored by an older version of the site.
-      setUserAnimationPreference(preference.value);
-    } else {
-      if (preference) clearAnimationPreference();
-      setUserAnimationPreference(!isSafari); // Safari: stopped; others: playing
-    }
-  }, [isHydrated, isSafari]);
+  }, [settledBrowser]);
 
   // Only a visitor's own choice is stored, by the controls below; the
   // browser default is worked out again on every load. An effect here

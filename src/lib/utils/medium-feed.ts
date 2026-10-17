@@ -1,3 +1,5 @@
+import { mediumUsername } from "@/lib/utils/medium-username";
+
 /** One post as rss2json gives it. */
 export interface MediumFeedItem {
   title: string;
@@ -27,7 +29,7 @@ export interface MediumFeed {
  * read production's API.
  */
 export async function fetchMediumFeed<T = MediumFeed>(
-  username = process.env.NEXT_PUBLIC_MEDIUM_USERNAME || "romainclaret",
+  username = mediumUsername(),
 ): Promise<T> {
   const response = await fetch(
     `https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@${username}`,

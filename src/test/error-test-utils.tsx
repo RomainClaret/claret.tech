@@ -1,49 +1,18 @@
 /**
  * Error Testing Utilities for React Hook Testing
  *
- * Comprehensive utilities for testing React hooks that throw errors when used
- * improperly (e.g., outside their required providers). These utilities work
- * with our custom Vitest environment to properly capture and test errors.
- *
- * Key features:
- * - Error boundary wrapper for hook testing
- * - Enhanced renderHook with error capturing
- * - Assertion helpers for hook errors
- * - Error isolation and recovery mechanisms
- *
- * Created for Engineering Excellence: Achieving 100% Test Pass Rate
+ * For testing React hooks that throw when used improperly (outside their
+ * provider, say): renderHookWithErrorBoundary renders the hook under an
+ * error boundary and returns what it threw, and expectHookError checks it.
  */
 
-import React, { Component, ReactNode, ErrorInfo } from "react";
+import { Component, ReactNode, ErrorInfo } from "react";
 import {
   renderHook as originalRenderHook,
   RenderHookOptions,
   RenderHookResult,
 } from "@testing-library/react";
-import { act } from "@testing-library/react";
 import { vi } from "vitest";
-
-// Global error capture interface (set by our custom environment)
-interface ErrorCaptureGlobal {
-  captureError: (error: Error, context?: string) => void;
-  getLastError: () => CapturedError | undefined;
-  getCapturedErrors: () => CapturedError[];
-  clearErrors: () => void;
-  hasErrors: () => boolean;
-}
-
-interface CapturedError {
-  error: Error;
-  errorInfo?: unknown;
-  timestamp: number;
-  testContext?: string;
-}
-
-// Extend global to include our error capture
-declare global {
-  // eslint-disable-next-line no-var
-  var __VITEST_ERROR_CAPTURE__: ErrorCaptureGlobal | undefined;
-}
 
 /**
  * Error boundary component for capturing React errors in tests
@@ -78,11 +47,6 @@ class TestErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Capture the error through our global handler
-    if (global.__VITEST_ERROR_CAPTURE__) {
-      global.__VITEST_ERROR_CAPTURE__.captureError(error, "ErrorBoundary");
-    }
-
     // Update state with error info
     this.setState({
       hasError: true,
@@ -399,176 +363,4 @@ export function expectHookError(
       );
     }
   }
-}
-
-/**
- * Higher-order component for error isolation in tests
- */
-export function withErrorIsolation<P extends object>(
-  Component: React.ComponentType<P>,
-): React.ComponentType<
-  P & { onError?: (error: Error, errorInfo: ErrorInfo) => void }
-> {
-  return function WrappedComponent(props) {
-    const { onError, ...componentProps } = props as P & {
-      onError?: (error: Error, errorInfo: ErrorInfo) => void;
-    };
-
-    return (
-      <TestErrorBoundary onError={onError}>
-        <Component {...(componentProps as P)} />
-      </TestErrorBoundary>
-    );
-  };
-}
-
-/**
- * Create an error boundary wrapper for custom providers
- */
-export function createErrorBoundaryWrapper(
-  Provider?: React.ComponentType<{ children: ReactNode }>,
-): React.ComponentType<{ children: ReactNode }> {
-  return function ErrorBoundaryWrapper({ children }) {
-    return (
-      <TestErrorBoundary>
-        {Provider ? <Provider>{children}</Provider> : children}
-      </TestErrorBoundary>
-    );
-  };
-}
-
-/**
- * Test helper to verify error handling in async scenarios
- */
-export async function testAsyncHookError<T>(
-  hookFn: () => T,
-  expectedError: {
-    message: string | RegExp;
-    type?: new (...args: unknown[]) => Error;
-  },
-  options?: RenderHookOptions<unknown>,
-): Promise<void> {
-  const { getError } = renderHookWithErrorBoundary(hookFn, options);
-
-  // Wait for any async operations to complete
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-  expectHookError(getError(), expectedError);
-}
-
-/**
- * Utility to test hook errors in different scenarios
- */
-export interface HookErrorTestScenario<T> {
-  name: string;
-  hookFn: () => T;
-  expectedError: {
-    message: string | RegExp;
-    type?: new (...args: unknown[]) => Error;
-  };
-  setup?: () => void | Promise<void>;
-  cleanup?: () => void | Promise<void>;
-}
-
-export async function testHookErrorScenarios<T>(
-  scenarios: HookErrorTestScenario<T>[],
-): Promise<void> {
-  for (const scenario of scenarios) {
-    // Setup
-    if (scenario.setup) {
-      await scenario.setup();
-    }
-
-    try {
-      // Test the scenario
-      await testAsyncHookError(scenario.hookFn, scenario.expectedError);
-    } catch (error) {
-      // Add scenario context to error
-      const contextualError = new Error(
-        `Error in scenario "${scenario.name}": ${(error as Error).message}`,
-      );
-      contextualError.stack = (error as Error).stack;
-      throw contextualError;
-    } finally {
-      // Cleanup
-      if (scenario.cleanup) {
-        await scenario.cleanup();
-      }
-    }
-  }
-}
-
-/**
- * Debug utility to inspect captured errors
- */
-export function inspectCapturedErrors(): CapturedError[] {
-  if (!global.__VITEST_ERROR_CAPTURE__) {
-    console.warn(
-      "Error capture not available. Make sure you are using the custom Vitest environment.",
-    );
-    return [];
-  }
-
-  const errors = global.__VITEST_ERROR_CAPTURE__.getCapturedErrors();
-  console.log("Captured Errors:", errors);
-  return errors;
-}
-
-/**
- * Utility to clear all captured errors
- */
-export function clearAllCapturedErrors(): void {
-  if (global.__VITEST_ERROR_CAPTURE__) {
-    global.__VITEST_ERROR_CAPTURE__.clearErrors();
-  }
-}
-
-/**
- * Check if error capture is available
- */
-export function isErrorCaptureAvailable(): boolean {
-  return typeof global.__VITEST_ERROR_CAPTURE__ !== "undefined";
-}
-
-// ==============================================================================
-// Expected Error Context Utilities
-// ==============================================================================
-
-/**
- * Provides clear context for intentional error tests
- * Use this to explain why stderr output is expected and indicates success
- */
-export function logExpectedError(testName: string, expectedError: string) {
-  console.info(`⚠️ EXPECTED ERROR TEST: ${testName}`);
-  console.info(`   Expected stderr: "${expectedError}"`);
-  console.info(
-    "   This error proves our error handling infrastructure works correctly.",
-  );
-  console.info(
-    "   ↓ The following stderr output is intentional and indicates success:",
-  );
-}
-
-/**
- * Enhanced hook error testing with better error context
- * Combines error logging context with existing error testing infrastructure
- */
-export function testHookErrorWithContext(
-  testName: string,
-  hook: () => unknown,
-  expectedMessage: string,
-  _options: { expectError?: boolean } = {},
-) {
-  // Log clear context about this expected error
-  logExpectedError(testName, expectedMessage);
-
-  // Use existing error testing infrastructure
-  const { getError } = renderHookWithErrorBoundary(hook, { expectError: true });
-
-  expectHookError(getError(), {
-    message: expectedMessage,
-    type: Error as new (...args: unknown[]) => Error,
-  });
 }

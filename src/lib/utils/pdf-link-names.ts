@@ -664,7 +664,17 @@ export interface LinkNameBook {
   pageCallbacks: (pageNumber: number) => PageLinkCallbacks;
   /** Forget every name: a different document. */
   reset: () => void;
+  /**
+   * Also tell `onNamed` when a page's names are known, until the returned
+   * function is called. For a component, which subscribes in an effect.
+   */
+  listen: (onNamed: OnNamed) => () => void;
 }
+
+type OnNamed = (
+  pageNumber: number,
+  nameOf: (id: string) => string | null,
+) => void;
 
 interface PageState {
   annotations?: readonly LinkAnnotationData[];
@@ -676,16 +686,17 @@ interface PageState {
 /**
  * Names a document's links page by page, once each: react-pdf hands every
  * page's annotations and text over again on each zoom, and those come back
- * at once. `onNamed` runs when a page's names are known, for the links
- * already on screen; links added later look their name up.
+ * at once. `onNamed`, and each listener, runs when a page's names are known,
+ * for the links already on screen; links added later look their name up.
  */
 export function createLinkNameBook({
   onNamed,
   measure,
 }: {
-  onNamed: (pageNumber: number, nameOf: (id: string) => string | null) => void;
+  onNamed?: OnNamed;
   measure?: MeasureChar;
-}): LinkNameBook {
+} = {}): LinkNameBook {
+  const listeners = new Set<OnNamed>();
   const names = new Map<string, string>();
   let pages = new Map<number, PageState>();
   const callbacks = new Map<number, PageLinkCallbacks>();
@@ -708,7 +719,9 @@ export function createLinkNameBook({
     state.annotations = undefined;
     state.text = undefined;
     named.forEach((name, id) => names.set(id, name));
-    if (named.size > 0) onNamed(pageNumber, nameOf);
+    if (named.size === 0) return;
+    onNamed?.(pageNumber, nameOf);
+    listeners.forEach((listener) => listener(pageNumber, nameOf));
   };
 
   const pageCallbacks = (pageNumber: number): PageLinkCallbacks => {
@@ -760,5 +773,12 @@ export function createLinkNameBook({
     generation++;
   };
 
-  return { nameOf, pageCallbacks, reset };
+  const listen = (listener: OnNamed) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  return { nameOf, pageCallbacks, reset, listen };
 }

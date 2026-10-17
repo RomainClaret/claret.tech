@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  fileSystem,
-  resolvePath,
-  getFileAtPath,
-  getParentPath,
-} from "./fileSystem";
+import { fileSystem, resolvePath, getFileAtPath } from "./fileSystem";
 
 describe("Terminal File System", () => {
   describe("resolvePath", () => {
@@ -119,32 +114,6 @@ describe("Terminal File System", () => {
 
     it("returns null when trying to access children of files", () => {
       expect(getFileAtPath("/README.md/nonexistent")).toBeNull();
-    });
-  });
-
-  describe("getParentPath", () => {
-    it("gets parent of nested paths", () => {
-      expect(getParentPath("/home/user/docs")).toBe("/home/user");
-      expect(getParentPath("/docs/api.md")).toBe("/docs");
-      expect(getParentPath("/home/user")).toBe("/home");
-    });
-
-    it("gets parent of root-level paths", () => {
-      expect(getParentPath("/docs")).toBe("/");
-      expect(getParentPath("/file.txt")).toBe("/");
-    });
-
-    it("handles root path", () => {
-      expect(getParentPath("/")).toBe("/");
-    });
-
-    it("handles hidden paths", () => {
-      expect(getParentPath("/.hidden/file1")).toBe("/.hidden");
-      expect(getParentPath("/.hiddenFile")).toBe("/");
-    });
-
-    it("handles deep nested paths", () => {
-      expect(getParentPath("/a/b/c/d/e")).toBe("/a/b/c/d");
     });
   });
 

@@ -48,17 +48,14 @@ print("Running in WebAssembly, sandboxed, on your machine.")
 
 from functools import lru_cache
 
-
 def slow(n):
     """Exponential: recomputes the same subproblems over and over."""
     return n if n < 2 else slow(n - 1) + slow(n - 2)
-
 
 @lru_cache(maxsize=None)
 def fast(n):
     """Same recursion, memoized. Linear instead of exponential."""
     return n if n < 2 else fast(n - 1) + fast(n - 2)
-
 
 print("first 10:", [fast(i) for i in range(10)])
 print("fib(90) is", fast(90), "and slow() would still be running")
@@ -81,16 +78,13 @@ random.seed(7)
 COUNT, STEPS, WIDTH = 12, 40, 48
 penguins = [random.uniform(0, WIDTH) for _ in range(COUNT)]
 
-
 def nearest_neighbor(index):
     me = penguins[index]
     others = [(abs(me - p), p) for i, p in enumerate(penguins) if i != index]
     return min(others)[1]
 
-
 def spread():
     return max(penguins) - min(penguins)
-
 
 print("start:  spread over", round(spread(), 1), "units")
 
@@ -217,10 +211,4 @@ export function getFileAtPath(path: string): VirtualFile | null {
   }
 
   return current;
-}
-
-export function getParentPath(path: string): string {
-  const parts = path.split("/").filter(Boolean);
-  parts.pop();
-  return "/" + parts.join("/");
 }

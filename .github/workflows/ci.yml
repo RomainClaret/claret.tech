@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   # CI environment detection variables
   CI: true
   CONTINUOUS_INTEGRATION: true
@@ -90,6 +90,10 @@ jobs:
             source:
               - 'src/**'
               - 'public/**'
+              # npm ci runs postinstall and the build prebuild, both from
+              # scripts/, and next.config imports one: a change there alone
+              # can break any job.
+              - 'scripts/**'
               - 'package.json'
               - 'package-lock.json'
             # Config files by glob: next and tailwind are .mjs and .ts, and
@@ -104,8 +108,8 @@ jobs:
               - 'next.config.*'
               - 'tsconfig.json'
               - 'tsconfig.test.json'
-              - '.eslintrc.json'
-              - '.eslintignore'
+              - 'eslint.config.mjs'
+              - 'knip.jsonc'
               - '.prettierignore'
               - 'vitest.config.ts'
               - '.github/workflows/**'
@@ -128,6 +132,7 @@ jobs:
             has-code-changes:
               - 'src/**'
               - 'public/**'
+              - 'scripts/**'
               - '*.config.{js,mjs,ts}'
               - 'package.json'
               - 'package-lock.json'
@@ -140,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: detect-changes
-    # Config too: lint, format and type-check read .eslintrc.json,
+    # Config too: lint, format and type-check read eslint.config.mjs,
     # .prettierignore, tsconfig.json and tsconfig.test.json. And the tests:
     # type-check covers them (tests/e2e is outside has-code-changes).
     if: |
@@ -150,7 +155,7 @@ jobs:
        needs.detect-changes.outputs.tests == 'true')
     strategy:
       matrix:
-        check: [lint, format, type-check]
+        check: [lint, format, type-check, knip, actionlint]
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
@@ -163,7 +168,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - run: npm ci
+      # actionlint runs from its Docker image and needs no dependencies.
+      - if: matrix.check != 'actionlint'
+        run: npm ci
       - name: Run ${{ matrix.check }}
         run: |
           case "${{ matrix.check }}" in
@@ -171,10 +178,16 @@ jobs:
               npm run lint
               ;;
             format)
-              npm run format -- --check
+              npm run format:check
               ;;
             type-check)
               npm run type-check
+              ;;
+            knip)
+              npm run knip
+              ;;
+            actionlint)
+              npm run lint:workflows
               ;;
           esac
 
@@ -442,7 +455,7 @@ jobs:
           path: |
             node_modules/.cache/vitest
             .vitest-cache
-          key: hooks-tests-${{ hashFiles('src/hooks/**', 'package-lock.json') }}
+          key: hooks-tests-${{ hashFiles('src/lib/hooks/**', 'package-lock.json') }}
           restore-keys: hooks-tests-
       - run: npm run test:hooks
 
@@ -524,13 +537,8 @@ jobs:
        needs.detect-changes.outputs.config == 'true')
     env:
       NEXT_PUBLIC_SITE_URL: https://claret.tech
-      NEXT_PUBLIC_ENABLE_TERMINAL: true
-      NEXT_PUBLIC_DEFAULT_LLM_MODEL: llama-3.2-1b
-      NEXT_PUBLIC_ENABLE_AI_FEATURES: true
       GITHUB_TOKEN: mock_token
-      GITHUB_USERNAME: mock_username
       USE_GITHUB_DATA: false
-      MEDIUM_USERNAME: mock_username
     steps:
       - uses: actions/checkout@v6
       - name: Free Disk Space

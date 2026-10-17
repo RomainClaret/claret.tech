@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { useTheme } from "./theme-provider";
 import { useQuality } from "@/contexts/quality-context";
 import { useAnimationStateOptional } from "@/contexts/animation-state-context";
@@ -50,28 +50,39 @@ interface FaviconWindow extends Window {
  */
 const ICON_LINKS = "link[rel~='icon']";
 
+// One request per script per page. A run superseded while the scripts
+// loaded (a dark visitor's theme settles after hydration) found them not yet
+// loaded and appended both again. A failed load can be asked for again.
+const scriptLoads = new Map<string, Promise<void>>();
+
 function loadScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-    document.head.appendChild(script);
-  });
+  let load = scriptLoads.get(src);
+  if (!load) {
+    load = new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+      document.head.appendChild(script);
+    });
+    load.catch(() => scriptLoads.delete(src));
+    scriptLoads.set(src, load);
+  }
+  return load;
 }
 
 export function AnimatedFavicon() {
   const { theme } = useTheme();
   const { quality } = useQuality();
   const isLowQuality = quality === "battery" || quality === "low";
-  // Honor the site-wide animation switch. Read through a ref so toggling
-  // pauses the loop in place instead of tearing down and reloading the
-  // favicon scripts (optional hook: tests may render without the provider).
+  // Honor the site-wide animation switch. Read through an effect event so
+  // toggling pauses the loop in place instead of tearing down and reloading
+  // the favicon scripts (optional hook: tests may render without the
+  // provider).
   const animationState = useAnimationStateOptional();
   const areAnimationsPlaying = animationState?.areAnimationsPlaying ?? true;
-  const areAnimationsPlayingRef = useRef(areAnimationsPlaying);
-  areAnimationsPlayingRef.current = areAnimationsPlaying;
+  const animationsPlaying = useEffectEvent(() => areAnimationsPlaying);
 
   useEffect(() => {
     let animationId: number | null = null;
@@ -285,7 +296,7 @@ export function AnimatedFavicon() {
         // the previous requestAnimationFrame loop woke 60 times per second
         // only to skip ~95% of those on a frame-interval check.
         const animate = () => {
-          if (!document.hidden && areAnimationsPlayingRef.current) {
+          if (!document.hidden && animationsPlaying()) {
             updateFavicon();
           }
 

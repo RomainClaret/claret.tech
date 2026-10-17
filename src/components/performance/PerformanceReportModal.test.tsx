@@ -88,6 +88,7 @@ vi.mock("@/lib/utils", () => ({
 let mockIsGenerating = false;
 let mockReportData: unknown = null;
 const mockGenerateReport = vi.fn();
+const mockCancel = vi.fn();
 const mockProgressUI = vi.fn(() => (
   <div data-testid="progress-ui">Report Progress</div>
 ));
@@ -108,6 +109,7 @@ vi.mock("./PerformanceReportGenerator", () => ({
       report: mockReportData,
       error: null,
       generateReport: mockGenerateReport,
+      cancel: mockCancel,
       formatReportForTerminal: vi.fn(),
       getTerminalProgress: vi.fn(),
       ProgressUI: mockProgressUI,
@@ -234,6 +236,24 @@ describe("PerformanceReportModal", () => {
       rerender(<PerformanceReportModal isOpen={false} onClose={mockOnClose} />);
       rerender(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
       expect(mockGenerateReport).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Leaving", () => {
+    it("stops the run when it closes, and when it leaves the page", () => {
+      // A run went on after the dialog closed and posted its report to the
+      // API all the same.
+      const { rerender, unmount } = render(
+        <PerformanceReportModal isOpen={true} onClose={mockOnClose} />,
+      );
+      expect(mockCancel).not.toHaveBeenCalled();
+
+      rerender(<PerformanceReportModal isOpen={false} onClose={mockOnClose} />);
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+
+      rerender(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+      unmount();
+      expect(mockCancel).toHaveBeenCalledTimes(2);
     });
   });
 

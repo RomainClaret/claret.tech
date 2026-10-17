@@ -211,6 +211,13 @@ function startSampler() {
  */
 export function useFpsOnly(isEnabled: boolean = true): FpsOnlyData {
   const [fpsData, setFpsData] = useState<FpsOnlyData>(() => data);
+  // Switched on again: the shared loop's latest reading, in that render
+  // (another caller may have kept it running meanwhile).
+  const [wasEnabled, setWasEnabled] = useState(isEnabled);
+  if (isEnabled !== wasEnabled) {
+    setWasEnabled(isEnabled);
+    if (isEnabled) setFpsData(data);
+  }
 
   useEffect(() => {
     if (!isEnabled || typeof window === "undefined") {
@@ -219,7 +226,6 @@ export function useFpsOnly(isEnabled: boolean = true): FpsOnlyData {
 
     listeners.add(setFpsData);
     startSampler();
-    setFpsData(data);
 
     return () => {
       listeners.delete(setFpsData);

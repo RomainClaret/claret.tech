@@ -704,10 +704,8 @@ test.describe("Terminal", () => {
     const text = await page.evaluate(() => {
       // Try to access xterm's terminal instance directly
       const terminalEl = document.querySelector(".xterm");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (terminalEl && (terminalEl as any)._xtermTerminal) {
         // If xterm instance is accessible, use its buffer
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const term = (terminalEl as any)._xtermTerminal;
         const buffer = term.buffer?.active || term.buffer;
         if (buffer) {
@@ -1982,8 +1980,12 @@ test.describe("Terminal", () => {
       return window.getComputedStyle(el).backgroundColor;
     });
 
-    // Toggle theme
-    const themeToggle = page.locator('button[aria-label*="theme" i]').first();
+    // Toggle theme: by its accessible name, which its text gives (it has no
+    // aria-label since the name follows <html>'s class)
+    const themeToggle = page
+      .getByRole("button", { name: /toggle theme/i })
+      .filter({ visible: true })
+      .first();
     await themeToggle.click();
     await page.waitForTimeout(500);
 

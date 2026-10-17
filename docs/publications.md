@@ -77,7 +77,7 @@ Nothing refreshes automatically. There is no cron.
 - `.github/workflows/update-publications.yml` is `workflow_dispatch` only. Trigger it from the Actions tab; it opens a pull request rather than pushing, so the diff is reviewable.
 - `npm install`, `npm run build` and `npm run dev` never touch publications data.
 - A normal `GET /api/publications` reads the committed file and never refetches, at any cache age.
-- `/api/publications?refresh=true` needs `&key=$PUBLICATIONS_REFRESH_TOKEN`. Without the variable set, refresh is off entirely. A wrong or absent key is served the committed data as an ordinary request, with no error.
+- A request to `/api/publications` with the header `x-refresh-key: $PUBLICATIONS_REFRESH_TOKEN` rebuilds from the APIs (a header, not the query string, which access logs record). Without the variable set, refresh is off entirely. A wrong or absent key is served the committed data as an ordinary request, with no error.
 - No request path writes `public/publications.json`. The script is the only writer.
 
 ## Fields the APIs never supply

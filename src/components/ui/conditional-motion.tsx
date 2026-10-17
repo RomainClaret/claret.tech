@@ -4,7 +4,7 @@ import React from "react";
 import { m } from "framer-motion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
-import type { MotionValue, MotionTransition } from "@/test/mock-types";
+import type { MotionValue, MotionTransition } from "@/types/motion";
 
 interface ConditionalMotionProps {
   children?: React.ReactNode;
@@ -53,7 +53,7 @@ export function ConditionalMotion({
 
   // Render static element for Safari or reduced motion preference
   if (shouldReduceAnimations) {
-    const Component = as as keyof JSX.IntrinsicElements;
+    const Component = as as keyof React.JSX.IntrinsicElements;
     return (
       <Component
         className={cn(className, fallbackClassName)}

@@ -399,6 +399,31 @@ describe("Skills Component", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("names each toggle after its panel and says whether it is open", () => {
+      render(<Skills />);
+
+      const toggles = screen.getAllByRole("button", {
+        name: /^Read more about /,
+      });
+      // 3 core activities + 4 research philosophy panels, none open.
+      expect(toggles).toHaveLength(7);
+      for (const toggle of toggles) {
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+      }
+      expect(toggles[0]).toHaveAccessibleName(
+        "Read more about Evolutionary Algorithms",
+      );
+
+      fireEvent.click(toggles[0]);
+      fireEvent.click(toggles[3]);
+
+      expect(toggles[0]).toHaveAccessibleName(
+        "Show less about Evolutionary Algorithms",
+      );
+      expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
+      expect(toggles[3]).toHaveAttribute("aria-expanded", "true");
+    });
+
     it("renders chevron icons that rotate when expanded", () => {
       render(<Skills />);
 

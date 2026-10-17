@@ -75,7 +75,10 @@ export function FloatingNav() {
         {/* Home Button */}
         <button
           onClick={scrollToTop}
-          aria-label="Scroll to top"
+          // Holds the label it shows ("Home"), as the others hold theirs.
+          aria-label="Home, scroll to top"
+          // Out of the Tab order while it is invisible, as the others are.
+          disabled={!showHomeButton}
           className={cn(
             "group relative h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-lg transition-all duration-300 hover:scale-110 hover:shadow-xl flex items-center justify-center",
             showHomeButton
@@ -84,7 +87,7 @@ export function FloatingNav() {
           )}
         >
           <Home className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity whitespace-nowrap">
             Home
           </span>
         </button>
@@ -102,7 +105,7 @@ export function FloatingNav() {
           )}
         >
           <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity whitespace-nowrap">
             Previous
           </span>
         </button>
@@ -120,7 +123,7 @@ export function FloatingNav() {
           )}
         >
           <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity whitespace-nowrap">
             Next
           </span>
         </button>
@@ -138,7 +141,7 @@ export function FloatingNav() {
           )}
         >
           <ChevronsDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <span className="absolute right-full mr-2 px-2 py-1 text-xs font-medium text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity whitespace-nowrap">
             Latest
           </span>
         </button>

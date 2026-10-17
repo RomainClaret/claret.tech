@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { users, defaultUser, getUser, listUsernames } from "./users";
+import { users, getUser, listUsernames } from "./users";
 
 describe("Terminal User System", () => {
   describe("users object", () => {
@@ -58,13 +58,6 @@ describe("Terminal User System", () => {
       expect(readmeFile.type).toBe("file");
       expect(readmeFile.content).toContain("# Welcome, guest!");
       expect(readmeFile.content).toContain("This is your home directory");
-    });
-  });
-
-  describe("defaultUser", () => {
-    it("is the guest user", () => {
-      expect(defaultUser).toBe(users.guest);
-      expect(defaultUser.username).toBe("guest");
     });
   });
 

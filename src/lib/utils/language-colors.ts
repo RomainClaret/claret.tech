@@ -152,9 +152,12 @@ export const languageIcons: Record<string, LucideIcon> = {
 };
 
 // Get icon for language with fallback
+/** The icon for a language languageIcons does not list. */
+export const defaultLanguageIcon: LucideIcon = Code;
+
 export function getLanguageIcon(
   language: string | null | undefined,
 ): LucideIcon {
-  if (!language) return Code;
-  return languageIcons[language] || Code;
+  if (!language) return defaultLanguageIcon;
+  return languageIcons[language] || defaultLanguageIcon;
 }

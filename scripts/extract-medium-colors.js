@@ -8,8 +8,14 @@
 const fs = require("fs").promises;
 const path = require("path");
 
-const MEDIUM_RSS_URL =
-  "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@romainclaret";
+// The feed of the account the site's blog reads, by the same rule as
+// src/lib/utils/medium-username.ts: NEXT_PUBLIC_MEDIUM_USERNAME without a
+// leading "@", else romainclaret.
+function mediumRssUrl(value = process.env.NEXT_PUBLIC_MEDIUM_USERNAME) {
+  const username = (value || "").trim().replace(/^@+/, "") || "romainclaret";
+  return `https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@${username}`;
+}
+
 const OUTPUT_FILE = path.join(__dirname, "../src/lib/utils/medium-colors.json");
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -84,7 +90,7 @@ const BLOG_COLORS = {
 
 async function fetchMediumPosts() {
   try {
-    const response = await fetch(MEDIUM_RSS_URL);
+    const response = await fetch(mediumRssUrl());
     const data = await response.json();
 
     if (data.status !== "ok" || !data.items) {
@@ -222,4 +228,4 @@ if (require.main === module) {
   extractMediumColors();
 }
 
-module.exports = { extractMediumColors };
+module.exports = { extractMediumColors, mediumRssUrl };

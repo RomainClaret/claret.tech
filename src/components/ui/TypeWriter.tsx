@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { useAnimationGate } from "@/lib/hooks/useMotionGate";
@@ -71,6 +71,16 @@ function nextStep(
 }
 
 /**
+ * Puts a new cursor glyph at the point of the 2 s animate-pulse loop every
+ * glyph is at in that moment, so the blink carries on unbroken. Once, as the
+ * glyph mounts: computed while rendering, it moved on any render, typed or
+ * not.
+ */
+function joinBlink(glyph: HTMLSpanElement | null) {
+  if (glyph) glyph.style.animationDelay = `${-(performance.now() % 2000)}ms`;
+}
+
+/**
  * Types each phrase, holds it, deletes it and moves on to the next, at the
  * library's cadence.
  *
@@ -100,13 +110,14 @@ function AnimatedTyping({
   });
   // The parent passes a new array on every render; read the latest one when
   // a step is taken rather than restarting the timer for it.
-  const phrasesRef = useRef(strings);
-  phrasesRef.current = strings;
+  const stepFrom = useEffectEvent((from: TypingState) =>
+    nextStep(from, strings),
+  );
   const running = active && !isPaused && strings.length > 0;
 
   useEffect(() => {
     if (!running) return;
-    const { state: next, delay } = nextStep(state, phrasesRef.current);
+    const { state: next, delay } = stepFrom(state);
     const timer = setTimeout(() => setState(next), delay);
     return () => clearTimeout(timer);
   }, [running, state]);
@@ -124,15 +135,11 @@ function AnimatedTyping({
             px; top-0 put it up to 2 px high).
             A new glyph per keystroke: one glyph moving along the line was a
             layout shift each time (CLS counts any element that moves), a new
-            one is not. The negative delay puts every glyph at the same
-            point of the 2 s animate-pulse loop for the same moment, so the
-            blink carries on unbroken. */}
+            one is not. joinBlink keeps the blink unbroken. */}
         <span
           key={`${state.phrase}:${state.length}`}
+          ref={joinBlink}
           className={cn(className, "animate-pulse absolute")}
-          style={{
-            animationDelay: `${-(performance.now() % 2000)}ms`,
-          }}
           aria-hidden="true"
         >
           |
@@ -153,7 +160,6 @@ export function TypeWriter({
   className = "",
   isPaused = false,
 }: TypeWriterProps) {
-  const [isClient, setIsClient] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [key, setKey] = useState(0);
   const [currentStringIndex, setCurrentStringIndex] = useState(0);
@@ -164,23 +170,18 @@ export function TypeWriter({
   const config = getConfig(TYPEWRITER_PROFILE);
 
   useEffect(() => {
-    setIsClient(true);
     // Small delay to ensure smooth transition
     const timer = setTimeout(() => setIsLoaded(true), 50);
     return () => clearTimeout(timer);
   }, []);
 
-  // Force re-render when pause state or animation settings change
-  useEffect(() => {
-    if (isPaused) {
-      setKey((prev) => prev + 1);
-    }
-  }, [isPaused]);
-
-  // Force re-render when animation state or quality changes
-  useEffect(() => {
-    setKey((prev) => prev + 1); // Increment counter for unique keys
-  }, [areAnimationsPlaying, config.animate]);
+  // Pausing starts the typing over (a new key remounts it), in the render
+  // that pauses it.
+  const [wasPaused, setWasPaused] = useState(isPaused);
+  if (isPaused !== wasPaused) {
+    setWasPaused(isPaused);
+    if (isPaused) setKey((prev) => prev + 1);
+  }
 
   // Cycle through strings when reduced motion is preferred, Safari performance optimization, or animations are disabled
   useEffect(() => {
@@ -211,7 +212,7 @@ export function TypeWriter({
   ]);
 
   // Show static text during SSR and initial load
-  if (!isClient || !isLoaded) {
+  if (!isLoaded) {
     return (
       <span className={className}>
         {strings[0]}
@@ -246,8 +247,9 @@ export function TypeWriter({
     );
   }
 
-  // Remounted (key) when the pause or animation settings change, so typing
-  // starts over from the first phrase, as the library's remount did.
+  // Typing starts over from the first phrase, as the library's remount did:
+  // remounted (key) when paused, and mounted afresh when animations come back
+  // on, since the branch above replaces it meanwhile.
   if (areAnimationsPlaying && config.animate) {
     return (
       <AnimatedTyping

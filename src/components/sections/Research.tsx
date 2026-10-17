@@ -25,7 +25,7 @@ import {
   Scaling,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useId, useState } from "react";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
@@ -133,6 +133,7 @@ function ResearchCard({
     : Beaker;
   const year = project.year;
   const nodeColor = project.color || "139, 92, 246";
+  const detailsId = useId();
 
   return (
     <m.div
@@ -226,6 +227,7 @@ function ResearchCard({
             <AnimatePresence>
               {isActive && (
                 <m.div
+                  id={detailsId}
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
@@ -272,10 +274,10 @@ function ResearchCard({
                           {project.tags.map((tag, i) => (
                             <span
                               key={i}
-                              className="px-2.5 py-1 text-xs font-medium rounded-lg transition-all hover:scale-105"
+                              className="px-2.5 py-1 text-xs font-medium rounded-lg transition-all hover:scale-105 accent-text"
                               style={{
+                                ...accentStyle(`rgb(${nodeColor})`),
                                 backgroundColor: `rgba(${nodeColor}, 0.1)`,
-                                color: `rgb(${nodeColor})`,
                                 border: `1px solid rgba(${nodeColor}, 0.3)`,
                               }}
                             >
@@ -351,7 +353,7 @@ function ResearchCard({
             </AnimatePresence>
 
             {/* Quick Stats / Expand Toggle */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-4">
               {!isActive && project.links && (
                 <span className="flex items-center gap-1">
                   <FileText className="w-3 h-3" />
@@ -365,15 +367,27 @@ function ResearchCard({
                   {project.highlights.length} Achievements
                 </span>
               )}
-              <span className="flex items-center gap-1 ml-auto text-primary cursor-pointer">
+              {/* The card opens from a click anywhere on it; this is its
+                  control for the keyboard and for screen readers. */}
+              <button
+                type="button"
+                aria-expanded={isActive}
+                aria-controls={detailsId}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggle();
+                }}
+                className="flex items-center gap-1 ml-auto text-primary cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 {isActive ? "Click to collapse" : "Click to expand"}
                 <ChevronDown
+                  aria-hidden="true"
                   className={cn(
                     "w-3 h-3 transition-transform duration-300",
                     isActive && "rotate-180",
                   )}
                 />
-              </span>
+              </button>
             </div>
           </div>
         </HolographicCard>
@@ -384,11 +398,16 @@ function ResearchCard({
 
 export function Research() {
   const shouldReduceAnimations = useShouldReduceAnimations();
+  const highlightId = useId();
   // The hero glow and the timeline pulse only run while on screen. Not tied
   // to the animation switch, which they never followed: Safari, where it
   // starts off, keeps its look.
-  const heroGlowGate = useAnimationGate({ respectPlaying: false });
-  const timelineGate = useAnimationGate({ respectPlaying: false });
+  const { ref: heroGlowRef, active: heroGlowActive } = useAnimationGate({
+    respectPlaying: false,
+  });
+  const { ref: timelineRef, active: timelineActive } = useAnimationGate({
+    respectPlaying: false,
+  });
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
   const [isPhdExpanded, setIsPhdExpanded] = useState(false);
@@ -422,22 +441,24 @@ export function Research() {
     !!heroAnchor &&
     (deepLinkedId === heroAnchor || deepLinkedId === heroFullAnchor);
 
-  // Arriving via a deep link opens the targeted card.
+  // Arriving via a deep link opens the targeted card, in the render the link
+  // arrives in.
   //
   // Only the hero distinguishes the two variants. Grid cards always open,
   // because collapsed they show a three-line teaser, so a link that left one
   // shut would land the reader on something they still have to click.
-  useEffect(() => {
-    if (!deepLinkedId) return;
-    if (deepLinkedId === heroFullAnchor) {
+  const [seenLink, setSeenLink] = useState<string | null>(null);
+  if (deepLinkedId !== seenLink) {
+    setSeenLink(deepLinkedId);
+    if (deepLinkedId && deepLinkedId === heroFullAnchor) {
       setIsPhdExpanded(true);
-      return;
+    } else if (deepLinkedId) {
+      const target = visibleProjects.findIndex(
+        (p) => p.anchorId === deepLinkedId,
+      );
+      if (target > 0) setActiveIndex(target);
     }
-    const target = visibleProjects.findIndex(
-      (p) => p.anchorId === deepLinkedId,
-    );
-    if (target > 0) setActiveIndex(target);
-  }, [deepLinkedId, heroFullAnchor]);
+  }
 
   if (!researchSection.display) {
     return null;
@@ -549,7 +570,9 @@ export function Research() {
 
                   <div className="flex justify-center mt-6">
                     <m.button
+                      type="button"
                       onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
+                      aria-expanded={isJourneyExpanded}
                       className="group flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300"
                       style={{
                         borderColor: "rgba(245, 158, 11, 0.3)",
@@ -572,6 +595,7 @@ export function Research() {
                           isJourneyExpanded && "rotate-180",
                         )}
                         style={{ color: "rgb(245, 158, 11)" }}
+                        aria-hidden="true"
                       />
                     </m.button>
                   </div>
@@ -688,19 +712,17 @@ export function Research() {
             {/* Neural glow effect for hero; rests at its starting opacity
                 while off-screen */}
             <m.div
-              ref={heroGlowGate.ref}
+              ref={heroGlowRef}
               className="absolute -inset-1 rounded-2xl opacity-0 blur-xl"
               style={{
                 backgroundColor: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
               }}
               initial={{ opacity: 0.3 }}
               animate={
-                heroGlowGate.active
-                  ? { opacity: [0.3, 0.5, 0.3] }
-                  : { opacity: 0.3 }
+                heroGlowActive ? { opacity: [0.3, 0.5, 0.3] } : { opacity: 0.3 }
               }
               transition={
-                heroGlowGate.active
+                heroGlowActive
                   ? { duration: 3, repeat: Infinity }
                   : { duration: 0 }
               }
@@ -749,7 +771,9 @@ export function Research() {
                   {/* Toggle Button */}
                   <div className="flex justify-center mt-4">
                     <m.button
+                      type="button"
                       onClick={() => setIsPhdExpanded(!isPhdExpanded)}
+                      aria-expanded={isPhdExpanded}
                       className="group flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300"
                       style={{
                         borderColor: `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.3)`,
@@ -776,6 +800,7 @@ export function Research() {
                         style={{
                           color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
                         }}
+                        aria-hidden="true"
                       />
                     </m.button>
                   </div>
@@ -792,10 +817,19 @@ export function Research() {
                     const expandedDescriptions =
                       visibleProjects[0].expandedHighlightDescriptions || [];
 
+                    const explanation = expandedDescriptions[i];
+                    const explanationId = `${highlightId}-${i}`;
                     return (
                       <ScaleIn key={i} className="h-full">
                         <m.div
-                          className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
+                          // Focusable when it has an explanation, which shows
+                          // on focus or a tap as it does on hover: hover alone
+                          // kept it from keyboards and touch screens.
+                          tabIndex={explanation ? 0 : undefined}
+                          aria-describedby={
+                            explanation ? explanationId : undefined
+                          }
+                          className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
                           whileHover={{ scale: 1.05 }}
                           transition={{
                             type: "spring",
@@ -829,15 +863,17 @@ export function Research() {
                                 made the page pan sideways and stretched the
                                 fixed navigation and site grid to match. */}
                           <div
+                            id={explanationId}
+                            role="tooltip"
                             className={cn(
-                              "absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64",
+                              "absolute top-full mt-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64",
                               i % 2 === 0 ? "left-0" : "right-0",
                               "md:left-1/2 md:right-auto md:-translate-x-1/2",
                             )}
                           >
                             <div className="bg-popover text-popover-foreground rounded-lg shadow-xl border p-3">
                               <p className="text-xs leading-relaxed">
-                                {expandedDescriptions[i]}
+                                {explanation}
                               </p>
                             </div>
                           </div>
@@ -937,8 +973,8 @@ export function Research() {
         <div className="relative">
           {/* Unified Timeline for Desktop - single continuous element */}
           <div
-            ref={timelineGate.ref}
-            data-anim={timelineGate.active ? "on" : "off"}
+            ref={timelineRef}
+            data-anim={timelineActive ? "on" : "off"}
             className="absolute left-1/2 -top-8 sm:-top-16 bottom-0 w-0.5 -translate-x-1/2 hidden md:block -z-10"
           >
             {/* Continuous gradient from Current Focus to end */}

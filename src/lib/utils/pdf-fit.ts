@@ -100,19 +100,3 @@ export async function pageSizes(pdf: MeasurablePdf): Promise<PageSize[]> {
 export function widestOf(sizes: PageSize[]): number {
   return sizes.reduce((max, size) => (size.width > max ? size.width : max), 0);
 }
-
-/**
- * The widest page in the document, in points.
- *
- * Fitting only the first page is not enough: a thesis opens on a portrait
- * title page and turns landscape 55 pages later, and fitting page one leaves
- * those later pages overflowing sideways. Page size comes from the document
- * metadata rather than from a rendered canvas, so this does not depend on
- * render timing.
- *
- * Resolves to 0 if the document cannot be measured, which callers should read
- * as "do not adjust the zoom".
- */
-export async function widestPageWidth(pdf: MeasurablePdf): Promise<number> {
-  return widestOf(await pageSizes(pdf));
-}

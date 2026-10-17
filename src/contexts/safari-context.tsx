@@ -4,10 +4,13 @@ import {
   createContext,
   useContext,
   useEffect,
-  useState,
+  useSyncExternalStore,
   ReactNode,
 } from "react";
 import { detectSafari } from "@/lib/utils/safari-detection";
+import { useHydrated } from "@/lib/hooks/useHydrated";
+
+const subscribeNever = () => () => {};
 
 interface SafariContextType {
   isSafari: boolean;
@@ -42,21 +45,17 @@ export function SafariProvider({
   children,
   initialSafari,
 }: SafariProviderProps) {
-  // The value the HTML was rendered with, so hydration matches it: the
-  // homepage is generated once, at build time, for every browser. The
-  // browser itself is known on the client only, and settled after mount.
-  const [isSafari, setIsSafari] = useState(initialSafari ?? false);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // After mount: the browser this really is. The head script has already
+  // The value the HTML was rendered with while hydrating, so hydration
+  // matches it: the homepage is generated once, at build time, for every
+  // browser. Then the browser this really is. The head script has already
   // set <html data-safari> before the first paint (lib/boot/head-boot.ts);
   // detectSafari's user-agent test is the same one.
-  useEffect(() => {
-    setIsHydrated(true);
-    const detected = detectSafari().isSafari;
-    if (detected !== isSafari) setIsSafari(detected);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
-  }, []);
+  const isSafari = useSyncExternalStore(
+    subscribeNever,
+    () => detectSafari().isSafari,
+    () => initialSafari ?? false,
+  );
+  const isHydrated = useHydrated();
 
   // CSS targets <body data-safari> and .enable-animations on <body>.
   useEffect(() => {

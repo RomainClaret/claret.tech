@@ -837,12 +837,17 @@ describe("Terminal Commands", () => {
       expect(sent()).toEqual(["terminal-research-map"]);
     });
 
-    it("closes the research map", () => {
+    it("has no close: the map closes from itself", () => {
+      // The terminal steps aside while the map is open, so `research close`
+      // could only be typed with the map already closed, and it answered
+      // "Research map closed" all the same. Escape, the close button and
+      // the backdrop close the map.
       mockWindow.dispatchEvent.mockClear();
       const result = commands.research(["close"], mockContext) as CommandResult;
 
-      expect(result).toEqual({ output: "Research map closed", success: true });
-      expect(sent()).toEqual(["terminal-research-close"]);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Unknown action: close");
+      expect(sent()).toEqual([]);
     });
 
     it("lists its actions, and refuses one it does not know", () => {
@@ -850,7 +855,8 @@ describe("Terminal Commands", () => {
       const help = commands.research(["help"], mockContext) as CommandResult;
       const unknown = commands.research(["zoom"], mockContext) as CommandResult;
 
-      expect(help.output).toContain("research close");
+      expect(help.output).toContain("research help");
+      expect(help.output).not.toContain("close");
       expect(unknown.success).toBe(false);
       expect(unknown.output).toContain("research help");
       expect(sent()).toEqual([]);
@@ -860,9 +866,13 @@ describe("Terminal Commands", () => {
       const help = commands.help([], mockContext) as CommandResult;
       const man = commands.man(["research"], mockContext) as CommandResult;
 
-      expect(help.output).toContain("research [close]");
+      expect(help.output).toMatch(/\n {2}research +Open the research map/);
       expect(man.output).toContain("research - open the research map");
-      expect(getCompletions("research c", mockContext)).toEqual(["close"]);
+      expect(man.output).not.toMatch(/^ +close /m);
+      expect(getCompletions("research ", mockContext)).toEqual([
+        "help",
+        "open",
+      ]);
       expect(getCompletions("man rese", mockContext)).toEqual(["research"]);
     });
   });

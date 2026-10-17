@@ -28,11 +28,3 @@ export function writeStorage(which: Area, key: string, value: string): void {
     // Blocked or full: kept for this page view only.
   }
 }
-
-export function removeStorage(which: Area, key: string): void {
-  try {
-    area(which).removeItem(key);
-  } catch {
-    // Blocked: there is nothing stored to remove.
-  }
-}

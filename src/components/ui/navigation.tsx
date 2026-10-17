@@ -24,6 +24,7 @@ import { terminalIntent } from "@/components/terminal/load-terminal";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { scrollToSection } from "@/lib/utils/scroll-to-section";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 const navItems = [
   { href: "#home", label: "Home", icon: Home },
@@ -42,13 +43,9 @@ export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
-  const [isHydrated, setIsHydrated] = useState(false);
+  // The cursor blinks only once hydrated: the HTML has no animation class.
+  const isHydrated = useHydrated();
   const { areAnimationsPlaying } = useAnimationState();
-
-  // Track hydration to prevent animation class mismatch
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -172,6 +169,7 @@ export function Navigation() {
               // It measured 37x20, under even WCAG 2.2 AA's 24px floor.
               className="flex items-center justify-center ml-1 min-h-11 min-w-11 transition-colors hover:opacity-80"
               aria-label="Toggle terminal"
+              aria-expanded={isTerminalOpen}
             >
               <span className="text-gray-500 dark:text-gray-400">~&nbsp;$</span>
               <span
@@ -349,9 +347,8 @@ export function Navigation() {
                       handleNavClick(e, "#contact");
                     }}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-lg font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-                    aria-label="Contact me"
                   >
-                    <Mail className="w-5 h-5" />
+                    <Mail className="w-5 h-5" aria-hidden="true" />
                     Get In Touch
                   </button>
                 </div>

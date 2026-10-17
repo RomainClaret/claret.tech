@@ -96,6 +96,19 @@ describe("ProjectDetailsDialog", () => {
     expect(document.body.lastElementChild).toContainElement(dialog);
   });
 
+  it("writes its topics in the language's colour, deepened to read", () => {
+    // Raw, the chips read at 1.35 to 3.9:1. GitHub gives the colour, so the
+    // mix is the one that holds for any colour (accent-text.test.ts).
+    open(full);
+
+    for (const topic of ["neuroevolution", "jax"]) {
+      const chip = screen.getByText(topic);
+      expect(chip).toHaveClass("accent-text-any");
+      expect(chip.style.getPropertyValue("--accent")).toBe("rgb(49, 120, 198)");
+      expect(chip.style.color).toBe("");
+    }
+  });
+
   it("shows a repository's full record", () => {
     open(full);
     const dialog = screen.getByRole("dialog");

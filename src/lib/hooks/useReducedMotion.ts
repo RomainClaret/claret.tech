@@ -1,78 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+const QUERY = "(prefers-reduced-motion: reduce)";
+
+// One list per matchMedia, so the many animated components that ask do not
+// call matchMedia on every render (tests swap matchMedia, hence the check).
+let cached: {
+  matchMedia: typeof window.matchMedia;
+  list: MediaQueryList;
+} | null = null;
+function reducedMotionQuery(): MediaQueryList | null {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    return null;
+  if (cached?.matchMedia !== window.matchMedia) {
+    cached = { matchMedia: window.matchMedia, list: window.matchMedia(QUERY) };
+  }
+  return cached.list;
+}
+
+function subscribe(onChange: () => void) {
+  const query = reducedMotionQuery();
+  if (!query) return () => {};
+  if (query.addEventListener) {
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }
+  // Older Safari
+  query.addListener(onChange);
+  return () => query.removeListener(onChange);
+}
 
 /**
- * Custom hook to detect if the user prefers reduced motion
- * @returns {boolean} true if the user prefers reduced motion
+ * Whether the visitor asks for reduced motion. False in the server's HTML
+ * and while hydrating, then the system's setting, followed live.
  */
 export function useReducedMotion(): boolean {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    // Check if window is available (client-side)
-    if (typeof window === "undefined") return;
-
-    // Create media query
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    // Set initial value
-    setPrefersReducedMotion(mediaQuery.matches);
-
-    // Handler for changes
-    const handleChange = (event: MediaQueryListEvent) => {
-      setPrefersReducedMotion(event.matches);
-    };
-
-    // Modern browsers
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    }
-    // Fallback for older browsers
-    else {
-      mediaQuery.addListener(handleChange);
-      return () => mediaQuery.removeListener(handleChange);
-    }
-  }, []);
-
-  return prefersReducedMotion;
+  return useSyncExternalStore(
+    subscribe,
+    () => reducedMotionQuery()?.matches ?? false,
+    () => false,
+  );
 }
-
-/**
- * Get animation duration based on motion preference
- * @param normalDuration - Duration in ms when motion is allowed
- * @param reducedDuration - Duration in ms when motion is reduced (default: 0)
- * @returns {number} Appropriate duration based on user preference
- */
-export function getMotionSafeDuration(
-  normalDuration: number,
-  reducedDuration: number = 0,
-): number {
-  if (typeof window === "undefined") return normalDuration;
-
-  const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-  return mediaQuery.matches ? reducedDuration : normalDuration;
-}
-
-/**
- * Configuration for motion-safe animations
- */
-export const MOTION_SAFE_CONFIG = {
-  // Transitions
-  transition: {
-    normal: "all 0.3s ease",
-    reduced: "none",
-  },
-  // Animation durations
-  duration: {
-    fast: { normal: 200, reduced: 0 },
-    medium: { normal: 300, reduced: 0 },
-    slow: { normal: 600, reduced: 0 },
-  },
-  // Spring animations
-  spring: {
-    normal: { stiffness: 100, damping: 10 },
-    reduced: { stiffness: 300, damping: 30 }, // Faster, less bouncy
-  },
-} as const;

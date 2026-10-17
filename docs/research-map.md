@@ -2,8 +2,9 @@
 
 `research` in the terminal opens a map of the papers and research projects on
 the site: one row per line of work, time running left to right, and lines
-between items that say why they belong together. `research close` closes it;
-`man research` lists its keys.
+between items that say why they belong together. Escape, its close button or
+the backdrop closes it (there is no `research close`: the terminal steps
+aside while the map is open); `man research` lists its keys.
 
 It is built from the data the sections already show. Nothing on the map is
 typed twice, except the few things below that only the map needs.
@@ -61,6 +62,14 @@ in the item's details. Directions:
 
 The map draws an arrowhead at `to`. Curated lines are heavier than derived
 ones; derived kinds differ by their dashes, never by colour alone.
+
+A relation is a claim about the research, so it goes in only once Romain has
+reviewed it. The 20 in the file (2026-10-15): the five papers the thesis is
+based on, each with its chapter (the thesis's List of Publications), what
+the site's own text states, and four links it does not state (Bio palettes
+and the breeder, the TPE study under Partitioned and Early stopping,
+Blockchain and Overclouds). A note shows on both items' panels, so it names
+its subject: a card's "This thesis" becomes the project's name.
 
 ## Code
 

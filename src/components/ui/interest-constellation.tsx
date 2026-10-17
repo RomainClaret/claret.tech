@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAnimationState } from "@/contexts/animation-state-context";
 import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import { getTechIcon } from "@/components/icons";
+import { accentStyle } from "@/components/ui/accent-text";
 
 interface Interest {
   interestName: string;
@@ -328,7 +329,6 @@ export function InterestConstellation({
   brainNodes,
 }: InterestConstellationProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
   // Initialize with correct screen size
   const [screenSize, setScreenSize] = useState<"tablet" | "desktop">(
     typeof window !== "undefined" && window.innerWidth < 1024
@@ -352,8 +352,6 @@ export function InterestConstellation({
   const shouldUsePartialArc = usePartialArc || screenSize === "tablet";
 
   useEffect(() => {
-    setIsHydrated(true);
-
     /**
      * Measure the component's own root, which carries `w-full`.
      *
@@ -551,7 +549,9 @@ export function InterestConstellation({
             </filter>
           </defs>
 
-          {isHydrated &&
+          {/* Drawn once measured: a width exists only in the browser, and
+              below md, where the orbit is hidden, never. */}
+          {containerWidth !== null &&
             layout.interestForSlot.map((interestIndex, slot) => {
               const interest = interests[interestIndex];
               const index = interestIndex;
@@ -846,14 +846,16 @@ export function InterestConstellation({
                     </>
                   )}
 
-                  {/* Text label */}
+                  {/* Text label, in its colour through the contrast helper
+                      (accent-text.ts): as it was, green read at 2.3:1 on
+                      the light theme. */}
                   <m.text
                     x={labelPos.x}
                     y={labelPos.y}
                     textAnchor={labelPos.textAnchor}
                     dominantBaseline="middle"
-                    className="select-none"
-                    fill={`rgb(${color})`}
+                    className="select-none accent-text"
+                    fill="currentColor"
                     fontSize={textBounds.fontSize}
                     fontWeight="600"
                     fontFamily="system-ui, -apple-system, sans-serif"
@@ -885,6 +887,7 @@ export function InterestConstellation({
                       },
                     }}
                     style={{
+                      ...accentStyle(`rgb(${color})`),
                       pointerEvents: "none",
                       letterSpacing: textBounds.needsAdjustment
                         ? "0.01em"
@@ -953,53 +956,6 @@ export function InterestConstellation({
               );
             })}
         </svg>
-      </div>
-
-      {/* Mobile: Compact list with icons and text */}
-      <div className="md:hidden">
-        <m.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            delay: areAnimationsPlaying ? 0.8 : 0,
-            duration: areAnimationsPlaying ? 0.5 : 0,
-          }}
-          className="flex flex-wrap gap-2 justify-center"
-        >
-          {isHydrated &&
-            interests.map((interest, index) => {
-              const color = getInterestColor(interest.interestName);
-
-              return (
-                <m.div
-                  key={`mobile-interest-${index}`}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{
-                    delay: areAnimationsPlaying ? 0.9 + index * 0.05 : 0,
-                    duration: areAnimationsPlaying ? 0.3 : 0,
-                    type: areAnimationsPlaying ? "spring" : "tween",
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-                  style={{
-                    backgroundColor: `rgba(${color}, 0.1)`,
-                    border: `1px solid rgba(${color}, 0.3)`,
-                  }}
-                >
-                  <i
-                    className={cn(interest.fontAwesomeClassname, "text-xs")}
-                    style={{ color: `rgb(${color})` }}
-                  />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: `rgb(${color})` }}
-                  >
-                    {interest.interestName}
-                  </span>
-                </m.div>
-              );
-            })}
-        </m.div>
       </div>
     </div>
   );

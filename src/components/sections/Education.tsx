@@ -38,7 +38,6 @@ function EducationCard({
   index,
   shouldReduceAnimations,
 }: EducationCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Use dynamic color extraction with fallback color
@@ -103,7 +102,7 @@ function EducationCard({
 
             {/* Title and Progress */}
             <div className="flex-1">
-              <h3 className="text-xl sm:text-2xl font-bold mb-1 bg-gradient-to-r from-foreground to-foreground group-hover:from-primary group-hover:to-purple-600 bg-clip-text text-transparent transition-all duration-500">
+              <h3 className="text-xl sm:text-2xl font-bold mb-1">
                 {school.subHeader}
               </h3>
               <Link
@@ -136,38 +135,36 @@ function EducationCard({
 
           {/* Main content */}
           <div className="space-y-4">
-            {/* Thesis with expandable abstract */}
-            <div className="relative">
-              <div
-                className="flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-all duration-300 hover:bg-muted/50"
-                style={{
-                  borderLeft: `3px solid ${extractedColor}`,
-                  backgroundColor: `${extractedColor}05`,
-                }}
-                onClick={() => setIsExpanded(!isExpanded)}
+            {/* Thesis with expandable abstract: a native disclosure, which
+                opens from the keyboard, says whether it is open, and works
+                without scripts (it was a div that only a mouse could open). */}
+            <details className="group/thesis relative">
+              <summary
+                className="flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-all duration-300 hover:bg-muted/50 list-none [&::-webkit-details-marker]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                style={{ borderLeft: `3px solid ${extractedColor}` }}
               >
                 <Sparkles
+                  aria-hidden="true"
                   className="w-4 h-4 mt-0.5 flex-shrink-0"
                   style={{ color: extractedColor }}
                 />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{school.desc}</p>
+                <span className="block flex-1">
+                  <span className="block text-sm font-medium">
+                    {school.desc}
+                  </span>
                   {school.research && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <span className="block text-xs text-muted-foreground mt-1">
                       {school.research}
-                    </p>
+                    </span>
                   )}
-                </div>
+                </span>
                 <ChevronDown
-                  className={cn(
-                    "w-4 h-4 transition-transform duration-300",
-                    isExpanded && "rotate-180",
-                  )}
+                  aria-hidden="true"
+                  className="w-4 h-4 transition-transform duration-300 group-open/thesis:rotate-180"
                 />
-              </div>
+              </summary>
 
-              {/* Expandable content */}
-              {isExpanded && school.descBullets.length > 0 && (
+              {school.descBullets.length > 0 && (
                 <div
                   className={cn(
                     "mt-3 pl-9 space-y-2 duration-300",
@@ -185,7 +182,7 @@ function EducationCard({
                   ))}
                 </div>
               )}
-            </div>
+            </details>
 
             {/* Stats (Mobile) */}
             <div className="sm:hidden flex items-center justify-center">
@@ -358,8 +355,10 @@ export function Education() {
       </div>
 
       <div ref={sectionRef} className="flex gap-4 sm:gap-8">
-        {/* Neural Pathway Timeline */}
-        <div className="relative h-auto">
+        {/* Neural Pathway Timeline: under 400 px its 64 px went to the
+            cards, which could not fit their header and skills in what
+            was left (176 px at 320). */}
+        <div className="relative h-auto max-[399px]:hidden">
           <InteractiveTimeline
             nodes={timelineNodes}
             activeNodeId={activeNodeId}
@@ -368,7 +367,7 @@ export function Education() {
         </div>
 
         {/* Education Cards */}
-        <div className="flex-1 space-y-12 mr-8 sm:mr-16">
+        <div className="min-w-0 flex-1 space-y-12 min-[400px]:mr-8 sm:mr-16">
           {educationInfo.schools.map((school, index) => (
             <div
               key={index}

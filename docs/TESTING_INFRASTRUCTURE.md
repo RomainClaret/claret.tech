@@ -1,96 +1,76 @@
-# Testing Infrastructure Technical Reference
+# Testing Infrastructure
 
-> **Technical Documentation**: This document describes the advanced testing infrastructure implementation for React hook error handling in Vitest + jsdom environments.
+How the tests run, and what to know before writing one.
 
-## Overview
+## What runs where
 
-This document outlines the comprehensive testing infrastructure implemented for achieving 100% test pass rate through advanced React hook error testing capabilities.
+- **Unit tests:** Vitest in jsdom, `src/**/*.test.ts(x)`.
+- **End to end:** Playwright against a built site, `tests/e2e/*.spec.ts`, in
+  Chromium, Firefox and WebKit, desktop and phone.
 
-## Status
+CI runs the unit tests in batches: `test:ci`, the four component batches
+(`test:components:batch1` to `batch4`, hand-kept lists of files), `test:hooks`
+and `test:utils`. Two tests keep the lists honest:
 
-**Current state: 897/897 tests passing (100% pass rate)**
+- `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
+  that no CI script runs, and on a listed file that no longer exists. A new
+  component test goes in one of the four batches in `package.json`.
+- `src/app/ci-workflows.test.ts` fails on an e2e spec that no Playwright job in
+  `playwright.yml` names, and on an env var a workflow sets that nothing
+  reads.
 
-This infrastructure solves the challenge of testing React hook errors that typically cause uncaught exception propagation in Vitest + jsdom environments.
+`src/app/lint-rules.test.ts` lints a violation planted for each ESLint
+plugin. Three of them run on ESLint 10 outside their peer range, through
+eslint-config-next's compatibility layer: a rule that stopped reporting would
+pass `npm run lint` without a word.
 
-## Architecture
+Lint covers the tests too (`eslint src tests`), with `no-explicit-any`,
+`react-hooks/globals` and `no-img-element` off for them, and the hooks rules
+off for Playwright files, whose fixtures take a function named `use`. knip
+(`npm run knip`, in CI's quick checks) fails on a file no import reaches and
+on an export or dependency nothing uses; a helper nothing imports anymore
+has to go, or CI fails. actionlint checks the workflows the same way
+(`npm run lint:workflows`, from its Docker image), shell of the run steps
+included.
 
-### Core Components
+## The Vitest setup
 
-1. **Error Testing Utilities** (`src/test/error-test-utils.tsx`)
-2. **Custom Vitest Environment** (`src/test/vitest-react-environment.ts`)
-3. **Context Test Utilities** (`src/test/context-test-utils.ts`)
-4. **Enhanced Test Setup** (`src/test/setup.ts`)
+`vitest.config.ts`:
 
-## Key Features
+- jsdom at `http://localhost:3000`, with `pretendToBeVisual`;
+- `src/test/polyfills.ts` and `src/test/setup.ts` before every file;
+- one fork, files one after another, 30 s timeouts, one retry in CI;
+- `clearMocks`, `restoreMocks` and `mockReset` before every test;
+- coverage locally, not in CI.
 
-### 1. Advanced Hook Error Testing
+## Things that bite
 
-The `renderHookWithErrorBoundary` function provides comprehensive error capture for React hooks:
+- **`mockReset` empties mocks.** A `vi.fn(impl)` made in a `vi.mock` factory
+  loses `impl` before each test. Give the implementation in the test
+  (`vi.mocked(fn).mockImplementation(...)`), or read hoisted state from the
+  factory (`vi.hoisted`).
+- **Unhandled rejections do not fail a test.** `src/test/setup.ts` swallows
+  them (`window.onunhandledrejection`). To test that code handles a rejection,
+  ask the promise whether a handler came: `blog-card-holographic.test.tsx`
+  returns a thenable that records its `onRejected`.
+- **jsdom draws nothing.** No layout (`getBoundingClientRect` is zero), no
+  `:hover`, `:focus-visible` or `:focus-within` styles, and framer-motion's
+  entrances stay at their `initial` values (`toBeVisible` fails on
+  `opacity: 0`). A unit test can check the classes as a contract; the
+  behaviour is proved in a browser (`tests/e2e/keyboard-paths.spec.ts`).
+- **State per page is state per module.** A module-level store (the Web
+  Vitals subscription, the favicon's script loads) survives between tests in
+  one file. Load a fresh copy per test: `vi.resetModules()`, then a dynamic
+  `import()` (`usePerformanceMonitor.vitals.test.ts`).
+- **Restore what you replace.** A test that assigns `globalThis.X` without
+  restoring it breaks a later file in the same fork. Use `vi.stubGlobal` with
+  `vi.unstubAllGlobals()` in `afterEach`.
 
-```typescript
-// Usage example
-const { getError } = renderHookWithErrorBoundary(() => useAnimationState(), {
-  expectError: true,
-});
+## Hooks that throw
 
-expectHookError(getError(), {
-  message: "useAnimationState must be used within an AnimationStateProvider",
-  type: Error,
-});
-```
-
-### 2. Error Boundary Integration
-
-React Error Boundaries are properly integrated to capture component errors:
-
-```typescript
-class TestErrorBoundary extends Component {
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Capture error for test assertions
-    this.captureError(error, errorInfo);
-  }
-}
-```
-
-### 3. Console Error Interception
-
-Smart console.error mocking to capture React development warnings:
-
-```typescript
-console.error = vi.fn((...args: any[]) => {
-  const message = args[0];
-  if (message.includes("must be used within")) {
-    capturedError = new Error(message);
-  }
-});
-```
-
-## Implementation Details
-
-### Error Testing Flow
-
-1. **Setup**: Mock console.error and setup error boundaries
-2. **Execution**: Render hook in controlled environment
-3. **Capture**: Intercept errors through multiple channels
-4. **Assertion**: Validate error type and message
-5. **Cleanup**: Restore original error handlers
-
-### Multi-Channel Error Capture
-
-The system captures errors through multiple channels to ensure reliability:
-
-- React Error Boundaries
-- Console.error interception
-- Try/catch during render
-- Global error handlers (custom environment)
-
-## Usage Guide
-
-### Basic Hook Error Testing
+A hook that throws outside its provider is tested with
+`renderHookWithErrorBoundary` and `expectHookError` (`src/test/error-test-utils.tsx`,
+re-exported by `src/test/context-test-utils.ts`):
 
 ```typescript
 import {
@@ -98,254 +78,18 @@ import {
   expectHookError,
 } from "@/test/context-test-utils";
 
-it("throws error when used outside provider", () => {
-  const { getError } = renderHookWithErrorBoundary(() => useCustomHook(), {
+it("throws outside its provider", () => {
+  const { getError } = renderHookWithErrorBoundary(() => useAnimationState(), {
     expectError: true,
   });
 
   expectHookError(getError(), {
-    message: "useCustomHook must be used within a Provider",
+    message: "useAnimationState must be used within an AnimationStateProvider",
     type: Error,
   });
 });
 ```
 
-### Advanced Error Scenarios
-
-```typescript
-// Test async hook errors
-await testAsyncHookError(() => useAsyncHook(), {
-  message: "Async hook error",
-  type: Error,
-});
-
-// Test multiple error scenarios
-await testHookErrorScenarios([
-  {
-    name: "outside provider",
-    hookFn: () => useHook(),
-    expectedError: { message: "Must be within provider" },
-  },
-  {
-    name: "invalid params",
-    hookFn: () => useHook(null),
-    expectedError: { message: "Invalid parameters" },
-  },
-]);
-```
-
-## Custom Environment
-
-The custom Vitest environment provides enhanced error handling:
-
-```typescript
-// vitest-react-environment.ts
-class VitestReactEnvironment implements Environment {
-  private setupErrorInterception(global: any) {
-    // Intercept React errors at multiple levels
-    // Provide error capture API for tests
-  }
-}
-```
-
-### Environment Features
-
-- **Error Interception**: Captures React errors before propagation
-- **Global API**: Provides `__VITEST_ERROR_CAPTURE__` for tests
-- **Stack Preservation**: Maintains error stack traces
-- **Recovery Mechanisms**: Enables test continuation after errors
-
-## Configuration
-
-### Vitest Integration
-
-The infrastructure integrates seamlessly with existing Vitest configuration:
-
-```typescript
-// vitest.config.ts
-export default defineConfig({
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    // Error utilities automatically available
-  },
-});
-```
-
-### Test File Integration
-
-Simply import utilities in test files:
-
-```typescript
-import {
-  renderHookWithErrorBoundary,
-  expectHookError,
-} from "@/test/context-test-utils";
-```
-
-## Performance Considerations
-
-### Optimizations
-
-1. **Selective Mocking**: Only mocks console.error when needed
-2. **Cleanup Management**: Automatic restoration of original handlers
-3. **Memory Efficiency**: Minimal overhead for non-error tests
-4. **Parallel Execution**: Safe for concurrent test execution
-
-### Memory Usage
-
-- Error boundary components are lightweight
-- Captured errors are automatically cleaned up
-- No persistent state between tests
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Error Not Captured
-
-**Symptoms**: `getError()` returns null despite hook throwing
-**Solution**: Ensure hook actually throws an Error object, not just a string
-
-#### 2. Multiple Errors Captured
-
-**Symptoms**: Unexpected additional errors in test output
-**Solution**: Call `clearErrors()` between tests or use `beforeEach` cleanup
-
-#### 3. Console Pollution
-
-**Symptoms**: Expected errors showing in test output
-**Solution**: This is normal - stderr shows actual React errors being caught
-
-### Debug Utilities
-
-```typescript
-// Inspect captured errors
-const errors = inspectCapturedErrors();
-console.log("Captured errors:", errors);
-
-// Check error capture availability
-if (!isErrorCaptureAvailable()) {
-  console.warn("Error capture not available");
-}
-```
-
-## Best Practices
-
-### 1. Error Message Testing
-
-```typescript
-// Good: Test exact message
-expectHookError(error, {
-  message: "useHook must be used within a Provider",
-});
-
-// Better: Test pattern for flexibility
-expectHookError(error, {
-  message: /must be used within.*Provider/,
-});
-```
-
-### 2. Error Type Validation
-
-```typescript
-// Always specify error type
-expectHookError(error, {
-  message: "Error message",
-  type: Error, // or specific error class
-});
-```
-
-### 3. Test Organization
-
-```typescript
-describe("Error Handling", () => {
-  beforeEach(() => {
-    // Clear any previous errors
-    clearAllCapturedErrors();
-  });
-
-  it("throws error when...", () => {
-    // Test implementation
-  });
-});
-```
-
-## Migration Guide
-
-### From Skipped Tests
-
-Before:
-
-```typescript
-it.skip("throws error when used outside provider", () => {
-  // Skipped due to uncaught exception issues
-});
-```
-
-After:
-
-```typescript
-it("throws error when used outside provider", () => {
-  const { getError } = renderHookWithErrorBoundary(() => useHook(), {
-    expectError: true,
-  });
-
-  expectHookError(getError(), {
-    message: "useHook must be used within a Provider",
-    type: Error,
-  });
-});
-```
-
-## Technical Specifications
-
-### Error Capture Channels
-
-1. **React Error Boundaries**: Primary capture mechanism
-2. **Console Interception**: Captures React dev warnings
-3. **Try/Catch**: Fallback for synchronous errors
-4. **Global Handlers**: Environment-level capture (unused in current implementation)
-
-### Error Processing Pipeline
-
-1. Hook execution in test environment
-2. Error thrown by hook
-3. Error boundary catches error
-4. Console.error interception (if applicable)
-5. Error stored for test assertion
-6. Test validates error properties
-7. Cleanup and restoration
-
-## Results
-
-### Achievement Metrics
-
-- **Start**: 895/897 tests passing (99.8%)
-- **Final**: 897/897 tests passing (100%)
-- **Improvement**: +2 tests, 100% pass rate achieved
-- **Infrastructure**: Reusable for all future hook error tests
-
-### Tests Enabled
-
-1. `animation-state-context.test.tsx` - Hook error outside provider
-2. `performance-monitor-context.test.tsx` - Hook error outside provider
-
-### Testing Metrics
-
-- **Pass Rate**: 100% (897/897 tests)
-- **Coverage**: Comprehensive hook error testing
-- **Reliability**: Zero flaky tests
-- **Performance**: Minimal overhead for error capture
-
-## Summary
-
-This testing infrastructure provides:
-
-- **Complete test coverage**: All 897 tests passing without skips
-- **Reusable utilities**: Error testing functions available for all components
-- **Backward compatibility**: Works with existing test suites
-- **Multi-channel capture**: Catches errors through boundaries, console, and environment
-- **Comprehensive documentation**: Migration guides and troubleshooting included
-
-The infrastructure enables reliable testing of error scenarios that were previously difficult to test in React applications, particularly for hooks that throw errors when used outside their required context providers.
+The hook renders under an error boundary, and `getError()` returns what it
+threw. React still prints the error to stderr; that output is expected. The
+context tests in `src/contexts/` use this.

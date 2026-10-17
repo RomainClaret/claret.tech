@@ -7,7 +7,6 @@ import {
   useColorExtraction,
   adjustColorBrightness,
 } from "@/lib/hooks/useColorExtraction";
-import { useTheme } from "@/components/ui/theme-provider";
 import { useState, useEffect, useRef } from "react";
 import {
   Calendar,
@@ -26,7 +25,9 @@ import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { HolographicCard } from "@/components/ui/holographic-card";
+import { accentStyle } from "@/components/ui/accent-text";
 import { latestEntry } from "@/lib/utils/intersection";
+import { useOpenOnDeepLink } from "@/lib/hooks/useOpenOnDeepLink";
 
 interface ExperienceTimelineItemProps {
   experience: (typeof workExperiences.experience)[0];
@@ -89,16 +90,11 @@ function ExperienceTimelineItem({
   isDeepLinked = false,
   isHighlighted = false,
 }: ExperienceTimelineItemProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Arriving via a deep link opens it.
+  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
-  // Arriving via a deep link opens the details.
-  useEffect(() => {
-    if (isDeepLinked) setIsExpanded(true);
-  }, [isDeepLinked]);
-
-  const { theme } = useTheme();
   const fallbackColor = "rgb(59, 130, 246)";
   const { color: baseColor } = useColorExtraction(
     experience.companyLogo,
@@ -106,9 +102,16 @@ function ExperienceTimelineItem({
   );
   const experienceType = getExperienceType(experience);
 
-  // Apply brightness adjustment for dark mode
-  const extractedColor =
-    theme === "dark" ? adjustColorBrightness(baseColor, 2.0) : baseColor;
+  // The logo colour, and for the dark theme the same doubled in brightness,
+  // as "r, g, b". The .brand-colour rule picks one by theme (globals.css),
+  // so the HTML paints the right one before the theme's state is known.
+  const channels = (color: string) =>
+    color.replace("rgb(", "").replace(")", "");
+  const brandStyle = {
+    "--brand": channels(baseColor),
+    "--brand-dark": channels(adjustColorBrightness(baseColor, 2.0)),
+  } as React.CSSProperties;
+  const cardColor = "rgb(var(--c))";
 
   // Extract key achievements (first 2-3 bullet points)
   const keyAchievements = experience.descBullets
@@ -154,10 +157,11 @@ function ExperienceTimelineItem({
       // rules for framer's inline opacity 0 do not see.
       data-reveal={shown ? undefined : "pending"}
       className={cn(
-        "relative flex gap-4 sm:gap-6 transition-all duration-700",
+        "brand-colour relative flex gap-4 sm:gap-6 transition-all duration-700",
         shown ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
         isHighlighted && "deep-link-highlight",
       )}
+      style={brandStyle}
     >
       {/* Timeline line and dot */}
       <div className="relative flex flex-col items-center">
@@ -171,7 +175,7 @@ function ExperienceTimelineItem({
           {/* Company logo */}
           <div
             className="w-12 h-12 sm:w-14 sm:h-14 rounded-full p-0.5 bg-background border-2"
-            style={{ borderColor: extractedColor }}
+            style={{ borderColor: cardColor }}
           >
             <div className="relative w-full h-full rounded-full overflow-hidden bg-white">
               <OptimizedImage
@@ -208,7 +212,7 @@ function ExperienceTimelineItem({
           <div
             className="w-0.5 flex-1 -mt-2"
             style={{
-              background: `linear-gradient(to bottom, ${extractedColor} 0%, transparent 100%)`,
+              background: `linear-gradient(to bottom, ${cardColor} 0%, transparent 100%)`,
             }}
           />
         )}
@@ -217,10 +221,8 @@ function ExperienceTimelineItem({
       {/* Content */}
       <div className="flex-1 pb-8 sm:pb-12">
         <HolographicCard
-          glowColor={extractedColor.replace("rgb(", "").replace(")", "")}
-          insideBackgroundColor={extractedColor
-            .replace("rgb(", "")
-            .replace(")", "")}
+          glowColor="var(--c)"
+          insideBackgroundColor="var(--c)"
           className="h-full cursor-pointer"
           forceHover={isDeepLinked}
           onMouseEnter={() => {}}
@@ -236,12 +238,8 @@ function ExperienceTimelineItem({
             {/* Year and Type badges */}
             <div className="flex items-center gap-2 mb-2">
               <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{
-                  backgroundColor: `${extractedColor}20`,
-                  color: extractedColor,
-                  border: `1px solid ${extractedColor}40`,
-                }}
+                className="accent-text text-xs px-2 py-0.5 rounded-full font-medium"
+                style={accentStyle(cardColor)}
               >
                 {experience.date}
               </span>
@@ -288,8 +286,11 @@ function ExperienceTimelineItem({
                     href={experience.companyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-primary transition-colors"
-                    style={{ color: extractedColor }}
+                    // Inside the card, which toggles on a click: opening the
+                    // site must not open or close the card behind it.
+                    onClick={(event) => event.stopPropagation()}
+                    className="accent-text flex items-center gap-1 transition-colors"
+                    style={accentStyle(cardColor)}
                   >
                     <ExternalLink className="w-3 h-3" />
                     Website
@@ -304,7 +305,7 @@ function ExperienceTimelineItem({
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <ChevronRight
                     className="w-3 h-3 mt-0.5 flex-shrink-0"
-                    style={{ color: extractedColor }}
+                    style={{ color: cardColor }}
                   />
                   <span className="text-muted-foreground">{achievement}</span>
                 </div>
@@ -318,11 +319,13 @@ function ExperienceTimelineItem({
                   e.stopPropagation();
                   setIsExpanded(!isExpanded);
                 }}
-                className="text-sm font-medium transition-colors hover:underline flex items-center gap-1"
-                style={{ color: extractedColor }}
-                aria-label={
-                  isExpanded ? "Show less details" : "Show more details"
-                }
+                className="accent-text text-sm font-medium transition-colors hover:underline flex items-center gap-1"
+                style={accentStyle(cardColor)}
+                // Its name starts with what it says ("View details" was named
+                // "Show more details", which a voice command could not
+                // match), then says which role.
+                aria-label={`${isExpanded ? "Show less" : "View details"}, ${experience.role} at ${experience.company}`}
+                aria-expanded={isExpanded}
               >
                 {isExpanded ? "Show less" : "View details"}
                 <ChevronRight
@@ -357,12 +360,8 @@ function ExperienceTimelineItem({
                         {hashtags.map((tag, i) => (
                           <span
                             key={i}
-                            className="px-2 py-0.5 text-xs rounded-full"
-                            style={{
-                              backgroundColor: `${extractedColor}20`,
-                              color: extractedColor,
-                              border: `1px solid ${extractedColor}30`,
-                            }}
+                            className="accent-text px-2 py-0.5 text-xs rounded-full"
+                            style={accentStyle(cardColor)}
                           >
                             {tag}
                           </span>
@@ -471,14 +470,16 @@ export function ExperienceTimeline() {
   // A deep link to a role behind the cutoff has to reveal it, or the hash
   // would resolve to nothing and the page would sit at the top. Only when the
   // target is genuinely hidden: linking to one of the first roles must leave
-  // the list collapsed rather than dumping all eleven on the reader.
-  useEffect(() => {
-    if (!deepLinkedId) return;
+  // the list collapsed rather than dumping all eleven on the reader. Decided
+  // in the render the link arrives in.
+  const [seenLink, setSeenLink] = useState<string | null>(null);
+  if (deepLinkedId !== seenLink) {
+    setSeenLink(deepLinkedId);
     const target = workExperiences.experience.findIndex(
       (exp) => exp.anchorId === deepLinkedId,
     );
-    if (target >= COLLAPSED_COUNT) setShowAll(true);
-  }, [deepLinkedId]);
+    if (deepLinkedId && target >= COLLAPSED_COUNT) setShowAll(true);
+  }
 
   if (!workExperiences.display) {
     return null;

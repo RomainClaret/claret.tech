@@ -143,8 +143,9 @@ export function useScrollSection() {
       });
     };
 
-    // Initial detection
-    detectCurrentSection();
+    // The first detection too, on the next frame (the nav shows nothing for
+    // its first 500 ms anyway).
+    handleScroll();
 
     // Add scroll listener with passive flag for better performance
     window.addEventListener("scroll", handleScroll, { passive: true });

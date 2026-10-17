@@ -5,8 +5,10 @@
  * that can cause issues in tests. Uses a Map for better cache management.
  */
 
-interface CacheEntry<T = any> {
-  data: T;
+// One store for every route, whatever it caches: a reader names the type
+// it stored under that key (get<T>), as the routes do.
+interface CacheEntry {
+  data: unknown;
   timestamp: number;
 }
 
@@ -32,7 +34,7 @@ export class ApiCache {
       return null;
     }
 
-    return entry.data;
+    return entry.data as T;
   }
 
   /**

@@ -110,13 +110,6 @@ export function storeSafariDetection(
 }
 
 /**
- * Quick Safari check (uses detection cache if available)
- */
-export function isSafari(): boolean {
-  return detectSafari().isSafari;
-}
-
-/**
  * Get animation preference with browser awareness
  */
 export function getAnimationPreference(): AnimationPreference | null {
@@ -200,17 +193,4 @@ export function shouldResetAnimationPreference(
   }
 
   return false;
-}
-
-/**
- * Clear stored browser detection (for testing/debugging)
- */
-export function clearBrowserDetection(): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.removeItem(BROWSER_DETECTION_KEY);
-  } catch {
-    logWarning("Failed to clear browser detection", "Safari Detection");
-  }
 }

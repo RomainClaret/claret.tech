@@ -3,8 +3,6 @@
  * Used to prevent race conditions in Safari performance optimizations
  */
 
-import { isSafari as detectIsSafari } from "./safari-detection";
-
 // Flag to prevent repeated console logging
 let hasLoggedBrowserDetection = false;
 
@@ -65,13 +63,6 @@ export function detectBrowser(): BrowserInfo {
 
   return browserInfo;
 }
-
-/**
- * Check if the current browser is Safari
- * Useful for quick checks in components
- * Re-exported from safari-detection for consistency
- */
-export const isSafari = detectIsSafari;
 
 /**
  * Check if animations should be reduced for performance

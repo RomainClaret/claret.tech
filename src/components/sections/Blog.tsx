@@ -93,28 +93,6 @@ export function Blog() {
   const [error, setError] = useState(false);
   const shouldReduceAnimations = useShouldReduceAnimations();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const promises = [];
-
-      if (blogSection.displayMediumBlogs) {
-        promises.push(fetchMediumPosts());
-      }
-
-      if (blogSection.displayKudosArticles) {
-        promises.push(fetchKudosArticles());
-      }
-
-      if (promises.length > 0) {
-        await Promise.all(promises);
-      }
-
-      setLoading(false);
-    };
-
-    fetchData();
-  }, []);
-
   const fetchMediumPosts = async () => {
     try {
       const response = await fetch("/api/medium-posts");
@@ -143,6 +121,28 @@ export function Blog() {
       // Don't set global error for Kudos, just log it
     }
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const promises = [];
+
+      if (blogSection.displayMediumBlogs) {
+        promises.push(fetchMediumPosts());
+      }
+
+      if (blogSection.displayKudosArticles) {
+        promises.push(fetchKudosArticles());
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+
+      setLoading(false);
+    };
+
+    fetchData();
+  }, []);
 
   // Combine all blog sources (computed before the display early-return so the
   // deep-link hook below runs unconditionally, per the rules of hooks)

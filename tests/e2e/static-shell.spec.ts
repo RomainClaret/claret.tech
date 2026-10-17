@@ -7,6 +7,7 @@ import {
 } from "./utils/fixtures";
 import { routeChunk, type ChunkHandler } from "./utils/chunks";
 import { gotoWithoutScripts } from "./utils/no-script";
+import { waitForSplashToEnd } from "./utils/splash";
 
 /**
  * The homepage is generated once, at build time, for every visitor. What
@@ -176,6 +177,144 @@ test.describe("Static shell", () => {
     });
   }
 
+  // A visitor who never chose a theme gets the system's, set by the head
+  // script before the first paint (it gave light whatever the system said).
+  test("first paints the dark theme for a dark system, with no choice stored", async ({
+    browser,
+    browserName,
+  }) => {
+    // As for high contrast below: Playwright's Firefox drops its colour
+    // scheme emulation on a page sent with Cross-Origin-Opener-Policy.
+    // Fixed upstream for 1.65 (microsoft/playwright#43287): drop the skip
+    // with that bump.
+    test.skip(
+      browserName === "firefox",
+      "Playwright's Firefox drops prefers-color-scheme emulation under COOP",
+    );
+    const context = await browser.newContext({ colorScheme: "dark" });
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+
+    const dark = await page.evaluate(() =>
+      document.documentElement.classList.contains("dark"),
+    );
+
+    expect(dark).toBe(true);
+    await closeContext(context);
+  });
+
+  // The theme toggle's icon came from the theme's state, which settles after
+  // hydration: a document page, which has no splash over it, showed a dark
+  // visitor the sun until then. CSS picks the icon from <html>'s class now.
+  test("shows the moon in the theme toggle before the bundle runs", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem("theme", "dark");
+      } catch {
+        // Storage blocked: the test would show the sun.
+      }
+    });
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/pdf/cv?playwright=true");
+
+    const shown = await page.evaluate(() => {
+      const toggle = document.querySelector('[data-testid="theme-toggle"]');
+      const visible = (selector: string) => {
+        const icon = toggle?.querySelector(selector);
+        return icon ? getComputedStyle(icon).display !== "none" : null;
+      };
+      return { sun: visible(".lucide-sun"), moon: visible(".lucide-moon") };
+    });
+
+    expect(shown).toEqual({ sun: false, moon: true });
+    await closeContext(context);
+  });
+
+  // The toggles' names came from React's state too: until hydration a dark
+  // visitor heard "current: light", and one with high contrast "currently
+  // off". CSS picks them from <html>'s classes now, as it does the icons.
+  test("names the toggles' state before the bundle runs", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem("theme", "dark");
+        localStorage.setItem("highContrast", "true");
+      } catch {
+        // Storage blocked: the test would hear light and off.
+      }
+    });
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/pdf/cv?playwright=true");
+
+    await expect(
+      page.getByRole("button", {
+        name: "Toggle theme (current: dark)",
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    const contrast = page.getByRole("button", {
+      name: "Toggle high contrast mode (currently on)",
+      exact: true,
+    });
+    await expect(contrast).toHaveCount(1);
+    // No pressed state until hydration (the server's would say off), and
+    // the description, hidden to keep it out of the name, still reaches it.
+    await expect(contrast).not.toHaveAttribute("aria-pressed");
+    await expect(contrast).toHaveAccessibleDescription(/improves visibility/);
+    await closeContext(context);
+  });
+
+  // An Experience card's brand colour is doubled in brightness on the dark
+  // theme. It came from the theme's state, which only the bundle sets: until
+  // then (a load slower than the backdrop's 6 s, or a failed bundle) a dark
+  // visitor read UCD's dates at 3.4:1. CSS picks the dark colour now.
+  test("colours Experience for the dark theme before the bundle runs", async ({
+    browser,
+  }) => {
+    const badgeColour = (page: Page) =>
+      page.evaluate(() => {
+        const badge = document.querySelector("#experience .accent-text");
+        return badge ? getComputedStyle(badge).color : null;
+      });
+    const darkContext = async () => {
+      const context = await browser.newContext();
+      await context.addInitScript(() => {
+        try {
+          localStorage.setItem("theme", "dark");
+        } catch {
+          // Storage blocked: the test would show the light colour.
+        }
+      });
+      return context;
+    };
+
+    const withoutBundle = await darkContext();
+    await withoutBundle.route(/\/_next\/static\/chunks\//, (route) =>
+      route.abort(),
+    );
+    const before = await withoutBundle.newPage();
+    await before.goto("/?playwright=true");
+    const firstColour = await badgeColour(before);
+    await closeContext(withoutBundle);
+
+    const hydrated = await darkContext();
+    const after = await hydrated.newPage();
+    await after.goto("/?playwright=true");
+    await waitForSplashToEnd(after);
+
+    expect(firstColour).not.toBeNull();
+    await expect.poll(() => badgeColour(after)).toBe(firstColour);
+    await closeContext(hydrated);
+  });
+
   // On a phone, the first paint is the server's HTML, every entrance in its
   // starting state until the bundle runs. The Contact section's avatar
   // column started 20 px to the right: as wide as the screen inside 16 px
@@ -213,7 +352,9 @@ test.describe("Static shell", () => {
       // Playwright's Firefox (1.64) drops its contrast and colour scheme
       // emulation on a page sent with Cross-Origin-Opener-Policy:
       // same-origin, as every page here is: a bare server lost it with that
-      // one header and kept it without, while reduced motion held.
+      // one header and kept it without, while reduced motion held. Fixed
+      // upstream for 1.65 (microsoft/playwright#43287): drop the skip with
+      // that bump.
       test.skip(
         browserName === "firefox" && contrast === "more",
         "Playwright's Firefox drops prefers-contrast emulation under COOP",
@@ -745,5 +886,37 @@ test.describe("The retired service worker", () => {
         { timeout: 15_000 },
       )
       .toEqual([0, "webllm/model"]);
+  });
+});
+
+// A group-hover (or group-focus, group-open...) style applies only below an
+// element with the matching group class. Two titles, Education's and the
+// blog cards', carried hover gradients that never showed: nothing above
+// them was a group.
+test.describe("Group variants", () => {
+  test("have their group above them", async ({ page }) => {
+    await page.goto("/?playwright=true");
+    await waitForSplashToEnd(page);
+
+    const orphans = await page.evaluate(() => {
+      const found = new Set<string>();
+      for (const element of document.querySelectorAll("[class*='group-']")) {
+        const classes = element.getAttribute("class") ?? "";
+        for (const token of classes.split(/\s+/)) {
+          const variant =
+            /^group-(?:hover|focus|focus-visible|focus-within|active|open)(?:\/([\w-]+))?:/.exec(
+              token,
+            );
+          if (!variant) continue;
+          const group = variant[1] ? `.group\\/${variant[1]}` : ".group";
+          if (!element.parentElement?.closest(group)) {
+            found.add(`${element.tagName.toLowerCase()} ${token}`);
+          }
+        }
+      }
+      return [...found];
+    });
+
+    expect(orphans).toEqual([]);
   });
 });

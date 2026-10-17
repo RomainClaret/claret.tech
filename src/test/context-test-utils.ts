@@ -1,5 +1,5 @@
 /**
- * Context Testing Utilities for React 18
+ * Context Testing Utilities
  *
  * Comprehensive utilities for testing React contexts that integrate with
  * browser APIs, performance monitoring, and complex state management.
@@ -8,7 +8,7 @@
  * Target: Enable Animation State Context (23 tests) and Performance Monitor Context (31 tests)
  */
 
-import { vi, expect } from "vitest";
+import { vi } from "vitest";
 import React, { ReactNode } from "react";
 import { restoreNavigator, stubNavigator } from "./navigator";
 
@@ -156,32 +156,6 @@ export const mockSafariContext = {
   isHydrated: true,
 };
 
-/**
- * Mock implementation for FPS monitoring
- */
-export const mockFpsContext = {
-  fps: 60,
-  isLowFps: false,
-  isAutoDisabled: false,
-  cooldownActive: false,
-  remainingCooldownMinutes: 0,
-  threshold: 30,
-  consecutiveLowFpsCount: 0,
-  progressToAutoDisable: 0,
-  forceEnableAnimations: vi.fn(),
-};
-
-/**
- * Create a mock provider wrapper for context testing
- */
-export function createMockProvider<T>(
-  Provider: React.ComponentType<{ children?: ReactNode; value?: T }>,
-  mockValue: T,
-) {
-  return ({ children }: { children: ReactNode }) =>
-    React.createElement(Provider, { value: mockValue }, children);
-}
-
 // ==============================================================================
 // Animation State Context Specific Utilities
 // ==============================================================================
@@ -263,34 +237,6 @@ export function createTestWrapper(
 }
 
 // ==============================================================================
-// Hook Testing Utilities
-// ==============================================================================
-
-/**
- * Safe hook testing with proper cleanup
- */
-export function createHookTestingEnvironment() {
-  const cleanup: (() => void)[] = [];
-
-  const addCleanup = (fn: () => void) => {
-    cleanup.push(fn);
-  };
-
-  const runCleanup = () => {
-    cleanup.forEach((fn) => {
-      try {
-        fn();
-      } catch (error) {
-        console.warn("Cleanup function failed:", error);
-      }
-    });
-    cleanup.length = 0;
-  };
-
-  return { addCleanup, runCleanup };
-}
-
-// ==============================================================================
 // Error Handling Utilities
 // ==============================================================================
 
@@ -311,35 +257,6 @@ export function fixReactDOMErrors() {
   global.Element = global.Element || class Element {};
   global.HTMLElement = global.HTMLElement || class HTMLElement {};
   global.Node = global.Node || class Node {};
-}
-
-// ==============================================================================
-// Context-Specific Test Patterns
-// ==============================================================================
-
-/**
- * Standard test pattern for context providers
- */
-export function createContextTestSuite<T>(
-  contextName: string,
-  useContext: () => T,
-  Provider: React.ComponentType<{ children: ReactNode }>,
-  _defaultValue: T,
-) {
-  return {
-    testProviderExists: () => {
-      expect(Provider).toBeDefined();
-    },
-
-    testHookExists: () => {
-      expect(useContext).toBeDefined();
-    },
-
-    testDefaultValue: () => {
-      // This would need to be implemented based on specific context requirements
-      // Each context will have different default value expectations
-    },
-  };
 }
 
 // ==============================================================================
@@ -426,53 +343,4 @@ export function setupContextTesting(
     cleanup: cleanupAllMocks,
     wrapper: createTestWrapper(),
   };
-}
-
-/**
- * Setup for SSR testing - minimal mocks only
- */
-export function setupSSRTesting() {
-  fixReactDOMErrors();
-
-  return {
-    cleanup: () => {},
-    wrapper: createTestWrapper({
-      mockSafari: true,
-      mockPerformance: false,
-      mockFps: true,
-    }),
-  };
-}
-
-// ==============================================================================
-// SSR Testing Utilities
-// ==============================================================================
-
-/**
- * Properly simulate SSR environment by removing window and ensuring typeof checks work
- */
-export function simulateSSR() {
-  const originalWindow = global.window;
-
-  // Only remove window - keep document for React Testing Library
-  delete (global as { window?: typeof window }).window;
-
-  return {
-    restore: () => {
-      global.window = originalWindow;
-    },
-  };
-}
-
-/**
- * Enhanced SSR test wrapper that properly handles window removal
- */
-export function withSSREnvironment<T>(testFn: () => T): T {
-  const ssrCleanup = simulateSSR();
-
-  try {
-    return testFn();
-  } finally {
-    ssrCleanup.restore();
-  }
 }

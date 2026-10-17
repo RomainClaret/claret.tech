@@ -163,7 +163,10 @@ describe("withLoadFallback", () => {
     // The first load failed, then a hover preloaded the chunk. The stand-in
     // knew only its own retries, so the next open rendered the failure for
     // a frame (and a dialog's lock, focus and scroll cycled with it).
-    let preloaded: React.ComponentType<{ name: string }> | undefined;
+    // Undefined until the hover's preload lands below, after the stand-in
+    // that peeks at it is made.
+    let preloaded: React.ComponentType<{ name: string }> | undefined =
+      undefined;
     let failedRenders = 0;
     const CountingFailed = (props: Parameters<typeof Failed>[0]) => {
       failedRenders++;

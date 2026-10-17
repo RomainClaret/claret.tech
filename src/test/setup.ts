@@ -386,8 +386,6 @@ if (typeof window !== "undefined") {
 
 // Re-apply in beforeAll to ensure they persist
 beforeAll(() => {
-  // happy-dom handles DOM initialization automatically, no need for manual setup
-
   global.requestAnimationFrame =
     mockRequestAnimationFrame as typeof requestAnimationFrame;
   global.cancelAnimationFrame =
@@ -477,12 +475,15 @@ document.createElement = vi.fn((tagName: string) => {
   return originalCreateElement(tagName);
 }) as typeof document.createElement;
 
-// Mock IntersectionObserver globally
-global.IntersectionObserver = vi.fn().mockImplementation((_callback) => ({
+// Mock IntersectionObserver globally. The body goes to vi.fn() itself: test
+// files keep this one at load to put it back later, and a
+// mockImplementation() would not survive the mockReset before each test
+// (src/app/test-setup-globals.test.ts).
+global.IntersectionObserver = vi.fn((_callback) => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
-  takeRecords: vi.fn().mockReturnValue([]),
+  takeRecords: vi.fn(() => []),
   root: null,
   rootMargin: "",
   thresholds: [],

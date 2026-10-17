@@ -399,46 +399,6 @@ export async function dismissToasts(
 }
 
 /**
- * Wait for toast to appear and verify it has proper accessibility attributes
- */
-export async function waitForToastWithAccessibility(
-  page: Page,
-  expectedContent?: string,
-  timeout: number = 5000,
-): Promise<void> {
-  const toastSelector = '[role="alert"], [data-testid="toast"]';
-
-  // Wait for toast to appear
-  await page.waitForSelector(toastSelector, { timeout, state: "visible" });
-
-  const toast = page.locator(toastSelector).first();
-
-  // Verify accessibility attributes
-  const hasProperAttributes = await toast.evaluate((el) => {
-    return (
-      el.hasAttribute("role") &&
-      (el.getAttribute("role") === "alert" ||
-        el.getAttribute("role") === "status") &&
-      (el.hasAttribute("aria-live") || el.hasAttribute("aria-atomic"))
-    );
-  });
-
-  if (!hasProperAttributes) {
-    throw new Error("Toast does not have proper accessibility attributes");
-  }
-
-  // Verify content if provided
-  if (expectedContent) {
-    const toastText = await toast.textContent();
-    if (!toastText?.includes(expectedContent)) {
-      throw new Error(
-        `Toast does not contain expected content: ${expectedContent}`,
-      );
-    }
-  }
-}
-
-/**
  * Waits until nothing covers an element where it is: the element at its
  * centre is it, or inside it, within the window. It does not scroll.
  *
@@ -646,49 +606,6 @@ export async function clickMobileElement(
   }
 
   return false;
-}
-
-/**
- * Mobile-specific element visibility check with viewport detection
- */
-export async function isMobileElementVisible(
-  page: Page,
-  elementSelector: string,
-): Promise<boolean> {
-  try {
-    const result = await page.evaluate((selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return false;
-
-      const rect = element.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Check if element is within viewport
-      const isInViewport =
-        rect.top >= 0 &&
-        rect.left >= 0 &&
-        rect.bottom <= viewportHeight &&
-        rect.right <= viewportWidth;
-
-      // Check if element is actually visible (not hidden)
-      const style = getComputedStyle(element as HTMLElement);
-      const isVisible =
-        style.display !== "none" &&
-        style.visibility !== "hidden" &&
-        style.opacity !== "0";
-
-      return isInViewport && isVisible;
-    }, elementSelector);
-
-    return result;
-  } catch (error) {
-    console.warn(
-      `Mobile visibility check failed for ${elementSelector}:`,
-      error,
-    );
-    return false;
-  }
 }
 
 /**
@@ -974,62 +891,4 @@ export async function toggleThemeReliably(
 
   console.error(`All ${retries} theme toggle attempts failed`);
   return false;
-}
-
-/**
- * Wait for theme transition to complete
- */
-export async function waitForThemeTransition(
-  page: Page,
-  expectedTheme: "dark" | "light",
-  timeout: number = 5000,
-): Promise<boolean> {
-  try {
-    await page.waitForFunction(
-      (theme) => {
-        const isDark = document.documentElement.classList.contains("dark");
-        return theme === "dark" ? isDark : !isDark;
-      },
-      expectedTheme,
-      { timeout },
-    );
-    return true;
-  } catch (error) {
-    console.warn(`Theme transition wait failed:`, error);
-    return false;
-  }
-}
-
-/**
- * Simple mobile menu helper - opens mobile menu if it exists
- * Much simpler than the complex retry logic in tests
- */
-export async function openMobileMenuIfNeeded(page: Page): Promise<void> {
-  try {
-    // Check if we're on mobile viewport
-    const isMobile = await page.evaluate(() => window.innerWidth <= 768);
-    if (!isMobile) return;
-
-    // Look for common mobile menu button selectors
-    const mobileMenuSelectors = [
-      '[data-testid="mobile-menu-button"]',
-      '[aria-label*="menu" i]:not(nav)',
-      'button:has(svg[class*="h-6"])',
-      "button.md\\:hidden",
-      "header button:visible",
-    ];
-
-    for (const selector of mobileMenuSelectors) {
-      const button = page.locator(selector).first();
-      if ((await button.count()) > 0 && (await button.isVisible())) {
-        await button.click({ timeout: 5000 });
-        // Simple wait for menu to appear
-        await page.waitForTimeout(500);
-        break;
-      }
-    }
-  } catch (error) {
-    console.warn("Mobile menu opening failed:", error);
-    // Continue - not critical for most tests
-  }
 }

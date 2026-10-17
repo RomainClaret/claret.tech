@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTestMode } from "@/components/providers/test-mode-provider";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 
 interface ToastProps {
   message: string;
@@ -18,12 +19,9 @@ export function Toast({
   type = "info",
 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  // Portalled into document.body, which only the browser has.
+  const mounted = useHydrated();
   const { isTestMode } = useTestMode();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // ToastContainer passes a new onClose on every render. Read the latest one
   // when the timer fires instead of restarting the timer for it: every

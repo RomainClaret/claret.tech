@@ -71,16 +71,6 @@ export const kudosArticles: KudosArticle[] = [
   },
 ];
 
-// Helper function to get Kudos widget URLs
-export function getKudosWidgetUrls(doi: string) {
-  const encodedDoi = encodeURIComponent(doi);
-  return {
-    article: `https://api.growkudos.com/widgets/article-v2/${encodedDoi}`,
-    resources: `https://api.growkudos.com/widgets/resources-v2/${encodedDoi}`,
-    useKudos: `https://api.growkudos.com/widgets/use_kudos/${encodedDoi}`,
-  };
-}
-
 // Helper function to format Kudos article for blog display
 export function formatKudosArticleForBlog(article: KudosArticle) {
   return {

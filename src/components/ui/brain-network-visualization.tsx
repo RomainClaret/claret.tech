@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import { useMotionGate } from "@/lib/hooks/useMotionGate";
@@ -91,7 +98,7 @@ export function BrainNetworkVisualization({
   onNodesReady,
 }: BrainNetworkVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const [isVisible, setIsVisible] = useState(true);
   const prefersReducedMotion = useReducedMotion();
   // The splash, a modal or a hidden tab: the canvas keeps its last frame.
@@ -287,14 +294,13 @@ export function BrainNetworkVisualization({
   // when the canvas is resized while an overlay has stopped the loop: a
   // resize clears the bitmap (the tier can change the backing resolution),
   // and the brain stayed blank behind the overlay until it closed. Read
-  // through a ref, so an overlay opening does not itself replace the frozen
-  // frame with the still one.
-  const suspendedRef = useRef(suspended);
-  suspendedRef.current = suspended;
+  // through an effect event, so an overlay opening does not itself replace
+  // the frozen frame with the still one.
+  const isSuspended = useEffectEvent(() => suspended);
   useEffect(() => {
     if (
       nodesRef.current.length > 0 &&
-      (!areAnimationsPlaying || !config.animate || suspendedRef.current) &&
+      (!areAnimationsPlaying || !config.animate || isSuspended()) &&
       !prefersReducedMotion &&
       isVisible
     ) {

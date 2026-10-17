@@ -15,7 +15,7 @@ import {
 } from "@/components/icons";
 
 const iconMap = {
-  github: { Icon: GitHubIcon, color: "#333" },
+  github: { Icon: GitHubIcon, color: "#333333" },
   linkedin: { Icon: LinkedInIcon, color: "#0077B5" },
   gitlab: { Icon: GitLabIcon, color: "#FC6D26" },
   medium: { Icon: MediumIcon, color: "#00AB6C" },

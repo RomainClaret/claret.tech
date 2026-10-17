@@ -127,7 +127,12 @@ describe("ResearchMapDialog", () => {
     const headings = within(details)
       .getAllByRole("heading", { level: 4 })
       .map((heading) => heading.textContent);
+    // The curated relations first, in the words of their direction, then
+    // the links derived from the data.
     expect(headings).toEqual([
+      "Built on by",
+      "Companion work",
+      "Part of",
       "Same code repository",
       "Linked from a research card",
       "Shared co-authors",

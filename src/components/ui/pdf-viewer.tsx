@@ -153,13 +153,14 @@ export function PDFViewer({
   // Links within the document are named by the text printed under them,
   // page by page, once per document (pdf-link-names.ts); a page's names
   // that arrive after its links are on screen go to the links in its box.
-  const [linkNames] = useState(() =>
-    createLinkNameBook({
-      onNamed: (page, nameOf) => {
+  const [linkNames] = useState(() => createLinkNameBook());
+  useEffect(
+    () =>
+      linkNames.listen((page, nameOf) => {
         const box = pageRefs.current[page];
         if (box) fixLinkAnnotations(box, nameOf);
-      },
-    }),
+      }),
+    [linkNames],
   );
 
   // pdf.js puts each link's wrapper ahead of everything in the Tab order and

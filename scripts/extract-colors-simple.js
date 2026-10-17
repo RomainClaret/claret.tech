@@ -23,63 +23,51 @@ const OUTPUT_FILE = path.join(
 );
 const SUPPORTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 
-// Predefined colors based on known company/institution branding
+// Predefined colors based on known company/institution branding, by file
+// name without its extension: the site serves the .webp next to a .png or
+// .jpg, and every format gets the same colour. (Keyed by full file name,
+// this table named only the .png and .jpg files, so from the first commit
+// every .webp the site loads got the default grey.)
 const KNOWN_COLORS = {
   // Universities
-  "unine_logo.jpg": "rgb(0, 102, 255)", // University of Neuchâtel bright blue
-  "ucd_logo.jpg": "rgb(0, 39, 76)", // UCD Dublin blue
-  "unige_logo.jpg": "rgb(207, 35, 42)", // University of Geneva red
-  "harvardLogo.png": "rgb(165, 28, 48)", // Harvard crimson
+  unine_logo: "rgb(0, 102, 255)", // University of Neuchâtel bright blue
+  ucd_logo: "rgb(0, 39, 76)", // UCD Dublin blue
+  unige_logo: "rgb(207, 35, 42)", // University of Geneva red
 
   // Companies
-  "artificialkind_logo.jpg": "rgb(26, 26, 94)", // ArtificialKind deep navy blue
-  "artificialkind_logo.png": "rgb(26, 26, 94)",
-  "libacy_logo.png": "rgb(90, 191, 204)", // Libacy turquoise
-  "versicherix_logo.png": "rgb(16, 185, 129)", // Green
-  "manufactureclaret_logo.jpg": "rgb(211, 211, 211)", // Manufacture Claret light gray
-  "clarettech_logo.jpg": "rgb(64, 64, 64)", // Claret.Tech dark charcoal
-  "overclouds_logo.png": "rgb(59, 130, 246)", // Sky blue
-  "jvpl_logo.png": "rgb(239, 68, 68)", // Red
+  artificialkind_logo: "rgb(26, 26, 94)", // ArtificialKind deep navy blue
+  libacy_logo: "rgb(90, 191, 204)", // Libacy turquoise
+  versicherix_logo: "rgb(16, 185, 129)", // Green
+  manufactureclaret_logo: "rgb(211, 211, 211)", // Manufacture Claret light gray
+  clarettech_logo: "rgb(64, 64, 64)", // Claret.Tech dark charcoal
+  overclouds_logo: "rgb(59, 130, 246)", // Sky blue
+  jvpl_logo: "rgb(239, 68, 68)", // Red
 
   // Schools
-  "he_arc_logo.png": "rgb(227, 6, 19)", // HE-Arc bright red
-  "he_arc_logo_ing.jpg": "rgb(227, 6, 19)", // HE-Arc bright red
-  "hes_so_logo_master.png": "rgb(0, 121, 193)", // HES-SO blue
+  he_arc_logo: "rgb(227, 6, 19)", // HE-Arc bright red
+  hes_so_logo_master: "rgb(0, 121, 193)", // HES-SO blue
 
   // Papers/Publications
-  "paper_blockchain_2016.png": "rgb(245, 158, 11)", // Amber
-  "paper_geenns_2024.png": "rgb(139, 92, 246)", // Purple
-  "paper_graphqa_2020.png": "rgb(34, 197, 94)", // Green
-  "paper_graphqa_schema_2020.png": "rgb(34, 197, 94)", // Green
-  "paper_visual_vestibular_2013.png": "rgb(59, 130, 246)", // Blue
+  paper_blockchain_2016: "rgb(245, 158, 11)", // Amber
+  paper_geenns_2024: "rgb(139, 92, 246)", // Purple
+  paper_visual_vestibular_2013: "rgb(59, 130, 246)", // Blue
+  debs_2023: "rgb(139, 92, 246)", // Purple, as the GEENNS paper
+  jax_es_hyperneat: "rgb(139, 92, 246)", // Purple, as the GEENNS paper
 
   // Conference logos
-  "gecco_2024_logo.jpg": "rgb(16, 185, 129)", // Green (evolutionary computing)
-  "gecco_2024_logo.png": "rgb(16, 185, 129)",
-  "40th_annual_meeting_of_neuroscience_2010_logo.jpg": "rgb(147, 51, 234)", // Purple (neuroscience)
-  "40th_annual_meeting_of_neuroscience_2010_logo.png": "rgb(147, 51, 234)",
+  gecco_2024_logo: "rgb(16, 185, 129)", // Green (evolutionary computing)
+  "40th_annual_meeting_of_neuroscience_2010_logo": "rgb(147, 51, 234)", // Purple (neuroscience)
 
   // Upcoming 2026 conference logos
-  "icpr_2026_logo.png": "rgb(8, 56, 56)", // ICPR 2026 dark teal
-  "icpr_2026_logo.webp": "rgb(8, 56, 56)",
-  "wcci_2026_logo.png": "rgb(8, 40, 88)", // IEEE WCCI 2026 navy
-  "wcci_2026_logo.webp": "rgb(8, 40, 88)",
-  "alife_2026_logo.png": "rgb(168, 40, 24)", // ALIFE 2026 maple red
-  "alife_2026_logo.webp": "rgb(168, 40, 24)",
-  "ppsn_2026_logo.png": "rgb(17, 17, 17)", // PPSN 2026 black
-  "ppsn_2026_logo.webp": "rgb(17, 17, 17)",
-  "ppsn_2026_logo_white.png": "rgb(245, 245, 245)", // PPSN 2026 white variant
-  "ppsn_2026_logo_white.webp": "rgb(245, 245, 245)",
-  "gecco_2026_logo.png": "rgb(8, 40, 120)", // GECCO 2026 blue
-  "gecco_2026_logo.webp": "rgb(8, 40, 120)",
+  icpr_2026_logo: "rgb(8, 56, 56)", // ICPR 2026 dark teal
+  wcci_2026_logo: "rgb(8, 40, 88)", // IEEE WCCI 2026 navy
+  alife_2026_logo: "rgb(168, 40, 24)", // ALIFE 2026 maple red
+  ppsn_2026_logo: "rgb(17, 17, 17)", // PPSN 2026 black
+  ppsn_2026_logo_white: "rgb(245, 245, 245)", // PPSN 2026 white variant
+  gecco_2026_logo: "rgb(8, 40, 120)", // GECCO 2026 blue
 
   // Other assets
-  "contactMail.webp": "rgb(107, 114, 128)", // Gray
-  "contactMailDark.svg": "rgb(107, 114, 128)", // Gray
-  "developerActivity.svg": "rgb(59, 130, 246)", // Blue
-  "manOnTable.svg": "rgb(107, 114, 128)", // Gray
-  "programmer.svg": "rgb(139, 92, 246)", // Purple
-  "skill.svg": "rgb(34, 197, 94)", // Green
+  contactMail: "rgb(107, 114, 128)", // Gray
 };
 
 /**
@@ -106,10 +94,12 @@ async function processImages() {
     for (const file of imageFiles) {
       const publicPath = `/images/${file}`;
 
-      if (KNOWN_COLORS[file]) {
-        colorMap[publicPath] = KNOWN_COLORS[file];
+      const known = KNOWN_COLORS[path.parse(file).name];
+
+      if (known) {
+        colorMap[publicPath] = known;
         knownCount++;
-        console.log(`✓ ${file.padEnd(45)} → ${KNOWN_COLORS[file]}`);
+        console.log(`✓ ${file.padEnd(45)} → ${known}`);
       } else {
         // Use a default color based on file type
         const defaultColor = "rgb(107, 114, 128)"; // Default gray

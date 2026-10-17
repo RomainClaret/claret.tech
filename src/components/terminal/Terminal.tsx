@@ -1630,13 +1630,6 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, hasInitialized]); // currentDirectory, onClose, and stableSetCurrentDirectory are stable or intentionally excluded
 
-  // Handle loading state based on initialization
-  useEffect(() => {
-    if (isOpen && !hasInitialized) {
-      setIsLoading(true);
-    }
-  }, [isOpen, hasInitialized]);
-
   // Additional effect for handling resize when terminal is already loaded
   useEffect(() => {
     // Not while it is aside, out of sight: hidden, it measures nothing.

@@ -45,8 +45,9 @@ export function SkillCards({
         </span>
       </div>
 
-      {/* Skills grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+      {/* Skills: tags that wrap on phones, where pills such as "Software
+          Engineering" (175 px) cannot sit two to a row; a grid from sm. */}
+      <div className="flex flex-wrap gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-4">
         {skills.map((skill, index) => (
           <div
             key={skill.name}
@@ -87,35 +88,10 @@ export function SkillCards({
                 )}
                 <span className="whitespace-nowrap">{skill.name}</span>
               </div>
-
-              {/* Subtle shimmer effect */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-md overflow-hidden pointer-events-none"
-                style={{
-                  backgroundImage: `linear-gradient(
-                    105deg,
-                    transparent 40%,
-                    ${color}20 50%,
-                    transparent 60%
-                  )`,
-                  animation: "shimmer-slow 2s ease-out",
-                }}
-              />
             </div>
           </div>
         ))}
       </div>
-
-      <style jsx>{`
-        @keyframes shimmer-slow {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-      `}</style>
     </div>
   );
 }

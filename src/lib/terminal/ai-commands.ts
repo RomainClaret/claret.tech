@@ -4,7 +4,12 @@ import {
   WebLLMConfig,
   AIModelInfo,
 } from "@/types/webllm";
-import type { WebLLMClientClass } from "@/test/mock-types";
+
+/** The WebLLM client class, as the dynamic import returns it. */
+interface WebLLMClientClass {
+  isSupported: () => boolean;
+  new (...args: unknown[]): unknown;
+}
 
 interface WebLLMProgress {
   progress: number;
@@ -19,13 +24,19 @@ let WEBLLM_CONFIG: WebLLMConfig | null = null;
 
 async function loadWebLLM() {
   if (!webLLMClient) {
-    const [webllm, config] = await Promise.all([
+    // Destructured where they are imported: knip, which keeps the exports
+    // honest, traces names taken from an import, not from a namespace
+    // object passed along.
+    const [
+      { webLLMClient: client, WebLLMClient: clientClass },
+      { WEBLLM_CONFIG: config },
+    ] = await Promise.all([
       import("@/lib/webllm"),
       import("@/lib/webllm/config"),
     ]);
-    webLLMClient = webllm.webLLMClient;
-    WebLLMClient = webllm.WebLLMClient;
-    WEBLLM_CONFIG = config.WEBLLM_CONFIG;
+    webLLMClient = client;
+    WebLLMClient = clientClass;
+    WEBLLM_CONFIG = config;
   }
   return { webLLMClient, WebLLMClient, WEBLLM_CONFIG };
 }

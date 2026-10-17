@@ -338,8 +338,11 @@ describe("SafariContext", () => {
 
   describe("DOM Manipulation", () => {
     it("sets data-safari attribute on body after hydration", async () => {
+      // The browser's own answer: a client render reads it at once, and the
+      // HTML's value (initialSafari) only serves the render that hydrates.
+      detectedAs(true);
       render(
-        <SafariProvider initialSafari={true}>
+        <SafariProvider initialSafari={false}>
           <TestSafariComponent />
         </SafariProvider>,
       );

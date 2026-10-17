@@ -126,6 +126,9 @@ export function ResearchMapDialog({
     // card's deep link scrolls to it and lights it.
     requestAnimationFrame(() => {
       if (!document.getElementById(id)) {
+        // A full load on purpose: the card is on the homepage, not this page,
+        // and the homepage's deep-link code runs as it loads.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = `/#${id}`;
       } else if (window.location.hash === `#${id}`) {
         window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -181,8 +184,9 @@ export function ResearchMapDialog({
                   className="mt-1 text-sm text-muted-foreground"
                 >
                   Papers and research projects by line of work, over time. Each
-                  line joins two items and says why: shared code, co-authors, a
-                  venue, or a research card that links them.
+                  line joins two items and says why: one builds on, led to or is
+                  part of the other, they are companion work, they share code,
+                  co-authors or a venue, or a research card links them.
                 </p>
               </div>
               <button

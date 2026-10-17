@@ -159,34 +159,6 @@ export async function waitForAnimationCompletion(
 }
 
 /**
- * Perform a scroll to element and wait for completion
- */
-export async function scrollToElement(
-  page: Page,
-  selector: string,
-  options: ScrollOptions & { behavior?: "smooth" | "instant" | "auto" } = {},
-): Promise<number> {
-  const { behavior = "smooth", ...scrollOptions } = options;
-
-  // Initiate scroll
-  await page.evaluate(
-    ({ sel, scrollBehavior }) => {
-      const element = document.querySelector(sel);
-      if (element) {
-        element.scrollIntoView({
-          behavior: scrollBehavior as ScrollBehavior,
-          block: "start",
-        });
-      }
-    },
-    { sel: selector, scrollBehavior: behavior },
-  );
-
-  // Wait for scroll to complete
-  return await waitForScrollCompletion(page, scrollOptions);
-}
-
-/**
  * Wait for element to be meaningfully visible (more than just a few pixels)
  * Uses browser-specific thresholds for better compatibility
  */

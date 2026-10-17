@@ -1,5 +1,7 @@
 import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
+import { gotoWithoutScripts } from "./utils/no-script";
+import { waitForSplashToEnd } from "./utils/splash";
 
 /**
  * Open the mobile menu for accessibility checks and verify it opened.
@@ -197,7 +199,7 @@ test.describe("Mobile Accessibility", () => {
     const nextItem = browserName === "webkit" ? "Alt+Tab" : "Tab";
     const lastItem = page
       .getByTestId("mobile-navigation-menu")
-      .getByRole("button", { name: "Contact me" });
+      .getByRole("button", { name: "Get In Touch" });
     await lastItem.focus();
     await page.keyboard.press(nextItem);
 
@@ -234,5 +236,56 @@ test.describe("Mobile Accessibility", () => {
         document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+});
+
+// WCAG 1.4.10 (Reflow): at 320 CSS px nothing may need a sideways scroll.
+// The homepage was 19 px too wide there, with scripts or without: no-wrap
+// rows in the research cards, the Papers header and the footer, and
+// Education's skill pills two to a row in a 176 px column. Measured after
+// a pass over the whole page, so every section and entrance has run.
+const NARROWEST = { width: 320, height: 568 };
+
+async function scrollThrough(page: Page) {
+  for (let top = 0; ; top += NARROWEST.height) {
+    const height = await page.evaluate((y) => {
+      window.scrollTo(0, y);
+      return document.documentElement.scrollHeight;
+    }, top);
+    if (top >= height) break;
+    await page.waitForTimeout(150);
+  }
+}
+
+const sidewaysOverflow = (page: Page) =>
+  page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+
+test.describe("Reflow at 320 px", () => {
+  test.skip(({ isMobile }) => !isMobile, "These tests are mobile-only");
+  test.use({ viewport: NARROWEST });
+
+  test("needs no sideways scroll", async ({ page }) => {
+    test.slow();
+    await page.goto("/?playwright=true");
+    await waitForSplashToEnd(page);
+    await scrollThrough(page);
+
+    await expect.poll(() => sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe("Reflow at 320 px, scripts off", () => {
+  test.skip(({ isMobile }) => !isMobile, "These tests are mobile-only");
+  test.use({ viewport: NARROWEST, javaScriptEnabled: false });
+
+  test("needs no sideways scroll", async ({ page }) => {
+    await gotoWithoutScripts(page);
+    await scrollThrough(page);
+
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
   });
 });

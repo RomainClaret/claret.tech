@@ -75,29 +75,6 @@ export interface MapLayout {
   years: { year: number; x: number }[];
 }
 
-/** The point at t on a cubic Bezier. */
-export function cubicPoint(
-  p0: Point,
-  p1: Point,
-  p2: Point,
-  p3: Point,
-  t: number,
-): Point {
-  const u = 1 - t;
-  return {
-    x:
-      u * u * u * p0.x +
-      3 * u * u * t * p1.x +
-      3 * u * t * t * p2.x +
-      t * t * t * p3.x,
-    y:
-      u * u * u * p0.y +
-      3 * u * u * t * p1.y +
-      3 * u * t * t * p2.y +
-      t * t * t * p3.y,
-  };
-}
-
 /** The tangent (derivative) at t on a cubic Bezier. */
 export function cubicTangent(
   p0: Point,

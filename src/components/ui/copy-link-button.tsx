@@ -28,7 +28,9 @@ export function CopyLinkButton({
   className,
 }: CopyLinkButtonProps) {
   const [copied, setCopied] = useState(false);
-  const resetTimer = useRef<ReturnType<typeof setTimeout>>();
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   useEffect(() => () => clearTimeout(resetTimer.current), []);
 

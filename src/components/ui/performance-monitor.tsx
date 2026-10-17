@@ -28,6 +28,38 @@ interface PerformanceMonitorProps {
  * Real-time performance monitor overlay
  * Shows FPS, GPU layers, animations, and browser optimization status
  */
+// A sparkline of a metric's recent values. At module scope: defined inside
+// the monitor, each render made it a new component and remounted every graph.
+function MiniGraph({
+  data,
+  color = "rgb(59, 130, 246)",
+}: {
+  data: number[];
+  color?: string;
+}) {
+  if (data.length < 2) return <div className="w-16 h-4 bg-gray-800 rounded" />;
+
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+
+  return (
+    <svg width="64" height="16" className="bg-gray-800 rounded">
+      <polyline
+        points={data
+          .map(
+            (value, index) =>
+              `${(index / (data.length - 1)) * 64},${16 - ((value - min) / range) * 14}`,
+          )
+          .join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth="1"
+      />
+    </svg>
+  );
+}
+
 export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
@@ -106,6 +138,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     getGpuGrade,
     getGpuTierLabel,
     getThermalState,
+    sampledAt,
   } = usePerformanceMonitor(isMonitorActive, monitoringOptions);
 
   const getFpsColor = (fpsValue: number) => {
@@ -178,37 +211,6 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
-  const MiniGraph = ({
-    data,
-    color = "rgb(59, 130, 246)",
-  }: {
-    data: number[];
-    color?: string;
-  }) => {
-    if (data.length < 2)
-      return <div className="w-16 h-4 bg-gray-800 rounded" />;
-
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-
-    return (
-      <svg width="64" height="16" className="bg-gray-800 rounded">
-        <polyline
-          points={data
-            .map(
-              (value, index) =>
-                `${(index / (data.length - 1)) * 64},${16 - ((value - min) / range) * 14}`,
-            )
-            .join(" ")}
-          fill="none"
-          stroke={color}
-          strokeWidth="1"
-        />
-      </svg>
-    );
-  };
-
   const tabs = [
     { id: "overview", label: "Overview", count: null },
     { id: "vitals", label: "Web Vitals", count: getWebVitalsScore() },
@@ -266,10 +268,11 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
     setTestStartTime(null);
   };
 
-  const getTestDuration = () => {
-    if (!testStartTime) return 0;
-    return Math.floor((Date.now() - testStartTime) / 1000);
-  };
+  // As of the last FPS reading, which re-renders the monitor every second.
+  const testDuration =
+    testStartTime === null
+      ? 0
+      : Math.max(0, Math.floor((sampledAt - testStartTime) / 1000));
 
   // At the end of <body>, as the dashboard is: rendered in place, at the
   // same z-index, it painted under a PDF reader already open, which a portal
@@ -909,7 +912,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                         }}
                         className="flex-1 bg-red-800 hover:bg-red-700 text-red-200 text-[10px] px-2 py-1 rounded transition-colors"
                       >
-                        Stop ({getTestDuration()}s)
+                        Stop ({testDuration}s)
                       </button>
                     )}
                     <button

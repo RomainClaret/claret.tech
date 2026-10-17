@@ -22,8 +22,9 @@ vi.mock("@/lib/hooks/useReducedMotion", () => ({
 vi.mock("@/lib/hooks/useSafari", () => ({
   useShouldReduceAnimations: () => false,
 }));
+const animation = vi.hoisted(() => ({ playing: true }));
 vi.mock("@/contexts/animation-state-context", () => ({
-  useAnimationState: () => ({ areAnimationsPlaying: true }),
+  useAnimationState: () => ({ areAnimationsPlaying: animation.playing }),
 }));
 vi.mock("@/contexts/quality-context", () => ({
   useQuality: () => ({ getConfig: () => ({ animate: true }) }),
@@ -49,6 +50,7 @@ const advance = (ms: number) =>
 beforeEach(() => {
   vi.useFakeTimers();
   gate.active = true;
+  animation.playing = true;
 });
 
 afterEach(() => {
@@ -104,6 +106,23 @@ describe("TypeWriter", () => {
     expect((cursor() as HTMLElement).style.animationDelay).toMatch(/^-?\d/);
   });
 
+  it("keeps a cursor's place in the blink when nothing was typed", () => {
+    // A render without a keystroke (a parent's) must not move the glyph's
+    // pulse: it is the same glyph, already blinking.
+    const clock = vi.spyOn(performance, "now").mockReturnValue(1300);
+    const { container, rerender } = mount();
+    const cursor = () =>
+      shown(container).root.children[1].firstElementChild as HTMLElement;
+    const delay = cursor().style.animationDelay;
+    expect(delay).toBe("-1300ms");
+
+    clock.mockReturnValue(1800);
+    rerender(<TypeWriter strings={PHRASES} className="text-blue" />);
+
+    expect(cursor().style.animationDelay).toBe(delay);
+    clock.mockRestore();
+  });
+
   it("keeps the cursor out of the line's layout", () => {
     // As inline text or an inline-block, the cursor would add a line break
     // opportunity in the middle of the word being typed.
@@ -129,5 +148,36 @@ describe("TypeWriter", () => {
     rerender(<TypeWriter strings={PHRASES} className="text-blue" />);
     advance(TYPE_MS);
     expect(shown(container).typed).toBe("ab");
+  });
+
+  it("starts over from the first phrase when animations come back on", () => {
+    const { container, rerender } = mount();
+    advance(TYPE_MS);
+    expect(shown(container).typed).toBe("a");
+
+    animation.playing = false;
+    rerender(<TypeWriter strings={PHRASES} className="text-blue" />);
+    expect(container.querySelector(".Typewriter")).toBeNull();
+
+    animation.playing = true;
+    rerender(<TypeWriter strings={PHRASES} className="text-blue" />);
+    expect(shown(container)).toMatchObject({ typed: "", rest: "ab" });
+    advance(TYPE_MS);
+    expect(shown(container).typed).toBe("a");
+  });
+
+  it("starts the phrase over when paused, and types on once unpaused", () => {
+    const { container, rerender } = mount();
+    advance(TYPE_MS);
+    expect(shown(container).typed).toBe("a");
+
+    rerender(<TypeWriter strings={PHRASES} className="text-blue" isPaused />);
+    expect(shown(container)).toMatchObject({ typed: "", rest: "ab" });
+    advance(10 * TYPE_MS);
+    expect(shown(container).typed).toBe("");
+
+    rerender(<TypeWriter strings={PHRASES} className="text-blue" />);
+    advance(TYPE_MS);
+    expect(shown(container).typed).toBe("a");
   });
 });

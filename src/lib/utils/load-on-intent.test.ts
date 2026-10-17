@@ -16,15 +16,15 @@ describe("loadOnIntent", () => {
 
   it("fetches once and shares the result", async () => {
     const importer = vi.fn(() => Promise.resolve({ value: 1 }));
-    const module = loadOnIntent(importer);
+    const mod = loadOnIntent(importer);
 
-    module.preload();
-    module.preload();
-    const loaded = await module.load();
+    mod.preload();
+    mod.preload();
+    const loaded = await mod.load();
 
     expect(importer).toHaveBeenCalledTimes(1);
     expect(loaded).toEqual({ value: 1 });
-    expect(await module.load()).toBe(loaded);
+    expect(await mod.load()).toBe(loaded);
   });
 
   it("tries again after a failed fetch", async () => {
@@ -32,10 +32,10 @@ describe("loadOnIntent", () => {
       .fn<() => Promise<{ value: number }>>()
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce({ value: 2 });
-    const module = loadOnIntent(importer);
+    const mod = loadOnIntent(importer);
 
-    await expect(module.load()).rejects.toThrow("offline");
-    expect(await module.load()).toEqual({ value: 2 });
+    await expect(mod.load()).rejects.toThrow("offline");
+    expect(await mod.load()).toEqual({ value: 2 });
     expect(importer).toHaveBeenCalledTimes(2);
   });
 
@@ -43,9 +43,9 @@ describe("loadOnIntent", () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
     try {
-      const module = loadOnIntent(() => Promise.reject(new Error("offline")));
+      const mod = loadOnIntent(() => Promise.reject(new Error("offline")));
 
-      module.preload();
+      mod.preload();
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(unhandled).not.toHaveBeenCalled();
@@ -56,9 +56,9 @@ describe("loadOnIntent", () => {
   it("gives what loaded synchronously, from a load or a preload", async () => {
     // For a renderer that must not wait a frame to learn the chunk is in.
     let fail = true;
-    const module = { value: 1 };
+    const mod = { value: 1 };
     const { load, preload, loaded } = loadOnIntent(() =>
-      fail ? Promise.reject(new Error("offline")) : Promise.resolve(module),
+      fail ? Promise.reject(new Error("offline")) : Promise.resolve(mod),
     );
     expect(loaded()).toBeUndefined();
 
@@ -68,6 +68,6 @@ describe("loadOnIntent", () => {
     fail = false;
     preload();
     await load();
-    expect(loaded()).toBe(module);
+    expect(loaded()).toBe(mod);
   });
 });

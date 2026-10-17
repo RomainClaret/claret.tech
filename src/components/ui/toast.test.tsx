@@ -280,7 +280,6 @@ describe("ToastContainer", () => {
 });
 
 describe("showToast Helper", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockDispatchEvent: any;
 
   beforeEach(() => {

@@ -115,7 +115,7 @@ describe("AnimatedFavicon Integration", () => {
 });
 
 describe("AnimatedFavicon loading", () => {
-  it("starts one loop when the theme changes while its scripts load", async () => {
+  it("starts one loop, and asks for its scripts once, when the theme changes while they load", async () => {
     const { act, render } = await import("@testing-library/react");
     vi.resetModules();
     const state = { theme: "light" };
@@ -149,6 +149,15 @@ describe("AnimatedFavicon loading", () => {
       const view = render(<AnimatedFavicon />);
       state.theme = "dark"; // switched while the first load is in flight
       view.rerender(<AnimatedFavicon />);
+
+      // The second run found no scripts loaded yet and appended both again:
+      // two requests each on a dark visitor's every load.
+      expect(
+        scripts.map((script) => new URL(script.src).pathname).sort(),
+      ).toEqual([
+        "/favicons/animated/patterns.js",
+        "/favicons/animated/renderer.js",
+      ]);
 
       win.generateHybrid2 = () => ({ length: 4 });
       win.generateContinuousHybrid2 = () => ({

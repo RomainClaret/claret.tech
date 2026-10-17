@@ -155,36 +155,5 @@ export function withRateLimit(
   };
 }
 
-/**
- * Custom rate limit configuration for specific endpoints
- */
-export function createRateLimiter(options: {
-  windowMs?: number;
-  maxRequests?: number;
-  message?: string;
-}) {
-  const config = {
-    ...RATE_LIMIT_CONFIG,
-    ...options,
-  };
-
-  return function withCustomRateLimit(
-    handler: (request: NextRequest) => Promise<NextResponse>,
-  ) {
-    return async (request: NextRequest) => {
-      // Use custom config for this specific rate limiter
-      const originalConfig = { ...RATE_LIMIT_CONFIG };
-      Object.assign(RATE_LIMIT_CONFIG, config);
-
-      const response = await rateLimit(request, () => handler(request));
-
-      // Restore original config
-      Object.assign(RATE_LIMIT_CONFIG, originalConfig);
-
-      return response;
-    };
-  };
-}
-
 // Export configuration for testing
 export { RATE_LIMIT_CONFIG };

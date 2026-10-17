@@ -173,6 +173,86 @@ describe("Research", () => {
     });
   });
 
+  describe("Keyboard", () => {
+    it("opens and closes a grid card from a real button that says so", async () => {
+      // The card was a div with a click handler: no Tab stop, no role, no
+      // state, so its description, links and PDF buttons were out of a
+      // keyboard's reach.
+      render(<Research />);
+      const [toggle] = screen.getAllByRole("button", {
+        name: "Click to expand",
+      });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+      fireEvent.click(toggle);
+
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(toggle).toHaveTextContent("Click to collapse");
+      const details = document.getElementById(
+        toggle.getAttribute("aria-controls")!,
+      );
+      expect(details).not.toBeNull();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("lets each PhD highlight take focus, which shows its explanation", () => {
+      // The explanations showed on hover only, out of reach of a keyboard
+      // or a touch screen.
+      render(<Research />);
+      const explanations = screen.getAllByRole("tooltip", { hidden: true });
+      expect(explanations.length).toBeGreaterThan(0);
+
+      for (const explanation of explanations) {
+        const box = document.querySelector(
+          `[aria-describedby="${explanation.id}"]`,
+        );
+        expect(box).toHaveAttribute("tabindex", "0");
+        // jsdom applies no :focus styles; the classes are the contract.
+        expect(explanation).toHaveClass(
+          "group-hover:opacity-100",
+          "group-focus:opacity-100",
+        );
+      }
+    });
+
+    it("writes an open card's technologies through the contrast helper", () => {
+      // Raw, the tags read at 2.1 to 4.0:1 on the light theme.
+      render(<Research />);
+      const [toggle] = screen.getAllByRole("button", {
+        name: "Click to expand",
+      });
+      fireEvent.click(toggle);
+
+      const details = document.getElementById(
+        toggle.getAttribute("aria-controls")!,
+      )!;
+      const tags = [...details.querySelectorAll("span.rounded-lg")];
+      expect(tags.length).toBeGreaterThan(0);
+      for (const tag of tags) {
+        expect(tag).toHaveClass("accent-text");
+        expect((tag as HTMLElement).style.getPropertyValue("--accent")).toMatch(
+          /^rgb\(/,
+        );
+      }
+    });
+
+    it("says whether the story and the PhD description are open", () => {
+      render(<Research />);
+
+      for (const name of ["Read full story", "Read full description"]) {
+        const toggle = screen.getByRole("button", { name });
+        expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveTextContent("Show less");
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+      }
+    });
+  });
+
   describe("Deep links", () => {
     it("gives every project an anchor id", () => {
       render(<Research />);

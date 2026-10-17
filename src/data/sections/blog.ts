@@ -1,4 +1,6 @@
 // Blog section data
+import { mediumUsername } from "@/lib/utils/medium-username";
+
 export const blogSection = {
   display: true,
   title: "Thoughts & Tales",
@@ -9,12 +11,12 @@ export const blogSection = {
   },
   displayMediumBlogs: true,
   displayKudosArticles: true, // Enable Kudos research stories
-  mediumUsername: process.env.NEXT_PUBLIC_MEDIUM_USERNAME || "romainclaret",
+  mediumUsername: mediumUsername(),
   kudosProfileUrl: "https://www.growkudos.com/profile/romain_claret",
   blogs: [
     // Fallback blogs in case Medium fetch fails
     {
-      url: "https://medium.com/@romainclaret",
+      url: `https://medium.com/@${mediumUsername()}`,
       title: "Visit my Medium profile",
       description:
         "Research notes, fiction, and the occasional rant, on Medium.",

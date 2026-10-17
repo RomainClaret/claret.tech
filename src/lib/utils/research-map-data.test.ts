@@ -110,6 +110,29 @@ describe("src/data/research-map.json", () => {
     ).toEqual([]);
   });
 
+  it("joins the thesis to the five papers it is based on, chapter by chapter", () => {
+    // The thesis's List of Publications: "based on" five papers, the TPE
+    // study and the early-stopping paper in Chapter 3, then one a chapter.
+    const chapters = graph.edges.flatMap((edge) =>
+      edge.reasons
+        .filter(
+          (reason) =>
+            reason.kind === "part-of" &&
+            reason.from !== "phd-thesis" &&
+            [edge.source, edge.target].includes("phd-thesis"),
+        )
+        .map((reason) => [reason.from, reason.text]),
+    );
+
+    expect(Object.fromEntries(chapters)).toEqual({
+      claret2024tpe: "Chapter 3 of the PhD thesis.",
+      claret2026pruner: "Chapter 3 of the PhD thesis.",
+      claret2026partitioned: "Chapter 4 of the PhD thesis.",
+      claret2026quadtree: "Chapter 5 of the PhD thesis.",
+      claret2026emr: "Chapter 6 of the PhD thesis.",
+    });
+  });
+
   it("keeps em and en dashes out of its words", () => {
     const words = [
       ...config.lanes.map((lane) => lane.label),

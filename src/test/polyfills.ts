@@ -1,4 +1,4 @@
-// URL and URLSearchParams polyfills for happy-dom environment
+// URL and URLSearchParams from Node for the jsdom test environment
 // This file MUST be loaded before any other imports
 
 import { URL, URLSearchParams } from "url";
@@ -6,7 +6,6 @@ import { URL, URLSearchParams } from "url";
 // Force polyfill installation with proper type handling
 // Check if URL needs to be polyfilled (safely handle read-only properties)
 try {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (!globalThis.URL || (globalThis as any).URL !== URL) {
     Object.defineProperty(globalThis, "URL", {
       value: URL,
@@ -20,7 +19,6 @@ try {
 }
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (
     !globalThis.URLSearchParams ||
     (globalThis as any).URLSearchParams !== URLSearchParams
@@ -39,9 +37,7 @@ try {
 // Also set on global for older Node.js compatibility
 if (typeof global !== "undefined") {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!global.URL || (global as any).URL !== URL) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (global as any).URL = URL;
     }
   } catch {
@@ -49,12 +45,10 @@ if (typeof global !== "undefined") {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (
       !global.URLSearchParams ||
       (global as any).URLSearchParams !== URLSearchParams
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (global as any).URLSearchParams = URLSearchParams;
     }
   } catch {
@@ -65,9 +59,7 @@ if (typeof global !== "undefined") {
 // Ensure they're available on window for browser-like tests
 if (typeof window !== "undefined") {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!window.URL || (window as any).URL !== URL) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).URL = URL;
     }
   } catch {
@@ -75,12 +67,10 @@ if (typeof window !== "undefined") {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (
       !window.URLSearchParams ||
       (window as any).URLSearchParams !== URLSearchParams
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).URLSearchParams = URLSearchParams;
     }
   } catch {

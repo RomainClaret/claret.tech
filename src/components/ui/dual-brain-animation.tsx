@@ -50,11 +50,13 @@ export function DualBrainAnimation({
   const { areAnimationsPlaying } = useAnimationState();
   const { getConfig } = useQuality();
   const config = getConfig(NEURAL_CANVAS_PROFILE);
-  const pulseIntervalRef = useRef<NodeJS.Timeout>();
+  const pulseIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
   // Ends the current pulse. Cleared with the loop: left running, an older
   // one cut a newer pulse short after a quick stop and start, and could
   // fire after unmount.
-  const pulseEndRef = useRef<ReturnType<typeof setTimeout>>();
+  const pulseEndRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   // True while the loop has run and is only paused by an overlay or a
   // hidden tab, which the pulse never stopped for before: it then picks its
   // rhythm up again rather than pulsing the moment a modal closes. Showing

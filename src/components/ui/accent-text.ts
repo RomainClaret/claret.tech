@@ -6,6 +6,10 @@ import type { CSSProperties } from "react";
  * and add the `accent-text` class (globals.css), which darkens it on the
  * light theme and lightens it on the dark one. Used as they were, the
  * colours read at 1.5 to 4.3:1 on their own light tints.
+ *
+ * `accent-text` is checked for the site's own colours. For a colour from
+ * elsewhere (a GitHub language's), use `accent-text-any`, a deeper mix that
+ * holds for any colour.
  */
 export function accentStyle(color: string): CSSProperties {
   return { "--accent": color } as CSSProperties;
