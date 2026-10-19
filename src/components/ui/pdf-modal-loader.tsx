@@ -39,9 +39,9 @@ function PdfReaderUnavailable({
   // At the end of <body>, as the reader it stands in for: in place, the
   // cookie notice painted over it.
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/80 backdrop-blur-xs"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -51,7 +51,7 @@ function PdfReaderUnavailable({
         role="dialog"
         aria-modal="true"
         aria-label={title || "PDF viewer"}
-        className="relative m-4 max-w-md space-y-4 rounded-lg bg-background p-6 shadow-2xl outline-none"
+        className="relative m-4 max-w-md space-y-4 rounded-lg bg-background p-6 shadow-2xl outline-hidden"
       >
         {title && <h2 className="text-lg font-semibold">{title}</h2>}
         <p className="text-muted-foreground">

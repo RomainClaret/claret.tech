@@ -1,6 +1,6 @@
 /**
  * Advance widths of the PDF core fonts, in thousandths of an em, by
- * character: Adobe's metrics as pdfjs-dist 5.3.31 ships them. The PDF
+ * character: Adobe's metrics as pdfjs-dist 5.4.296 ships them. The PDF
  * reader weighs the characters of a printed line by them to find the text
  * under a link (pdf-link-names.ts).
  *

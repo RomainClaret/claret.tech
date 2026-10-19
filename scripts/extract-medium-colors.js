@@ -88,20 +88,17 @@ const BLOG_COLORS = {
   default: "rgb(71, 85, 105)", // Slate
 };
 
+// Throws when the feed fails: an empty list here used to be written over the
+// saved map, as if the account had no posts.
 async function fetchMediumPosts() {
-  try {
-    const response = await fetch(mediumRssUrl());
-    const data = await response.json();
+  const response = await fetch(mediumRssUrl());
+  const data = await response.json();
 
-    if (data.status !== "ok" || !data.items) {
-      throw new Error("Failed to fetch Medium posts");
-    }
-
-    return data.items;
-  } catch (error) {
-    console.error("Error fetching Medium posts:", error);
-    return [];
+  if (data.status !== "ok" || !data.items) {
+    throw new Error("Failed to fetch Medium posts");
   }
+
+  return data.items;
 }
 
 async function extractColorFromImage(imageUrl) {
@@ -136,13 +133,13 @@ function getCategoryFromPost(post) {
   return "technology"; // default category
 }
 
-async function extractMediumColors() {
+async function extractMediumColors(outputFile = OUTPUT_FILE) {
   console.log("🎨 Extracting colors from Medium blog posts...");
 
   try {
     // Check if we have a recent cache
     try {
-      const stats = await fs.stat(OUTPUT_FILE);
+      const stats = await fs.stat(outputFile);
       const now = Date.now();
       const fileAge = now - stats.mtime.getTime();
 
@@ -205,21 +202,23 @@ async function extractMediumColors() {
     }
 
     // Save to file
-    await fs.writeFile(OUTPUT_FILE, JSON.stringify(colorMap, null, 2) + "\n");
+    await fs.writeFile(outputFile, JSON.stringify(colorMap, null, 2) + "\n");
 
     console.log(
       `\n✅ Extracted colors for ${Object.keys(colorMap).length} posts`,
     );
-    console.log(`📄 Saved to ${OUTPUT_FILE}`);
+    console.log(`📄 Saved to ${outputFile}`);
   } catch (error) {
     console.error("❌ Error extracting Medium colors:", error);
 
-    // Create a default file if extraction fails
-    const defaultColors = {};
-    await fs.writeFile(
-      OUTPUT_FILE,
-      JSON.stringify(defaultColors, null, 2) + "\n",
-    );
+    // The map is tracked, and this runs before every build: a failed feed
+    // (offline, or rss2json refusing) keeps the saved one. An empty map only
+    // when there is none, since Blog.tsx imports the file.
+    try {
+      await fs.access(outputFile);
+    } catch {
+      await fs.writeFile(outputFile, JSON.stringify({}, null, 2) + "\n");
+    }
   }
 }
 

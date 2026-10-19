@@ -119,6 +119,14 @@ const nextConfig = {
       // resolves from the project root: reached only through lottie-react,
       // it did so only while npm happened to hoist it.
       "lottie-web$": "lottie-web/build/player/lottie_light.js",
+      // The PDF reader runs pdf.js's legacy build. The default build calls
+      // URL.parse and Promise.withResolvers without a polyfill, which
+      // Chrome and Edge 111 to 125 and Safari 16.4 to 17.x lack, all in the
+      // browserslist: there the reader's page fell to the error page. The
+      // legacy build targets Chrome 110, Firefox ESR and Safari 16.4 (+19
+      // KB gzipped, loaded only with the reader); scripts/setup-assets.js
+      // copies its worker. react-pdf imports the bare package everywhere.
+      "pdfjs-dist$": "pdfjs-dist/legacy/build/pdf.mjs",
     };
 
     // Configure to prevent source map 404 errors
@@ -329,7 +337,10 @@ const nextConfig = {
     const servesOverHttp = process.env.SERVE_HTTP === "true";
     const isProd = process.env.NODE_ENV === "production" && !servesOverHttp;
 
-    // Content Security Policy - strict but allows necessary resources
+    // Content Security Policy - strict but allows necessary resources.
+    // connect-src's https://*.hf.co: Hugging Face redirects the AI chat's
+    // model weights to its Xet CDN (us.aws.cdn.hf.co, other regions under
+    // hf.co); without it no model could load.
     const ContentSecurityPolicy = `
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://va.vercel-scripts.com https://vercel.live;
@@ -337,7 +348,7 @@ const nextConfig = {
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com https://avatars.githubusercontent.com https://cdn-images-1.medium.com https://cdn-images-2.medium.com https://miro.medium.com https://images.unsplash.com;
       font-src 'self' data: https://cdn.scite.ai moz-extension: chrome-extension:;
-      connect-src 'self' https://api.github.com https://pub.orcid.org https://api.semanticscholar.org https://www.growkudos.com https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://s3.amazonaws.com https://raw.githubusercontent.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com;
+      connect-src 'self' https://api.github.com https://pub.orcid.org https://api.semanticscholar.org https://www.growkudos.com https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://*.hf.co https://s3.amazonaws.com https://raw.githubusercontent.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com;
       media-src 'self';
       object-src 'none';
       frame-src 'none';

@@ -111,7 +111,7 @@ export function Contact() {
                           />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-1 bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                          <h3 className="text-lg font-semibold mb-1 bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
                             {contactInfo.emailDesc}
                           </h3>
                           <p className="text-muted-foreground break-all">
@@ -184,7 +184,7 @@ export function Contact() {
                           />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold mb-1 bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                          <h3 className="text-lg font-semibold mb-1 bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
                             Connect on LinkedIn
                           </h3>
                           <p className="text-muted-foreground">@RomainClaret</p>
@@ -243,7 +243,7 @@ export function Contact() {
                         placeholder="blur"
                         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAKAAoDASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAAQFB//EACYQAAIBAwMEAQUAAAAAAAAAAAECAwAEEQUSITFBUWEGExQiMoH/xAAVAQEBAAAAAAAAAAAAAAAAAAABAv/EABcRAQEBAQAAAAAAAAAAAAAAAAECEQD/2gAMAwEAAhEDEQA/ANLviNwkhABCkgHxU2N2VgysVI6EGrN2zSXEkhGCx61EuI8EkAYNZsYV//Z"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                      <div className="absolute inset-0 bg-linear-to-t from-primary/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
                     </div>
                   </div>
                 </EducationStyleCard>

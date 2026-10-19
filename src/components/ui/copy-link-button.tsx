@@ -59,7 +59,7 @@ export function CopyLinkButton({
     <button
       onClick={handleCopy}
       className={cn(
-        "p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0",
+        "p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0",
         className,
       )}
       title={label}

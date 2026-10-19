@@ -59,6 +59,11 @@ jobs:
         env: &build-env
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           USE_GITHUB_DATA: true
+          # The account whose pinned repositories the build saves at
+          # /profile.json (src/app/profile.json/route.ts), Projects' fallback
+          # when the API fails. A public name, so no secret; Vercel's runtime
+          # env holds its own copy for the API routes.
+          GH_USERNAME: RomainClaret
           # The blog's Medium account; a leading @ is dropped
           # (src/lib/utils/medium-username.ts). Unset, romainclaret.
           NEXT_PUBLIC_MEDIUM_USERNAME: ${{ secrets.MEDIUM_USERNAME }}

@@ -24,7 +24,7 @@ interface MapToolbarProps {
 }
 
 const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary";
 const chip = cn(
   "inline-flex min-h-[32px] items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
   focusRing,
@@ -116,7 +116,7 @@ export function MapToolbar({
                 chip,
                 "lane-ink",
                 shown
-                  ? "border-[color:var(--ink)] text-foreground"
+                  ? "border-(--ink) text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
               style={{ "--lane": lane.color } as CSSProperties}
@@ -124,8 +124,8 @@ export function MapToolbar({
               <span
                 aria-hidden="true"
                 className={cn(
-                  "h-2.5 w-2.5 rounded-full border-2 border-[color:var(--ink)]",
-                  shown && "bg-[var(--ink)]",
+                  "h-2.5 w-2.5 rounded-full border-2 border-(--ink)",
+                  shown && "bg-(--ink)",
                 )}
               />
               {lane.label}

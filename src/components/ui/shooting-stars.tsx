@@ -231,7 +231,7 @@ export function ShootingStars({
                   height: "1px",
                 }}
               >
-                <div className="h-full w-full bg-gradient-to-r from-slate-700/80 via-slate-700/40 to-transparent dark:from-white/80 dark:via-white/40 dark:to-transparent" />
+                <div className="h-full w-full bg-linear-to-r from-slate-700/80 via-slate-700/40 to-transparent dark:from-white/80 dark:via-white/40 dark:to-transparent" />
               </div>
             </div>
           </div>

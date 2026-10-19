@@ -1,0 +1,86 @@
+diff --git a/node_modules/motion-dom/dist/es/index.mjs b/node_modules/motion-dom/dist/es/index.mjs
+index 58db687..cdd66b4 100644
+--- a/node_modules/motion-dom/dist/es/index.mjs
++++ b/node_modules/motion-dom/dist/es/index.mjs
+@@ -121,7 +121,8 @@ export { HTMLVisualElement } from './render/html/HTMLVisualElement.mjs';
+ export { ObjectVisualElement } from './render/object/ObjectVisualElement.mjs';
+ export { visualElementStore } from './render/store.mjs';
+ export { SVGVisualElement } from './render/svg/SVGVisualElement.mjs';
+-export { VisualElement, getFeatureDefinitions, setFeatureDefinitions } from './render/VisualElement.mjs';
++export { VisualElement } from './render/VisualElement.mjs';
++export { getFeatureDefinitions, setFeatureDefinitions } from './render/feature-definitions.mjs';
+ export { checkVariantsDidChange, createAnimationState } from './render/utils/animation-state.mjs';
+ export { getVariantContext } from './render/utils/get-variant-context.mjs';
+ export { isAnimationControls } from './render/utils/is-animation-controls.mjs';
+diff --git a/node_modules/motion-dom/dist/es/render/VisualElement.mjs b/node_modules/motion-dom/dist/es/render/VisualElement.mjs
+index f8e8cd6..63fc55d 100644
+--- a/node_modules/motion-dom/dist/es/render/VisualElement.mjs
++++ b/node_modules/motion-dom/dist/es/render/VisualElement.mjs
+@@ -17,6 +17,7 @@ import { updateMotionValuesFromProps } from './utils/motion-values.mjs';
+ import { initPrefersReducedMotion } from './utils/reduced-motion/index.mjs';
+ import { hasReducedMotionListener, prefersReducedMotion } from './utils/reduced-motion/state.mjs';
+ import { frame, cancelFrame } from '../frameloop/frame.mjs';
++import { featureDefinitions } from './feature-definitions.mjs';
+ 
+ const propEventHandlers = [
+     "AnimationStart",
+@@ -27,23 +28,6 @@ const propEventHandlers = [
+     "LayoutAnimationStart",
+     "LayoutAnimationComplete",
+ ];
+-/**
+- * Static feature definitions - can be injected by framework layer
+- */
+-let featureDefinitions = {};
+-/**
+- * Set feature definitions for all VisualElements.
+- * This should be called by the framework layer (e.g., framer-motion) during initialization.
+- */
+-function setFeatureDefinitions(definitions) {
+-    featureDefinitions = definitions;
+-}
+-/**
+- * Get the current feature definitions
+- */
+-function getFeatureDefinitions() {
+-    return featureDefinitions;
+-}
+ /**
+  * A VisualElement is an imperative abstraction around UI elements such as
+  * HTMLElement, SVGElement, Three.Object3D etc.
+@@ -548,5 +532,5 @@ class VisualElement {
+     }
+ }
+ 
+-export { VisualElement, getFeatureDefinitions, setFeatureDefinitions };
++export { VisualElement };
+ //# sourceMappingURL=VisualElement.mjs.map
+diff --git a/node_modules/motion-dom/dist/es/render/feature-definitions.mjs b/node_modules/motion-dom/dist/es/render/feature-definitions.mjs
+new file mode 100644
+index 0000000..631eafe
+--- /dev/null
++++ b/node_modules/motion-dom/dist/es/render/feature-definitions.mjs
+@@ -0,0 +1,23 @@
++// Patched by claret.tech (patches/motion-dom+14.3.1.patch): the registry in
++// a module of its own. In VisualElement.mjs, importing it (framer-motion's
++// `m` and LazyMotion do) pulled VisualElement and all it imports into the
++// importer's chunk, out of LazyMotion's lazily loaded features.
++/**
++ * Static feature definitions - can be injected by framework layer
++ */
++let featureDefinitions = {};
++/**
++ * Set feature definitions for all VisualElements.
++ * This should be called by the framework layer (e.g., framer-motion) during initialization.
++ */
++function setFeatureDefinitions(definitions) {
++    featureDefinitions = definitions;
++}
++/**
++ * Get the current feature definitions
++ */
++function getFeatureDefinitions() {
++    return featureDefinitions;
++}
++
++export { featureDefinitions, getFeatureDefinitions, setFeatureDefinitions };

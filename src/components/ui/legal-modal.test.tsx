@@ -376,7 +376,7 @@ describe("LegalModal", () => {
         "absolute",
         "inset-0",
         "bg-background/80",
-        "backdrop-blur-sm",
+        "backdrop-blur-xs",
       );
     });
 

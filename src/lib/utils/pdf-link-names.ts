@@ -219,7 +219,7 @@ function textUnder(
     if (!kept.some(Boolean)) continue;
     // Whole words: a word with any character kept is kept.
     const word = item.word!;
-    for (let i = 0; i < chars.length; ) {
+    for (let i = 0; i < chars.length;) {
       if (!word[i]) {
         i++;
         continue;
@@ -308,7 +308,7 @@ function clean(raw: string): string {
     .replace(/(?:\s*[.·…]){3,}/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  for (let previous = ""; previous !== text; ) {
+  for (let previous = ""; previous !== text;) {
     previous = text;
     text = trimUnbalanced(text.replace(EDGE_PUNCTUATION, "").trim()).trim();
     if (DASHES.includes(text[0] ?? "") && /\d/.test(text[1] ?? "")) {

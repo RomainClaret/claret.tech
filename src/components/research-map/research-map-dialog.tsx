@@ -154,7 +154,7 @@ export function ResearchMapDialog({
   return (
     <>
       {createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-9999 flex items-end justify-center sm:items-center sm:p-4">
           <div
             aria-hidden="true"
             data-testid="research-map-backdrop"
@@ -172,7 +172,7 @@ export function ResearchMapDialog({
             // On a phone the sheet is the one scroller, its header sticky:
             // a fixed toolbar left the list a third of the screen. Wider,
             // the toolbar stays and the map and details scroll inside.
-            className="relative flex max-h-[90vh] w-full flex-col overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-background shadow-2xl outline-none supports-[height:100dvh]:max-h-[90dvh] sm:max-w-7xl sm:overflow-hidden sm:rounded-xl motion-safe:animate-[slideUp_200ms_ease-out]"
+            className="relative flex max-h-[90vh] w-full flex-col overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-background shadow-2xl outline-hidden supports-[height:100dvh]:max-h-[90dvh] sm:max-w-7xl sm:overflow-hidden sm:rounded-xl motion-safe:animate-[slideUp_200ms_ease-out]"
           >
             <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-border bg-background p-4 sm:static sm:px-6">
               <div className="min-w-0 flex-1">
@@ -193,7 +193,7 @@ export function ResearchMapDialog({
                 type="button"
                 onClick={() => onClose("dismiss")}
                 aria-label="Close research map"
-                className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <X aria-hidden="true" className="h-5 w-5" />
               </button>

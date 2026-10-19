@@ -130,4 +130,20 @@ describe("security headers (next.config)", () => {
     // (https://...), so no `https:` may appear that isn't followed by `//`.
     expect(csp).not.toMatch(/\bhttps:(?!\/\/)/);
   });
+
+  // Hugging Face redirects model weights to its Xet CDN (us.aws.cdn.hf.co on
+  // 2026-10-18; other regions elsewhere under hf.co). Without it every weight
+  // download was refused, and the terminal's AI chat could load no model.
+  it("lets the AI chat download model weights from Hugging Face's CDN", async () => {
+    const headers = await securityHeaderMap();
+    const connect =
+      (headers.get("Content-Security-Policy") ?? "")
+        .split(";")
+        .find((directive) => directive.trim().startsWith("connect-src"))
+        ?.trim()
+        .split(/\s+/) ?? [];
+
+    expect(connect).toContain("https://huggingface.co");
+    expect(connect).toContain("https://*.hf.co");
+  });
 });

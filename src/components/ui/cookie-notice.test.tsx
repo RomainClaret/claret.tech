@@ -314,7 +314,7 @@ describe("CookieNotice", () => {
         .closest(".bg-gray-900\\/95");
 
       expect(notice).toHaveClass("bg-gray-900/95");
-      expect(notice).toHaveClass("backdrop-blur-sm");
+      expect(notice).toHaveClass("backdrop-blur-xs");
       expect(notice).toHaveClass("border-t");
       expect(notice).toHaveClass("border-gray-800");
       expect(notice).toHaveClass("shadow-lg");

@@ -99,8 +99,7 @@ export function renderHookWithErrorBoundary<T>(
   let originalConsoleError: typeof console.error;
   let originalOnError: OnErrorEventHandler;
   let originalOnUnhandledRejection:
-    | ((event: PromiseRejectionEvent) => void)
-    | null;
+    ((event: PromiseRejectionEvent) => void) | null;
 
   // Setup error capture
   const setupErrorCapture = () => {

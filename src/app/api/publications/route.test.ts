@@ -13,35 +13,41 @@ import { GET, POST } from "./route";
 
 // Mock Next.js
 vi.mock("next/server", () => ({
-  NextRequest: vi.fn((url, options) => ({
-    url,
-    // Honour headers passed to the constructor: the refresh key is read from
-    // x-refresh-key, and a bare Map here made that unreadable.
-    headers: {
-      get: (name: string) =>
-        (options?.headers as Record<string, string> | undefined)?.[
-          name.toLowerCase()
-        ] ?? null,
-    },
-    nextUrl: {
-      pathname: url.split("?")[0],
-      searchParams: {
-        get: (key: string) => {
-          const params = url.includes("?") ? url.split("?")[1].split("&") : [];
-          const param = params.find((p: string) => p.startsWith(`${key}=`));
-          return param ? param.split("=")[1] : null;
-        },
-        has: (key: string) => {
-          const params = url.includes("?") ? url.split("?")[1].split("&") : [];
-          return params.some((p: string) => p.startsWith(`${key}=`));
-        },
+  NextRequest: vi.fn(function (url, options) {
+    return {
+      url,
+      // Honour headers passed to the constructor: the refresh key is read from
+      // x-refresh-key, and a bare Map here made that unreadable.
+      headers: {
+        get: (name: string) =>
+          (options?.headers as Record<string, string> | undefined)?.[
+            name.toLowerCase()
+          ] ?? null,
       },
-      toString: () => url,
-    },
-    json: async () => (options?.body ? JSON.parse(options.body) : {}),
-  })),
+      nextUrl: {
+        pathname: url.split("?")[0],
+        searchParams: {
+          get: (key: string) => {
+            const params = url.includes("?")
+              ? url.split("?")[1].split("&")
+              : [];
+            const param = params.find((p: string) => p.startsWith(`${key}=`));
+            return param ? param.split("=")[1] : null;
+          },
+          has: (key: string) => {
+            const params = url.includes("?")
+              ? url.split("?")[1].split("&")
+              : [];
+            return params.some((p: string) => p.startsWith(`${key}=`));
+          },
+        },
+        toString: () => url,
+      },
+      json: async () => (options?.body ? JSON.parse(options.body) : {}),
+    };
+  }),
   NextResponse: Object.assign(
-    vi.fn((body, options) => {
+    vi.fn(function (body, options) {
       const headersMap = new Map(Object.entries(options?.headers || {}));
       return {
         text: async () => body,

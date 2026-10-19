@@ -172,7 +172,8 @@ jobs:
               - 'src/**/*mobile*.{ts,tsx}'
               - 'src/**/*responsive*.{ts,tsx}'
               - 'src/**/*breakpoint*.{ts,tsx}'
-              - 'tailwind.config.*'
+              # Tailwind's theme, breakpoints included, since Tailwind 4.
+              - 'src/app/globals.css'
               # Shared helpers every spec imports. Without this a fix to
               # tests/e2e/utils/ skips the very suite it was written for:
               # terminal-utils.ts changed on 2026-08-04 and terminal-tests did
@@ -183,11 +184,13 @@ jobs:
               - 'public/**'
               # postinstall, prebuild and next.config's plugin.
               - 'scripts/**'
-              # next.config.mjs, tailwind.config.ts, playwright.config.ts...
+              # next.config.mjs, postcss.config.js, playwright.config.ts...
               - '*.config.{js,mjs,ts}'
             dependencies:
               - 'package.json'
               - 'package-lock.json'
+              # Applied to node_modules by the postinstall (scripts/apply-patches.mjs).
+              - 'patches/**'
             workflows:
               - '.github/workflows/**'
               - '.github/scripts/**'

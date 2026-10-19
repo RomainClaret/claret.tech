@@ -91,14 +91,14 @@ Median of 3 runs (W1 and P1: 1 run).
 
 **What each scenario shows:**
 
-- **Never idle.** The page keeps the main thread busy while nobody touches it: 27–37% at full CPU, wherever you are on the page, and 91–100% at 4× slower.
+- **Never idle.** The page keeps the main thread busy while nobody touches it: 27-37% at full CPU, wherever you are on the page, and 91-100% at 4× slower.
   - SVG `<animate>` drives thousands of style recalculations per second.
-  - Most running animations (36–39) target off-screen elements.
+  - Most running animations (36-39) target off-screen elements.
 - **No click needed for the heavy chunks.** pdf.js (`pdfjs.*`), the terminal (`terminal.*`, `2390.*`) and lottie (`7853.*`) load on every visit without any interaction.
 - **Layout shifts at load.** CLS comes from the splash box resizing (`div.max-w-md.w-full.px-8`) and the hero phrase's half-typed words wrapping.
 - **PDF reader.** The PhD thesis asks for 7.8 GB of canvas.
 
-### After Phases 1–4: `b87c925` against `ce75bc9` (2026-10-08)
+### After Phases 1-4: `b87c925` against `ce75bc9` (2026-10-08)
 
 Median of 2 runs per scenario, alternating between the two builds (baseline,
 candidate, baseline, ...), both serving the same content. S5 did not run on the
@@ -119,7 +119,7 @@ Everything fetched with no interaction: 1,153 → 709 KB on S1. pdf.js, xterm,
 the terminal commands, the Pyodide client, DOMPurify and the full Lottie player
 no longer load until someone reaches for them.
 
-### Phases 5–6: targeted checks on the build after them
+### Phases 5-6: targeted checks on the build after them
 
 | Check                                                      | Baseline              | After          |
 | ---------------------------------------------------------- | --------------------- | -------------- |
@@ -130,7 +130,7 @@ no longer load until someone reaches for them.
 
 ### Final: `acd4ead` against `ce75bc9` (2026-10-08)
 
-Phases 0–6 and 8. Median of 2 runs per scenario, alternating between the two
+Phases 0-6 and 8. Median of 2 runs per scenario, alternating between the two
 builds, both with the same content and assets.
 
 | id  | main%       | recalc/s   | fps           | >20ms   | offscr | heapMB      | nodes       | CLS       | jsKB      | fontKB   |
@@ -150,8 +150,8 @@ builds, both with the same content and assets.
   First-load JS for `/` in the build output: 271 → 242 kB.
 - **Scroll jank** on the phone (S7): 59 → 11 frames over 20 ms. On the
   desktop (S1) no measurable change: 36 and 37.5 over 4 runs each, with a
-  spread of 19–54 between runs.
-- **Frame throughput** in S2–S4 is 5–8% lower on the software GPU, with 0–2
+  spread of 19-54 between runs.
+- **Frame throughput** in S2-S4 is 5-8% lower on the software GPU, with 0-2
   frames over 20 ms on either side, so no frame misses a 60 Hz display: the
   decorative loops now run on the compositor rather than the main thread,
   whose share halved.
@@ -161,7 +161,7 @@ builds, both with the same content and assets.
 
 The 65 commits of review fixes after the pass, measured the same way.
 Absolute numbers drift between sessions (S7 measured 50.4% on `acd4ead` in
-the table above and 68–78% here), so compare within a table, not across.
+the table above and 68-78% here), so compare within a table, not across.
 
 | id  | main%       | fps          | >20ms      | heapMB      | scroll>20   |
 | --- | ----------- | ------------ | ---------- | ----------- | ----------- |
@@ -182,11 +182,11 @@ the table above and 68–78% here), so compare within a table, not across.
   animated under the hero, with twice the running animations. With
   `7dd7216` (measure again when the grid's box changes) and `9469a6e` (a
   Research tooltip made every page under 600 px wide pan sideways by up to
-  31 px), S7 is 70.6–71.3% against 67.8–75.2% for `acd4ead`, and its
-  scroll jank 17–20 against 26 frames over 20 ms.
+  31 px), S7 is 70.6-71.3% against 67.8-75.2% for `acd4ead`, and its
+  scroll jank 17-20 against 26 frames over 20 ms.
 - **S5**: the brain canvas now stops under the PDF reader (`fa842a8`).
 - **S1M** (MAXIMUM, where the automatic loop takes a capable machine) costs
-  5–10 points more than S1 on the same build. Its SMIL count is no measure
+  5-10 points more than S1 on the same build. Its SMIL count is no measure
   of a change: it is a snapshot of whatever signals are in flight, and the
   same `acd4ead` build read 168, 192 and 312 in three runs.
 - First-load JS for `/`: 242 → 245 kB (the fallbacks and the quality loop's
@@ -201,7 +201,7 @@ interleaved; traces for scroll work, file sizes from the build manifest.
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | framer-motion features after hydration           | JS `/` loads before hydrating: 904.7 → 843.9 KB raw, 275.3 → 253.4 KB gzip                             |
 | Montserrat Latin subset, full font for the rest  | font fetched on a full visit: 78,724 → 40,508 B; text byte-identical at DPR 2                          |
-| no permanent layer per card and skill badge      | main-thread paint in a full scroll: 320–349 → 115–127 ms; frames over 20 ms lower in each pair         |
+| no permanent layer per card and skill badge      | main-thread paint in a full scroll: 320-349 → 115-127 ms; frames over 20 ms lower in each pair         |
 | Kudos card's color extracted when near           | 45 KB image, the colorthief chunk and the extraction left out of visits that never reach the blog      |
 | MAXIMUM particles travel, three per signal       | S1M main thread unchanged (median 35.1%); eight traveling particles cost 36 → 43%                      |
 | Latin subset keeps the default features and tnum | font file 40,508 → 25,876 B (913 → 501 glyphs); S1 fetches 41.2 → 26.9 KB of font; text byte-identical |
@@ -218,20 +218,20 @@ interleaved; traces for scroll work, file sizes from the build manifest.
   (10 KB, not render-blocking); moving `.prose` out of the main stylesheet
   (needs a second Tailwind build); converting the constellation, signal
   draw and brain pulse from framer to CSS (pausing every CSS animation at
-  once saves 5.7 points, so each of these is worth 1–3, under the run-to-run
+  once saves 5.7 points, so each of these is worth 1-3, under the run-to-run
   spread).
 
 ### Static homepage (2026-10-08)
 
 `/` used to be rendered on every request: the root layout read the theme
 and Safari cookies, which made each page view a function call. On the live
-site that cost 200–350 ms before the first byte from Europe (the edge in
+site that cost 200-350 ms before the first byte from Europe (the edge in
 Dublin, the function in US East) and about a second when the function was
 cold; the splash's timer starts at hydration, so none of it was hidden.
 
 Now `next build` lists `○ /` and `● /pdf/[slug]`, there is no middleware,
-and `next start` answers `/` from the prerender cache (3–8 ms here against
-17–23 ms for the render) with an ETag, a 304 on revalidation and no cookie.
+and `next start` answers `/` from the prerender cache (3-8 ms here against
+17-23 ms for the render) with an ETag, a 304 on revalidation and no cookie.
 How it holds together:
 
 - **One HTML for everyone** (light, not Safari). A blocking ES5 script, first
@@ -504,6 +504,371 @@ image (arm64), by the CPUs the container may use:
 
 The homepage's rate does not fall with the CPUs, so CI's WebKit jobs
 should not stall on it.
+
+### Round 19: Lighthouse 13 and colorthief 3 (2026-10-17)
+
+`lighthouse.spec.ts` in the Playwright 1.64 container against CI's e2e
+build, three runs per version (Lighthouse's default mobile emulation):
+
+| Category       | 12.8.2 | 13.5.0 | Lost to                                                |
+| -------------- | ------ | ------ | ------------------------------------------------------ |
+| Performance    | 100    | 100    |                                                        |
+| Accessibility  | 96     | 93     | `link-in-text-block` in both, `target-size` in 13 only |
+| Best practices | 96     | 96     | `errors-in-console`: no GitHub data in the e2e build   |
+| SEO            | 92     | 92     | `link-text`: the blog cards' "More" links              |
+
+The three runs of each version gave the same scores; FCP 403 to 445 ms,
+LCP 645 to 689 ms, CLS 0.016 and TBT 0 in all six. `target-size` is the
+skill carousel's 15 dot buttons, 6 by 6 px (the current one 12 by 6),
+under WCAG 2.2's 24 by 24: Lighthouse 13's axe-core (4.14, from its `^4.13`)
+catches them, 12's and the e2e scans' (4.10) do not.
+
+After this round's fixes, at `2a935ac` (three runs, Lighthouse 13):
+performance 100, accessibility 100 (the carousel's 24 px controls, the
+underlined footer links), best practices 96 (the same console errors), SEO
+100 (the cards' "Medium" links). LCP 859 to 870 ms, from 686 to 849 ms
+before Tailwind 4's larger stylesheet; FCP 443 ms, TBT 0. npm audit: 46
+advisories at the start of the round, 8 at its end, all in tools that never
+reach the site (eslint-config-next's fast-glob, braces and micromatch;
+@tailwindcss/typography's postcss-selector-parser; vite's esbuild dev
+server).
+
+colorthief 3.5.0 against 2.6.0 in Chromium, the hook's call in each, on
+the 53 images in `public/images`, the Kudos card's Unsplash photo and two
+Medium images:
+
+| Comparison                                         | Result                                      |
+| -------------------------------------------------- | ------------------------------------------- |
+| 3.5.0 in RGB (`colorCount` 5, `quality` 10)        | identical on all 54 that 2.6.0 can read     |
+| 3.5.0 in its default OKLCH                         | all 54 differ; 33 by a delta E over 10      |
+| All-white images (`ppsn_2026_logo_white`, 2 files) | 2.6.0 throws, 3.5.0 gives white             |
+| The lazy chunk                                     | 6,570 to 16,997 B, 2,707 to 6,409 B gzipped |
+
+The delta E is CIE76 between the colors the hook shows, after its glow
+adjustment. In a production build the Kudos card, the only image the site
+extracts at runtime, shows the same color (197, 60, 106) once the blog
+comes near, and the chunk loads only then.
+
+Tailwind 4.3.3 against 3.4.19, CI's e2e build of the same tree:
+
+| CSS                                   | 3.4.19                      | 4.3.3                       |
+| ------------------------------------- | --------------------------- | --------------------------- |
+| The homepage's stylesheets (blocking) | 114,882 B, 19,518 B gzipped | 157,531 B, 23,131 B gzipped |
+| All stylesheets                       | 127,002 B, 22,383 B gzipped | 169,659 B, 25,996 B gzipped |
+
+Screenshots of every homepage section at 1280 by 900 and 390 by 844, light
+and dark, with reduced motion, against two runs of the 3.4 build (pixels
+whose largest channel differs by more than 16):
+
+| Section                    | Changed pixels                      | Why                                                               |
+| -------------------------- | ----------------------------------- | ----------------------------------------------------------------- |
+| Home and page top, desktop | 10.8 to 12.7%, 90 px taller         | `leading-tight` now beats `xl:text-7xl`'s line height of 1        |
+| Research, desktop          | 12.5 to 13.8%                       | the title gradients in OKLCH                                      |
+| Skills                     | 6.4 to 6.5% desktop, 17% phone      | subtitle sizes and margins (`text-2xl mb-*` beats the gradient's) |
+| Education                  | 1.5% desktop, 12% phone             | the same                                                          |
+| Projects, Home on a phone  | 2% desktop, 1.7 to 1.9% phone       | the same, and the palette                                         |
+| The other 22 shots         | 1.1% at most (the phone's page top) | two 3.4 runs differ by up to 2%; Papers 3 px shorter on desktop   |
+
+### Round 20: Lighthouse limits for CI's runners (2026-10-18)
+
+CI's Lighthouse job (GitHub's ubuntu-24.04 runners, Lighthouse 12, the code
+before the performance pass) scored performance 69 to 94 over its last 19
+runs, 2026-07-22 to 2026-10-04, median 83; retries of one commit went from
+69 to 87 and from 79 to 91. Round 19's bar of 90 would have failed 13 of
+the 19. CI kept no metric: only the four category scores reached its log.
+
+Calibration, in the Playwright 1.64 arm64 container: one container served
+CI's Lighthouse-job build of `d8da49f` (Next 15.5.22, Lighthouse 12.8.2,
+Playwright 1.57's Chromium, Node 24 where CI had 20), another the same
+build of HEAD; their audits alternated, three per CPU multiplier, under the
+same host load. Each run's effective slowdown is its multiplier times the
+idle container's CPU benchmark (3,982, round 19) over its own (1,676 to
+2,401 under that load):
+
+| Multiplier | `d8da49f`: slowdown, performance | HEAD: slowdown, performance | HEAD: TBT, ms | HEAD: TTI, s | HEAD: LCP, ms |
+| ---------- | -------------------------------- | --------------------------- | ------------- | ------------ | ------------- |
+| 1          | 1.8 to 2.3: 87 to 91             | 1.7 to 2.2: 99 to 100       | 60 to 92      | 1.24 to 1.32 | 824 to 951    |
+| 2          | 3.3 to 4.2: 79 to 83             | 4.0 to 4.4: 89 to 91        | 367 to 443    | 2.06 to 2.27 | 614 to 960    |
+| 3          | 5.2 to 6.6: 67 to 72             | 6.4 to 7.1: 77 to 84        | 635 to 1,055  | 2.50 to 3.02 | 906 to 1,006  |
+| 4          | 6.8 to 8.8: 60 to 69             | 6.8 to 8.2: 73 to 80        | 868 to 1,611  | 2.80 to 3.81 | 917 to 1,051  |
+
+`d8da49f` scores CI's 81 and 83 at a slowdown of 3.3 to 4.2: CI's runners
+take about 3.7 times an idle M4 Max container's CPU time (by the same
+arithmetic, a CPU benchmark near 1,100). HEAD there: performance 89 to 91, FCP 449 to 461 ms, TBT 367
+to 443 ms, TTI 2.06 to 2.27 s, CLS 0.016. Round 19's limits, set from the
+idle container alone, would likely have failed on CI: TBT under 300 ms and
+performance at least 90, against those 367 to 443 ms and 89 to 91. The old
+code's CLS (0.10 to 0.20) is gone from HEAD (0.016) and costs it nothing.
+
+The new limits (median of three audits): performance at least 80, FCP under
+1.5 s, LCP under 2 s, CLS under 0.1, TBT under 1,000 ms, TTI under 3 s.
+Measured with the spec itself (three audits, medians) in the same
+container: it passed at a median slowdown of 6.3 and 6.7, 1.7 to 1.8 times
+CI's (performance 81 and 82, TBT 706 and 795 ms, TTI 2.64 and 2.79 s), and
+failed at 8.2 and 9.8, round 19's 8x CPU and beyond (performance 74 both
+times; TBT and TTI over their limits too).
+
+The first version of the median measured repeat visits:
+playwright-lighthouse passes `disableStorageReset: true`, so the second and
+third audits found the cache the first had filled (FCP 449, then 192 ms;
+TTI 1,658, then 532 ms). The first audit was cold anyway: all 22 scripts
+came over the network despite the spec's warm-up visit (Lighthouse opens its
+own tab, apparently outside that page's browser context). The spec now
+passes `disableStorageReset: false`: three cold audits (FCP 454, 551 and
+461 ms).
+
+Vite 8 (`d347892`): all 10 CI unit scripts pass with round 19's counts
+(2,552 tests) on vite 8.3.4, and esbuild leaves the tree (npm audit 8 to 7).
+Vite 8 raised the shared postcss from 8.5.25 to 8.5.30; built in one
+directory with each lockfile, all 71 CSS and JavaScript files of the site
+are byte-identical. New since vite 8: one warning per Vitest run that
+`vitest.config.ts` is ESM loaded as CommonJS, which vite's native config
+loader, planned as a future default, will refuse (rename it `.mts` and
+replace `__dirname`).
+
+Final HEAD (`bf7d638`) in the Playwright 1.64 container, against CI's e2e
+build. Lighthouse, three spec runs of three audits each, all passing:
+medians performance 100, FCP 444 to 450 ms, LCP 647 to 924 ms, TBT 2 to
+68 ms, TTI 0.94 to 1.50 s, CLS 0.016 (CPU benchmark 2,017 to 2,728 under
+the host's load); every audit scored accessibility 100, best practices 96
+and SEO 100. Best practices loses `errors-in-console`: the e2e build has no
+GitHub data, so `/profile.json` answers its prerendered 404 and
+`/api/fetch-all-repos` a 500 (no `GH_USERNAME`). The homepage asks the API,
+then the snapshot, once each, and says the projects could not load: two
+console errors, from three (`/profile.json` was asked twice). e2e: Chromium
+122 passed and 1 skipped (navigation, the accessibility job, the
+performance set), WebKit's accessibility job 41 and 1 skipped, and all 24
+on both phones. npm audit: 7.
+
+### Round 21: the dependency backlog (2026-10-18)
+
+Each major and in-range update was measured on its own commit, against
+the commit before it.
+
+| Update                                | Evidence                                                                                                                                                            | Cost                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| TypeScript 5.8.3 to 6.0.3 (`~6.0.3`)  | type-check 0 errors under 6.0's new defaults; lint, knip, `next build` clean                                                                                        | none; 7.0.2 waits for typescript-eslint (`<6.1.0`)                                       |
+| Vitest 4.1.12 to 5.0.5                | on a copy first: all 10 unit scripts three times with retries off and once as CI, 2,566 passed each run, nothing retried                                            | none                                                                                     |
+| prettier 3.6.2 to 3.9.10              | 16 files reformatted; each file's TypeScript syntax tree identical                                                                                                  | none                                                                                     |
+| xterm 5.5.0 to 6.0.0                  | window `resize` listeners over 5 terminal open/close cycles: 5.5 without the cleanup 9 to 14, with it 9 to 9, 6.0 without it 9 to 9; terminal screenshots identical | terminal chunk 67,832 to 82,488 B gzipped (+21.6%), its CSS 812 to 1,059 B; both lazy    |
+| framer-motion 12.23.11 to 14.3.0      | prerendered homepage: 810 style attributes identical; screenshots of every section within two runs of the old build                                                 | homepage JS 337,221 to 348,067 B gzipped (+3.2%): framer's eager code 27,786 to 38,545 B |
+| web-llm 0.2.79 to 0.2.86              | the 7 configured models still listed (165), same weights; a new WebGPU library each (all served); the default model loads and answers a chat                        | its lazy chunk 1,962,235 to 2,170,720 B gzipped (+10.6%)                                 |
+| analytics, web-vitals, lottie-react   | homepage JS the same raw bytes; three lazy chunks +54 B each                                                                                                        | +162 B of client JS                                                                      |
+| autoprefixer 10.4.21 to 10.6.1        | every CSS file byte-identical (caniuse-lite and browserslist unchanged)                                                                                             | none                                                                                     |
+| react-pdf 10.0.1 to 10.5.0 (not kept) | link names in node identical (3,400 of 3,400 under pdf.js 5.3.31 and 5.4.296), font widths identical; but the reader's e2e failed 4 of 32 (below)                   | not committed                                                                            |
+
+react-pdf 10.5 with pdf.js 5.4.296 broke two pdf-reader tests in Chromium
+and WebKit alike, and HEAD's 10.0.1 passes all 32: the GECCO paper's 33
+internal links got no name in the browser (in node, the same pdf.js names
+every link as 5.3.31 did), and the fallback-fonts reload sent a reader on
+page 200 back to page 1. The annotation layer's markup is unchanged
+(`section.linkAnnotation[data-annotation-id] > a`), and react-pdf still calls
+`onGetAnnotationsSuccess` and `onGetTextSuccess`. Both failures look like
+the document's load cycle, which react-pdf 10.3 changed ("resilience to
+promise cancellations"); confirming it needs the viewer instrumented.
+react-pdf stays at 10.0.1. (Round 22 found the causes, neither of them
+10.3's change: pdf.js 5.4's link titles and react-pdf 10.5's unmount on
+reload. See below.)
+
+The terminal's AI chat could not load any model, in production too: Hugging
+Face redirects model weights to its Xet CDN (`params_shard_*.bin` answer 302
+to `us.aws.cdn.hf.co`), which the CSP's `connect-src` did not allow, so the
+browser refused every weight download ("Failed to fetch", reason csp).
+`connect-src` now allows `https://*.hf.co`; the default model (Llama 3.2 1B)
+loads and answers in a build. Headless Chromium's default shell offers only
+SwiftShader's fallback adapter, without `shader-f16`, which the q4f16
+models need ("Invalid ShaderModule"); `channel: "chromium"` (the new
+headless) gets the Mac's Metal adapter with it.
+
+The e2e build's console: `/api/fetch-all-repos` ignored `USE_GITHUB_DATA`
+and answered 500 without `GH_USERNAME`, and `/profile.json` answered 404
+with the switch off: two errors on every load of a build without GitHub
+data. Both answer "no data" with a 200 now, and static-shell's hydration
+test fails on any console error.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped        | `5033cb0`          | `7c740ff`          |
+| --------------------- | ------------------ | ------------------ |
+| Homepage JS           | 337,147 (15 files) | 348,035 (16 files) |
+| All CSS               | 25,927             | 26,174             |
+| Terminal chunk (lazy) | 67,835             | 82,428             |
+| PDF chunk (lazy)      | 106,870            | 106,870            |
+| web-llm chunk (lazy)  | 1,964,686          | 2,171,956          |
+
+Final HEAD (`7c740ff`) in the container: Lighthouse, three spec runs of
+three audits, all passing, medians performance 100, FCP 446 to 450 ms, LCP
+692 to 856 ms, TBT 21 to 25 ms, TTI 1.19 to 1.20 s; every audit scored
+accessibility, best practices and SEO 100 (best practices was 96: the
+console errors are gone). e2e: Chromium 122 passed and 1 skipped (with
+pdf-reader), WebKit's accessibility job 41 and 1 skipped, terminal,
+python-terminal and research-map 63 in Chromium, 42 in Firefox and 43 in
+WebKit (21 and 20 skipped by the specs), and all 24 on both phones. npm
+audit: 7.
+
+### Round 22: react-pdf 10.5, framer-motion's eager bytes, jsdom 30 (2026-10-19)
+
+Round 21 left react-pdf 10.5 out (the reader's e2e failed) and framer-motion
+14 costing 10.8 KB gzipped of eager homepage JS. The two failures and the
+extra bytes each had one cause in a library, dealt with in our code or by a
+patch; jsdom and jest-dom moved too. Each change was measured on its own
+commit, against the commit before it.
+
+| Update                                     | Evidence                                                                                                                            | Cost                                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| jest-dom 6.9.1 to 7.0.1                    | 6.10's code (16 new matchers) as a major; 2,568 unit tests pass                                                                     | none                                                                                                                |
+| jsdom 24.1.3 to 30.1.3                     | two copies, three alternating runs of the 10 CI unit scripts each, retries off: every run passes, none retried                      | the suite 118.6 to 140.4 s (+18.4%), about 0.11 s per test file; peak memory -23 to +43 MB per script               |
+| react-pdf 10.0.1 to 10.5.0, pdf.js 5.4.296 | 3,400 of 3,400 link names identical, font widths identical; pdf-reader e2e 32 of 32 in Chromium and WebKit, after two fixes (below) | reader chunk 106,976 to 120,684 B gzipped (+12.8%), worker 283,317 to 287,344 B, its CSS 2,011 to 2,256 B; all lazy |
+| framer-motion 14.3.0 to 14.3.1, exact      | unit and e2e pass                                                                                                                   | homepage JS +90 B, lazy features +151 B                                                                             |
+| motion-dom's registry split (patch)        | prerendered homepage: 810 style attributes identical; screenshots of every section within the run-to-run noise                      | homepage JS 348,155 to 338,576 B gzipped (-9,579 B); lazy features 19,614 to 28,431 B; per visit -762 B             |
+
+react-pdf 10.5's two failures had a cause each, in different packages:
+
+- **Unnamed links: pdf.js 5.4.** Since PR #20096 pdf.js titles each link
+  with the text printed under it ("5" for "[5]"), and `fixLinkAnnotation`
+  took any title for a name the PDF gave, so none of the GECCO paper's 33
+  internal links got a name. A title no longer stops the naming, and a
+  named link loses pdf.js's title, which was read after the name
+  ("Reference 5, link, 5") and showed as a tooltip.
+- **Back to page 1: react-pdf 10.5.** PR #2129 clears the document as soon
+  as the old one is destroyed: until the new one arrives, Document shows its
+  `loading` in place of all 368 page boxes. The fallback-fonts reload then
+  collapsed the column, and both browsers clamped the scroll to the top;
+  the counter measured the detached boxes (all zero) and said 1; and the
+  page observer reported the removed boxes out of view, so the reader's
+  page came back without a canvas until every size was measured again. The
+  column holds its size through a reload, the counter keeps its page while
+  no box is in view, and the observer skips boxes that left the page and is
+  made again for each load's boxes.
+
+A bisect on 10.5: with the link fix alone, both fallback-fonts tests fail
+in both engines (the reader on page 1); without the observer's skip, 3 of 4
+runs find the reader's page back without its canvas (the observer made for
+the new boxes sometimes reports first). Two tests had hidden the second
+cause: the page-2 e2e checked only that the counter agreed with the page in
+view, which held when 10.5 moved both to page 1, and the unit mock kept the
+pages mounted, as 10.0 did.
+
+framer-motion's eager bytes: since 12.26.2 (#3470), framer's `m` and
+`LazyMotion` read the feature registry (`get/setFeatureDefinitions`) from
+motion-dom's `render/VisualElement.mjs`, which also holds the VisualElement
+class and imports KeyframeResolver, NativeAnimation, motionValue, the
+frameloop and the value types. webpack does not split a module across
+chunks, so all of it left LazyMotion's lazy features for the eager chunk
+that holds `m`. `patches/motion-dom+14.3.1.patch` (patch-package, in the
+postinstall with `--error-on-fail --error-on-warn`) moves the registry into
+`render/feature-definitions.mjs`; any other motion-dom version fails the
+install. motion's own size budget bundles `m` alone with rollup, which drops
+the unused class, so it cannot see this; an upstream issue is drafted.
+
+jsdom 30 broke the suite twice. Every file failed to load: `setup.ts`
+assigned `global.localStorage`, Vitest's accessor writes that on to jsdom's
+window, and jsdom 30's window (`vm.constants.DONT_CONTEXTIFY`) refuses a
+write to a getter-only property where jsdom 24's contextified sandbox let it
+through. And the research map's list buttons lost a space in their names:
+jsdom 30 applies the HTML Standard's default stylesheet (a span is inline),
+where jsdom 24 reported no `display`, which the name computation took for a
+block; the markup has the space now.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped         | `647a81f`          | `456e8a7`          |
+| ---------------------- | ------------------ | ------------------ |
+| Homepage JS            | 348,021 (16 files) | 338,521 (16 files) |
+| Motion features (lazy) | 19,417             | 28,343             |
+| All CSS                | 26,174             | 26,419             |
+| Terminal chunk (lazy)  | 82,428             | 82,428             |
+| PDF chunk (lazy)       | 106,870            | 120,529            |
+| pdf.js worker (lazy)   | 283,837            | 287,697            |
+
+Final HEAD (`456e8a7`) in the container: `npm ci` applied the patch
+(`motion-dom@14.3.1 ✔`); lint, type-check, knip, format, CI's build and the
+static-home check passed. Lighthouse, three spec runs of three audits, all
+passing: medians performance 100, FCP 443 ms, LCP 688 to 871 ms, TBT 0 ms, TTI
+688 to 871 ms; accessibility, best practices and SEO 100 in every audit. The
+container's CPU benchmark read 3,867 to 3,876 (2,640 to 2,747 in round 21's
+run): the lower TBT and TTI cannot be credited to this round without an A/B
+under the same load. e2e: Chromium 136 passed and 1 skipped (pdf-reader and
+the research map included), WebKit's accessibility job with pdf-reader and the
+research map 71 and 1 skipped, both phones 24. Unit: the 10 CI scripts twice
+on macOS and act's 8 jobs (each of its 7 installs applied the patch), 2,574
+tests every time, none retried. npm audit: 9, up from 7: patch-package and its
+find-yarn-workspace-root reach braces 3.0.3, whose stack-exhaustion advisory
+(GHSA-vfj7-8cjw-p6xm, 2026-09-18, no fixed release) eslint-config-next's
+fast-glob already brought in; patch-package runs at install time, on our own
+package.json.
+
+### Round 23: the reader's browser floor, CI's wasted minutes (2026-10-19)
+
+- **The PDF reader opened no PDF on part of the browserslist.** pdf.js 5's
+  default build calls `URL.parse` (Chrome 126, Safari 18) and
+  `Promise.withResolvers` (Chrome 119, Safari 17.4) without a polyfill;
+  `getDocument` reaches the first through `getUrlProp`. On Chrome and Edge 111
+  to 125 and Safari and iOS 16.4 to 17.x, all in the browserslist, opening a
+  PDF took the page to the app's "Something went wrong". pdf.js 5.3.31 called
+  `URL.parse` the same way, and nothing else in the site calls either API. The
+  reader runs pdf.js's legacy build now (an exact `pdfjs-dist$` alias in
+  `next.config.mjs`, and its worker), which targets Chrome 110, Firefox ESR
+  and Safari 16.4: its chunk 120,684 to 139,566 B gzipped, its worker 287,344
+  to 304,368 B, both loaded only with the reader. An e2e test deletes both
+  APIs before the page loads; it failed on the default build in Chromium and
+  WebKit.
+- **CI spent minutes on nothing.** In the last GitHub run (2026-10-04),
+  every ci.yml job deleted the runner's Android and .NET SDKs first: 53 to
+  193 s a job, more than `npm ci` (47 to 82 s) and the tests (2 to 30 s),
+  with 103 GB still free after it and `node_modules` at 0.9 GB. Ten jobs
+  cached two folders Vitest 5 never writes, and the build job saved a
+  `.next` nothing restored. All 23 steps are gone. `test:lib-dom` also ran
+  the 11 hook test files `test:hooks` runs: 79 tests counted twice in every
+  total. A test fails now on a file two jobs run.
+- **The motion-dom patch without patch-package.** `scripts/apply-patches.mjs`
+  (Node's built-ins) applies the diff exactly, checked against the exact
+  version and every file's SHA-256 before and after
+  (`patches/patches.json`): 15 packages left the lockfile, npm audit is 7
+  again, and a patched tree comes out byte-identical.
+- **The test forks' compile cache: not taken.** jsdom 30's +18% (round 22)
+  is cold start: every test file runs in a fresh fork, which loads jsdom
+  (212 ms against jsdom 24's 136, median of 10 fresh processes) and makes
+  its first window and style (69 ms against 42). Vitest 5 passes
+  `NODE_COMPILE_CACHE` to its forks, and nothing set it. Three alternating
+  runs each of the 10 CI scripts, the cache empty at each script's start as
+  in a CI job: median 211.1 s without, 199.5 s with (-5.5%; pairs -9.8%,
+  -5.5%, -9.8%), short of the 10% agreed. Warm it saved 23%, but no run
+  has it warm: Vitest turns it off under v8 coverage, which local runs
+  use, and CI starts empty. Measured under a load of 25 to 42 from other
+  jobs.
+- **react-pdf 11 waits.** It pins pdf.js 6.3.289, whose default build needs
+  Chrome 145, Firefox 144 and Safari 26.2 (`Map.prototype.getOrInsertComputed`,
+  no polyfill) and whose legacy build Chrome 125 and Safari 18; since pdf.js
+  5.7, CCITT and JBIG2 images need a wasm decoder (the SNF 2010 poster has
+  three); loading suspends by default; the worker grows 86 KB gzipped. The
+  site gains nothing from it.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped         | `b4a33e8`          | `54f2379`          |
+| ---------------------- | ------------------ | ------------------ |
+| Homepage JS            | 338,513 (16 files) | 338,522 (16 files) |
+| All CSS                | 26,419             | 26,419             |
+| Motion features (lazy) | 28,343             | 28,343             |
+| Terminal chunk (lazy)  | 82,428             | 82,428             |
+| PDF chunk (lazy)       | 120,529            | 139,564            |
+| pdf.js worker (lazy)   | 287,697            | 305,155            |
+
+Final code HEAD (`54f2379`) in the container: `npm ci` ran the new script
+("motion-dom@14.3.1 patched (3 files)"); lint, type-check, knip, format, CI's
+build and the static-home check passed. Lighthouse, three spec runs of three
+audits, all passing: medians performance 100, FCP 442 to 443 ms, LCP 859 to
+869 ms, TBT 0 ms, TTI 859 to 869 ms (CPU benchmark 3,935 to 3,960);
+accessibility, best practices and SEO 100 in every audit. e2e: Chromium 137
+passed and 1 skipped (pdf-reader with the browser-floor test, and the research
+map), WebKit's accessibility job with pdf-reader and the research map 72 and 1
+skipped, both phones 24. Unit: act's 8 jobs (each of their 7 installs ran the
+script) and the eight timed macOS runs of the 10 scripts, 2,502 tests each
+time, each in one job. npm audit: 7.
 
 ## Measuring well
 
@@ -964,10 +1329,10 @@ should not stall on it.
   no resize event. Anything measured on resize keeps the larger size; watch
   the element's own box with a ResizeObserver.
 - **A forced recalculation in a scroll handler is not always extra work.**
-  A trace of the scripted scroll put 157–171 ms in the scroll handlers,
+  A trace of the scripted scroll put 157-171 ms in the scroll handlers,
   nearly all of it style recalculation forced by reading `window.scrollY`
   and `offsetTop`. Rebuilt on IntersectionObservers, the handlers dropped to
-  3 ms, but the scroll's total style recalculation (129–148 ms) and layout
+  3 ms, but the scroll's total style recalculation (129-148 ms) and layout
   stayed where they were, and so did the frames over 20 ms over 4
   interleaved rounds: the frame recalculates once either way, and the
   handler only made it happen earlier. Compare totals before rewriting.
@@ -1410,3 +1775,236 @@ Round 17 (2026-10-17):
   its Docker image pinned by digest): syntax, expressions, job references,
   and shellcheck on every run step. It needs the repository mounted, not
   only `.github`, to find the workflows itself.
+
+Round 19 (2026-10-17):
+
+- **npm audit counts code that never runs.** None of the 46 advisories at
+  the start of the round reached production code. The critical ones were
+  Vitest 3's (tinypool), gone with Vitest 4. colorthief 2's nested sharp
+  0.33.5 never ran: the browser build reads pixels from a canvas, and the
+  server bundle never calls the library. Sort each advisory into runtime,
+  build or dev only before acting on it. After colorthief 3: 38, none
+  critical.
+- **Vitest 4 refuses `new` on an arrow mock.** `vi.fn(() => ({ ... }))`
+  standing in for a class (IntersectionObserver, Worker,
+  PerformanceObserver, NextRequest) throws "is not a constructor"; write
+  `vi.fn(function () { return { ... }; })`. A hook's try/catch swallowed
+  one such TypeError, so its test failed far from the cause.
+  `docs/TESTING_INFRASTRUCTURE.md` lists the other changes.
+- **Lighthouse never read the budgets.** `lighthouse.config.js`'s
+  `settings.budgets` (resource counts, sizes, timings) came with the first
+  commit, on Lighthouse 12, which had removed budgets: neither 12.8.2 nor
+  13.5.0 has a line that reads them. The spec's budget check read
+  `resource-summary`, an informative audit, and Lighthouse scores every
+  informative audit 1, so the check could not fail (the homepage loads 22
+  scripts against a budget of 20). Both are gone; the limits now come from
+  measurements (`docs/TESTING_INFRASTRUCTURE.md`).
+- **Lighthouse 13 rejects a category it does not know.**
+  playwright-lighthouse passes the thresholds' keys as `onlyCategories`;
+  12 ignored the `pwa` key (it had removed the category) and 13 throws
+  "unrecognized category in 'onlyCategories': pwa". An unknown id in
+  `skipAudits` is still ignored without a word: `uses-http2` is
+  `modern-http-insight` in 13.
+- **A newer axe finds what the old one passed.** Lighthouse 13 brings
+  axe-core 4.14 (`^4.13`), which failed `target-size` on the skill
+  carousel's 6 px dots; axe-core 4.10 (Lighthouse 12, `@axe-core/playwright`
+  4.10) passed them, and the e2e scans did not ask for `wcag22aa`. They run
+  4.14 with it now, and the carousel has 24 px controls.
+- **axe's "incomplete" hid a link told apart by color alone.** The footer's
+  "Hosted on Vercel" link (1.35:1 against the text around it, underlined
+  only on hover) is `incomplete` at 1280 by 900 and a `serious` violation
+  at 412 by 823. The homepage scans ran at the desktop size and allowed
+  five serious violations; they allow none now, and one runs at 412 px.
+- **colorthief 3's sync API defaults to OKLCH.** Its type says
+  `@default 'rgb'`, its `validateOptions` says `oklch`. Pass
+  `colorSpace: "rgb"`, or the colors change (all 54 compared did).
+- **A port in use answers for someone else.** The comparison page's server
+  could not bind 8766, held by another session's process, and Playwright
+  loaded that server's 404 for two minutes. Ask the OS for a free port
+  (`server.listen(0)`) and read it back.
+- **A component rendered twice cannot use a fixed id.** The navigation
+  renders the high contrast toggle in the desktop bar and in the phone
+  menu, so its `id="high-contrast-desc"` was on every page twice. `useId`
+  gives each copy its own.
+- **Tailwind 4's codemod breaks what it cannot see.** `@tailwindcss/upgrade`
+  4.3.3 moved the theme into `@theme`, whose variables resolve on `:root`:
+  `--font-sans` reads next/font's `--font-montserrat`, set on `<body>`, so
+  the whole site lost Montserrat until `@theme inline`. It also dropped the
+  typography plugin (`@plugin` brings it back), removed autoprefixer
+  although xterm's and react-pdf's stylesheets need it, and renamed ten
+  strings that only looked like classes: a button variant (`"outline"`),
+  next/image's `placeholder="blur"`, a `data-shape="ring"`, an effect name
+  (`includes("blur")`, which would never have matched again), test names
+  and comments. Review every renamed string that is not a class.
+- **Tailwind 4 puts your CSS in cascade layers.** The codemod moved the
+  unlayered rules and the imported stylesheets into `layer(utilities)`.
+  Order inside a layer is source order, as before, but an `!important`
+  declaration now ranks by layer (an earlier layer's wins), and an
+  unlayered rule beats every layered one. 108 `!important`s live in these
+  stylesheets; the e2e suites found no change, but a rule added outside a
+  layer later will win over all of them.
+- **axe 4.14 checks that a link's name contains its text.** The accepted
+  arXiv line showed "accepted version" and was named "Authors' accepted
+  manuscript on arXiv, ..." (WCAG 2.5.3): a speech user saying what they
+  see would not reach it. A custom name starts with the visible label.
+- **Measure copy in a fixed grid before changing it.** "More on Medium" in
+  the blog cards' three equal columns wrapped to two lines at every width
+  from 360 to 1280 px and stretched every card's action row from 34 to
+  50 px; "Medium" fits.
+- **A browserslist floor can be a statement only.** Raising Firefox
+  from 111 to 128 changed no byte of the build (autoprefixer adds nothing for 111 to 127,
+  and the JavaScript compiles the same): the floor records what Tailwind
+  4's CSS was written for.
+
+Round 20 (2026-10-18):
+
+- **CI recorded four scores and nothing else.** playwright-lighthouse prints
+  the category scores; the spec's metric logs were commented out and its
+  JSON went to `test-results/`, which CI does not upload. A passing run
+  therefore could not calibrate any limit, and round 19's "the first CI run
+  calibrates" could not have worked. Each audit now prints its numbers and
+  Lighthouse's CPU benchmark in the job log, and the test report (uploaded
+  for 90 days) keeps them as JSON.
+- **`npm audit fix` can be a downgrade.** For esbuild's GHSA-g7r4-m6w7-qqqr
+  (`>=0.27.3 <0.28.1`) under vite 7's `^0.27.0`, the "fix available" was
+  esbuild 0.27.7 to 0.27.2, below the range. Read `npm audit fix --dry-run`
+  before calling an advisory fixable.
+- **npm keeps a transitive version that still fits.** Taking
+  `@vitejs/plugin-react` 5.2, whose peer range allows vite 8, left vite at
+  7.3.5, since 7.3.5 still satisfied every range; the first trial ran four
+  suites on vite 7 before `npm ls` showed it. `npm update vite` moved it to
+  8.3.4. Check the resolved version after loosening a range.
+- **Next prerenders a route's 404, never its 5xx.** A `force-static` GET
+  route answering 500 at build becomes a function run on every request
+  (`next/dist/export/routes/app-route.js` keeps an answer below 400, or a
+  404). `/profile.json` answers 404 when a build has no GitHub data.
+- **A file in `public/` can sit at a route's URL.** The Mac kept an
+  untracked `public/profile.json` from 2026-07-04, written by a manual
+  script deleted in round 14, at the new route's path. Next's build checks
+  only pages-router routes against `public/` (`build/index.js`), so nothing
+  said so. It is deleted, and its ignore rule with it.
+- **An ignore rule hides a tracked file from search.** Git keeps a tracked
+  file whatever `.gitignore` says, but ripgrep, act and a fresh `git init`
+  read the rules: `rg skipAudits` missed `lighthouse.config.js`. Seven such
+  rules are gone, and `src/app/gitignore.test.ts` fails on a new one.
+- **Compare builds in one directory.** The vite 8 A/B, built in two
+  directories, differed in nine JavaScript chunks of identical sizes (the
+  module ids); built in the same directory with each lockfile, all 71 CSS
+  and JavaScript files matched, the shared postcss bump (8.5.25 to 8.5.30)
+  included.
+- **A cycle can wrap back to where it started.** The carousel's rotation
+  test advanced three steps over three skills, so the old component, which
+  never held, showed the same skill and passed. A fail-first run caught it;
+  the test now waits two steps.
+- **playwright-lighthouse keeps the cache between audits.** It passes
+  `disableStorageReset: true` unless told otherwise, so a second audit in
+  the same browser measures a repeat visit (FCP 449, then 192 ms). Pass
+  `disableStorageReset: false` for first visits every time.
+- **A loaded host is a slower CPU, and Lighthouse says by how much.** The
+  calibration ran at load averages of 75 to 180 from other jobs on the Mac.
+  Lighthouse's CPU benchmark (1,676 to 2,401, against 3,982 idle) gave each
+  run's effective slowdown, and alternating the two builds' audits gave both
+  the same load.
+
+Round 21 (2026-10-18):
+
+- **A CDN move can break a CSP silently.** Hugging Face moved model weights
+  behind a redirect to `us.aws.cdn.hf.co`; the CSP allowed only
+  `huggingface.co` hosts, so the AI chat could load no model, and nothing
+  reported it (production logs no client error). Only an end-to-end model
+  load found it. After a change upstream, load the thing, not its listing.
+- **Headless Chromium has two WebGPU adapters.** The default headless shell
+  gets SwiftShader's fallback adapter, without `shader-f16`, and web-llm's
+  q4f16 models fail to compile ("Invalid ShaderModule"). The new headless
+  mode (`channel: "chromium"`) gets Metal with `shader-f16`, as Chrome does.
+  Probe the adapter on a secure origin (`http://localhost`): `about:blank`
+  has no `navigator.gpu`.
+- **`npm install <package>` does not refresh what the postinstall copies.**
+  After pdf.js 5.4.296 went in, `public/pdf.worker.min.mjs` was still the
+  5.3.31 worker, which pdf.js refuses ("API version does not match the
+  Worker version"). `npm ci` (CI, Vercel) runs the postinstall;
+  locally, run `npm run postinstall` after such a change.
+- **A mock of a module that does not exist passes quietly.** The context
+  test helper mocked `@/lib/utils/performance-monitor`, gone since an
+  earlier cleanup, with a factory that read a variable out of its scope
+  once hoisted. Vitest 5's refusal of nested `vi.mock` surfaced it.
+- **`**/*.ts` does not match `.mts`.** Renaming the Vitest config to `.mts`
+  would have taken it out of type-checking; `tsconfig.test.json` includes
+  `**/*.mts` now.
+- **A formatter upgrade can be checked by syntax tree.** prettier 3.9
+  reformatted 16 files; parsing each old and new text with TypeScript and
+  comparing node kinds with identifier and literal text (parentheses
+  skipped) showed them identical, and a one-identifier mutation shows the
+  check bites.
+- **No visible change can still cost bytes.** framer-motion 14 changed no
+  pixel and no prerendered style, and its eagerly loaded code grew 39%
+  (+10.8 KB gzipped on the homepage). Measure the bundle by chunk with
+  every dependency bump.
+- **Node and the browser can disagree after a library bump.** With react-pdf
+  10.5, pdf.js names every link in node exactly as before, yet the browser's
+  reader applied none: the integration, not the computation, broke. Keep an
+  e2e check on the integration (pdf-reader.spec's naming test caught it).
+
+Round 22 (2026-10-19):
+
+- **A scroll box whose content goes away loses its place.** react-pdf 10.5
+  shows its `loading` in place of the pages while it loads a document
+  again; the column collapsed and the browser clamped the scroll to the
+  top. Hold the content's size until it is back.
+- **An IntersectionObserver reports a removed target as out of view.** The
+  reader's near-pages set lost page 200 when react-pdf unmounted its box,
+  and the new box came back undrawn. Skip entries whose target is no
+  longer connected when a replacement is coming, and observe the
+  replacements.
+- **A test that compares two derived values passes when both are wrong.**
+  The page-2 reload test checked that the counter agreed with the page in
+  view; react-pdf 10.5 moved both to page 1. Assert the value expected.
+- **webpack cannot split a module across chunks.** A three-line registry
+  that framer's `m` needs, in the same module as motion-dom's VisualElement
+  class, put the class and its imports in the eager chunk, because the
+  lazy features need the class. A size budget that bundles one entry alone
+  (motion's rollup budgets) cannot see it: unused code is dropped there.
+  Measure the real build, by chunk.
+- **patch-package only warns when the version differs.** It applies a
+  patch made for another version if it fits, and exits 0 locally.
+  `--error-on-fail --error-on-warn` and an exact pin make any change of the
+  patched package fail the install. It also crashed cleaning up its temp
+  folder (ENOTEMPTY) after writing the patch: read the patch, then
+  `--reverse` and apply it again to check it.
+- **`git stash create` leaves untracked files out.** A scratch copy made
+  from it lacked the new `patches/` folder; copy new files in by hand, or
+  stage them first.
+- **jsdom 30's window refuses what jsdom 24's let through.** A write to a
+  getter-only window property throws (`DONT_CONTEXTIFY`), and spans are
+  inline under the HTML Standard's stylesheet, which changes accessible
+  names made of block spans. Both are in docs/TESTING_INFRASTRUCTURE.md. Its
+  cost is setup: about 0.11 s more per test file, nothing per test.
+- **A timer in a mock can fire inside React's async `act`.** The PDF mock
+  delivered a reloaded document on `setTimeout(0)`, which ran before the
+  click's `act` resolved: no test saw the pages away. Let the test release
+  the delivery.
+
+Round 23 (2026-10-19):
+
+- **A prebuilt dependency brings its own browser floor.** The browserslist
+  shapes our code, not pdf.js's default build, which is for the latest
+  browsers only: the reader failed on Safari 17 for as long as it ran
+  pdf.js 5. Check what a lazily loaded package calls, and test the floor in
+  e2e by deleting the APIs in an init script. The failure was the app's
+  error page, not the reader's own message.
+- **A CI step can cost more than the tests, unseen.** The disk cleanup took
+  53 to 193 s in every job. Step timings are in the API
+  (`gh api repos/<owner>/<repo>/actions/runs/<id>/jobs`): read them before
+  tuning the tests.
+- **A cache of a path nothing writes saves nothing, quietly.** Ten jobs
+  cached Vitest folders that do not exist. And a cache step placed after a
+  build restores an older copy over the fresh one.
+- **"Every file runs" is not "every file runs once".** Two CI scripts
+  matched src/lib/hooks: 79 tests ran twice, and every total counted them.
+- **An assertion on output a dependency stopped producing passes for
+  good.** The e2e count of `[tabindex="1000"]` was 0 whatever our code did,
+  once pdf.js 5.4 stopped setting it. When a library changes what it
+  renders, re-read the assertions written against it.
+- **A compile cache helps only where it is warm.** `NODE_COMPILE_CACHE`
+  saved 5.5% on a CI-like cold start and 23% warm; Vitest drops it under
+  v8 coverage, and CI starts empty.

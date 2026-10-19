@@ -111,12 +111,12 @@ function EducationCard({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-sm sm:text-base text-primary hover:text-primary/80 transition-colors mb-2"
               >
-                <GraduationCap className="w-4 h-4 flex-shrink-0" />
+                <GraduationCap className="w-4 h-4 shrink-0" />
                 {school.schoolName}
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                <ExternalLink className="w-3 h-3 shrink-0" />
               </Link>
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Calendar className="w-3 h-3 flex-shrink-0" />
+                <Calendar className="w-3 h-3 shrink-0" />
                 {school.duration}
               </div>
             </div>
@@ -140,12 +140,12 @@ function EducationCard({
                 without scripts (it was a div that only a mouse could open). */}
             <details className="group/thesis relative">
               <summary
-                className="flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-all duration-300 hover:bg-muted/50 list-none [&::-webkit-details-marker]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex items-start gap-2 p-3 rounded-lg cursor-pointer transition-all duration-300 hover:bg-muted/50 list-none [&::-webkit-details-marker]:hidden focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 style={{ borderLeft: `3px solid ${extractedColor}` }}
               >
                 <Sparkles
                   aria-hidden="true"
-                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  className="w-4 h-4 mt-0.5 shrink-0"
                   style={{ color: extractedColor }}
                 />
                 <span className="block flex-1">
@@ -174,7 +174,7 @@ function EducationCard({
                   {school.descBullets.map((bullet, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
                       <div
-                        className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                        className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
                         style={{ backgroundColor: extractedColor }}
                       />
                       <span className="text-muted-foreground">{bullet}</span>

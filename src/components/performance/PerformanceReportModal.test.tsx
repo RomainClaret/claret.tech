@@ -7,7 +7,15 @@
  */
 
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 import { PerformanceReportModal } from "./PerformanceReportModal";
 import { useLayoutEffect } from "react";
 
@@ -157,10 +165,10 @@ describe("PerformanceReportModal", () => {
     expect(closedAtMount[0]).toBe(true);
   });
 
-  let mockOnClose: ReturnType<typeof vi.fn>;
+  let mockOnClose: Mock<() => void>;
 
   beforeEach(() => {
-    mockOnClose = vi.fn();
+    mockOnClose = vi.fn<() => void>();
     mockIsGenerating = false;
     mockReportData = null;
     storedCallback = null;
@@ -273,7 +281,7 @@ describe("PerformanceReportModal", () => {
       // Find backdrop (first motion div with backdrop classes)
       const motionDivs = screen.getAllByTestId("motion-div");
       const backdrop = motionDivs.find((div) =>
-        div.className?.includes("backdrop-blur-sm"),
+        div.className?.includes("backdrop-blur-xs"),
       );
 
       if (backdrop) {
@@ -551,7 +559,7 @@ describe("PerformanceReportModal", () => {
       expect(dialog).not.toHaveAttribute("aria-modal");
       const backdrop = screen
         .getAllByTestId("motion-div")
-        .find((div) => div.className?.includes("backdrop-blur-sm"));
+        .find((div) => div.className?.includes("backdrop-blur-xs"));
       expect(backdrop).toHaveAttribute("aria-hidden", "true");
     });
 
@@ -593,7 +601,7 @@ describe("PerformanceReportModal", () => {
         div.className?.includes("fixed inset-0"),
       );
       expect(modalContainer).toHaveClass(
-        "z-[9999]",
+        "z-9999",
         "flex",
         "items-center",
         "justify-center",
@@ -601,7 +609,7 @@ describe("PerformanceReportModal", () => {
 
       // Check for backdrop classes
       const backdrop = motionDivs.find((div) =>
-        div.className?.includes("backdrop-blur-sm"),
+        div.className?.includes("backdrop-blur-xs"),
       );
       expect(backdrop).toHaveClass("absolute", "inset-0", "bg-black/80");
     });

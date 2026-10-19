@@ -1052,56 +1052,89 @@ describe("Projects Component", () => {
     });
   });
 
+  // The pinned repositories come from /api/fetch-github, else from the
+  // snapshot the deploy build saved at /profile.json: one request each. The
+  // old fallback read a file nothing built, twice, then said "No projects
+  // found matching your criteria" with a Clear filters button and no filter.
   describe("Error Handling", () => {
-    it("handles API failure and falls back to profile.json", async () => {
-      // First API call fails
-      (global.fetch as unknown as MockedFetch)
+    const fetchMock = () => global.fetch as unknown as MockedFetch;
+    const requested = () =>
+      vi.mocked(global.fetch).mock.calls.map(([url]) => url);
+    const pinnedAnswer = {
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          pinnedItems: {
+            edges: mockPinnedProjects.map((p) => ({ node: p })),
+          },
+        },
+      }),
+    };
+
+    it("asks the API once when it answers", async () => {
+      fetchMock().mockResolvedValueOnce(pinnedAnswer);
+
+      render(<Projects />);
+
+      expect(
+        (await screen.findAllByText("awesome-project")).length,
+      ).toBeGreaterThan(0);
+      expect(requested()).toEqual(["/api/fetch-github"]);
+    });
+
+    it.each([
+      ["fails", new Error("API Error")],
+      [
+        "has no data",
+        { ok: true, json: async () => ({ success: true, data: null }) },
+      ],
+    ])(
+      "reads the build's snapshot, once, when the API %s",
+      async (_, apiAnswer) => {
+        if (apiAnswer instanceof Error) {
+          fetchMock().mockRejectedValueOnce(apiAnswer);
+        } else {
+          fetchMock().mockResolvedValueOnce(apiAnswer);
+        }
+        fetchMock().mockResolvedValueOnce(pinnedAnswer);
+
+        render(<Projects />);
+
+        expect(
+          (await screen.findAllByText("awesome-project")).length,
+        ).toBeGreaterThan(0);
+        expect(requested()).toEqual(["/api/fetch-github", "/profile.json"]);
+      },
+    );
+
+    it("says the projects could not load when both fail", async () => {
+      fetchMock()
         .mockRejectedValueOnce(new Error("API Error"))
         .mockResolvedValueOnce({
-          ok: true,
+          ok: false,
+          status: 404,
           json: async () => ({
-            data: {
-              user: {
-                pinnedItems: {
-                  edges: mockPinnedProjects.map((p) => ({ node: p })),
-                },
-              },
-            },
+            success: false,
+            error: "No snapshot in this build",
           }),
         });
 
       render(<Projects />);
 
-      await waitFor(() => {
-        expect(screen.getAllByText("awesome-project").length).toBeGreaterThan(
-          0,
-        );
-        expect(global.fetch).toHaveBeenCalledWith("/profile.json");
-      });
-    });
-
-    it("handles complete API failure gracefully", async () => {
-      // Both API calls fail
-      (global.fetch as unknown as MockedFetch)
-        .mockRejectedValueOnce(new Error("API Error"))
-        .mockRejectedValueOnce(new Error("Fallback Error"));
-
-      render(<Projects />);
-
-      await waitFor(() => {
-        // Component should still render the main structure (heading)
-        expect(
-          screen.getByRole("heading", {
-            name: /Software Engineering Playground/i,
-          }),
-        ).toBeInTheDocument();
-        // Should show empty state message when no projects are loaded
-        expect(
-          screen.getByText("No projects found matching your criteria."),
-        ).toBeInTheDocument();
-        // Should show the clear filters button
-        expect(screen.getByText("Clear filters")).toBeInTheDocument();
-      });
+      expect(
+        await screen.findByText("The projects could not load from GitHub."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", {
+          name: /Software Engineering Playground/i,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("No projects found matching your criteria."),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Clear filters")).not.toBeInTheDocument();
+      expect(requested()).toEqual(["/api/fetch-github", "/profile.json"]);
     });
   });
 

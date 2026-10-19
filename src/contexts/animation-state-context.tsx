@@ -287,7 +287,6 @@ export function useAnimationState() {
 // render without the provider (tests, isolated tools). Callers treat an
 // undefined context as "animations playing".
 export function useAnimationStateOptional():
-  | AnimationStateContextType
-  | undefined {
+  AnimationStateContextType | undefined {
   return useContext(AnimationStateContext);
 }

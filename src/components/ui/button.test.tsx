@@ -7,9 +7,17 @@
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 import { Button } from "./button";
-import { createRef } from "react";
+import { createRef, type MouseEventHandler } from "react";
 
 // Mock the cn utility function
 vi.mock("@/lib/utils", () => ({
@@ -44,10 +52,10 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 describe("Button", () => {
-  let mockOnClick: ReturnType<typeof vi.fn>;
+  let mockOnClick: Mock<MouseEventHandler<HTMLButtonElement>>;
 
   beforeEach(() => {
-    mockOnClick = vi.fn();
+    mockOnClick = vi.fn<MouseEventHandler<HTMLButtonElement>>();
     vi.clearAllMocks();
   });
 
@@ -89,7 +97,7 @@ describe("Button", () => {
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass(
-        "focus-visible:outline-none",
+        "focus-visible:outline-hidden",
         "focus-visible:ring-2",
         "focus-visible:ring-ring",
         "focus-visible:ring-offset-2",
@@ -538,7 +546,7 @@ describe("Button", () => {
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass(
-        "focus-visible:outline-none",
+        "focus-visible:outline-hidden",
         "focus-visible:ring-2",
         "focus-visible:ring-ring",
         "focus-visible:ring-offset-2",

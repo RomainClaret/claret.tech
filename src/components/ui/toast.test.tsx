@@ -7,7 +7,15 @@
  */
 
 import { render, act } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 import { Toast, ToastContainer, showToast } from "./toast";
 
 // Mock createPortal to render in the same container for testing
@@ -20,10 +28,10 @@ vi.mock("react-dom", async () => {
 });
 
 describe("Toast", () => {
-  let mockOnClose: ReturnType<typeof vi.fn>;
+  let mockOnClose: Mock<() => void>;
 
   beforeEach(() => {
-    mockOnClose = vi.fn();
+    mockOnClose = vi.fn<() => void>();
     vi.clearAllMocks();
     vi.useFakeTimers();
   });

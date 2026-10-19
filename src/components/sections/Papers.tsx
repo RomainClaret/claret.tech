@@ -185,7 +185,8 @@ function WatchVideoButton({ url }: { url: string }) {
 // The arXiv copy of a paper is sometimes the published one and sometimes a
 // longer one. Which of the two it is, is the whole reason to click, so the
 // label says it. The wordmark supplies "arXiv", which is why the label does not
-// repeat it, and why the link carries its own accessible name.
+// repeat it, and why the link carries its own accessible name. That name starts
+// with the label, so a speech user can say what they see (WCAG 2.5.3).
 const ARXIV_LABELS: Record<
   ArxivVariant,
   { label: string; description: string }
@@ -201,7 +202,7 @@ const ARXIV_LABELS: Record<
   accepted: {
     label: "accepted version",
     description:
-      "Authors' accepted manuscript on arXiv, not the publisher's final version",
+      "Accepted version on arXiv: the authors' manuscript, not the publisher's final version",
   },
 };
 
@@ -230,9 +231,9 @@ function ArxivLine({
       title={description}
       className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary px-3 py-1.5 rounded-lg transition-colors duration-200 group"
     >
-      <ArxivWordmark className="h-3.5 w-[31px] flex-shrink-0" />
+      <ArxivWordmark className="h-3.5 w-[31px] shrink-0" />
       <span>{label}</span>
-      <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+      <ExternalLink className="w-3 h-3 ml-auto shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
     </Link>
   );
 }
@@ -322,7 +323,7 @@ function PaperCard({
           <span className="truncate">{link.name}</span>
           <Download
             className={cn(
-              "w-3 h-3 flex-shrink-0",
+              "w-3 h-3 shrink-0",
               !shouldReduceAnimations && "group-hover:animate-bounce",
             )}
           />
@@ -339,7 +340,7 @@ function PaperCard({
         className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary-foreground px-3 py-2 bg-primary/5 hover:bg-primary rounded-lg transition-all duration-200 group"
       >
         <span className="truncate">{link.name}</span>
-        <ExternalLink className="w-3 h-3 flex-shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+        <ExternalLink className="w-3 h-3 shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
       </Link>
     );
   };
@@ -438,7 +439,7 @@ function PaperCard({
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
               {paper.title}
             </h3>
 
@@ -478,7 +479,7 @@ function PaperCard({
 
             {/* Preview image */}
             {paper.image && (
-              <div className="relative h-48 mb-4 rounded-lg overflow-hidden bg-gradient-to-br from-muted/50 to-muted/30">
+              <div className="relative h-48 mb-4 rounded-lg overflow-hidden bg-linear-to-br from-muted/50 to-muted/30">
                 <OptimizedImage
                   src={paper.image}
                   alt={paper.title}
@@ -502,7 +503,7 @@ function PaperCard({
                 the two kinds of card finds the names in one place. */}
             {paper.authors && paper.authors.length > 0 && (
               <div className="text-sm text-muted-foreground flex items-start gap-1 mb-3">
-                <Users className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <Users className="w-3 h-3 shrink-0 mt-0.5" />
                 <p className="line-clamp-2">
                   {paper.authors.map((author, i) => (
                     <span key={i}>
@@ -701,7 +702,7 @@ function DynamicPaperCard({
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     {publication.starred && (
                       <Star
-                        className="w-4 h-4 flex-shrink-0 fill-amber-400 text-amber-400"
+                        className="w-4 h-4 shrink-0 fill-amber-400 text-amber-400"
                         aria-label="Featured paper"
                       />
                     )}
@@ -772,7 +773,7 @@ function DynamicPaperCard({
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+            <h3 className="text-lg font-semibold mb-3 line-clamp-3 min-h-[84px] bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
               {publication.title}
             </h3>
 
@@ -817,7 +818,7 @@ function DynamicPaperCard({
                 being letterboxed by object-contain; the box centers and clips any
                 horizontal overflow. */}
             {logoUrl && (
-              <div className="relative h-32 mb-3 rounded-lg overflow-hidden bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center">
+              <div className="relative h-32 mb-3 rounded-lg overflow-hidden bg-linear-to-br from-muted/50 to-muted/30 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={logoUrl}
@@ -831,7 +832,7 @@ function DynamicPaperCard({
             {/* Authors and Venue */}
             <div className="space-y-1 mb-3">
               <div className="text-sm text-muted-foreground flex items-start gap-1 min-h-[48px]">
-                <Users className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <Users className="w-3 h-3 shrink-0 mt-0.5" />
                 <p className="line-clamp-2">
                   {publication.authors.map((author, i) => (
                     <span key={i}>
@@ -1156,7 +1157,7 @@ export function Papers() {
           {hasDynamicPapers && filteredDynamicPapers.length > 0 && (
             <div className="mb-16 w-full">
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-semibold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                <h3 className="text-2xl font-semibold mb-2 bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Peer-Reviewed Publications
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -1192,7 +1193,7 @@ export function Papers() {
           {filteredStaticPapers.length > 0 && (
             <div className="w-full">
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-semibold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                <h3 className="text-2xl font-semibold mb-2 bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Other Work
                 </h3>
                 <p className="text-sm text-muted-foreground">

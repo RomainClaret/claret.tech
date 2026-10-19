@@ -57,7 +57,7 @@ USE_GITHUB_DATA=true
 
 - **Framework**: Next.js 16 with App Router, React 19
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS 4
 - **Animation**: Framer Motion
 - **AI**: WebLLM
 - **Terminal**: xterm.js

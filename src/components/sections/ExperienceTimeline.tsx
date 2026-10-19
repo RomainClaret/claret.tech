@@ -304,7 +304,7 @@ function ExperienceTimelineItem({
               {keyAchievements.map((achievement, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <ChevronRight
-                    className="w-3 h-3 mt-0.5 flex-shrink-0"
+                    className="w-3 h-3 mt-0.5 shrink-0"
                     style={{ color: cardColor }}
                   />
                   <span className="text-muted-foreground">{achievement}</span>
@@ -409,7 +409,7 @@ function TimelineRevealNode({
             "w-0.5 h-6 -mt-2",
             expanded
               ? "bg-primary/30"
-              : "bg-[linear-gradient(to_bottom,currentColor_50%,transparent_50%)] bg-[length:2px_8px] text-primary/40",
+              : "bg-[linear-gradient(to_bottom,currentColor_50%,transparent_50%)] bg-size-[2px_8px] text-primary/40",
           )}
         />
         <button

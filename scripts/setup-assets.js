@@ -97,9 +97,12 @@ async function downloadVerified(url, dest, expectedSha256) {
  * the Pyodide work.
  */
 async function setupPdfWorker() {
+  // The legacy build's worker, as the reader runs the legacy build (the
+  // "pdfjs-dist$" alias in next.config.mjs): the default one calls URL.parse
+  // and Promise.withResolvers, which Safari 16.4 to 17.x lacks.
   const src = path.join(
     ROOT,
-    "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+    "node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
   );
   const dest = path.join(PUBLIC, "pdf.worker.min.mjs");
   try {

@@ -12,7 +12,13 @@ import fs from "fs";
 import { clearApiCache } from "@/test/helpers/api-test-helpers";
 
 // Mock dependencies
-vi.mock("fs");
+// The route reads fs's default export. Vitest 4's automock no longer makes
+// its functions mocks, so the factory names the two it uses.
+vi.mock("fs", () => {
+  const existsSync = vi.fn();
+  const readFileSync = vi.fn();
+  return { default: { existsSync, readFileSync }, existsSync, readFileSync };
+});
 vi.mock("@/lib/utils/dev-logger", () => ({
   devError: vi.fn(),
 }));

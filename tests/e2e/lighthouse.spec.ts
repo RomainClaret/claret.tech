@@ -20,26 +20,96 @@ interface LighthouseResult {
     si: number;
     tti: number;
   };
-  budgets: {
-    passed: boolean;
-    violations: Array<{
-      resourceType: string;
-      actual: number;
-      budget: number;
-      metric: string;
-    }>;
+}
+
+/** One audit: its scores, its metrics, and Lighthouse's CPU benchmark. */
+type Audit = Pick<LighthouseResult, "scores" | "metrics"> & {
+  benchmarkIndex: number;
+};
+
+// CI's runners scored one commit 69, then 87 on a retry: the gate reads the
+// median of three audits, so one slow run cannot fail it alone.
+const AUDITS = 3;
+
+interface Lhr {
+  categories: Record<string, { score: number | null } | undefined>;
+  audits: Record<string, { numericValue?: number } | undefined>;
+  environment?: { benchmarkIndex?: number };
+}
+
+function readAudit(lhr: Lhr): Audit {
+  const score = (id: string) =>
+    Math.round((lhr.categories[id]?.score ?? 0) * 100);
+  const metric = (id: string) => lhr.audits[id]?.numericValue ?? 0;
+  return {
+    scores: {
+      performance: score("performance"),
+      accessibility: score("accessibility"),
+      bestPractices: score("best-practices"),
+      seo: score("seo"),
+    },
+    metrics: {
+      fcp: metric("first-contentful-paint"),
+      lcp: metric("largest-contentful-paint"),
+      cls: metric("cumulative-layout-shift"),
+      tbt: metric("total-blocking-time"),
+      si: metric("speed-index"),
+      tti: metric("interactive"),
+    },
+    benchmarkIndex: lhr.environment?.benchmarkIndex ?? 0,
   };
 }
 
+const median = (values: number[]) =>
+  [...values].sort((a, b) => a - b)[(values.length - 1) >> 1];
+
+/** Each score and each metric, the median over the audits (odd count). */
+function medianAudit(audits: Audit[]): Audit {
+  const of = (pick: (audit: Audit) => number) => median(audits.map(pick));
+  return {
+    scores: {
+      performance: of((a) => a.scores.performance),
+      accessibility: of((a) => a.scores.accessibility),
+      bestPractices: of((a) => a.scores.bestPractices),
+      seo: of((a) => a.scores.seo),
+    },
+    metrics: {
+      fcp: of((a) => a.metrics.fcp),
+      lcp: of((a) => a.metrics.lcp),
+      cls: of((a) => a.metrics.cls),
+      tbt: of((a) => a.metrics.tbt),
+      si: of((a) => a.metrics.si),
+      tti: of((a) => a.metrics.tti),
+    },
+    benchmarkIndex: of((a) => a.benchmarkIndex),
+  };
+}
+
+const describeAudit = ({ scores, metrics, benchmarkIndex }: Audit) =>
+  `performance ${scores.performance}, FCP ${Math.round(metrics.fcp)} ms, ` +
+  `LCP ${Math.round(metrics.lcp)} ms, TBT ${Math.round(metrics.tbt)} ms, ` +
+  `TTI ${Math.round(metrics.tti)} ms, CLS ${metrics.cls.toFixed(3)}, ` +
+  `CPU benchmark ${Math.round(benchmarkIndex)}`;
+
 // Performance thresholds for different browsers
 const PERFORMANCE_THRESHOLDS = {
+  // For CI's runners, calibrated on 2026-10-18 (docs/performance.md, round
+  // 20). In the Playwright container, d8da49f scored what CI gave it on
+  // 2026-10-04 (81 to 83) at 3.3 to 4.2 times an idle M4 Max's CPU time:
+  // CI runs about 3.7 times slower. HEAD at that speed: performance 89 to
+  // 91, FCP 450 to 460 ms, LCP 610 to 960 ms, TBT 370 to 440 ms, TTI 2.1
+  // to 2.3 s, CLS 0.016. The medians passed at 1.7 to 1.8 times CI's
+  // slowness (performance 81 and 82) and failed from 2.2 times, round 19's
+  // 8x CPU (performance 74). Round 19 had set performance 90, TBT 300 ms
+  // and TTI 2.5 s from the container alone, which HEAD's TBT at CI's speed
+  // already exceeds.
   chromium: {
-    performance: 60, // Production baseline (actual: 62)
-    fcp: 3000, // Relaxed for production
-    lcp: 4000, // Relaxed for production
-    cls: 0.35, // Adjusted for CI stability (actual: 0.332)
-    tbt: 1000, // Adjusted for CI stability (actual: 979ms)
-    tti: 7000, // Relaxed for production (actual: ~6462ms)
+    performance: 80,
+    fcp: 1500,
+    lcp: 2000,
+    cls: 0.1,
+    tbt: 1000,
+    tti: 3000,
   },
   webkit: {
     performance: 85, // Slightly lower for Safari due to known limitations
@@ -268,8 +338,8 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
         return;
       }
 
-      // Increase timeout for Lighthouse tests as they take longer
-      test.setTimeout(180000); // 3 minutes
+      // Three audits of up to a minute each on CI's runners.
+      test.setTimeout(300000);
 
       // Two properties of this test that cost debugging time, recorded here
       // rather than rediscovered:
@@ -280,11 +350,11 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
       //    a different port and playAudit ends up auditing the wrong target.
       // 2. Run alongside the rest of the suite (4 workers against `next dev`)
       //    it is unreliable: observed 2026-08-03 as a 180s test timeout and, on
-      //    retry, `LighthouseError: PROTOCOL_TIMEOUT`. Run on its own it
-      //    completes in ~40s and scores 76. Its CI job
-      //    (.github/workflows/playwright.yml "lighthouse-tests") runs this file
-      //    alone against `npm start`, which is the environment the thresholds
-      //    are calibrated for; a local full-suite run is not.
+      //    retry, `LighthouseError: PROTOCOL_TIMEOUT`. Run on its own, an
+      //    audit takes about 30 s. Its CI job (.github/workflows/playwright.yml
+      //    "lighthouse-performance") runs this file alone against `npm start`,
+      //    the environment the thresholds are calibrated for; a local
+      //    full-suite run is not.
       const browser = await browserInfo.launcher.launch({
         args: [
           "--remote-debugging-port=9222", // Enable Chrome DevTools Protocol
@@ -311,52 +381,52 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
 
         // Run Lighthouse audit (only works with Chromium)
         const config = await import("../../lighthouse.config.js");
-        const lighthouseReport = await playAudit({
-          page: page,
-          config: config.default,
-          port: 9222, // Required port for Chrome DevTools Protocol
-          thresholds: {
-            performance: 60,
-            accessibility: 85,
-            "best-practices": 75,
-            seo: 80,
-            pwa: 0, // Not testing PWA
-          },
-          opts: {
-            // chromeFlags are not supported in opts, removed
-          },
+        const audits: Audit[] = [];
+        for (let run = 1; run <= AUDITS; run++) {
+          const lighthouseReport = await playAudit({
+            page: page,
+            config: config.default,
+            port: 9222, // Required port for Chrome DevTools Protocol
+            // playwright-lighthouse runs only the categories named here, and
+            // Lighthouse 13 rejects an unknown one, such as the PWA category
+            // that Lighthouse 12 removed. It logs each run against these;
+            // the assertions below read the median instead of one run.
+            thresholds: {
+              performance: PERFORMANCE_THRESHOLDS.chromium.performance,
+              accessibility: 85,
+              "best-practices": 75,
+              seo: 80,
+            },
+            ignoreError: true,
+            opts: {
+              // A first visit each time. playwright-lighthouse keeps the
+              // cache between audits (disableStorageReset: true), so the
+              // second and third measured a repeat visit: FCP 449 then 192
+              // ms. The first audit was cold either way: all its scripts
+              // came over the network despite the warm-up visit above.
+              disableStorageReset: false,
+            },
+          });
+          const audit = readAudit(lighthouseReport.lhr as unknown as Lhr);
+          audits.push(audit);
+          // The job log keeps every run's numbers: CI recorded only the
+          // four scores, so a passing run could not calibrate anything.
+          console.log(
+            `Lighthouse run ${run}/${AUDITS}: ${describeAudit(audit)}`,
+          );
+        }
+        const { scores, metrics, benchmarkIndex } = medianAudit(audits);
+        console.log(
+          `Lighthouse median: ${describeAudit({ scores, metrics, benchmarkIndex })}`,
+        );
+        await testInfo.attach("lighthouse-audits.json", {
+          body: JSON.stringify(
+            { audits, median: { scores, metrics } },
+            null,
+            2,
+          ),
+          contentType: "application/json",
         });
-
-        // Extract metrics from the report
-        const lhr = lighthouseReport.lhr;
-        const scores = {
-          performance: Math.round(
-            (lhr.categories.performance?.score ?? 0) * 100,
-          ),
-          accessibility: Math.round(
-            (lhr.categories.accessibility?.score ?? 0) * 100,
-          ),
-          bestPractices: Math.round(
-            (lhr.categories["best-practices"]?.score ?? 0) * 100,
-          ),
-          seo: Math.round((lhr.categories.seo?.score ?? 0) * 100),
-        };
-
-        const metrics = {
-          fcp: lhr.audits["first-contentful-paint"].numericValue || 0,
-          lcp: lhr.audits["largest-contentful-paint"].numericValue || 0,
-          cls: lhr.audits["cumulative-layout-shift"].numericValue || 0,
-          tbt: lhr.audits["total-blocking-time"].numericValue || 0,
-          si: lhr.audits["speed-index"].numericValue || 0,
-          tti: lhr.audits["interactive"].numericValue || 0,
-        };
-
-        // Check budget violations
-        const budgetAudit = lhr.audits["resource-summary"];
-        const budgets = {
-          passed: !budgetAudit || budgetAudit.score === 1,
-          violations: [],
-        };
 
         // Create result object
         const result: LighthouseResult = {
@@ -364,7 +434,6 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
           timestamp: new Date().toISOString(),
           scores,
           metrics,
-          budgets,
         };
 
         // Save results and update history
@@ -426,37 +495,19 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
         expect(
           scores.accessibility,
           `Accessibility score should be >= 85 in ${browserInfo.name}`,
-        ).toBeGreaterThanOrEqual(85); // Relaxed due to design choices
+        ).toBeGreaterThanOrEqual(85); // 100 on 2026-10-18
 
         // Best practices should be high
         expect(
           scores.bestPractices,
           `Best practices score should be >= 75 in ${browserInfo.name}`,
-        ).toBeGreaterThanOrEqual(75); // Production baseline (actual: 79)
+        ).toBeGreaterThanOrEqual(75); // 96 on 2026-10-18: console errors, no GitHub data
 
         // SEO should be good
         expect(
           scores.seo,
           `SEO score should be >= 80 in ${browserInfo.name}`,
-        ).toBeGreaterThanOrEqual(80); // Production baseline (actual: 83)
-
-        // Performance budgets should pass
-        expect(
-          budgets.passed,
-          `Performance budgets should pass in ${browserInfo.name}`,
-        ).toBe(true);
-
-        // Log results for debugging
-        // console.log(`${browserInfo.name} Lighthouse Results:`);
-        // console.log(`  Performance: ${scores.performance}`);
-        // console.log(`  Accessibility: ${scores.accessibility}`);
-        // console.log(`  Best Practices: ${scores.bestPractices}`);
-        // console.log(`  SEO: ${scores.seo}`);
-        // console.log(`  FCP: ${metrics.fcp.toFixed(0)}ms`);
-        // console.log(`  LCP: ${metrics.lcp.toFixed(0)}ms`);
-        // console.log(`  CLS: ${metrics.cls.toFixed(3)}`);
-        // console.log(`  TBT: ${metrics.tbt.toFixed(0)}ms`);
-        // console.log(`  TTI: ${metrics.tti.toFixed(0)}ms`);
+        ).toBeGreaterThanOrEqual(80); // 100 on 2026-10-18
 
         // Fail test if regression detected (optional - can be configured)
         if (
@@ -504,10 +555,9 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
    *      now say what it measures. The webkit/firefox lookups stay: they cost
    *      nothing, and if `browsers` grows the report grows with it.
    *
-   * The LCP > 4000 and CLS > 0.25 critical-issue checks below are deliberately
-   * left hardcoded. 4000 already equals PERFORMANCE_THRESHOLDS.chromium.lcp,
-   * and 0.25 is *stricter* than the declared cls threshold of 0.35, so routing
-   * it through the table would weaken the check rather than unify it.
+   * The LCP and CLS critical-issue checks below read the table too. They were
+   * hardcoded at 4000 and 0.25 while the table said 4000 and 0.35; since the
+   * 2026-10-17 limits (2000 and 0.1) the table is the stricter of the two.
    */
   test("should report Lighthouse scores for every audited browser", async ({}, testInfo) => {
     // The audit test only runs on the chromium project (Lighthouse needs CDP),
@@ -582,23 +632,24 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
       // Identify critical issues. The bar is whatever PERFORMANCE_THRESHOLDS
       // declares for that browser, not a second number kept in this test.
       validResults.forEach((result) => {
-        const minPerformance =
+        const limits =
           PERFORMANCE_THRESHOLDS[
             result.browserName as keyof typeof PERFORMANCE_THRESHOLDS
-          ].performance;
+          ];
+        const minPerformance = limits.performance;
         if (result.scores.performance < minPerformance) {
           comparisonReport.summary.criticalIssues.push(
             `${result.browserName}: Performance score below ${minPerformance} (${result.scores.performance})`,
           );
         }
-        if (result.metrics.lcp > 4000) {
+        if (result.metrics.lcp > limits.lcp) {
           comparisonReport.summary.criticalIssues.push(
-            `${result.browserName}: LCP above 4s (${result.metrics.lcp.toFixed(0)}ms)`,
+            `${result.browserName}: LCP above ${limits.lcp}ms (${result.metrics.lcp.toFixed(0)}ms)`,
           );
         }
-        if (result.metrics.cls > 0.25) {
+        if (result.metrics.cls > limits.cls) {
           comparisonReport.summary.criticalIssues.push(
-            `${result.browserName}: CLS above 0.25 (${result.metrics.cls.toFixed(3)})`,
+            `${result.browserName}: CLS above ${limits.cls} (${result.metrics.cls.toFixed(3)})`,
           );
         }
       });

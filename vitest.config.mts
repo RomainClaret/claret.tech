@@ -30,13 +30,11 @@ export default defineConfig(({ mode: _mode }) => {
       globals: true,
       setupFiles: ["./src/test/polyfills.ts", "./src/test/setup.ts"],
       pool: "forks" as const, // Use forks for better isolation between tests
-      poolOptions: {
-        forks: {
-          singleFork: true, // Use single fork for stability
-          maxForks: 1, // Only 1 fork at a time
-          minForks: 1,
-        },
-      },
+      // One fork at a time. Vitest 4 moved poolOptions to the top level; its
+      // singleFork would be maxWorkers 1 with isolate off, but isolate stays
+      // on below: each file gets a fresh fork, so one file's globals cannot
+      // leak into the next.
+      maxWorkers: 1,
       // File parallelism control
       fileParallelism: false, // Run test files sequentially
       // Timeout configuration optimized for different test types
@@ -46,6 +44,10 @@ export default defineConfig(({ mode: _mode }) => {
       // Disable parallel execution to improve test stability
       maxConcurrency: 1, // Only 1 test at a time
       isolate: true, // Enable isolation to prevent test pollution
+      // Vitest 5 caches transformed modules on disk by default
+      // (node_modules/.vitest-cache) and reuses them across runs; a stale
+      // entry would make a local run test old code. CI starts clean anyway.
+      fsModuleCache: false,
       // Add retry for flaky tests in CI
       retry: isCI ? 1 : 0, // Retry once in CI
       // Clear and restore mocks between tests
@@ -67,10 +69,13 @@ export default defineConfig(({ mode: _mode }) => {
       coverage: {
         enabled: !isCI, // Disable in CI to save memory
         provider: "v8" as const,
+        // Vitest 4 reports only the files the tests load unless include is
+        // set: the whole source, as coverage.all did before.
+        include: ["src/**/*.{ts,tsx}"],
         // Absolute: the default ("./coverage") resolves against the cwd, so a
         // run started from src/ wrote a 13 MB report to src/coverage, which no
         // ignore rule covers (.gitignore has /coverage, anchored to the root).
-        reportsDirectory: path.resolve(__dirname, "coverage"),
+        reportsDirectory: path.resolve(import.meta.dirname, "coverage"),
         reporter: ["text", "json", "html"],
         exclude: [
           "node_modules/",
@@ -80,18 +85,21 @@ export default defineConfig(({ mode: _mode }) => {
           // source map. The one tested file, sw.js, runs through
           // `new Function`, which v8 cannot attribute to it anyway.
           "public/",
-          "src/test/",
+          // Vitest 5 matches exclude patterns as written: "src/test/" no
+          // longer covers the folder's files.
+          "src/test/**",
           "**/*.d.ts",
           "**/*.config.*",
           "**/mockData.ts",
         ],
       },
-      // CI-specific reporter configuration (avoiding deprecated 'basic')
-      reporters: isCI ? ["default"] : ["verbose"],
+      // CI-specific reporter configuration. Vitest 4's "verbose" is a flat
+      // list; "tree" is what "verbose" printed before.
+      reporters: isCI ? ["default"] : ["tree"],
     },
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
+        "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
   };

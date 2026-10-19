@@ -45,22 +45,22 @@ interface PinnedRepository {
   } | null;
 }
 
-interface GitHubData {
-  data: {
-    user: {
-      name: string;
-      bio: string;
-      avatarUrl: string;
-      location: string;
-      pinnedItems: {
-        totalCount: number;
-        edges: Array<{
-          node: PinnedRepository;
-        }>;
-      };
+// What /api/fetch-github and /profile.json both answer: the GitHub user,
+// pinned repositories included, when there is one.
+interface PinnedAnswer {
+  success: boolean;
+  data?: {
+    pinnedItems: {
+      edges: Array<{
+        node: PinnedRepository;
+      }>;
     };
-  };
+  } | null;
 }
+
+// The live API first, then the snapshot the deploy build saved
+// (src/app/profile.json/route.ts): one request each, at most.
+const PINNED_SOURCES = ["/api/fetch-github", "/profile.json"];
 
 type ViewMode = "featured" | "all";
 type LayoutMode = "grid" | "list";
@@ -87,39 +87,25 @@ export function Projects() {
   } | null>(null);
   const closeDetails = useCallback(() => setDetails(null), []);
 
-  // Fetch pinned projects
+  // Fetch pinned projects. The fallback used to read a file nothing built,
+  // twice: once when the API had no data, and again from the catch that the
+  // failed read landed in.
   useEffect(() => {
     async function fetchPinnedProjects() {
       try {
-        const response = await fetch("/api/fetch-github");
-        const result = await response.json();
-
-        if (result.success && result.data) {
-          setPinnedProjects(
-            result.data.pinnedItems.edges.map(
-              (edge: { node: PinnedRepository }) => edge.node,
-            ),
-          );
-        } else {
-          const fallbackResponse = await fetch("/profile.json");
-          const data: GitHubData = await fallbackResponse.json();
-          setPinnedProjects(
-            data.data.user.pinnedItems.edges.map((edge) => edge.node),
-          );
-        }
-      } catch (error) {
-        // Only log in non-test environments to avoid test stderr pollution
-        if (typeof process === "undefined" || process.env.NODE_ENV !== "test") {
-          logError(error, "Projects.fetchPinnedProjects");
-        }
-        try {
-          const fallbackResponse = await fetch("/profile.json");
-          const data: GitHubData = await fallbackResponse.json();
-          setPinnedProjects(
-            data.data.user.pinnedItems.edges.map((edge) => edge.node),
-          );
-        } catch (fallbackError) {
-          logError(fallbackError, "Projects.fetchPinnedProjects.fallback");
+        for (const url of PINNED_SOURCES) {
+          try {
+            const response = await fetch(url);
+            const result: PinnedAnswer = await response.json();
+            if (result.success && result.data) {
+              setPinnedProjects(
+                result.data.pinnedItems.edges.map((edge) => edge.node),
+              );
+              return;
+            }
+          } catch (error) {
+            logError(error, `Projects.fetchPinnedProjects ${url}`);
+          }
         }
       } finally {
         setLoading(false);
@@ -259,7 +245,11 @@ export function Projects() {
       (a, b) => b.stargazers.totalCount - a.stargazers.totalCount,
     )[0];
   }, [pinnedProjects]);
-  const hero = searchQuery || selectedTech ? null : spotlight;
+  const filtering = Boolean(searchQuery || selectedTech);
+  const hero = filtering ? null : spotlight;
+  const loadingAllShown =
+    loadingAll ||
+    (viewMode === "all" && contextLoading && allProjects.length === 0);
   const gridProjects = useMemo(
     () =>
       hero
@@ -461,7 +451,7 @@ export function Projects() {
               placeholder="Search projects by name, description, or topics..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+              className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-lg focus:outline-hidden focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
             />
           </div>
 
@@ -536,7 +526,7 @@ export function Projects() {
                               />
                             </div>
                           </div>
-                          <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                          <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                             {featuredProject.name}
                           </h3>
                           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
@@ -661,10 +651,7 @@ export function Projects() {
         )}
 
         {/* Loading indicator for all projects */}
-        {(loadingAll ||
-          (viewMode === "all" &&
-            contextLoading &&
-            allProjects.length === 0)) && (
+        {loadingAllShown && (
           <div className="text-center py-8">
             <div className="inline-flex items-center gap-2 text-muted-foreground">
               <div
@@ -680,25 +667,34 @@ export function Projects() {
 
         {/* Projects Display */}
         {filteredProjects.length === 0 ? (
-          <div
-            className={cn(
-              "text-center py-12",
-              !shouldReduceAnimations && "animate-fade-in",
-            )}
-          >
-            <p className="text-muted-foreground">
-              No projects found matching your criteria.
-              <button
-                onClick={() => {
-                  setSelectedTech(null);
-                  setSearchQuery("");
-                }}
-                className="text-primary hover:underline ml-1"
-              >
-                Clear filters
-              </button>
-            </p>
-          </div>
+          loadingAllShown ? null : (
+            <div
+              className={cn(
+                "text-center py-12",
+                !shouldReduceAnimations && "animate-fade-in",
+              )}
+            >
+              {/* With no filter on, an empty list means nothing loaded. */}
+              {filtering ? (
+                <p className="text-muted-foreground">
+                  No projects found matching your criteria.
+                  <button
+                    onClick={() => {
+                      setSelectedTech(null);
+                      setSearchQuery("");
+                    }}
+                    className="text-primary hover:underline ml-1"
+                  >
+                    Clear filters
+                  </button>
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  The projects could not load from GitHub.
+                </p>
+              )}
+            </div>
+          )
         ) : gridProjects.length === 0 ? null : (
           <div
             className={cn(
@@ -789,7 +785,7 @@ export function Projects() {
                               }}
                             />
                           </div>
-                          {/* No min-w-0 and no break-words: a long name breaks
+                          {/* No min-w-0 and no wrap-break-word: a long name breaks
                               at its hyphens. With them it broke inside a word
                               on phones ("optimizatio", "n-studies"); a name
                               with no hyphen is clipped by the card, and the
@@ -799,9 +795,9 @@ export function Projects() {
                               <button
                                 type="button"
                                 aria-haspopup="dialog"
-                                className="rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                                className="rounded-xs text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                               >
-                                <span className="bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                                <span className="bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
                                   {project.name}
                                 </span>
                               </button>
@@ -820,7 +816,7 @@ export function Projects() {
                             stretched it past its clamp next to a taller
                             card, and the lines after the ellipsis showed in
                             the extra height (5 under a 2-line clamp). */}
-                        <div className="flex-grow mb-3 sm:mb-4">
+                        <div className="grow mb-3 sm:mb-4">
                           <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-3">
                             {project.description || "No description available."}
                           </p>
@@ -927,7 +923,7 @@ export function Projects() {
                             <div className="flex-1">
                               <h3 className="text-base sm:text-lg font-semibold group-hover:text-primary group-focus-within:text-primary transition-colors flex items-center gap-1 sm:gap-2">
                                 {project.name}
-                                <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex-shrink-0" />
+                                <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0" />
                               </h3>
                               <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-1">
                                 {project.description ||

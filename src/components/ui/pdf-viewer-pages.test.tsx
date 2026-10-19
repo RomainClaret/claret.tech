@@ -34,8 +34,10 @@ vi.mock("lucide-react/dist/esm/icons/check", () => ({ default: icon() }));
 
 // A 368-page document, opened afresh by each load (react-pdf makes a new
 // proxy per load). A load's page sizes arrive when the test measures it, or
-// fail, as an old proxy's do once a reload destroys it. With `failNext`, the
-// next load fails instead, as a refused PDF request does.
+// fail, as an old proxy's do once a reload destroys it. A reloaded document
+// arrives when the test lets it (nextLoad): on a timer, React's async act
+// around the click already ran it, and no test saw the pages away. With
+// `failNext`, the next load fails instead, as a refused PDF request does.
 const pdf = vi.hoisted(() => {
   const loads: { measure: () => void; fail: () => void }[] = [];
   const open = () => {
@@ -60,6 +62,7 @@ const pdf = vi.hoisted(() => {
     open,
     latest: () => loads[loads.length - 1],
     failNext: false,
+    arrival: null as (() => void) | null,
   };
 });
 vi.mock("@/lib/pdf-config", () => ({
@@ -77,16 +80,18 @@ vi.mock("@/lib/pdf-config", () => ({
     options?: object;
   }) => {
     const [failed, setFailed] = useState(false);
+    const [reloading, setReloading] = useState(false);
     const loaded = useRef(false);
     // Once per load, as react-pdf calls it (the viewer passes a new callback
-    // on every render). New options reload the document under the same
-    // pages: react-pdf 10 keeps them mounted and hands them the new proxy
-    // (in Chromium the boxes are the same DOM nodes before and after). A
-    // new file loads that document. In react-pdf's order, a reload destroys
-    // the current proxy at once, so its getPage calls reject, and the new
-    // document arrives later, after a round trip to the worker (nextLoad).
+    // on every render). New options load the same document again, a new
+    // file another one. In react-pdf's order, a reload destroys the current
+    // proxy at once, so its getPage calls reject, and the new document
+    // arrives later, after a round trip to the worker (nextLoad). Meanwhile
+    // react-pdf 10.5 shows its `loading` in place of the pages: every page
+    // box unmounts, and new ones mount with the new document.
     useEffect(() => {
       const deliver = () => {
+        setReloading(false);
         if (pdf.failNext) {
           pdf.failNext = false;
           setFailed(true);
@@ -102,12 +107,15 @@ vi.mock("@/lib/pdf-config", () => ({
         return;
       }
       pdf.latest()?.fail();
-      const arrival = setTimeout(deliver, 0);
-      return () => clearTimeout(arrival);
+      setReloading(true);
+      pdf.arrival = deliver;
+      return () => {
+        if (pdf.arrival === deliver) pdf.arrival = null;
+      };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [file, options]);
     // A failed load shows react-pdf's error in place of the pages.
-    return <div>{failed ? null : children}</div>;
+    return <div>{failed || reloading ? null : children}</div>;
   },
   Page: ({
     pageNumber,
@@ -178,7 +186,11 @@ class LayoutObserver {
 }
 /** A reloaded document arrives, a worker round trip after the reload. */
 const nextLoad = () =>
-  act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  act(async () => {
+    const arrive = pdf.arrival;
+    pdf.arrival = null;
+    arrive?.();
+  });
 
 /** The browser lays the pages out again, with no scroll event. */
 const relayout = () =>
@@ -231,8 +243,35 @@ const reportNear = (pages: number[]) => {
     ),
   );
 };
+/** The browser reports the live observer's boxes that left the page (react-pdf
+ *  unmounted them) as out of view, as it does for any removed target. */
+const reportGone = () => {
+  const watcher = watchers.filter((w) => w.live).at(-1)!;
+  act(() =>
+    watcher.callback(
+      watcher.targets
+        .filter((target) => !target.isConnected)
+        .map(
+          (target) =>
+            ({
+              target,
+              isIntersecting: false,
+            }) as unknown as IntersectionObserverEntry,
+        ),
+      watcher as unknown as IntersectionObserver,
+    ),
+  );
+};
 const mode = (page: number) =>
   screen.getAllByTestId("page")[page - 1].dataset.mode;
+/** The reader's scroll box, which stays while the page boxes come and go. */
+const pagesRegion = () => screen.getByRole("region", { name: "Pages" });
+const reloadWithFallbackFonts = async () => {
+  act(() => console.warn("Warning: TT: undefined function: 32"));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /fallback fonts/ }));
+  });
+};
 
 beforeEach(() => {
   // jsdom does not scroll or lay out, and the setup file's observers are
@@ -251,6 +290,7 @@ beforeEach(() => {
   resizers = [];
   pdf.loads.length = 0;
   pdf.failNext = false;
+  pdf.arrival = null;
   globalThis.IntersectionObserver =
     PageObserver as unknown as typeof IntersectionObserver;
   globalThis.ResizeObserver =
@@ -289,10 +329,11 @@ describe("PDFViewer page navigation", () => {
   });
 
   it("keeps the reader's pages when the fallback fonts reload it", async () => {
-    // react-pdf keeps the page boxes mounted through the reload and redraws
-    // them from the new document. A reset to the first screen dropped every
-    // box past it until the sizes were measured again, and WebKit clamped a
-    // reader on page 200 to page 1.
+    // react-pdf 10.5 unmounts the page boxes while it loads the document
+    // again, and mounts new ones for it: they keep the sizes and the pages
+    // that were drawn. A reset to the first screen dropped every box past it
+    // until the sizes were measured again, and WebKit clamped a reader on
+    // page 200 to page 1.
     await act(async () => {
       render(<PDFViewer url="/pdfs/phd-thesis.pdf" title="Thesis" />);
     });
@@ -302,14 +343,14 @@ describe("PDFViewer page navigation", () => {
     expect(mode(1)).toBe("none");
 
     // A font warning, then the switch: the document reloads and measuring
-    // starts over.
-    act(() => console.warn("Warning: TT: undefined function: 32"));
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /fallback fonts/ }));
-    });
+    // starts over. The boxes go, and the browser reports them out of view:
+    // taken, that left page 200 undrawn until every size was measured again.
+    await reloadWithFallbackFonts();
+    expect(screen.queryAllByTestId("page")).toHaveLength(0);
+    reportGone();
     await nextLoad();
 
-    // Before the sizes are measured again: every box, page 200 still drawn.
+    // Before the sizes are measured again: every box, page 200 drawn.
     expect(pdf.loads).toHaveLength(2);
     expect(screen.getAllByTestId("page")).toHaveLength(368);
     expect(mode(200)).toBe("canvas");
@@ -318,6 +359,69 @@ describe("PDFViewer page navigation", () => {
     await act(async () => pdf.latest().measure());
     expect(screen.getAllByTestId("page")).toHaveLength(368);
     expect(mode(200)).toBe("canvas");
+  });
+
+  it("holds the column's size while the fallback fonts reload it", async () => {
+    // With the boxes unmounted, the column collapsed and the browser clamped
+    // the scroll to the top: a reader on page 200 was on page 1 when the
+    // boxes came back, in Chromium and WebKit.
+    await act(async () => {
+      render(<PDFViewer url="/pdfs/phd-thesis.pdf" title="Thesis" />);
+    });
+    await act(async () => pdf.latest().measure());
+    const column = pagesRegion().firstElementChild as HTMLElement;
+    // jsdom lays nothing out: the column's size as a browser measures it.
+    Object.defineProperty(column, "offsetHeight", { value: 315_000 });
+    Object.defineProperty(column, "offsetWidth", { value: 1_200 });
+
+    await reloadWithFallbackFonts();
+    expect(screen.queryAllByTestId("page")).toHaveLength(0);
+    expect(column.style.minHeight).toBe("315000px");
+    expect(column.style.minWidth).toBe("1200px");
+
+    // The new boxes are back at their sizes: the column lets go.
+    await nextLoad();
+    expect(screen.getAllByTestId("page")).toHaveLength(368);
+    expect(column.style.minHeight).toBe("");
+    expect(column.style.minWidth).toBe("");
+  });
+
+  it("watches the new page boxes after the fallback fonts reload it", async () => {
+    // The page observer watched the unmounted boxes until every size was
+    // measured again: a page the reader scrolled to meanwhile stayed
+    // undrawn.
+    await act(async () => {
+      render(<PDFViewer url="/pdfs/phd-thesis.pdf" title="Thesis" />);
+    });
+    await act(async () => pdf.latest().measure());
+
+    await reloadWithFallbackFonts();
+    await nextLoad();
+
+    const live = watchers.filter((w) => w.live).at(-1)!;
+    expect(live.targets).toHaveLength(368);
+    expect(live.targets.every((target) => target.isConnected)).toBe(true);
+    reportNear([250]);
+    expect(mode(250)).toBe("canvas");
+  });
+
+  it("keeps the counter on the reader's page through a scroll during the reload", async () => {
+    // The unmounted boxes each measure zero: a scroll meanwhile counted
+    // none of them in view and named page 1.
+    await act(async () => {
+      render(<PDFViewer url="/pdfs/phd-thesis.pdf" title="Thesis" />);
+    });
+    await act(async () => pdf.latest().measure());
+    scrollTo(200);
+    expect(screen.getByText("Page 200 of 368")).toBeInTheDocument();
+
+    await reloadWithFallbackFonts();
+    expect(screen.queryAllByTestId("page")).toHaveLength(0);
+    act(() => {
+      pagesRegion().dispatchEvent(new Event("scroll"));
+    });
+
+    expect(screen.getByText("Page 200 of 368")).toBeInTheDocument();
   });
 
   it("keeps the counter on the reader's page when the fallback fonts reload it", async () => {
@@ -359,10 +463,10 @@ describe("PDFViewer page navigation", () => {
   });
 
   it("keeps the page in view when the fallback fonts reload it", async () => {
-    // A reader within the first screen does not move: those pages stay
-    // mounted at their size, the scroll offset stays valid, and nothing
-    // scrolls (measured on page 2 of the thesis in Chromium and WebKit).
-    // Counting from 1 on every reload named page 1 under page 2.
+    // A reader within the first screen does not move: the column holds its
+    // size while the boxes are away, the scroll offset stays valid, and
+    // nothing scrolls (measured on page 2 of the thesis in Chromium and
+    // WebKit). Counting from 1 on every reload named page 1 under page 2.
     await act(async () => {
       render(<PDFViewer url="/pdfs/phd-thesis.pdf" title="Thesis" />);
     });

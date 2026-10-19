@@ -63,7 +63,7 @@ export function PerformanceMonitorUnavailable({ retry, retrying }: Fallback) {
   return createPortal(
     <div
       role="status"
-      className="fixed top-4 right-4 z-[9999] max-w-xs space-y-3 rounded-lg border border-border bg-background p-4 text-sm shadow-xl"
+      className="fixed top-4 right-4 z-9999 max-w-xs space-y-3 rounded-lg border border-border bg-background p-4 text-sm shadow-xl"
     >
       <p className="text-muted-foreground">
         Could not load the performance monitor.
@@ -100,9 +100,9 @@ export function ToolUnavailableDialog({
     // and later in the page, covered the backdrop and took clicks. And at
     // the end of <body>, as PerformanceModal too: in place, at the reader's
     // z-index, it painted under a PDF reader already open.
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/80 backdrop-blur-xs"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -112,7 +112,7 @@ export function ToolUnavailableDialog({
         role="dialog"
         aria-modal="true"
         aria-label={name.charAt(0).toUpperCase() + name.slice(1)}
-        className="relative m-4 max-w-md space-y-4 rounded-lg bg-background p-6 shadow-2xl outline-none"
+        className="relative m-4 max-w-md space-y-4 rounded-lg bg-background p-6 shadow-2xl outline-hidden"
       >
         <p className="text-muted-foreground">
           Could not load the {name}. Check your connection and try again.

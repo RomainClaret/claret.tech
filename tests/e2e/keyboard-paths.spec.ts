@@ -87,6 +87,42 @@ test.describe("Keyboard paths", () => {
     ).toBeVisible();
   });
 
+  test("opens the skill card, and picks a skill from its list", async ({
+    page,
+    browserName,
+  }) => {
+    // The sentence and the list's rows were divs only a click reached.
+    const tab = () =>
+      page.keyboard.press(
+        browserName === "webkit" && process.platform === "darwin"
+          ? "Alt+Tab"
+          : "Tab",
+      );
+    // Scoped: Projects has its own "List view" and "Show all projects".
+    const skills = page.locator("#skills");
+    const button = (name: string) =>
+      skills.getByRole("button", { name, exact: true });
+    const compactView = button("Compact view");
+
+    // After the controls comes the sentence, which opens the card.
+    await tabTo(page, button("Show all"), browserName);
+    const sentence = skills.locator("button:focus");
+    await expect(sentence).toHaveAccessibleDescription("Opens the card view");
+    await page.keyboard.press("Enter");
+    await expect(compactView).toBeFocused();
+
+    // The card's List view, then the third skill's row.
+    await tab();
+    await expect(button("List view")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(button("Close list view")).toBeFocused();
+    for (let row = 0; row < 3; row++) await tab();
+    await page.keyboard.press("Enter");
+
+    await expect(compactView).toBeFocused();
+    await expect(skills.getByText(/^Skill 3 of \d+$/)).toBeAttached();
+  });
+
   test("shows the floating navigation's labels on keyboard focus", async ({
     page,
     browserName,

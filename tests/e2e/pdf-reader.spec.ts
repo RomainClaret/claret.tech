@@ -48,24 +48,42 @@ function pageInView(page: Page): Promise<number> {
   });
 }
 
+type ReloadFlags = {
+  redrawn?: boolean;
+  layersBack?: boolean;
+  drawnWithLayers?: boolean;
+};
+
 /**
- * Switches page `n`'s document to the fallback fonts and waits for the
- * reload: page `n` drawn again from the new document (react-pdf redraws the
- * same canvas, hidden while it draws), or its box gone, as the reload
- * dropped every box past the first screen before the boxes were kept.
+ * Switches page `n`'s document to the fallback fonts, waits for the reload,
+ * and says whether page `n` was drawn as soon as it was back.
+ *
+ * react-pdf 10.0 drew the same canvas again from the new document (hidden
+ * while it drew). 10.5 unmounts every page box until the new document
+ * arrives and mounts new ones: page `n` is back when its new box's layers
+ * are, and it must have its canvas then. The page observer took the
+ * unmounted boxes for pages out of view, which left the reader's page
+ * blank until every page's size had been measured again.
  */
 async function reloadWithFallbackFonts(page: Page, n: number) {
   const canvas = page.locator(`[data-page="${n}"] .react-pdf__Page__canvas`);
   await expect(canvas).toBeVisible({ timeout: 15_000 });
-  await canvas.evaluate((element: HTMLCanvasElement) => {
-    const flags = window as unknown as { redrawn?: boolean; watched?: Element };
-    flags.watched = element;
+  await canvas.evaluate((element: HTMLCanvasElement, n: number) => {
+    const flags = window as unknown as ReloadFlags;
     let hidden = false;
     new MutationObserver(() => {
       if (element.style.visibility === "hidden") hidden = true;
       else if (hidden) flags.redrawn = true;
     }).observe(element, { attributes: true, attributeFilter: ["style"] });
-  });
+    const viewer = element.closest(".overflow-auto")!;
+    new MutationObserver(() => {
+      if (flags.layersBack || element.isConnected) return;
+      const box = viewer.querySelector(`[data-page="${n}"]`);
+      if (!box?.querySelector(".annotationLayer")) return;
+      flags.layersBack = true;
+      flags.drawnWithLayers = !!box.querySelector(".react-pdf__Page__canvas");
+    }).observe(viewer, { childList: true, subtree: true });
+  }, n);
 
   // The switch shows on a font warning, which this document does not log
   // by itself.
@@ -75,15 +93,16 @@ async function reloadWithFallbackFonts(page: Page, n: number) {
   await page.getByRole("button", { name: /fallback fonts/ }).click();
   await page.waitForFunction(
     () => {
-      const flags = window as unknown as {
-        redrawn?: boolean;
-        watched?: Element;
-      };
-      return flags.redrawn === true || !flags.watched?.isConnected;
+      const flags = window as unknown as ReloadFlags;
+      return flags.redrawn === true || flags.layersBack === true;
     },
     null,
     { timeout: 30_000 },
   );
+  return page.evaluate(() => {
+    const flags = window as unknown as ReloadFlags;
+    return flags.redrawn === true || flags.drawnWithLayers === true;
+  });
 }
 
 test.describe("PDF reader", () => {
@@ -158,15 +177,16 @@ test.describe("PDF reader", () => {
     await scrollToPage(page, 2);
     await expect(page.getByText(/Page 2 of \d+/)).toBeVisible();
 
-    await reloadWithFallbackFonts(page, 2);
+    const drawn = await reloadWithFallbackFonts(page, 2);
     await expect(boxes).toHaveCount(total, { timeout: 30_000 });
 
-    // A reader within the first screen does not move, and the counter reset
-    // to 1 named page 1 under page 2.
-    const inView = await pageInView(page);
-    await expect(page.getByText(/Page \d+ of \d+/)).toHaveText(
-      new RegExp(`^Page ${inView} of `),
-    );
+    // A reader within the first screen does not move, and the counter says
+    // so: its reset to 1 named page 1 under page 2. This checked only that
+    // the two agreed, and passed when react-pdf 10.5 moved the reader to
+    // page 1 as well.
+    await expect.poll(() => pageInView(page)).toBe(2);
+    await expect(page.getByText(/Page \d+ of \d+/)).toHaveText(/^Page 2 of /);
+    expect(drawn).toBe(true);
   });
 
   test("keeps the reader's place through the fallback-fonts reload", async ({
@@ -174,18 +194,21 @@ test.describe("PDF reader", () => {
   }) => {
     // The reload dropped every page box past the first screen until the
     // sizes were measured again: WebKit clamped a reader on page 200 to
-    // page 1, and Chromium put them back once the boxes returned.
+    // page 1, and Chromium put them back once the boxes returned. With
+    // react-pdf 10.5 unmounting every box for the reload, both browsers
+    // clamped the reader to page 1 until the column held its size.
     const boxes = page.locator("[data-page]");
     await expect(boxes.nth(299)).toBeAttached({ timeout: 30_000 });
     const total = await boxes.count();
     await scrollToPage(page, 200);
     await expect(page.getByText(/Page 200 of \d+/)).toBeVisible();
 
-    await reloadWithFallbackFonts(page, 200);
+    const drawn = await reloadWithFallbackFonts(page, 200);
     await expect(boxes).toHaveCount(total, { timeout: 30_000 });
 
     await expect.poll(() => pageInView(page)).toBe(200);
     await expect(page.getByText(/Page \d+ of \d+/)).toHaveText(/^Page 200 of /);
+    expect(drawn).toBe(true);
   });
 
   test("keeps the page in view through a zoom", async ({ page }) => {
@@ -232,6 +255,26 @@ test.describe("PDF reader", () => {
   });
 });
 
+// Chrome and Edge 111 to 125 and Safari 16.4 to 17.x, all in the site's
+// browserslist, lack URL.parse or Promise.withResolvers, which pdf.js 5's
+// default build calls without a polyfill: the reader loaded no PDF there
+// ("Failed to load PDF"). It runs pdf.js's legacy build, which targets
+// Chrome 110, Firefox ESR and Safari 16.4.
+test.describe("PDF reader on a browser without URL.parse", () => {
+  test("still draws the PDF", async ({ page }) => {
+    await page.addInitScript(() => {
+      delete (URL as unknown as { parse?: unknown }).parse;
+      delete (Promise as unknown as { withResolvers?: unknown }).withResolvers;
+    });
+    await page.goto("/pdf/cv");
+
+    await expect(page.locator(".react-pdf__Page__canvas").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/Failed to load PDF/)).toHaveCount(0);
+  });
+});
+
 test.describe("PDF reader when the PDF cannot be fetched", () => {
   test("says so once", async ({ page }) => {
     await page.route(/\/pdfs\/.*\.pdf/, (route) => route.abort());
@@ -250,7 +293,7 @@ test.describe("PDF links from the keyboard", () => {
     page,
     browserName,
   }) => {
-    // pdf.js wraps each link in a section with tabindex 1000, and a positive
+    // pdf.js 5.3 put tabindex 1000 on each link's wrapper, and a positive
     // tabindex goes first: the CV's first 21 Tab presses walked those
     // wrappers, ahead even of the skip links. And no link had a name.
     // Without the cookie notice, which comes first in the page since
@@ -260,9 +303,6 @@ test.describe("PDF links from the keyboard", () => {
     const links = page.locator(".annotationLayer a[href]");
     await expect(links.first()).toBeAttached({ timeout: 30_000 });
 
-    await expect(
-      page.locator('.annotationLayer [tabindex="1000"]'),
-    ).toHaveCount(0);
     const unnamed = await links.evaluateAll(
       (all) =>
         all.filter(
@@ -314,6 +354,13 @@ test.describe("PDF links within a document", () => {
         /^(Reference|Section|Figure|Table|Page|Theorem) \d+$/,
       );
     }
+    // pdf.js 5.4 titles each link with the text under it ("5"): the names
+    // replace those titles, read after the name and shown as tooltips.
+    expect(
+      await internal.evaluateAll(
+        (all) => all.filter((link) => link.hasAttribute("title")).length,
+      ),
+    ).toBe(0);
 
     const results = await new AxeBuilder({ page })
       .include('[role="region"][aria-label="Pages"]')
@@ -499,7 +546,7 @@ test.describe("The PDF reader over the homepage", () => {
     // macOS WebKit's Tab skips buttons and links by default, so the trap,
     // which only wrapped at its first and last control, never ran: the
     // first Tab from the close button left the reader, and Shift+Tab walked
-    // the page behind it. pdf.js wraps each link in a section with tabindex
+    // the page behind it. pdf.js 5.3 gave each link's wrapper tabindex
     // 1000: counted as stops, every link would be two.
     const where = () =>
       page.evaluate(() => {

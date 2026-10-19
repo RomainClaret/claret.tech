@@ -79,7 +79,7 @@ describe("PDFModal", () => {
     it("renders backdrop", () => {
       render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
 
-      const backdrop = document.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-xs");
       expect(backdrop).toBeInTheDocument();
     });
 
@@ -129,7 +129,7 @@ describe("PDFModal", () => {
 
       render(<PDFModal isOpen={true} onClose={onClose} pdfUrl="/test.pdf" />);
 
-      const backdrop = document.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-xs");
       if (backdrop) {
         fireEvent.click(backdrop);
       }
@@ -361,7 +361,7 @@ describe("PDFModal", () => {
     it("has aria-hidden on backdrop", () => {
       render(<PDFModal isOpen={true} onClose={vi.fn()} pdfUrl="/test.pdf" />);
 
-      const backdrop = document.querySelector(".backdrop-blur-sm");
+      const backdrop = document.querySelector(".backdrop-blur-xs");
       expect(backdrop).toHaveAttribute("aria-hidden", "true");
     });
 

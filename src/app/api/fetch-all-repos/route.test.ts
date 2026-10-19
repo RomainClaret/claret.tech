@@ -104,6 +104,7 @@ describe("Fetch All Repositories API Route", () => {
     vi.setSystemTime(new Date("2024-08-18T12:00:00.000Z"));
 
     // Mock environment variables
+    process.env.USE_GITHUB_DATA = "true";
     process.env.GH_USERNAME = "testuser";
     process.env.GITHUB_TOKEN = "test-token";
 
@@ -117,6 +118,7 @@ describe("Fetch All Repositories API Route", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    delete process.env.USE_GITHUB_DATA;
     delete process.env.GH_USERNAME;
     delete process.env.GITHUB_TOKEN;
   });
@@ -318,6 +320,26 @@ describe("Fetch All Repositories API Route", () => {
       expect(result.data).toHaveLength(2);
       expect(result.data[0].name).toBe("test-repo");
       expect(result.data[1].name).toBe("test-repo-2");
+    });
+
+    // CI's e2e builds have GitHub data off and no GH_USERNAME: the route
+    // answered 500 there, a console error on every page load.
+    it("answers no repositories, and asks GitHub nothing, with GitHub data off", async () => {
+      delete process.env.USE_GITHUB_DATA;
+      delete process.env.GH_USERNAME;
+
+      const request = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+      } as unknown as NextRequest;
+
+      await GET(request);
+
+      expect(mockNextResponse.json).toHaveBeenCalledWith({
+        success: true,
+        data: [],
+        cached: false,
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("returns error when username is not configured", async () => {

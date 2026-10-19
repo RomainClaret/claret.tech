@@ -200,38 +200,35 @@ test.describe("Performance", () => {
 
     const jsCoverage = await page.coverage.stopJSCoverage();
 
-    // Analyze JavaScript coverage
+    // The bytes that ran. V8 lists each function's ranges with a run count,
+    // nested, and unused code too (count 0): summed as they came, the "used"
+    // share read 3.54 on 2026-10-17. A byte takes its innermost range's
+    // count, so outer ranges are applied first.
     let totalBytes = 0;
     let usedBytes = 0;
-
     for (const entry of jsCoverage) {
-      // Use the source length if text is not available
-      const textLength =
-        (entry as any).source?.length || (entry as any).text?.length || 1000;
-      totalBytes += textLength;
-
-      // Handle different coverage formats
-      if ((entry as any).ranges) {
-        for (const range of (entry as any).ranges) {
-          usedBytes += range.end - range.start;
-        }
-      } else if ((entry as any).functions) {
-        for (const func of (entry as any).functions) {
-          for (const range of func.ranges) {
-            usedBytes += range.endOffset - range.startOffset;
-          }
-        }
+      const length = entry.source?.length ?? 0;
+      totalBytes += length;
+      const counts = new Uint32Array(length);
+      const ranges = entry.functions
+        .flatMap((fn) => fn.ranges)
+        .sort(
+          (a, b) => a.startOffset - b.startOffset || b.endOffset - a.endOffset,
+        );
+      for (const range of ranges) {
+        counts.fill(
+          range.count,
+          range.startOffset,
+          Math.min(range.endOffset, length),
+        );
       }
+      usedBytes += counts.filter((count) => count > 0).length;
     }
 
-    const usageRatio = totalBytes > 0 ? usedBytes / totalBytes : 1;
-
-    // At least 60% of JavaScript should be used (accounting for framework overhead)
-    expect(usageRatio).toBeGreaterThan(0.6);
-
-    // Total JavaScript should be reasonable for production
-    const totalKB = totalBytes / 1024;
-    expect(totalKB).toBeLessThan(60000); // Production baseline: ~55MB of JavaScript
+    // Production build, 2026-10-17: 1,290 KB of JavaScript, 0.59 to 0.60 of
+    // it run. (The limits were 60,000 KB and a share that could not fall.)
+    expect(usedBytes / totalBytes).toBeGreaterThan(0.5);
+    expect(totalBytes / 1024).toBeLessThan(2000);
   });
 
   test("should have efficient CSS", async ({ page, browserName, isMobile }) => {

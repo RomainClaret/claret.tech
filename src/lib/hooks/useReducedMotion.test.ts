@@ -22,31 +22,29 @@ describe("useReducedMotion", () => {
     listeners = {};
     system.reduced = false;
 
-    mockMatchMedia = vi.fn(
-      (query: string): MockMediaQueryList => ({
-        matches: false,
-        media: query,
-        addEventListener: vi.fn(
-          (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
-            if (!listeners[event]) {
-              listeners[event] = [];
-            }
-            listeners[event].push(handler);
-          },
-        ),
-        removeEventListener: vi.fn(
-          (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
-            if (listeners[event]) {
-              listeners[event] = listeners[event].filter((h) => h !== handler);
-            }
-          },
-        ),
-        dispatchEvent: vi.fn(),
-        onchange: null,
-        addListener: vi.fn(), // Deprecated but sometimes still used
-        removeListener: vi.fn(), // Deprecated but sometimes still used
-      }),
-    );
+    mockMatchMedia = vi.fn((query: string): MockMediaQueryList => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(
+        (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
+          if (!listeners[event]) {
+            listeners[event] = [];
+          }
+          listeners[event].push(handler);
+        },
+      ),
+      removeEventListener: vi.fn(
+        (event: string, handler: (e: MockMediaQueryListEvent) => void) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter((h) => h !== handler);
+          }
+        },
+      ),
+      dispatchEvent: vi.fn(),
+      onchange: null,
+      addListener: vi.fn(), // Deprecated but sometimes still used
+      removeListener: vi.fn(), // Deprecated but sometimes still used
+    }));
 
     window.matchMedia = mockMatchMedia;
   });

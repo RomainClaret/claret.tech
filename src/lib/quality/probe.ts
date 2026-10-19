@@ -23,10 +23,7 @@
  */
 
 export type WeakDeviceReason =
-  | "save-data"
-  | "no-webgl"
-  | "software-webgl"
-  | "software-renderer";
+  "save-data" | "no-webgl" | "software-webgl" | "software-renderer";
 
 export interface DeviceProbe {
   weak: boolean;

@@ -99,11 +99,15 @@ Add these secrets to your GitHub repository (Settings > Secrets > Actions):
 
 The production and preview builds get the same env (one block in
 `deploy.yml`, shared by a YAML anchor), so a preview builds what production
-would.
+would. That block also names `GH_USERNAME` (a public name, so not a
+secret): with the token and `USE_GITHUB_DATA` it lets the build save the
+pinned repositories at `/profile.json` (`src/app/profile.json/route.ts`),
+which Projects reads when `/api/fetch-github` fails. A build without them
+prerenders a 404 there.
 
-The build's other variables (`GH_USERNAME` and the rest of `.env.example`)
-come from the Vercel project's environment, which `vercel pull` fetches
-before the build.
+The build's other variables (the rest of `.env.example`) come from the
+Vercel project's environment, which `vercel pull` fetches before the build;
+the API routes read `GH_USERNAME` from it at run time.
 
 **Update Publications:**
 

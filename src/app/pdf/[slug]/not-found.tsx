@@ -16,7 +16,7 @@ export default function PdfNotFound() {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
       <div className="text-center max-w-md mx-auto">
         <h1 className="text-9xl font-bold mb-4">
-          <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          <span className="bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
             404
           </span>
         </h1>

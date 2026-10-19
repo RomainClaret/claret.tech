@@ -20,6 +20,7 @@ import {
   expect,
   beforeEach,
   afterEach,
+  type Mock,
   type MockedFunction,
 } from "vitest";
 import { Navigation } from "./navigation";
@@ -82,7 +83,8 @@ vi.mock("next/link", () => ({
 }));
 
 describe("Navigation", () => {
-  let mockScrollTo: MockedFunction<typeof window.scrollTo>;
+  // Only asserted on: window.scrollTo takes it through defineProperty.
+  let mockScrollTo: Mock;
   let mockAddEventListener: MockedFunction<typeof window.addEventListener>;
   let mockRemoveEventListener: MockedFunction<
     typeof window.removeEventListener
@@ -539,7 +541,7 @@ describe("Navigation", () => {
           "backdrop-blur-md",
           "border-b",
           "border-border",
-          "shadow-sm",
+          "shadow-xs",
         );
       });
     });
@@ -657,9 +659,8 @@ describe("Navigation", () => {
     });
 
     it("says whether the terminal is open on its toggle", async () => {
-      const { useTerminalToggle } = await import(
-        "@/lib/terminal/terminal-context"
-      );
+      const { useTerminalToggle } =
+        await import("@/lib/terminal/terminal-context");
       vi.mocked(useTerminalToggle).mockReturnValue({
         isOpen: true,
         toggleTerminal: vi.fn(),

@@ -1,0 +1,22 @@
+[
+  {
+    "package": "motion-dom",
+    "version": "14.3.1",
+    "patch": "motion-dom+14.3.1.patch",
+    "why": "framer-motion's m and LazyMotion read motion-dom's feature registry, which VisualElement.mjs defines beside the VisualElement class: webpack then ships the class and all it imports with m, out of LazyMotion's lazy features (9.6 KB gzipped of the homepage's eager JS). The patch moves the registry into a module of its own.",
+    "files": {
+      "node_modules/motion-dom/dist/es/index.mjs": {
+        "before": "3bb5b3c15e78c47891c4dcd813e982d62b976bba04c4a629ce7a05bbdf90e56f",
+        "after": "77fb2b237c6a92eebc13359aa678f27dde0ea8e720829be73f1d3a12b5726d30"
+      },
+      "node_modules/motion-dom/dist/es/render/VisualElement.mjs": {
+        "before": "b280fd0b86dc374fdee8eb41bdbcf470e057b408fa0cc01d69ef254aa79b34ed",
+        "after": "65ee3cf09e1ba38c8d1b8b808a4516fc740b08a27538d800beb0127bdee2f316"
+      },
+      "node_modules/motion-dom/dist/es/render/feature-definitions.mjs": {
+        "before": null,
+        "after": "588dddbe11e49f8fd60a6015f2ffec468e4e03d983392c6b3e9dde40e6d29bc3"
+      }
+    }
+  }
+]

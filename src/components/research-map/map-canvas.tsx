@@ -109,7 +109,7 @@ export function MapCanvas({ map, layout, items }: MapCanvasProps) {
           >
             <span
               aria-hidden="true"
-              className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--ink)]"
+              className="h-2.5 w-2.5 shrink-0 rounded-full bg-(--ink)"
             />
             {lane.label}
           </div>

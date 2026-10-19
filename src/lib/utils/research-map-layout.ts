@@ -293,12 +293,7 @@ function pullBack(from: Point, toward: Point, distance: number): Point {
 }
 
 export type NavKey =
-  | "ArrowLeft"
-  | "ArrowRight"
-  | "ArrowUp"
-  | "ArrowDown"
-  | "Home"
-  | "End";
+  "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home" | "End";
 
 /**
  * Where an arrow key goes from a node: along its lane left and right (Home

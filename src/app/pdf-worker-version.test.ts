@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * postinstall copies node_modules/pdfjs-dist/build/pdf.worker.min.mjs into
- * public/ (scripts/setup-assets.js), and pdf.js refuses a worker of another
+ * postinstall copies node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs
+ * into public/ (scripts/setup-assets.js), and pdf.js refuses a worker of another
  * version than its API ("The API version ... does not match the Worker
  * version"). pdfjs-dist arrived only as react-pdf's dependency, so the copy
  * read whichever pdfjs-dist npm hoisted. It is listed at react-pdf's exact
@@ -24,5 +24,19 @@ describe("the pdf.js worker postinstall copies", () => {
 
     expect(listed).toBe(wanted);
     expect(installed).toBe(wanted);
+  });
+
+  // The reader runs pdf.js's legacy build (next.config.mjs aliases
+  // pdfjs-dist to it), for the oldest browsers in the browserslist, and so
+  // must its worker: the default build's calls URL.parse and
+  // Promise.withResolvers without a polyfill too.
+  it("is the legacy build's, as the reader's pdf.js is", () => {
+    const file = (path: string) => readFileSync(join(process.cwd(), path));
+    const copied = file("public/pdf.worker.min.mjs");
+    const legacy = file(
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    );
+
+    expect(copied.equals(legacy)).toBe(true);
   });
 });

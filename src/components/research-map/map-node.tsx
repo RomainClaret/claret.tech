@@ -64,7 +64,7 @@ export const MapNodeButton = forwardRef<HTMLButtonElement, MapNodeProps>(
         onPointerLeave={() => onPoint(null)}
         onFocus={() => onPoint(node.id)}
         onBlur={() => onPoint(null)}
-        className="lane-ink absolute flex items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="lane-ink absolute flex items-center justify-center rounded-full outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         style={
           {
             left: place.x - offset - half,
@@ -80,7 +80,7 @@ export const MapNodeButton = forwardRef<HTMLButtonElement, MapNodeProps>(
           aria-hidden="true"
           // On the page's background, hugging the words: lines pass
           // behind a label, not through it.
-          className="absolute left-1/2 line-clamp-2 w-max max-w-[104px] -translate-x-1/2 rounded-sm bg-background/90 px-1 text-center text-[11px] font-medium leading-tight text-foreground"
+          className="absolute left-1/2 line-clamp-2 w-max max-w-[104px] -translate-x-1/2 rounded-xs bg-background/90 px-1 text-center text-[11px] font-medium leading-tight text-foreground"
           style={place.labelSide === "below" ? { top: gap } : { bottom: gap }}
         >
           {node.label}
@@ -102,7 +102,7 @@ function Shape({
   const state = cn(
     "motion-safe:transition-transform",
     selected &&
-      "scale-110 ring-2 ring-[color:var(--ink)] ring-offset-2 ring-offset-background",
+      "scale-110 ring-2 ring-(--ink) ring-offset-2 ring-offset-background",
     lit && !selected && "scale-125",
   );
   if (kind === "project") {
@@ -111,7 +111,7 @@ function Shape({
         aria-hidden="true"
         data-shape="disc"
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)]",
+          "flex h-7 w-7 items-center justify-center rounded-full bg-(--ink)",
           state,
         )}
       >
@@ -125,7 +125,7 @@ function Shape({
         aria-hidden="true"
         data-shape="ring"
         className={cn(
-          "h-3.5 w-3.5 rounded-full border-[3px] border-[color:var(--ink)] bg-background",
+          "h-3.5 w-3.5 rounded-full border-[3px] border-(--ink) bg-background",
           state,
         )}
       />
@@ -135,7 +135,7 @@ function Shape({
     <span
       aria-hidden="true"
       data-shape="dot"
-      className={cn("h-3.5 w-3.5 rounded-full bg-[var(--ink)]", state)}
+      className={cn("h-3.5 w-3.5 rounded-full bg-(--ink)", state)}
     />
   );
 }
@@ -155,10 +155,10 @@ export function KindMark({
       className={cn(
         "lane-ink inline-block shrink-0 rounded-full",
         kind === "project" &&
-          "h-3.5 w-3.5 border-[4px] border-[color:var(--ink)] bg-background",
+          "h-3.5 w-3.5 border-4 border-(--ink) bg-background",
         kind === "other-work" &&
-          "h-2.5 w-2.5 border-2 border-[color:var(--ink)] bg-background",
-        kind === "publication" && "h-2.5 w-2.5 bg-[var(--ink)]",
+          "h-2.5 w-2.5 border-2 border-(--ink) bg-background",
+        kind === "publication" && "h-2.5 w-2.5 bg-(--ink)",
       )}
       style={
         { "--lane": color ?? "hsl(var(--muted-foreground))" } as CSSProperties

@@ -145,7 +145,7 @@ export function Navigation() {
       className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
         isScrolled
-          ? "bg-background/80 backdrop-blur-md border-b border-border shadow-sm"
+          ? "bg-background/80 backdrop-blur-md border-b border-border shadow-xs"
           : "bg-transparent",
       )}
     >
@@ -253,10 +253,10 @@ export function Navigation() {
             {/* Glassmorphism Panel with Gradient Border */}
             <div className="relative rounded-2xl overflow-hidden shadow-2xl">
               {/* Animated Gradient Border */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-purple-500/20 to-pink-500/20 animate-gradient-xy" />
+              <div className="absolute inset-0 bg-linear-to-br from-primary/30 via-purple-500/20 to-pink-500/20 animate-gradient-xy" />
 
               {/* Inner Content with Backdrop */}
-              <div className="relative m-[1px] rounded-2xl bg-background/95 backdrop-blur-xl">
+              <div className="relative m-px rounded-2xl bg-background/95 backdrop-blur-xl">
                 {/* Gradient Mesh Overlay */}
                 <div className="absolute inset-0 opacity-30">
                   <div className="absolute top-0 left-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl" />
@@ -281,10 +281,10 @@ export function Navigation() {
                             onClick={(e) => handleNavClick(e, item.href)}
                             className={cn(
                               "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                              "hover:bg-gradient-to-r hover:from-primary/10 hover:to-transparent",
-                              "group relative overflow-hidden backdrop-blur-sm",
+                              "hover:bg-linear-to-r hover:from-primary/10 hover:to-transparent",
+                              "group relative overflow-hidden backdrop-blur-xs",
                               isActive &&
-                                "bg-gradient-to-r from-primary/20 to-transparent",
+                                "bg-linear-to-r from-primary/20 to-transparent",
                               "animate-in fade-in slide-in-from-left-2",
                             )}
                             style={{ animationDelay: `${index * 50}ms` }}
@@ -298,7 +298,7 @@ export function Navigation() {
                             <div
                               className={cn(
                                 "p-1.5 rounded-lg transition-all duration-200",
-                                "bg-gradient-to-br from-card/50 to-card/30",
+                                "bg-linear-to-br from-card/50 to-card/30",
                                 "group-hover:scale-110 group-hover:from-primary/20 group-hover:to-primary/10",
                                 isActive && "from-primary/30 to-primary/20",
                               )}
@@ -326,14 +326,14 @@ export function Navigation() {
                             </span>
 
                             {/* Hover Effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity -z-10" />
+                            <div className="absolute inset-0 bg-linear-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity -z-10" />
                           </a>
                         );
                       })}
                   </div>
 
                   {/* Divider */}
-                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent mb-4" />
+                  <div className="h-px bg-linear-to-r from-transparent via-border/50 to-transparent mb-4" />
 
                   {/* Contact Button - Prominent CTA */}
                   <button
@@ -346,7 +346,7 @@ export function Navigation() {
                       }
                       handleNavClick(e, "#contact");
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-lg font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-primary to-primary/80 text-primary-foreground rounded-lg font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <Mail className="w-5 h-5" aria-hidden="true" />
                     Get In Touch

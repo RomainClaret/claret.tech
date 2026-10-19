@@ -1708,7 +1708,7 @@ test.describe("Terminal", () => {
 
     const results = await new AxeBuilder({ page })
       .include('[data-performance-monitor-active="true"]')
-      .withTags(["wcag2a", "wcag2aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();
     expect(
       results.violations

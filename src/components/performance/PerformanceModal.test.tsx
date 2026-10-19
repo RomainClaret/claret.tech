@@ -152,7 +152,7 @@ describe("PerformanceModal", () => {
     expect(
       within(dialog).getByRole("heading", { name: "Performance Dashboard" }),
     ).toBeInTheDocument();
-    expect(document.querySelector(".backdrop-blur-sm")).toHaveAttribute(
+    expect(document.querySelector(".backdrop-blur-xs")).toHaveAttribute(
       "aria-hidden",
       "true",
     );

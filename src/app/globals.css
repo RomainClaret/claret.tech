@@ -1,10 +1,408 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Performance optimizations */
-@import "../styles/performance.css";
-@import "../styles/motion.css";
+@import "../styles/performance.css" layer(utilities);
+@import "../styles/motion.css" layer(utilities);
+@import "../styles/high-contrast.css" layer(utilities);
+
+@custom-variant dark (&:is(.dark *));
+
+@plugin "@tailwindcss/typography";
+
+/* inline: utilities use each value itself, not a variable read on :root.
+   --font-sans is var(--font-montserrat), which next/font sets on <body>,
+   so read on :root it was empty and the site lost Montserrat. */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-ring: hsl(var(--ring));
+  --color-primary-50: rgb(var(--primary-50));
+  --color-primary-100: rgb(var(--primary-100));
+  --color-primary-200: rgb(var(--primary-200));
+  --color-primary-300: rgb(var(--primary-300));
+  --color-primary-400: rgb(var(--primary-400));
+  --color-primary-500: rgb(var(--primary-500));
+  --color-primary-600: rgb(var(--primary-600));
+  --color-primary-700: rgb(var(--primary-700));
+  --color-primary-800: rgb(var(--primary-800));
+  --color-primary-900: rgb(var(--primary-900));
+
+  --font-sans: var(--font-montserrat), system-ui, sans-serif;
+
+  --animate-slide-up: slideUp 0.5s ease-out;
+  --animate-slide-down: slideDown 0.5s ease-out;
+  --animate-bounce-slow: bounce 2s infinite;
+  --animate-typewriter: typewriter 2s steps(20) 1s 1 normal both;
+
+  --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
+  --background-image-gradient-conic: conic-gradient(
+    from 180deg at 50% 50%,
+    var(--tw-gradient-stops)
+  );
+
+  @keyframes slideUp {
+    0% {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes slideDown {
+    0% {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes typewriter {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility animate-in {
+  /* Animation utilities */
+  animation: animate-in 0.5s ease-out;
+}
+
+@utility scrollbar-hide {
+  /* Hide scrollbar but keep functionality */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for button containers */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
+
+@utility dual-brain-background {
+  /* Dual Brain Animation Styles */
+  @apply overflow-hidden;
+  position: relative;
+  mix-blend-mode: screen;
+
+  /* Dark mode enhancements for dual brain */
+  .dark & {
+    mix-blend-mode: lighten;
+    filter: brightness(1.2) contrast(1.1);
+  }
+  @media (max-width: 768px) {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none !important;
+  }
+}
+
+@utility dual-brain-primary {
+  position: relative;
+  z-index: 2;
+
+  /* Enhanced glow effects for dual brain */
+
+  &.is-pulsing {
+    animation: neural-pulse 2s ease-in-out;
+  }
+
+  .dark & {
+    filter: brightness(1.1) saturate(1.2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none !important;
+  }
+}
+
+@utility bg-gradient-radial {
+  /* Gradient radial background effect */
+  background: radial-gradient(
+    circle,
+    var(--tw-gradient-from),
+    var(--tw-gradient-via),
+    var(--tw-gradient-to)
+  );
+}
+
+@utility is-pulsing {
+  /* Enhanced glow effects for dual brain */
+
+  &.dual-brain-primary {
+    animation: neural-pulse 2s ease-in-out;
+  }
+}
+
+@utility dark {
+  /* Dark mode enhancements for dual brain */
+  & .dual-brain-background {
+    mix-blend-mode: lighten;
+    filter: brightness(1.2) contrast(1.1);
+  }
+
+  & .dual-brain-primary {
+    filter: brightness(1.1) saturate(1.2);
+  }
+}
+
+@utility neural-connection-path {
+  /* Neural connection animation */
+  stroke-dasharray: 5 10;
+  animation: neural-flow 3s linear infinite;
+}
+
+@utility text-gradient {
+  /* Responsive adjustments for dual brain */
+
+  /* Custom utilities */
+  @apply bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent;
+}
+
+@utility animate-typewriter {
+  animation: typewriter 2s steps(40) 1s forwards;
+}
+
+@utility animate-fade-in {
+  /* Lightweight animation classes to replace framer-motion */
+  animation: fadeIn 0.6s ease-out forwards;
+  opacity: 0;
+
+  /* Experience card cascading layout */
+
+  /* In-view trigger */
+  /* Removed opacity: 0 from .animate-on-scroll to prevent elements being invisible */
+
+  /* When in-view class is applied, animations will run */
+
+  /* Ensure animations are visible when not using the animate-on-scroll wrapper */
+  &:not(.animate-on-scroll) {
+    opacity: 1 !important;
+  }
+}
+
+@utility animate-slide-in-up {
+  animation: slideInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+  &:not(.animate-on-scroll) {
+    opacity: 1 !important;
+  }
+}
+
+@utility animate-scale-in {
+  animation: scaleIn 0.4s ease-out forwards;
+  opacity: 0;
+  transform: scale(0.9);
+  &:not(.animate-on-scroll) {
+    opacity: 1 !important;
+  }
+}
+
+@utility animation-delay-200 {
+  /* The splash's one delay (splash-screen.tsx); the entrances have none. */
+  animation-delay: 200ms;
+}
+
+@utility animate-float {
+  /* Shimmer animation for color headers */
+
+  /* Education section animations */
+  animation: float 15s ease-in-out infinite;
+}
+
+@utility rotate-y-180 {
+  /* 3D rotate animation */
+  transform: rotateY(180deg);
+}
+
+@utility slide-in-from-top-2 {
+  /* Slide in from top animation */
+  animation: slideInFromTop 0.3s ease-out;
+}
+
+@utility animate-gradient-xy {
+  /* Animated gradient for mobile menu border */
+  background-size: 200% 200%;
+  animation: gradient-xy 6s ease infinite;
+}
+
+@utility animate-gradient-shift {
+  /* Gradient shift animation for neural background */
+  animation: gradient-shift 20s ease-in-out infinite;
+}
+
+@utility xterm {
+  /* Holographic animation for cards */
+
+  /* Terminal specific styles */
+  & .xterm-screen {
+    padding-top: 1rem;
+  }
+}
+
+@utility xterm-screen {
+  /* Holographic animation for cards */
+
+  /* Terminal specific styles */
+  .xterm & {
+    padding-top: 1rem;
+  }
+}
+
+@utility experience-bullet {
+  /* Experience section improvements */
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+
+  &::before {
+    content: "▸";
+    color: rgb(var(--primary));
+    font-weight: bold;
+    line-height: 1.5;
+    flex-shrink: 0;
+  }
+}
+
+@utility section-title-gradient {
+  /* Centralized gradient title styling */
+  @apply text-3xl sm:text-4xl font-bold mb-3 sm:mb-4 bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent;
+}
+
+@utility section-subtitle-gradient {
+  @apply text-xl sm:text-2xl font-semibold mb-2 sm:mb-3 bg-linear-to-r from-primary/80 to-purple-600/80 bg-clip-text text-transparent;
+}
+
+@utility timeline-connector {
+  @media (min-width: 1024px) {
+    /* Timeline connector lines */
+    @apply absolute top-1/2 w-8 h-0.5 bg-border;
+  }
+}
+
+@utility timeline-connector-left {
+  @media (min-width: 1024px) {
+    @apply right-full mr-4;
+  }
+}
+
+@utility timeline-connector-right {
+  @media (min-width: 1024px) {
+    @apply left-full ml-4;
+  }
+}
+
+@utility skills-card-chain {
+  @media (min-width: 1024px) {
+    /* Skills card chaining layout */
+    margin-top: 2rem; /* Positive spacing between cards */
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+}
+
+@utility resize-none {
+  /* Terminal resize and drag cursor styles */
+  resize: none !important;
+}
+
+@utility cursor-ns-resize {
+  /* Ensure proper cursor styles during resize */
+  cursor: ns-resize !important;
+}
+
+@utility cursor-ew-resize {
+  cursor: ew-resize !important;
+}
+
+@utility cursor-nesw-resize {
+  cursor: nesw-resize !important;
+}
+
+@utility cursor-nwse-resize {
+  cursor: nwse-resize !important;
+}
+
+@utility cursor-move {
+  cursor: move !important;
+}
+
+@utility terminal-header {
+  /* Terminal header smooth dragging */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+@utility no-select {
+  /* Prevent text selection during drag/resize */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+@utility grid-stretch {
+  /* Grid items stretch to fill container */
+  & > * {
+    @apply h-full;
+  }
+}
 
 @layer base {
   :root {
@@ -92,7 +490,8 @@
   }
 }
 
-/* Text in a colour that comes from data (accent-text.ts): darkened on the
+@layer utilities {
+  /* Text in a colour that comes from data (accent-text.ts): darkened on the
    light theme, lightened on the dark one. Over the site's data colours it
    reads at 5.07:1 or more on white, slate-50 and the colour's own 10 to 20%
    tints, and at 5.71:1 or more on the dark ones; over the companies' logo
@@ -100,61 +499,53 @@
    brightness first (ExperienceTimeline.tsx), 4.73:1 or more on dark
    (accent-text.test.ts). Used as they were, the colours read at 1.5 to
    4.3:1 on their own light tints (WCAG 1.4.3 asks 4.5 for small text). */
-.accent-text {
-  color: color-mix(in srgb, var(--accent) 50%, black);
-}
+  .accent-text {
+    color: color-mix(in srgb, var(--accent) 50%, black);
+  }
 
-.dark .accent-text {
-  color: color-mix(in srgb, var(--accent) 70%, white);
-}
+  .dark .accent-text {
+    color: color-mix(in srgb, var(--accent) 70%, white);
+  }
 
-/* The same for a colour no test can list, a GitHub language's: a deeper mix
+  /* The same for a colour no test can list, a GitHub language's: a deeper mix
    that reads at 4.5:1 or more for any colour, on the same surfaces (white,
    slate-50 and its own light tints; the dark background and its own dark
    tints). The worst cases are white on the light theme, at 5.7:1, and black
    on the dark one, at 5.0:1 (accent-text.test.ts samples the colour cube).
    Through .accent-text, 5 of the 37 fallback language colours fell short:
    Lua's navy read at 2.7:1 on the dark theme. */
-.accent-text-any {
-  color: color-mix(in srgb, var(--accent) 40%, black);
-}
+  .accent-text-any {
+    color: color-mix(in srgb, var(--accent) 40%, black);
+  }
 
-.dark .accent-text-any {
-  color: color-mix(in srgb, var(--accent) 50%, white);
-}
+  .dark .accent-text-any {
+    color: color-mix(in srgb, var(--accent) 50%, white);
+  }
 
-/* A card's brand colour, chosen by theme in CSS: each Experience card sets
+  /* A card's brand colour, chosen by theme in CSS: each Experience card sets
    --brand (its logo colour) and --brand-dark (the same, doubled in
    brightness), as "r, g, b", and its parts use rgb(var(--c)). The server's
    HTML paints the right one as soon as the head script sets .dark, where the
    theme's state in JavaScript only settles after hydration. */
-.brand-colour {
-  --c: var(--brand);
-}
+  .brand-colour {
+    --c: var(--brand);
+  }
 
-.dark .brand-colour {
-  --c: var(--brand-dark);
-}
+  .dark .brand-colour {
+    --c: var(--brand-dark);
+  }
 
-/* The research map's lane colours, given per element as --lane: on dots,
+  /* The research map's lane colours, given per element as --lane: on dots,
    rings, spans and swatches, never on text. At least 3:1 against both
    themes (research-map-data.test.ts); high contrast swaps them for the
    text colour (styles/high-contrast.css). */
-.lane-ink {
-  --ink: var(--lane);
+  .lane-ink {
+    --ink: var(--lane);
+  }
+
+  /* Custom utilities */
 }
-
-/* Custom utilities */
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Animation utilities */
-  .animate-in {
-    animation: animate-in 0.5s ease-out;
-  }
-
   @keyframes animate-in {
     from {
       opacity: 0;
@@ -170,40 +561,6 @@
   html {
     scroll-behavior: smooth;
   }
-
-  /* Hide scrollbar but keep functionality */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Dual Brain Animation Styles */
-  .dual-brain-background {
-    @apply overflow-hidden;
-    position: relative;
-    mix-blend-mode: screen;
-  }
-
-  .dual-brain-primary {
-    position: relative;
-    z-index: 2;
-  }
-
-  /* Gradient radial background effect */
-  .bg-gradient-radial {
-    background: radial-gradient(
-      circle,
-      var(--tw-gradient-from),
-      var(--tw-gradient-via),
-      var(--tw-gradient-to)
-    );
-  }
-
-  /* Enhanced glow effects for dual brain */
   @keyframes neural-pulse {
     0%,
     100% {
@@ -213,22 +570,6 @@
       filter: brightness(1.1) drop-shadow(0 0 40px rgba(139, 92, 246, 0.6));
     }
   }
-
-  .dual-brain-primary.is-pulsing {
-    animation: neural-pulse 2s ease-in-out;
-  }
-
-  /* Dark mode enhancements for dual brain */
-  .dark .dual-brain-background {
-    mix-blend-mode: lighten;
-    filter: brightness(1.2) contrast(1.1);
-  }
-
-  .dark .dual-brain-primary {
-    filter: brightness(1.1) saturate(1.2);
-  }
-
-  /* Neural connection animation */
   @keyframes neural-flow {
     0% {
       stroke-dashoffset: 0;
@@ -238,34 +579,6 @@
     }
   }
 
-  .neural-connection-path {
-    stroke-dasharray: 5 10;
-    animation: neural-flow 3s linear infinite;
-  }
-
-  /* Responsive adjustments for dual brain */
-  @media (max-width: 768px) {
-    .dual-brain-background {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .dual-brain-background,
-    .dual-brain-primary {
-      animation: none !important;
-    }
-  }
-
-  /* Custom utilities */
-  .text-gradient {
-    @apply bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent;
-  }
-
-  .animate-typewriter {
-    animation: typewriter 2s steps(40) 1s forwards;
-  }
-
   @keyframes typewriter {
     from {
       width: 0;
@@ -273,24 +586,6 @@
     to {
       width: 100%;
     }
-  }
-
-  /* Lightweight animation classes to replace framer-motion */
-  .animate-fade-in {
-    animation: fadeIn 0.6s ease-out forwards;
-    opacity: 0;
-  }
-
-  .animate-slide-in-up {
-    animation: slideInUp 0.6s ease-out forwards;
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  .animate-scale-in {
-    animation: scaleIn 0.4s ease-out forwards;
-    opacity: 0;
-    transform: scale(0.9);
   }
 
   @keyframes fadeIn {
@@ -312,13 +607,6 @@
       transform: scale(1);
     }
   }
-
-  /* The splash's one delay (splash-screen.tsx); the entrances have none. */
-  .animation-delay-200 {
-    animation-delay: 200ms;
-  }
-
-  /* Shimmer animation for color headers */
   @keyframes shimmer {
     0% {
       transform: translateX(-100%);
@@ -327,8 +615,6 @@
       transform: translateX(200%);
     }
   }
-
-  /* Education section animations */
   @keyframes float {
     0%,
     100% {
@@ -345,20 +631,6 @@
     }
   }
 
-  .animate-float {
-    animation: float 15s ease-in-out infinite;
-  }
-
-  /* 3D rotate animation */
-  .rotate-y-180 {
-    transform: rotateY(180deg);
-  }
-
-  /* Slide in from top animation */
-  .slide-in-from-top-2 {
-    animation: slideInFromTop 0.3s ease-out;
-  }
-
   @keyframes slideInFromTop {
     from {
       opacity: 0;
@@ -369,8 +641,6 @@
       transform: translateY(0);
     }
   }
-
-  /* Animated gradient for mobile menu border */
   @keyframes gradient-xy {
     0%,
     100% {
@@ -380,13 +650,6 @@
       background-position: right bottom;
     }
   }
-
-  .animate-gradient-xy {
-    background-size: 200% 200%;
-    animation: gradient-xy 6s ease infinite;
-  }
-
-  /* Gradient shift animation for neural background */
   @keyframes gradient-shift {
     0%,
     100% {
@@ -398,12 +661,6 @@
       transform: translateX(10%) translateY(10%);
     }
   }
-
-  .animate-gradient-shift {
-    animation: gradient-shift 20s ease-in-out infinite;
-  }
-
-  /* Holographic animation for cards */
   @keyframes holographic {
     0% {
       background-position: 0% 50%;
@@ -415,178 +672,59 @@
       background-position: 0% 50%;
     }
   }
-
-  /* Terminal specific styles */
-  .xterm .xterm-screen {
-    padding-top: 1rem;
-  }
-
-  /* Experience section improvements */
-  .experience-bullet {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .experience-bullet::before {
-    content: "▸";
-    color: rgb(var(--primary));
-    font-weight: bold;
-    line-height: 1.5;
-    flex-shrink: 0;
-  }
-
-  /* Centralized gradient title styling */
-  .section-title-gradient {
-    @apply text-3xl sm:text-4xl font-bold mb-3 sm:mb-4 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent;
-  }
-
-  .section-subtitle-gradient {
-    @apply text-xl sm:text-2xl font-semibold mb-2 sm:mb-3 bg-gradient-to-r from-primary/80 to-purple-600/80 bg-clip-text text-transparent;
-  }
-
-  /* Experience card cascading layout */
-  @media (min-width: 1024px) {
-    /* Timeline connector lines */
-    .timeline-connector {
-      @apply absolute top-1/2 w-8 h-0.5 bg-border;
-    }
-
-    .timeline-connector-left {
-      @apply right-full mr-4;
-    }
-
-    .timeline-connector-right {
-      @apply left-full ml-4;
-    }
-
-    /* Skills card chaining layout */
-    .skills-card-chain {
-      margin-top: 2rem; /* Positive spacing between cards */
-    }
-
-    .skills-card-chain:first-child {
-      margin-top: 0;
-    }
-  }
-
-  /* In-view trigger */
-  /* Removed opacity: 0 from .animate-on-scroll to prevent elements being invisible */
-
-  /* When in-view class is applied, animations will run */
-
-  /* Ensure animations are visible when not using the animate-on-scroll wrapper */
-  .animate-fade-in:not(.animate-on-scroll),
-  .animate-slide-in-up:not(.animate-on-scroll),
-  .animate-scale-in:not(.animate-on-scroll) {
-    opacity: 1 !important;
-  }
-
-  /* Terminal resize and drag cursor styles */
-  .resize-none {
-    resize: none !important;
-  }
-
-  /* Ensure proper cursor styles during resize */
-  .cursor-ns-resize {
-    cursor: ns-resize !important;
-  }
-
-  .cursor-ew-resize {
-    cursor: ew-resize !important;
-  }
-
-  .cursor-nesw-resize {
-    cursor: nesw-resize !important;
-  }
-
-  .cursor-nwse-resize {
-    cursor: nwse-resize !important;
-  }
-
-  .cursor-move {
-    cursor: move !important;
-  }
-
-  /* Terminal header smooth dragging */
-  .terminal-header {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    user-select: none;
-  }
-
-  /* Prevent text selection during drag/resize */
-  .no-select {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    user-select: none;
-  }
-
-  /* Hide scrollbar for button containers */
-  .scrollbar-hide {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
-  }
-
-  /* Grid items stretch to fill container */
-  .grid-stretch > * {
-    @apply h-full;
-  }
 }
 
-/* Respect user's motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  /* Remove all animations */
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+@layer utilities {
+  /* Respect user's motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    /* Remove all animations */
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    /* Disable specific animations */
+    .animate-fade-in,
+    .animate-slide-in-up,
+    .animate-scale-in,
+    .animate-float,
+    .animate-gradient-xy,
+    .animate-gradient-shift,
+    .animate-typewriter,
+    .animate-pulse {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+
+    /* Disable hover effects that involve motion */
+    .hover\:scale-105:hover,
+    .hover\:scale-110:hover,
+    .hover\:-translate-y-1:hover,
+    .hover\:-translate-y-2:hover {
+      transform: none !important;
+    }
+
+    /* Disable transform transitions */
+    .transition-transform,
+    .transition-all,
+    .transition {
+      transition-property:
+        opacity, color, background-color, border-color !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    /* Ensure content is visible */
+    .animate-on-scroll {
+      opacity: 1 !important;
+    }
   }
 
-  /* Disable specific animations */
-  .animate-fade-in,
-  .animate-slide-in-up,
-  .animate-scale-in,
-  .animate-float,
-  .animate-gradient-xy,
-  .animate-gradient-shift,
-  .animate-typewriter,
-  .animate-pulse {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  /* Disable hover effects that involve motion */
-  .hover\:scale-105:hover,
-  .hover\:scale-110:hover,
-  .hover\:-translate-y-1:hover,
-  .hover\:-translate-y-2:hover {
-    transform: none !important;
-  }
-
-  /* Disable transform transitions */
-  .transition-transform,
-  .transition-all,
-  .transition {
-    transition-property:
-      opacity, color, background-color, border-color !important;
-    transition-duration: 0.01ms !important;
-  }
-
-  /* Ensure content is visible */
-  .animate-on-scroll {
-    opacity: 1 !important;
-  }
-}
-
-/* The splash's backdrop is in the HTML and only the bundle removes it
+  /* The splash's backdrop is in the HTML and only the bundle removes it
    (app-wrapper.tsx). If the bundle never runs (a blocked or missing chunk,
    an error before hydration), this hides it 6 s after its first paint, so
    the page still shows. A working bundle removes it well before: 0.5 s
@@ -598,17 +736,17 @@
    - !important keeps broader rules from cancelling or pausing it.
    - visibility, because every browser animates it (display, only recent
      ones), and a hidden box takes no clicks. */
-[data-splash-backdrop] {
-  animation: splash-backdrop-timeout 0s 6s forwards !important;
-}
-
-@keyframes splash-backdrop-timeout {
-  to {
-    visibility: hidden;
+  [data-splash-backdrop] {
+    animation: splash-backdrop-timeout 0s 6s forwards !important;
   }
-}
 
-/* framer-motion puts each `m` element's initial state in the HTML, and for
+  @keyframes splash-backdrop-timeout {
+    to {
+      visibility: hidden;
+    }
+  }
+
+  /* framer-motion puts each `m` element's initial state in the HTML, and for
    most of the page's text that is opacity 0: only framer's features, a
    chunk loaded after hydration (motion-provider.tsx), animate it in. When
    that chunk fails, the bundle never runs or scripts are off, 14% of the
@@ -627,39 +765,39 @@
      ("transform:scale(0)"), so the text check never saw them hidden.
    - A plain selector list, no :is(): the browsers that cannot run the
      bundle may not parse it either. */
-html:not([data-motion-features]) [style*="opacity:0;transform:"],
-html:not([data-motion-features]) [style*="opacity: 0; transform:"],
-html:not([data-motion-features]) [style="opacity:0"],
-html:not([data-motion-features]) [style="opacity: 0;"],
-html:not([data-motion-features]) [style="transform:scale(0)"],
-html:not([data-motion-features]) [style="transform: scale(0);"],
-html:not([data-motion-features]) [data-reveal="pending"] {
-  animation: motion-features-timeout 0s 6s forwards !important;
-}
-
-html[data-motion-features="failed"] [style*="opacity:0;transform:"],
-html[data-motion-features="failed"] [style*="opacity: 0; transform:"],
-html[data-motion-features="failed"] [style="opacity:0"],
-html[data-motion-features="failed"] [style="opacity: 0;"],
-html[data-motion-features="failed"] [style="transform:scale(0)"],
-html[data-motion-features="failed"] [style="transform: scale(0);"] {
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-@keyframes motion-features-timeout {
-  to {
-    opacity: 1;
-    transform: none;
+  html:not([data-motion-features]) [style*="opacity:0;transform:"],
+  html:not([data-motion-features]) [style*="opacity: 0; transform:"],
+  html:not([data-motion-features]) [style="opacity:0"],
+  html:not([data-motion-features]) [style="opacity: 0;"],
+  html:not([data-motion-features]) [style="transform:scale(0)"],
+  html:not([data-motion-features]) [style="transform: scale(0);"],
+  html:not([data-motion-features]) [data-reveal="pending"] {
+    animation: motion-features-timeout 0s 6s forwards !important;
   }
-}
 
-/* Fonts are loaded via next/font in layout.tsx (its hashed @font-face rules
+  html[data-motion-features="failed"] [style*="opacity:0;transform:"],
+  html[data-motion-features="failed"] [style*="opacity: 0; transform:"],
+  html[data-motion-features="failed"] [style="opacity:0"],
+  html[data-motion-features="failed"] [style="opacity: 0;"],
+  html[data-motion-features="failed"] [style="transform:scale(0)"],
+  html[data-motion-features="failed"] [style="transform: scale(0);"] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  @keyframes motion-features-timeout {
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Fonts are loaded via next/font in layout.tsx (its hashed @font-face rules
    and CSS variables); the old manual @font-face duplicates were never applied
    because Tailwind only references the next/font variables. */
 
-/* Import high contrast mode styles */
-@import "../styles/high-contrast.css";
+  /* Import high contrast mode styles */
+}
 
 /* Cursor blink animation - pure CSS for better performance */
 @keyframes cursor-blink {

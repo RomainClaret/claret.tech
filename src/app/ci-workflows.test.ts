@@ -126,6 +126,35 @@ describe("the GitHub workflows", () => {
     expect(filterPaths(e2e, "src")).toContain("scripts/**");
   });
 
+  it("build and test a change under patches/", () => {
+    // npm ci applies patches/ to node_modules (scripts/apply-patches.mjs,
+    // in the postinstall): a patch changes what every job builds and tests.
+    const ci = workflow("ci.yml");
+    const e2e = workflow("playwright.yml");
+
+    expect(filterPaths(ci, "source")).toContain("patches/**");
+    expect(filterPaths(ci, "has-code-changes")).toContain("patches/**");
+    expect(filterPaths(e2e, "dependencies")).toContain("patches/**");
+  });
+
+  it("spend no time on steps that buy nothing", () => {
+    // Every ci.yml job deleted the runner's Android and .NET SDKs before
+    // npm ci: 53 to 193 s a job in run 37233882629 (2026-10-04), more than
+    // npm ci and the tests took, with 103 GB still free after it and
+    // node_modules at 0.9 GB. Ten jobs cached two folders Vitest 5 never
+    // writes (it keeps node_modules/.vite/vitest/<hash>/results.json), and
+    // the build job saved a .next that nothing restored.
+    for (const { name, text } of workflows) {
+      expect(text, name).not.toMatch(
+        /rm -rf \/usr\/(?:local\/lib\/android|share\/dotnet)/,
+      );
+      expect(text, name).not.toMatch(
+        /\.vitest-cache|node_modules\/\.cache\/vitest/,
+      );
+    }
+    expect(workflow("ci.yml")).not.toMatch(/^\s*path: \.next\s*$/m);
+  });
+
   it("run the phone suite on any change to the site", () => {
     // Its own filter matched only files named *mobile* (one, never
     // rendered), so the whole-page 320 px reflow test skipped most changes.
@@ -280,6 +309,33 @@ describe("the GitHub workflows", () => {
     ]);
   });
 
+  it("give the build what the /profile.json snapshot needs", () => {
+    // src/app/profile.json/route.ts saves the pinned repositories at build
+    // time, for Projects to read when the API fails. It needs the token, the
+    // switch and an account. The workflow never passed an account (round 16
+    // deleted the unused GH_USERNAME secret); the build could only find
+    // Vercel's copy through `vercel pull`, and only if Vercel stores it as
+    // Config (a Secret's value is write-only after saving, Vercel's docs
+    // say). The build env names it now.
+    const lines = workflow("deploy.yml").split("\n");
+    const start = lines.findIndex((line) =>
+      /^\s+env: &build-env\s*$/.test(line),
+    );
+    const indent = lines[start].search(/\S/);
+    const env: Record<string, string> = {};
+    for (const line of lines.slice(start + 1)) {
+      if (line.trim() === "" || line.trim().startsWith("#")) continue;
+      if (line.search(/\S/) <= indent) break;
+      const [, key, value] =
+        line.match(/^\s*([A-Z_][A-Z0-9_]*):\s*(.*)$/) ?? [];
+      if (key) env[key] = value;
+    }
+
+    expect(env.GITHUB_TOKEN).toMatch(/\$\{\{ secrets\.\w+ \}\}/);
+    expect(env.USE_GITHUB_DATA).toBe("true");
+    expect(env.GH_USERNAME).toBeTruthy();
+  });
+
   it("set only environment variables something reads", () => {
     // deploy.yml handed the Medium secret to the production build under a
     // name no code read, and six CI steps set a mock of it that changed
@@ -296,7 +352,7 @@ describe("the GitHub workflows", () => {
       ...["src", "scripts", ".github/scripts", "tests"].flatMap(scriptsUnder),
       "next.config.mjs",
       "playwright.config.ts",
-      "vitest.config.ts",
+      "vitest.config.mts",
     ].filter((path) => path !== "src/app/ci-workflows.test.ts");
     const code = files
       .filter((path) => !path.endsWith(".sh"))

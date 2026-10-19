@@ -166,6 +166,14 @@ async function fetchAllRepositories(
 
 async function handler(request: NextRequest) {
   try {
+    // As /api/fetch-github: with GitHub data off (CI's e2e builds, a local
+    // server without the token), there is nothing to fetch. This route used
+    // to answer 500 when GH_USERNAME was missing, a console error on every
+    // page load there, and called GitHub anyway when it was set.
+    if (process.env.USE_GITHUB_DATA !== "true") {
+      return NextResponse.json({ success: true, data: [], cached: false });
+    }
+
     // ?fresh alone is not enough. Every forced refresh costs one authenticated
     // GitHub GraphQL call per 100 repositories against the owner's token, and
     // it bypasses both this cache and the CDN, so an anonymous caller could

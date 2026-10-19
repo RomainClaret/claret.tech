@@ -42,10 +42,10 @@ export function PDFModal({
   // z-10, and the cookie notice (z-50 at the page's root) painted over its
   // bottom and took its clicks, the bottom quarter of a phone's screen.
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/80 backdrop-blur-xs"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -54,7 +54,7 @@ export function PDFModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative w-full h-full max-w-6xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col outline-none"
+        className="relative w-full h-full max-w-6xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col outline-hidden"
         role="dialog"
         aria-modal="true"
         aria-label={title || "PDF viewer"}

@@ -6,18 +6,15 @@ import {
 } from "./pdf-links";
 
 /**
- * pdf.js wraps each link of a PDF in a <section tabindex="1000"> around an
- * <a> with no name. The positive tabindex put every wrapper ahead of the
- * page's own controls (2,184 Tab presses on the PhD thesis before its skip
- * links), and each link was announced as nothing but "link".
+ * pdf.js wraps each link of a PDF in a <section> around an <a> with no
+ * name, and each link was announced as nothing but "link".
  */
 
-/** A link annotation as pdf.js 5 renders it. */
+/** A link annotation as pdf.js 5.4 renders it. */
 function wrapper(href: string, id = "1R") {
   const section = document.createElement("section");
   section.className = "linkAnnotation";
   section.setAttribute("data-annotation-id", id);
-  section.tabIndex = 1000;
   const link = document.createElement("a");
   link.setAttribute("href", href);
   section.append(link);
@@ -53,7 +50,7 @@ describe("linkName", () => {
 });
 
 describe("watchLinkAnnotations", () => {
-  it("takes the wrappers out of the Tab order and names web links", async () => {
+  it("names web and mail links", async () => {
     const { root, layer } = annotationLayer();
     layer.append(wrapper("https://orcid.org/0000-0002-5612-8471"));
     const stop = watchLinkAnnotations(root);
@@ -63,9 +60,6 @@ describe("watchLinkAnnotations", () => {
     await settle();
 
     const [orcid, mail, internal] = layer.querySelectorAll("section");
-    expect([orcid, mail, internal].map((s) => s.tabIndex)).toEqual([
-      -1, -1, -1,
-    ]);
     expect(orcid.querySelector("a")).toHaveAttribute(
       "aria-label",
       "orcid.org/0000-0002-5612-8471",
@@ -100,7 +94,7 @@ describe("watchLinkAnnotations", () => {
     layer.append(wrapper("https://doi.org/10.1000/1"));
     await settle();
 
-    expect(layer.querySelector("section")!.tabIndex).toBe(1000);
+    expect(layer.querySelector("a")).not.toHaveAttribute("aria-label");
     root.remove();
   });
 
@@ -137,6 +131,39 @@ describe("fixLinkAnnotations", () => {
     const [first, second] = layer.querySelectorAll("a");
     expect(first).toHaveAttribute("aria-label", "Reference 5");
     expect(second).toHaveAttribute("aria-label", "Figure 1");
+    root.remove();
+  });
+
+  it("names a link pdf.js titled with the text under it, in place of the title", () => {
+    // pdf.js 5.4 titles each link with the text printed under it ("5" for
+    // "[5]"). Taken for a name, it left the GECCO paper's 33 links unnamed.
+    const { root, layer } = annotationLayer();
+    const titled = wrapper("#", "98R");
+    titled.querySelector("a")!.title = "5";
+    layer.append(titled);
+
+    fixLinkAnnotations(root, (id) => (id === "98R" ? "Reference 5" : null));
+
+    const link = titled.querySelector("a")!;
+    expect(link).toHaveAttribute("aria-label", "Reference 5");
+    // Not read after the name ("Reference 5, link, 5"), nor a tooltip.
+    expect(link).not.toHaveAttribute("title");
+    root.remove();
+  });
+
+  it("keeps the title of a link it cannot name", () => {
+    // An attachment's link: pdf.js titles it with the file's description,
+    // and no name of ours is known for it.
+    const { root, layer } = annotationLayer();
+    const attachment = wrapper("#", "7R");
+    attachment.querySelector("a")!.title = "results.csv";
+    layer.append(attachment);
+
+    fixLinkAnnotations(root, () => null);
+
+    const link = attachment.querySelector("a")!;
+    expect(link).toHaveAttribute("title", "results.csv");
+    expect(link).not.toHaveAttribute("aria-label");
     root.remove();
   });
 });

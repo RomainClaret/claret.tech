@@ -47,12 +47,15 @@ interface MockWindow {
   screen: MockScreen;
 }
 
-interface MockDocument extends Partial<Document> {
+interface MockDocument extends Omit<Partial<Document>, "createElement"> {
   cookie: string;
   createElement: ReturnType<typeof vi.fn>;
 }
 
-interface MockLocalStorage extends Partial<Storage> {
+interface MockLocalStorage extends Omit<
+  Partial<Storage>,
+  "getItem" | "setItem" | "removeItem"
+> {
   getItem: ReturnType<typeof vi.fn>;
   setItem: ReturnType<typeof vi.fn>;
   removeItem: ReturnType<typeof vi.fn>;

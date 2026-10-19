@@ -383,18 +383,18 @@ test.describe("Static shell", () => {
     });
   }
 
-  test("hydrates without a mismatch, and the backdrop gives way", async ({
+  // Any console error, not only hydration's: production reports none of its
+  // client errors (by design), so this is where a broken script or a failed
+  // request shows. Builds without GitHub data logged two on every load (a 500
+  // from /api/fetch-all-repos, a 404 from /profile.json) until both answered
+  // "no data" like /api/fetch-github.
+  test("hydrates without a mismatch, logs no error, and the backdrop gives way", async ({
     page,
   }) => {
     const errors: string[] = [];
     page.on("console", (message) => {
-      if (
-        message.type() === "error" &&
-        /hydrat|did not match|server rendered|Minified React error/i.test(
-          message.text(),
-        )
-      ) {
-        errors.push(message.text());
+      if (message.type() === "error") {
+        errors.push(`${message.text()} ${message.location().url}`);
       }
     });
     page.on("pageerror", (error) => errors.push(String(error)));
@@ -404,6 +404,8 @@ test.describe("Static shell", () => {
     await expect(page.locator("[data-splash-backdrop]")).toHaveCount(0, {
       timeout: 15_000,
     });
+    // The splash's and Projects' requests start at hydration.
+    await page.waitForLoadState("networkidle");
     expect(errors).toEqual([]);
   });
 

@@ -143,7 +143,7 @@ export function CertificationTimeline({
 
                   {/* Icon */}
                   <div
-                    className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                    className="relative z-10 shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
                     style={{
                       backgroundColor: `rgba(${color}, 0.1)`,
                     }}
@@ -224,7 +224,7 @@ export function CertificationTimeline({
                 transition={{ delay: 0.3 + index * 0.05 }}
               >
                 <div
-                  className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
+                  className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
                   style={{
                     backgroundColor: `rgba(${color}, 0.1)`,
                   }}
@@ -273,7 +273,7 @@ export function CertificationTimeline({
                 transition={{ delay: 0.3 + index * 0.05 }}
               >
                 <div
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
                   style={{
                     backgroundColor: `rgba(${color}, 0.1)`,
                   }}

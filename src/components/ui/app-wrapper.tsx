@@ -245,7 +245,7 @@ export function AppWrapper({ children }: AppWrapperProps) {
                 ref={backdropRef}
                 aria-hidden="true"
                 data-splash-backdrop=""
-                className="fixed inset-0 z-[10000] bg-background"
+                className="fixed inset-0 z-10000 bg-background"
               />
             )}
           {!isDirectDocument && !splashScreenComplete && (

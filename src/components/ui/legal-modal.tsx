@@ -35,7 +35,7 @@ export function LegalModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/80 backdrop-blur-xs"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -44,7 +44,7 @@ export function LegalModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative w-full h-full max-w-4xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col border border-border outline-none"
+        className="relative w-full h-full max-w-4xl max-h-[90vh] m-4 bg-background rounded-lg shadow-2xl flex flex-col border border-border outline-hidden"
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -68,7 +68,7 @@ export function LegalModal({
           tabIndex={0}
           role="region"
           aria-label={`${title} text`}
-          className="flex-1 overflow-y-auto p-6 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          className="flex-1 overflow-y-auto p-6 text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
         >
           {children}
         </div>

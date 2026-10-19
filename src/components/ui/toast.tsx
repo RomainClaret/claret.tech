@@ -102,7 +102,7 @@ export function Toast({
       // persistent control - and it is worst on slow machines, where the
       // quality watcher is what raises the toast in the first place. It also
       // broke the WebKit e2e shards, which could not open the terminal at all.
-      className={`fixed top-20 left-4 z-[9999] max-w-sm rounded-lg border backdrop-blur-sm shadow-lg transition-all duration-300 ${
+      className={`fixed top-20 left-4 z-9999 max-w-sm rounded-lg border backdrop-blur-xs shadow-lg transition-all duration-300 ${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
       } ${getTypeStyles()}`}
       // Never swallow a click meant for the page. The only thing in here worth
@@ -115,7 +115,7 @@ export function Toast({
     >
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <span className="text-lg flex-shrink-0 mt-0.5">{getIcon()}</span>
+          <span className="text-lg shrink-0 mt-0.5">{getIcon()}</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium leading-5 whitespace-pre-line">
               {message}
@@ -123,7 +123,7 @@ export function Toast({
           </div>
           <button
             onClick={handleClose}
-            className="flex-shrink-0 ml-2 opacity-70 hover:opacity-100 transition-opacity"
+            className="shrink-0 ml-2 opacity-70 hover:opacity-100 transition-opacity"
             // Opt back in: the panel above is pointer-events:none, so this is
             // the one part of a toast that can still be clicked.
             style={{ pointerEvents: isTestMode ? "none" : "auto" }}

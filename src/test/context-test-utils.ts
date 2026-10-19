@@ -12,6 +12,22 @@ import { vi } from "vitest";
 import React, { ReactNode } from "react";
 import { restoreNavigator, stubNavigator } from "./navigator";
 
+// Registered when this module loads, before any test runs. They used to sit
+// inside createTestWrapper() and fixReactDOMErrors(), which looked
+// conditional: Vitest 4 hoisted them here anyway, with a warning, and
+// Vitest 5 refuses to load a file with a nested vi.mock.
+vi.mock("@/contexts/safari-context", () => ({
+  useSafariContext: vi.fn(() => mockSafariContext),
+}));
+// Mock React.isValidElement to prevent instanceof errors
+vi.mock("react", async () => {
+  const actual = (await vi.importActual("react")) as typeof import("react");
+  return {
+    ...actual,
+    isValidElement: vi.fn(() => true),
+  };
+});
+
 // ==============================================================================
 // Browser API Mocking Utilities
 // ==============================================================================
@@ -91,18 +107,14 @@ export function mockBrowserAPIs() {
   global.cancelAnimationFrame = vi.fn();
 
   // Intersection Observer mocking
-  global.IntersectionObserver = vi.fn(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })) as unknown as typeof IntersectionObserver;
+  global.IntersectionObserver = vi.fn(function () {
+    return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+  }) as unknown as typeof IntersectionObserver;
 
   // Resize Observer mocking
-  global.ResizeObserver = vi.fn(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })) as unknown as typeof ResizeObserver;
+  global.ResizeObserver = vi.fn(function () {
+    return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+  }) as unknown as typeof ResizeObserver;
 
   // Local Storage mocking with configurable property
   Object.defineProperty(global, "localStorage", {
@@ -163,67 +175,29 @@ export const mockSafariContext = {
 // Note: mockSafariDetection and mockFpsHooks are defined below in the Safari Detection Mocking section
 
 // ==============================================================================
-// Performance Monitor Context Specific Utilities
-// ==============================================================================
-
-/**
- * Mock performance monitoring utilities
- */
-export function mockPerformanceMonitoring() {
-  // Mock performance metrics collection
-  const mockMetrics = {
-    memoryUsage: 50,
-    cpuUsage: 25,
-    networkSpeed: "fast" as const,
-    batteryLevel: 0.8,
-    isLowPowerMode: false,
-  };
-
-  return {
-    collectMetrics: vi.fn(() => Promise.resolve(mockMetrics)),
-    generateReport: vi.fn(() =>
-      Promise.resolve({
-        timestamp: Date.now(),
-        metrics: mockMetrics,
-        recommendations: [],
-      }),
-    ),
-    isOptimalPerformance: vi.fn(() => true),
-    shouldReduceAnimations: vi.fn(() => false),
-  };
-}
-
-// ==============================================================================
 // Test Wrapper Utilities
 // ==============================================================================
 
 /**
  * Comprehensive test wrapper that includes all necessary providers and mocks
  */
+// It also mocked "@/lib/utils/performance-monitor", a module that no longer
+// exists, with a factory that read a variable out of its scope once hoisted.
 export function createTestWrapper(
   options: {
     mockSafari?: boolean;
-    mockPerformance?: boolean;
     mockFps?: boolean;
   } = {},
 ) {
-  const { mockSafari = true, mockPerformance = true, mockFps = true } = options;
+  const { mockSafari = true, mockFps = true } = options;
 
   // Setup mocks based on options
   if (mockSafari) {
     mockSafariDetection();
-    vi.mock("@/contexts/safari-context", () => ({
-      useSafariContext: vi.fn(() => mockSafariContext),
-    }));
   }
 
   if (mockFps) {
     mockFpsHooks();
-  }
-
-  if (mockPerformance) {
-    const perfMocks = mockPerformanceMonitoring();
-    vi.mock("@/lib/utils/performance-monitor", () => perfMocks);
   }
 
   // Return wrapper component
@@ -244,14 +218,7 @@ export function createTestWrapper(
  * Utility to handle React DOM instanceof errors
  */
 export function fixReactDOMErrors() {
-  // Mock React.isValidElement to prevent instanceof errors
-  vi.mock("react", async () => {
-    const actual = (await vi.importActual("react")) as typeof import("react");
-    return {
-      ...actual,
-      isValidElement: vi.fn(() => true),
-    };
-  });
+  // React.isValidElement is mocked at the top of this module.
 
   // Mock React DOM utilities
   global.Element = global.Element || class Element {};

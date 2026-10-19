@@ -1,7 +1,7 @@
 /* High Contrast Mode Styles */
 
 /* The theme reads its colours as HSL components, hsl(var(--token))
-   (tailwind.config.ts), so these are greys written as HSL. Written as RGB
+   (globals.css's @theme), so these are greys written as HSL. Written as RGB
    triples until 2026-10, they painted light high contrast yellow,
    rgb(255, 255, 0), in Chromium and WebKit, and gave dark high contrast
    yellow text with ochre and brown accents. High contrast is on when the

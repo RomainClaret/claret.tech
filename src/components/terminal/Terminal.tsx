@@ -19,13 +19,6 @@ import type { FitAddon as FitAddonType } from "@xterm/addon-fit";
 // implementation, or the Python client would land in the terminal chunk.
 import type { LineMode, PromptMode } from "@/lib/terminal/line-mode";
 
-/** The private path to the DPR monitor xterm 5.5.0 forgets to dispose. */
-interface XTermInternals {
-  _core?: {
-    _coreBrowserService?: { _screenDprMonitor?: { dispose?: () => void } };
-  };
-}
-
 interface TerminalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -375,7 +368,6 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           cursorStyle: "block",
           allowTransparency: false,
           scrollback: 1000,
-          windowsMode: false,
           cols: 80,
           rows: 24,
           convertEol: true,
@@ -1575,14 +1567,9 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
           window.removeEventListener("resize", handleResize);
           clearTimeout(autofillTimer);
           onData.dispose();
-          // xterm 5.5.0 creates a ScreenDprMonitor for each terminal and
-          // never disposes it (CoreBrowserService does not register it), so
-          // every terminal opened left a window resize listener holding the
-          // whole disposed instance. Release it by hand; the optional chain
-          // makes this a no-op if a later xterm moves or fixes it.
-          (
-            term as unknown as XTermInternals
-          )._core?._coreBrowserService?._screenDprMonitor?.dispose?.();
+          // Disposes the ScreenDprMonitor too since xterm 6.0.0 (xtermjs
+          // #4936): 5.5.0 left a window resize listener per terminal, which
+          // this cleanup released through xterm's private internals.
           term.dispose();
           xtermRef.current = null;
           fitAddonRef.current = null;
@@ -1776,7 +1763,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                   </span>
                   <button
                     onClick={onClose}
-                    className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors focus:outline-hidden focus:ring-2 focus:ring-red-500"
                     aria-label="Close terminal"
                     title="Close"
                   />
@@ -1784,7 +1771,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                     onClick={
                       windowState === "minimized" ? restore : handleMinimize
                     }
-                    className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors focus:outline-hidden focus:ring-2 focus:ring-yellow-500"
                     aria-label={
                       windowState === "minimized"
                         ? "Restore terminal"
@@ -1794,7 +1781,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                   />
                   <button
                     onClick={handleMaximize}
-                    className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors focus:outline-hidden focus:ring-2 focus:ring-green-500"
                     aria-label={
                       windowState === "maximized"
                         ? "Restore terminal"

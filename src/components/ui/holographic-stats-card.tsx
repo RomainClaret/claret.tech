@@ -136,7 +136,7 @@ export function HolographicStatsCard({
 
         {/* Border gradient */}
         <m.div
-          className="absolute inset-0 rounded-lg p-[1px] -z-10 opacity-0 group-hover/statscard:opacity-100 transition-opacity duration-300"
+          className="absolute inset-0 rounded-lg p-px -z-10 opacity-0 group-hover/statscard:opacity-100 transition-opacity duration-300"
           style={{
             backgroundImage: `linear-gradient(135deg,
               rgba(${glowColor}, 0.5) 0%,

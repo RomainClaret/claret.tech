@@ -331,7 +331,7 @@ export function BlogCardHolographic({
                   }}
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-60" />
+              <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent opacity-60" />
             </div>
           )}
 
@@ -341,7 +341,7 @@ export function BlogCardHolographic({
           {/* Author and stats */}
           <div className="space-y-1 mb-3">
             <div className="text-sm text-muted-foreground flex items-start gap-1">
-              <User className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <User className="w-3 h-3 shrink-0 mt-0.5" />
               <p className="line-clamp-1">{author}</p>
               {views && (
                 <>
@@ -459,7 +459,7 @@ export function BlogCardHolographic({
                   backgroundColor: `rgba(${nodeColor}, 0.2)`,
                 }}
               />
-              <span className="relative z-10">More</span>
+              <span className="relative z-10">Medium</span>
               <Sparkles className="relative z-10 w-3 h-3 group-hover:rotate-12 transition-transform duration-300" />
             </a>
           </div>

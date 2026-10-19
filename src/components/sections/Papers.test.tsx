@@ -755,9 +755,8 @@ describe("Papers", () => {
       });
 
       // The neuroevolution paper should trigger color extraction
-      const { useColorExtraction } = await import(
-        "@/lib/hooks/useColorExtraction"
-      );
+      const { useColorExtraction } =
+        await import("@/lib/hooks/useColorExtraction");
       expect(useColorExtraction).toHaveBeenCalled();
     });
   });
@@ -955,8 +954,8 @@ describe("Papers", () => {
         ).toBeInTheDocument();
       });
 
-      await clickBibTeXWithClipboardDenied(
-        () => screen.getAllByText("BibTeX")[0].closest("button")!,
+      await clickBibTeXWithClipboardDenied(() =>
+        screen.getAllByText("BibTeX")[0].closest("button")!,
       );
     });
 
@@ -967,8 +966,8 @@ describe("Papers", () => {
         render(<Papers />);
         const cardRoot = document.getElementById("claret2016blockchain")!;
 
-        await clickBibTeXWithClipboardDenied(
-          () => within(cardRoot).getByText("BibTeX").closest("button")!,
+        await clickBibTeXWithClipboardDenied(() =>
+          within(cardRoot).getByText("BibTeX").closest("button")!,
         );
       } finally {
         delete card.bibtex;
@@ -1144,6 +1143,13 @@ describe("Papers", () => {
       );
       expect(accepted).toHaveAccessibleName(/arXiv/);
 
+      // Each name contains the label shown (WCAG 2.5.3, label in name), so a
+      // speech user can say what they see. The accepted line's name was
+      // "Authors' accepted manuscript on arXiv, ...", which axe 4.14 fails.
+      expect(published).toHaveAccessibleName(/published version/i);
+      expect(extended).toHaveAccessibleName(/extended version/i);
+      expect(accepted).toHaveAccessibleName(/accepted version/i);
+
       // An id the fetcher filled in on an uncurated paper is not shown: the
       // default label would call an unchecked preprint the published version
       expect(
@@ -1314,9 +1320,8 @@ describe("Papers", () => {
 
   describe("Animation and Performance", () => {
     it("reduces animations when requested", async () => {
-      const { useShouldReduceAnimations } = await import(
-        "@/lib/hooks/useSafari"
-      );
+      const { useShouldReduceAnimations } =
+        await import("@/lib/hooks/useSafari");
       (
         useShouldReduceAnimations as unknown as MockHookFunction
       ).mockReturnValue(true);
@@ -1499,14 +1504,7 @@ describe("Papers", () => {
           ([, init]) => init?.method === "POST",
         );
         expect(posts).toHaveLength(0);
-        // jsdom's Blob has no text(); FileReader reads it.
-        const contents = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(reader.error);
-          reader.readAsText(blobs[0]);
-        });
-        expect(contents).toBe(exportToBibTeX(mockPublications));
+        expect(await blobs[0].text()).toBe(exportToBibTeX(mockPublications));
       } finally {
         for (const key of ["createObjectURL", "revokeObjectURL"] as const) {
           if (saved[key]) Object.defineProperty(URL, key, saved[key]);

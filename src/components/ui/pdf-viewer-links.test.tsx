@@ -74,12 +74,11 @@ import type {
   LinkTextItem,
 } from "@/lib/utils/pdf-link-names";
 
-/** A link annotation as pdf.js 5 adds it to a layer already in place. */
+/** A link annotation as pdf.js 5.4 adds it to a layer already in place. */
 function addLink(layer: HTMLElement, href: string, id = "1R") {
   const section = document.createElement("section");
   section.className = "linkAnnotation";
   section.dataset.annotationId = id;
-  section.tabIndex = 1000;
   const link = document.createElement("a");
   link.setAttribute("href", href);
   section.append(link);
@@ -113,10 +112,8 @@ describe("PDFViewer's links", () => {
     globalThis.ResizeObserver = OriginalResizeObserver;
   });
 
-  it("puts each link in the Tab order once, and names web links", async () => {
-    // pdf.js's tabindex 1000 put every wrapper ahead of the page's own
-    // controls, and in a dialog each link was two stops; the links had no
-    // name at all.
+  it("names web links", async () => {
+    // pdf.js leaves every link without a name: each was announced as "link".
     render(<PDFViewer url="/pdfs/CV_RomainClaret.pdf" title="CV" />);
     const layer = await screen.findByTestId("layer-1");
 
@@ -127,8 +124,6 @@ describe("PDFViewer's links", () => {
       internal = addLink(layer, "#");
     });
 
-    expect(web.tabIndex).toBe(-1);
-    expect(internal.tabIndex).toBe(-1);
     expect(screen.getByRole("link", { name: "doi.org/10.1000/1" })).toBe(
       web.querySelector("a"),
     );

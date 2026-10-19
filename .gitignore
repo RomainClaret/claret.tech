@@ -87,13 +87,8 @@ yarn-error.log
 # pnpm
 pnpm-lock.yaml
 
-# Generated files
-public/profile.json
-public/blogs.json
-
 # Cache files
 src/lib/utils/kudos-cache.json
-src/lib/utils/medium-colors.json
 src/lib/utils/medium-cache.json
 
 # Sentry
@@ -130,18 +125,8 @@ node_modules/
 
 certificates
 
-# Development documentation
-docs/TESTING_INFRASTRUCTURE.md
-tests/e2e/README.md
-.github/workflows/README.md
-
-# ACT local testing
-.env.act.local.example
-.actrc
-
 # Testing configurations
 artillery.yml
-lighthouse.config.js
 lighthouse-report.html
 lighthouse-ci.json
 

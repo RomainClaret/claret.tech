@@ -99,13 +99,13 @@ function TestLayout({ children }: { children: React.ReactNode }) {
       {/* Skip Navigation Links */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
       >
         Skip to main content
       </a>
       <a
         href="#main-navigation"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-48 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-48 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
       >
         Skip to navigation
       </a>
@@ -413,7 +413,7 @@ describe("RootLayout", () => {
         expect(link).toHaveClass("focus:absolute");
         expect(link).toHaveClass("focus:z-50");
         expect(link).toHaveClass("focus:ring-2");
-        expect(link).toHaveClass("focus:outline-none");
+        expect(link).toHaveClass("focus:outline-hidden");
       });
     });
   });

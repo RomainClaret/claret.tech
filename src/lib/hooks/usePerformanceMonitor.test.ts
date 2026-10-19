@@ -180,16 +180,20 @@ describe("usePerformanceMonitor", () => {
       onmessage: null,
       onerror: null,
     };
-    global.Worker = vi.fn(() => mockWorker) as unknown as typeof Worker;
+    global.Worker = vi.fn(function () {
+      return mockWorker;
+    }) as unknown as typeof Worker;
 
     // Mock PerformanceObserver
     mockPerformanceObserver = {
       observe: vi.fn(),
       disconnect: vi.fn(),
     };
-    const mockPerformanceObserverConstructor = vi.fn(
-      () => mockPerformanceObserver,
-    );
+    // A function, not an arrow: the hook calls it with `new`, which Vitest 4
+    // refuses on an arrow, and the hook's try/catch hid the TypeError.
+    const mockPerformanceObserverConstructor = vi.fn(function () {
+      return mockPerformanceObserver;
+    });
     Object.assign(mockPerformanceObserverConstructor, {
       supportedEntryTypes: ["measure", "navigation", "paint", "resource"],
     });
@@ -861,7 +865,7 @@ describe("usePerformanceMonitor", () => {
       const { logWarning } = await import("@/lib/utils/dev-logger");
 
       // Mock Worker constructor to throw
-      global.Worker = vi.fn(() => {
+      global.Worker = vi.fn(function () {
         throw new Error("Worker not supported");
       });
 

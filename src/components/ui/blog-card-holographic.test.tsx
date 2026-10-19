@@ -104,6 +104,30 @@ describe("BlogCardHolographic color", () => {
   });
 });
 
+describe("BlogCardHolographic links", () => {
+  it("names the Medium profile link after where it goes", () => {
+    // It read "More", on every card: Lighthouse flagged it as a vague link
+    // text, and it opened the profile, not more of the post.
+    render(
+      <BlogCardHolographic
+        title="An article"
+        description="An article"
+        url="https://example.com/article"
+        date="2026-01-01"
+        image={IMAGE}
+        index={0}
+        color="12, 34, 56"
+      />,
+    );
+
+    const profile = screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href")?.includes("medium.com/@"));
+    expect(profile).toHaveLength(1);
+    expect(profile[0]).toHaveAccessibleName("Medium");
+  });
+});
+
 describe("BlogCardHolographic description", () => {
   it("says whether its long description is open", () => {
     render(

@@ -194,7 +194,7 @@ function ResearchCard({
                 />
               </div>
               <div className="flex-1">
-                <h3 className="text-base sm:text-lg font-bold mb-1 bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                <h3 className="text-base sm:text-lg font-bold mb-1 bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
                   {project.title}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-2">
@@ -253,7 +253,7 @@ function ResearchCard({
                               key={i}
                               className="flex items-start gap-2 text-sm"
                             >
-                              <Sparkles className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                              <Sparkles className="w-3 h-3 text-primary mt-0.5 shrink-0" />
                               <span className="text-muted-foreground">
                                 {highlight}
                               </span>
@@ -377,7 +377,7 @@ function ResearchCard({
                   event.stopPropagation();
                   onToggle();
                 }}
-                className="flex items-center gap-1 ml-auto text-primary cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex items-center gap-1 ml-auto text-primary cursor-pointer rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {isActive ? "Click to collapse" : "Click to expand"}
                 <ChevronDown
@@ -512,7 +512,7 @@ export function Research() {
 
               <HolographicCard
                 glowColor="245, 158, 11"
-                className="bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-yellow-500/5 backdrop-blur-sm"
+                className="bg-linear-to-br from-amber-500/5 via-orange-500/5 to-yellow-500/5 backdrop-blur-xs"
               >
                 <div className="p-6 sm:p-8 text-center">
                   <div className="flex justify-center mb-4">
@@ -544,7 +544,7 @@ export function Research() {
                     </div>
                   </div>
 
-                  <h3 className="text-xl sm:text-2xl font-bold mb-4 bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+                  <h3 className="text-xl sm:text-2xl font-bold mb-4 bg-linear-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
                     My Research Journey
                   </h3>
 
@@ -730,7 +730,7 @@ export function Research() {
 
             <HolographicCard
               glowColor={visibleProjects[0].color || "139, 92, 246"}
-              className="bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5 backdrop-blur-sm"
+              className="bg-linear-to-br from-primary/5 via-purple-500/5 to-pink-500/5 backdrop-blur-xs"
               // The highlight boxes below open hover tooltips that are taller
               // than the space left under them, so the card must not clip.
               allowContentOverflow
@@ -738,7 +738,7 @@ export function Research() {
             >
               <div className="p-6 sm:p-8">
                 <div className="text-center mb-4 sm:mb-6">
-                  <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                  <h3 className="text-xl sm:text-2xl font-bold mb-2 bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                     {visibleProjects[0].title}
                   </h3>
                   <p className="text-sm sm:text-base text-muted-foreground mb-2">
@@ -829,7 +829,7 @@ export function Research() {
                           aria-describedby={
                             explanation ? explanationId : undefined
                           }
-                          className="group relative h-full bg-card/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
+                          className="group relative h-full bg-card/50 backdrop-blur-xs rounded-lg p-3 sm:p-4 text-center border border-primary/20 hover:border-primary/50 focus-visible:border-primary/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring transition-all hover:shadow-lg min-h-[140px] sm:min-h-[160px] flex flex-col justify-between"
                           whileHover={{ scale: 1.05 }}
                           transition={{
                             type: "spring",
@@ -866,7 +866,7 @@ export function Research() {
                             id={explanationId}
                             role="tooltip"
                             className={cn(
-                              "absolute top-full mt-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-all duration-300 pointer-events-none z-[60] w-64",
+                              "absolute top-full mt-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-all duration-300 pointer-events-none z-60 w-64",
                               i % 2 === 0 ? "left-0" : "right-0",
                               "md:left-1/2 md:right-auto md:-translate-x-1/2",
                             )}
@@ -978,11 +978,11 @@ export function Research() {
             className="absolute left-1/2 -top-8 sm:-top-16 bottom-0 w-0.5 -translate-x-1/2 hidden md:block -z-10"
           >
             {/* Continuous gradient from Current Focus to end */}
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/30 via-primary/20 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-b from-primary/30 via-primary/20 to-transparent" />
             {/* Subtle pulse animation for visual continuity */}
             <div
               className={cn(
-                "absolute inset-0 bg-gradient-to-b from-primary/40 via-primary/25 to-transparent opacity-50",
+                "absolute inset-0 bg-linear-to-b from-primary/40 via-primary/25 to-transparent opacity-50",
                 !shouldReduceAnimations && "animate-pulse anim-decor",
               )}
             />
@@ -990,7 +990,7 @@ export function Research() {
 
           {/* Mobile Timeline - simplified single element */}
           <div className="absolute left-1/2 -top-8 sm:-top-16 bottom-0 w-0.5 -translate-x-1/2 md:hidden -z-10">
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/25 via-primary/15 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-b from-primary/25 via-primary/15 to-transparent" />
           </div>
 
           {/* Other Research Projects Grid */}

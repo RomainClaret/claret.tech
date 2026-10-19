@@ -240,13 +240,13 @@ export function Blog() {
                   <div className="flex items-start gap-3 mb-4">
                     <div className="w-12 h-12 bg-muted rounded-full" />
                     <div className="flex-1">
-                      <div className="h-4 bg-muted rounded w-20 mb-2" />
-                      <div className="h-3 bg-muted rounded w-24" />
+                      <div className="h-4 bg-muted rounded-sm w-20 mb-2" />
+                      <div className="h-3 bg-muted rounded-sm w-24" />
                     </div>
                   </div>
-                  <div className="h-6 bg-muted rounded mb-4 w-3/4" />
-                  <div className="h-4 bg-muted rounded mb-2" />
-                  <div className="h-4 bg-muted rounded w-5/6" />
+                  <div className="h-6 bg-muted rounded-sm mb-4 w-3/4" />
+                  <div className="h-4 bg-muted rounded-sm mb-2" />
+                  <div className="h-4 bg-muted rounded-sm w-5/6" />
                 </div>
               ))}
             </div>

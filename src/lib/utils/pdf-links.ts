@@ -1,14 +1,13 @@
 /**
- * pdf.js's link annotations, made usable from the keyboard.
+ * pdf.js's link annotations, named.
  *
- * pdf.js wraps each link of a PDF in a `<section tabindex="1000">` around an
- * `<a>` that has no name. A positive tabindex goes ahead of everything else
- * in a page's Tab order: on `/pdf/<slug>` the first Tab presses walked these
- * wrappers (21 on the CV, 2,184 on the PhD thesis) ahead even of the skip
- * links, and a dialog that cycled through its controls counted each link
- * twice. A link with no name is announced as "link" and nothing else: web
- * and mail links are named here by their address, links within the document
- * by the text printed under them (pdf-link-names.ts).
+ * pdf.js wraps each link of a PDF in a `<section>` around an `<a>` that has
+ * no name, and a link with no name is announced as "link" and nothing else:
+ * web and mail links are named here by their address, links within the
+ * document by the text printed under them (pdf-link-names.ts). Until pdf.js
+ * 5.4 the wrappers also had tabindex 1000, which put them ahead of
+ * everything in a page's Tab order (21 Tab presses on the CV, 2,184 on the
+ * PhD thesis, before even the skip links); this file took them out of it.
  */
 
 /**
@@ -36,17 +35,11 @@ function decode(text: string): string {
 /** A link's name by its annotation id (pdf-link-names.ts), if known. */
 export type LinkNameLookup = (id: string) => string | null;
 
-/** One link's wrapper: out of the Tab order, its link named if it can be:
- *  by the PDF's own title, else its address, else the text under it. */
+/** One link's wrapper, its link named if it can be: by the PDF's own
+ *  title, else its address, else the text under it. */
 function fixLinkAnnotation(wrapper: HTMLElement, nameOf?: LinkNameLookup) {
-  if (wrapper.tabIndex > 0) wrapper.tabIndex = -1;
   const link = wrapper.querySelector("a");
-  if (
-    !link ||
-    link.hasAttribute("aria-label") ||
-    link.title ||
-    link.textContent?.trim()
-  ) {
+  if (!link || link.hasAttribute("aria-label") || link.textContent?.trim()) {
     return;
   }
   const id = wrapper.getAttribute("data-annotation-id");
@@ -54,7 +47,14 @@ function fixLinkAnnotation(wrapper: HTMLElement, nameOf?: LinkNameLookup) {
     wrapper.title ||
     linkName(link.getAttribute("href") ?? "") ||
     (id ? nameOf?.(id) : null);
-  if (name) link.setAttribute("aria-label", name);
+  if (!name) return;
+  link.setAttribute("aria-label", name);
+  // pdf.js 5.4 titles each link with the text printed under it ("5" for
+  // "[5]"). Taken for a name, it kept the GECCO paper's 33 links from
+  // being named; left beside the name, it is read after it ("Reference 5,
+  // link, 5") and shows as a tooltip. A link left unnamed keeps its title,
+  // as an attachment's description.
+  link.removeAttribute("title");
 }
 
 /** Fixes the link annotations already under `scope`: also the way names

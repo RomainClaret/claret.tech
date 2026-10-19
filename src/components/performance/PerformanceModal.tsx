@@ -79,7 +79,7 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
     <LazyMotion features={domMax}>
       <AnimatePresence>
         <m.div
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          className="fixed inset-0 z-9999 flex items-center justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -87,7 +87,7 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
         >
           {/* Backdrop */}
           <m.div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/80 backdrop-blur-xs"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -133,16 +133,16 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
             <div
               className={cn(
                 "flex items-center justify-between px-6 py-4 border-b border-border",
-                "bg-gradient-to-r from-primary/5 to-purple-500/5",
+                "bg-linear-to-r from-primary/5 to-purple-500/5",
                 isDragging ? "cursor-grabbing" : "cursor-grab",
               )}
             >
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-green-500 rounded-full" />
-                <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                <h2 className="text-lg font-semibold bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                   Performance Dashboard
                 </h2>
-                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded">
+                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-sm">
                   Terminal Access Only
                 </span>
               </div>
@@ -154,8 +154,8 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
                 {!isMinimized && (
                   <span className="mr-2 text-xs text-muted-foreground">
                     Press{" "}
-                    <kbd className="rounded bg-muted px-1 py-0.5">ESC</kbd> to
-                    close
+                    <kbd className="rounded-sm bg-muted px-1 py-0.5">ESC</kbd>{" "}
+                    to close
                   </span>
                 )}
 
@@ -200,7 +200,7 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
                   tabIndex={0}
                   role="region"
                   aria-label="Dashboard metrics"
-                  className="flex-1 overflow-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                  className="flex-1 overflow-auto focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}

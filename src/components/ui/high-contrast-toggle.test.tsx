@@ -48,16 +48,36 @@ describe("HighContrastToggle", () => {
     expect(screen.getByRole("button")).not.toHaveAttribute("aria-label");
     expect(
       screen.getByText("Toggle high contrast mode (currently off)"),
-    ).toHaveClass("sr-only", "[.high-contrast_&]:hidden");
+    ).toHaveClass("sr-only", "in-[.high-contrast]:hidden");
     expect(
       screen.getByText("Toggle high contrast mode (currently on)"),
-    ).toHaveClass("sr-only", "hidden", "[.high-contrast_&]:inline");
+    ).toHaveClass("sr-only", "hidden", "in-[.high-contrast]:inline");
     // Out of the name, still the button's description.
     expect(screen.getByText(/improves visibility/)).toHaveAttribute("hidden");
-    expect(screen.getByRole("button")).toHaveAttribute(
-      "aria-describedby",
-      "high-contrast-desc",
+    expect(screen.getByRole("button")).toHaveAccessibleDescription(
+      /improves visibility/,
     );
+  });
+
+  it("gives each copy its own description", () => {
+    // The navigation renders one in the desktop bar and one in the phone
+    // menu. A fixed id put two elements with the same id on every page.
+    render(
+      <>
+        <HighContrastToggle />
+        <HighContrastToggle />
+      </>,
+    );
+    const ids = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-describedby"));
+
+    expect(new Set(ids).size).toBe(2);
+    for (const id of ids) {
+      expect(document.getElementById(id ?? "")).toHaveTextContent(
+        /improves visibility/,
+      );
+    }
   });
 
   it("works for the page view when the browser blocks storage", () => {

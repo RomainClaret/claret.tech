@@ -93,3 +93,26 @@ describe("Footer date", () => {
     }
   });
 });
+
+describe("Footer links", () => {
+  it("underlines the links and the buttons that look like links", () => {
+    // Told apart from the text around them by color alone, 1.35:1 where
+    // WCAG 1.4.1 asks 3:1 or another cue: axe flagged "Hosted on Vercel"
+    // at 412 px wide. They were underlined only on hover.
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<Footer />);
+    const inText = [
+      ...container.querySelectorAll("p a, p button, div > button"),
+    ].filter((element) => element.classList.contains("text-primary"));
+
+    expect(inText.map((element) => element.textContent?.trim())).toEqual([
+      "GNU GPLv3 or later",
+      "Vercel",
+      "Privacy Policy",
+      "Terms of Service",
+    ]);
+    for (const element of inText) {
+      expect(element).toHaveClass("underline");
+    }
+  });
+});

@@ -84,7 +84,7 @@ interface MapDetailsProps {
 
 const action = cn(
   "inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary",
 );
 
 /**
@@ -128,7 +128,7 @@ export const MapDetails = forwardRef<HTMLHeadingElement, MapDetailsProps>(
           >
             <span
               aria-hidden="true"
-              className="h-2.5 w-2.5 rounded-full bg-[var(--ink)]"
+              className="h-2.5 w-2.5 rounded-full bg-(--ink)"
             />
             <span>{lane?.label}</span>
             <span aria-hidden="true">·</span>
@@ -145,7 +145,7 @@ export const MapDetails = forwardRef<HTMLHeadingElement, MapDetailsProps>(
             ref={headingRef}
             id={titleId}
             tabIndex={-1}
-            className="mt-2 break-words text-base font-semibold leading-snug outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="mt-2 wrap-break-word text-base font-semibold leading-snug outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             {node.title}
           </Title>
@@ -215,7 +215,7 @@ export const MapDetails = forwardRef<HTMLHeadingElement, MapDetailsProps>(
                       <button
                         type="button"
                         onClick={() => onSelect(other.id)}
-                        className="rounded font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="rounded-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         {other.label}
                       </button>

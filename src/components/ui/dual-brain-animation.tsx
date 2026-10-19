@@ -193,7 +193,7 @@ export function DualBrainAnimation({
             }}
             transition={{ duration: 2 }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full" />
+            <div className="absolute inset-0 bg-linear-to-r from-blue-500/10 to-purple-500/10 rounded-full" />
           </m.div>
 
           {/* Main brain animation, in a box of the canvas's final size. The

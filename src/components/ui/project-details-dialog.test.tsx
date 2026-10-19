@@ -197,7 +197,7 @@ describe("ProjectDetailsDialog", () => {
     opener.remove();
   });
 
-  it("drops its entrance and the blur behind it when motion is reduced", () => {
+  it("drops its entrance and the blur-sm behind it when motion is reduced", () => {
     reduce.value = true;
     open(full);
 

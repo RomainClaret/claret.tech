@@ -19,6 +19,37 @@ const fromHex = (hex: string): Rgb => [
   parseInt(hex.slice(5, 7), 16),
 ];
 
+/** A colour as Tailwind's palette writes it: oklch(L% C H) since Tailwind 4,
+ *  hex for black and white. Converted to sRGB through OKLab and clipped to
+ *  sRGB's gamut, as a screen without a wide gamut shows it. */
+const fromCss = (value: string): Rgb => {
+  if (value.startsWith("#")) {
+    return fromHex(
+      value.length === 4
+        ? value.replace(/[0-9a-f]/gi, (digit) => digit + digit)
+        : value,
+    );
+  }
+  const match = /^oklch\(([\d.]+)% ([\d.]+) ([\d.]+)\)$/.exec(value);
+  if (!match) throw new Error(`Not a colour Tailwind writes: ${value}`);
+  const lightness = Number(match[1]) / 100;
+  const chroma = Number(match[2]);
+  const hue = (Number(match[3]) * Math.PI) / 180;
+  const [a, b] = [chroma * Math.cos(hue), chroma * Math.sin(hue)];
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const linear = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  return linear.map((channel) => {
+    const c = Math.min(1, Math.max(0, channel));
+    return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  }) as Rgb;
+};
+
 const luminance = ([r, g, b]: Rgb) => {
   const [lr, lg, lb] = [r, g, b].map((channel) => {
     const c = channel / 255;
@@ -44,7 +75,7 @@ const palette = (className: string): { rgb: Rgb; alpha: number } => {
   const [, family, shade, alpha] = match;
   const scale = colors[family as keyof typeof colors] as Record<string, string>;
   return {
-    rgb: fromHex(scale[shade]),
+    rgb: fromCss(scale[shade]),
     alpha: alpha ? Number(alpha) / 100 : 1,
   };
 };

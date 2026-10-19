@@ -94,14 +94,17 @@ jobs:
               # scripts/, and next.config imports one: a change there alone
               # can break any job.
               - 'scripts/**'
+              # The postinstall applies these to node_modules
+              # (scripts/apply-patches.mjs).
+              - 'patches/**'
               - 'package.json'
               - 'package-lock.json'
-            # Config files by glob: next and tailwind are .mjs and .ts, and
-            # the .js names listed here before matched nothing, so a change to
-            # either alone skipped the build.
+            # Config files by glob: next is .mjs, and the .js names listed
+            # here before matched nothing, so a change to it alone skipped the
+            # build. Tailwind's theme is in globals.css since Tailwind 4.
             styles:
               - 'src/styles/**'
-              - 'tailwind.config.*'
+              - 'src/app/globals.css'
               - 'postcss.config.*'
               - 'src/**/*.module.css'
             config:
@@ -111,7 +114,7 @@ jobs:
               - 'eslint.config.mjs'
               - 'knip.jsonc'
               - '.prettierignore'
-              - 'vitest.config.ts'
+              - 'vitest.config.mts'
               - '.github/workflows/**'
               - '.github/scripts/**'
             tests:
@@ -123,7 +126,7 @@ jobs:
             # them, so every test job runs. Only quick checks and the build
             # read the config filter, so these used to skip all the tests.
             test-setup:
-              - 'vitest.config.ts'
+              - 'vitest.config.mts'
               - 'src/test/**'
             docs-only:
               - '**.md'
@@ -133,6 +136,7 @@ jobs:
               - 'src/**'
               - 'public/**'
               - 'scripts/**'
+              - 'patches/**'
               - '*.config.{js,mjs,ts}'
               - 'package.json'
               - 'package-lock.json'
@@ -159,11 +163,6 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -204,24 +203,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache API test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: api-tests-${{ hashFiles('src/app/api/**', 'package-lock.json') }}
-          restore-keys: api-tests-
       - run: npm run test:api
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -238,24 +224,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Utils test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: utils-tests-${{ hashFiles('src/lib/utils/**', 'package-lock.json') }}
-          restore-keys: utils-tests-
       - run: npm run test:utils
 
   test-components-batch1:
@@ -270,24 +243,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Component test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: components-tests-batch1-${{ hashFiles('src/components/**', 'package-lock.json') }}
-          restore-keys: components-tests-batch1-
       - run: npm run test:components:batch1
         env:
           NODE_OPTIONS: '--max-old-space-size=5120'
@@ -304,24 +264,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Component test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: components-tests-batch2-${{ hashFiles('src/components/**', 'package-lock.json') }}
-          restore-keys: components-tests-batch2-
       - run: npm run test:components:batch2
         env:
           NODE_OPTIONS: '--max-old-space-size=5120'
@@ -338,24 +285,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Component test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: components-tests-batch3-${{ hashFiles('src/components/**', 'package-lock.json') }}
-          restore-keys: components-tests-batch3-
       - run: npm run test:components:batch3
         env:
           NODE_OPTIONS: '--max-old-space-size=5120'
@@ -372,24 +306,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Component test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: components-tests-batch4-${{ hashFiles('src/components/**', 'package-lock.json') }}
-          restore-keys: components-tests-batch4-
       - run: npm run test:components:batch4
         env:
           NODE_OPTIONS: '--max-old-space-size=5120'
@@ -407,24 +328,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Context test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: contexts-tests-${{ hashFiles('src/contexts/**', 'package-lock.json') }}
-          restore-keys: contexts-tests-
       - run: npm run test:contexts
 
   test-hooks:
@@ -439,24 +347,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Hooks test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: hooks-tests-${{ hashFiles('src/lib/hooks/**', 'package-lock.json') }}
-          restore-keys: hooks-tests-
       - run: npm run test:hooks
 
   test-lib-dom:
@@ -471,24 +366,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Library DOM test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: lib-dom-tests-${{ hashFiles('src/lib/**', 'package-lock.json') }}
-          restore-keys: lib-dom-tests-
       - run: npm run test:lib-dom
 
   test-unit:
@@ -503,24 +385,11 @@ jobs:
        github.event_name == 'pull_request')
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
-      - name: Cache Unit test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.cache/vitest
-            .vitest-cache
-          key: unit-tests-${{ hashFiles('src/**', 'package-lock.json') }}
-          restore-keys: unit-tests-
       - run: npm run test:unit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -541,11 +410,6 @@ jobs:
       USE_GITHUB_DATA: false
     steps:
       - uses: actions/checkout@v6
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          df -h
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -564,12 +428,6 @@ jobs:
       # page view a function call again.
       - name: Check the homepage is a static file
         run: node .github/scripts/check-static-home.mjs
-      - name: Cache build output
-        uses: actions/cache@v5
-        with:
-          path: .next
-          key: build-${{ github.sha }}
-          restore-keys: build-
 
   # Phase 5: Summary job
   ci-summary:

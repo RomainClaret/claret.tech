@@ -50,6 +50,25 @@ function contrastFailures(results: { violations: AxeViolation[] }): string[] {
     );
 }
 
+/**
+ * Every critical or serious violation but contrast (listed above), by rule
+ * and element. The homepage scans allowed five serious ones, "intentional
+ * design choices", and a link told apart by color alone went through.
+ */
+function seriousViolations(results: { violations: AxeViolation[] }): string[] {
+  return results.violations
+    .filter((violation) => violation.id !== "color-contrast")
+    .filter(
+      (violation) =>
+        violation.impact === "critical" || violation.impact === "serious",
+    )
+    .flatMap((violation) =>
+      violation.nodes.map(
+        (node) => `${violation.id}: ${node.target.join(" ")}`,
+      ),
+    );
+}
+
 /** The theme colours high-contrast.css sets, as Tailwind reads them. */
 const HIGH_CONTRAST_TOKENS = [
   "background",
@@ -71,6 +90,7 @@ const HIGH_CONTRAST_TOKENS = [
 
 type AxeViolation = {
   id: string;
+  impact?: string | null;
   nodes: {
     target: unknown[];
     any: {
@@ -141,7 +161,7 @@ test.describe("Accessibility", () => {
 
     // Run axe accessibility tests
     const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
 
     // Log violations for awareness
@@ -158,21 +178,27 @@ test.describe("Accessibility", () => {
       // );
     }
 
-    // Only fail on critical violations
-    const criticalViolations = accessibilityScanResults.violations.filter(
-      (v) => v.impact === "critical",
-    );
-    expect(criticalViolations).toEqual([]);
-
+    expect(seriousViolations(accessibilityScanResults)).toEqual([]);
     expect(contrastFailures(accessibilityScanResults)).toEqual([]);
+  });
 
-    // Other serious issues: some allowed, as before.
-    const seriousNonContrastViolations =
-      accessibilityScanResults.violations.filter(
-        (v) => v.id !== "color-contrast" && v.impact === "serious",
-      );
-    // Allow up to 5 serious non-contrast violations (current design has some intentional choices)
-    expect(seriousNonContrastViolations.length).toBeLessThanOrEqual(5);
+  test("should pass accessibility checks at a phone's width", async ({
+    page,
+  }) => {
+    // axe decides the footer's links only at this width: at the desktop size
+    // it reported "Hosted on Vercel", told apart by color alone, as
+    // incomplete, which is not a pass.
+    await page.setViewportSize({ width: 412, height: 823 });
+    await page.goto("/");
+    await page.waitForSelector("h1", { timeout: 10000 });
+    await showWholePage(page);
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+
+    expect(seriousViolations(results)).toEqual([]);
+    expect(contrastFailures(results)).toEqual([]);
   });
 
   test("should pass accessibility checks on dark theme", async ({
@@ -244,7 +270,7 @@ test.describe("Accessibility", () => {
 
     // Run axe accessibility tests
     const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
 
     // Log violations for awareness
@@ -260,21 +286,8 @@ test.describe("Accessibility", () => {
       // );
     }
 
-    // Only fail on critical violations
-    const criticalViolations = accessibilityScanResults.violations.filter(
-      (v) => v.impact === "critical",
-    );
-    expect(criticalViolations).toEqual([]);
-
+    expect(seriousViolations(accessibilityScanResults)).toEqual([]);
     expect(contrastFailures(accessibilityScanResults)).toEqual([]);
-
-    // Other serious issues: some allowed, as before.
-    const seriousNonContrastViolations =
-      accessibilityScanResults.violations.filter(
-        (v) => v.id !== "color-contrast" && v.impact === "serious",
-      );
-    // Allow up to 5 serious non-contrast violations (current design has some intentional choices)
-    expect(seriousNonContrastViolations.length).toBeLessThanOrEqual(5);
   });
 
   test("should pass accessibility checks on high contrast mode", async ({
@@ -350,7 +363,7 @@ test.describe("Accessibility", () => {
 
     // Run axe accessibility tests with more lenient rules for high contrast
     const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .disableRules([
         "color-contrast", // Scanned, page-wide, by the test below
         "color-contrast-enhanced", // Enhanced contrast checks

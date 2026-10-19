@@ -6,11 +6,10 @@ import { getBlurDataURL } from "@/lib/utils/image-utils";
 import { cn } from "@/lib/utils";
 import { logError } from "@/lib/utils/dev-logger";
 
-interface OptimizedImageProps
-  extends Omit<
-    React.ImgHTMLAttributes<HTMLImageElement>,
-    "src" | "alt" | "width" | "height" | "loading"
-  > {
+interface OptimizedImageProps extends Omit<
+  React.ImgHTMLAttributes<HTMLImageElement>,
+  "src" | "alt" | "width" | "height" | "loading"
+> {
   src: string;
   alt: string;
   className?: string;

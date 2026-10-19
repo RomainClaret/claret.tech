@@ -221,7 +221,7 @@ export function HolographicCard({
           allowContentOverflow ? "overflow-visible" : "overflow-hidden",
           "shadow-lg border border-border",
           "transition-all",
-          "before:absolute before:inset-0 before:bg-gradient-to-br",
+          "before:absolute before:inset-0 before:bg-linear-to-br",
           "before:from-primary/5 before:to-purple-600/5",
           "before:rounded-lg before:-z-10 before:opacity-0",
           "before:transition-opacity",
@@ -239,7 +239,7 @@ export function HolographicCard({
         {/* Animated holographic border */}
         <m.div
           className={cn(
-            "absolute inset-0 rounded-lg p-[1px] -z-20 transition-opacity",
+            "absolute inset-0 rounded-lg p-px -z-20 transition-opacity",
             forceHover
               ? "opacity-100"
               : "opacity-0 group-hover/card:opacity-100",

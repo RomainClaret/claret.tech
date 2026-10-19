@@ -18,10 +18,7 @@ import { isDisplayed, type ResearchProject } from "@/data/sections/research";
 export type MapNodeKind = "publication" | "other-work" | "project";
 export type RelationKind = "extends" | "companion" | "precursor" | "part-of";
 export type DerivedKind =
-  | "same-repository"
-  | "co-authors"
-  | "same-venue"
-  | "project-link";
+  "same-repository" | "co-authors" | "same-venue" | "project-link";
 export type ReasonKind = RelationKind | DerivedKind;
 
 export const RELATION_KINDS: readonly RelationKind[] = [
@@ -147,16 +144,14 @@ export function parseMapConfig(raw: unknown): MapConfig {
   const lanes = (Array.isArray(data.lanes) ? data.lanes : [])
     .map((lane) => lane as Record<string, unknown>)
     .filter((lane) => isString(lane.id) && isString(lane.label))
-    .map(
-      (lane): MapLane => ({
-        id: lane.id as string,
-        label: lane.label as string,
-        color: isString(lane.color) ? lane.color : "#64748b",
-        repos: stringList(lane.repos),
-        members: stringList(lane.members),
-        fallback: lane.fallback === true,
-      }),
-    );
+    .map((lane): MapLane => ({
+      id: lane.id as string,
+      label: lane.label as string,
+      color: isString(lane.color) ? lane.color : "#64748b",
+      repos: stringList(lane.repos),
+      members: stringList(lane.members),
+      fallback: lane.fallback === true,
+    }));
   const labels: Record<string, string> = {};
   if (data.labels && typeof data.labels === "object") {
     for (const [id, label] of Object.entries(data.labels)) {
@@ -172,14 +167,12 @@ export function parseMapConfig(raw: unknown): MapConfig {
         relation.from !== relation.to &&
         RELATION_KINDS.includes(relation.kind as RelationKind),
     )
-    .map(
-      (relation): MapRelation => ({
-        from: relation.from as string,
-        to: relation.to as string,
-        kind: relation.kind as RelationKind,
-        note: isString(relation.note) ? relation.note : "",
-      }),
-    );
+    .map((relation): MapRelation => ({
+      from: relation.from as string,
+      to: relation.to as string,
+      kind: relation.kind as RelationKind,
+      note: isString(relation.note) ? relation.note : "",
+    }));
   return {
     owner: isString(data.owner) ? data.owner : "",
     lanes,

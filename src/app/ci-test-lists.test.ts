@@ -99,6 +99,22 @@ describe("the unit tests GitHub CI runs", () => {
     ).toEqual([]);
   });
 
+  it("runs each unit test file in one job", () => {
+    // test:lib-dom (every .test.tsx under src/lib) also ran the 11 hook files
+    // test:hooks runs: 198 file runs for 187 files, and about 80 tests
+    // counted twice in every CI total.
+    const files = testFiles(join(root, "src"));
+
+    expect(
+      files.flatMap((file) => {
+        const jobs = runs.filter((run) => runsFile(run, file));
+        return jobs.length > 1
+          ? [`${file}: ${jobs.map((run) => run.script).join(", ")}`]
+          : [];
+      }),
+    ).toEqual([]);
+  });
+
   it("lists only test files that exist", () => {
     const listed = runs.flatMap((run) =>
       run.filters.filter((filter) => /\.test\.tsx?$/.test(filter)),

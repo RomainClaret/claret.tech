@@ -124,7 +124,7 @@ function ShareLinkButton({ slug }: { slug: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0"
+      className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
       title={copied ? "Link copied" : "Copy link to this document"}
       aria-label="Copy link to this document"
     >
@@ -163,8 +163,8 @@ export function PDFViewer({
     [linkNames],
   );
 
-  // pdf.js puts each link's wrapper ahead of everything in the Tab order and
-  // leaves the link itself unnamed: one stop per link, each with a name.
+  // pdf.js leaves each link unnamed, announced as "link" and nothing else:
+  // each gets a name (pdf-links.ts).
   useEffect(() => {
     const root = scrollContainerRef.current;
     if (!root) return;
@@ -209,15 +209,29 @@ export function PDFViewer({
   // The document the page boxes are laid out for.
   const laidOutUrlRef = useRef<string | null>(null);
 
+  // The column's size while react-pdf loads the document again (the
+  // fallback fonts). Since 10.5 it unmounts every page box until the new
+  // document arrives: the column collapsed, the browser clamped the scroll
+  // to the top, and a reader on page 200 was on page 1 when the boxes came
+  // back. Held at its size, the column keeps the scroll where it was.
+  const [heldSize, setHeldSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Which load the page boxes on screen belong to: react-pdf 10.5 mounts
+  // new boxes for each, which the page observer below must watch.
+  const [boxesLoad, setBoxesLoad] = useState(0);
+
   const onDocumentLoadSuccess = (pdf: PDFDocumentProxyLike) => {
     // "Use fallback fonts" changes only the Document's options: react-pdf
-    // loads the same document again under the same page boxes and redraws
-    // them from it, so the boxes, their sizes and the drawn pages stay, and
-    // the reader stays where they were. 632715b reset them here, as if
-    // every box remounted at the top (the test mock's doing, not
-    // react-pdf's); the reset itself dropped every box past the first
-    // screen until the sizes were measured again, and WebKit then clamped a
-    // reader on page 200 to page 1. A different document starts over.
+    // loads the same document again and mounts new page boxes for it, which
+    // get the same sizes, so the sizes stay, and so do the pages near the
+    // view. The column held its size meanwhile, so the reader is where
+    // they were, and it lets go now that the boxes are back. 632715b reset
+    // the sizes here, which dropped every box past the first screen until
+    // they were measured again, and WebKit then clamped a reader on page
+    // 200 to page 1. A different document starts over.
     const load = ++loadIdRef.current;
     if (laidOutUrlRef.current !== url) {
       laidOutUrlRef.current = url;
@@ -225,6 +239,8 @@ export function PDFViewer({
       setSizes(null);
       setNearPages(firstScreenPages());
     }
+    setHeldSize(null);
+    setBoxesLoad(load);
     setNumPages(pdf.numPages);
     setLoading(false);
     setError(null);
@@ -250,6 +266,10 @@ export function PDFViewer({
       (entries) => {
         let changed = false;
         for (const entry of entries) {
+          // A box react-pdf unmounted for a reload, reported out of view:
+          // taken, it left the reader's page undrawn when its new box came
+          // back, until every size was measured again.
+          if (!entry.target.isConnected) continue;
           const page = Number((entry.target as HTMLElement).dataset.page);
           if (entry.isIntersecting === near.has(page)) continue;
           if (entry.isIntersecting) near.add(page);
@@ -265,7 +285,7 @@ export function PDFViewer({
       if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [numPages, sizes]);
+  }, [numPages, sizes, boxesLoad]);
 
   // The reader's place through a change of scale. A zoom or a fit rescales
   // every page box under the same scroll offset, which moved the reader:
@@ -419,6 +439,7 @@ export function PDFViewer({
     // no longer in the page.
     setNumPages(null);
     setPageNumber(1);
+    setHeldSize(null);
   };
 
   // Both flag userZoomed so the auto-fit stops overriding a deliberate choice
@@ -501,6 +522,10 @@ export function PDFViewer({
         }
       }
 
+      // No page in view: react-pdf has unmounted the boxes while it loads
+      // the document again (each measures zero). The counter keeps its page
+      // rather than naming page 1.
+      if (maxVisibleHeight === 0) return;
       setPageNumber(mostVisiblePage);
     };
 
@@ -537,7 +562,7 @@ export function PDFViewer({
           <h2 className="text-xl font-semibold truncate">
             {title || "PDF Viewer"}
           </h2>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {shareSlug && <ShareLinkButton slug={shareSlug} />}
             <button
               onClick={() => {
@@ -557,7 +582,7 @@ export function PDFViewer({
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors whitespace-nowrap"
               aria-label="Download PDF"
             >
-              <Download className="w-4 h-4 flex-shrink-0" />
+              <Download className="w-4 h-4 shrink-0" />
               <span>Download</span>
             </button>
           </div>
@@ -631,6 +656,13 @@ export function PDFViewer({
                 // landed while their load still looked current and
                 // collapsed every page box. A new load id drops them.
                 loadIdRef.current++;
+                const column = scrollContainerRef.current?.firstElementChild;
+                if (column instanceof HTMLElement) {
+                  setHeldSize({
+                    width: column.offsetWidth,
+                    height: column.offsetHeight,
+                  });
+                }
                 setDisableFontFace(true);
               }}
               className="text-xs text-yellow-700 dark:text-yellow-300 hover:underline"
@@ -649,13 +681,20 @@ export function PDFViewer({
         tabIndex={0}
         role="region"
         aria-label="Pages"
-        className="flex-1 overflow-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+        className="flex-1 overflow-auto focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       >
         {/* w-max + min-w-full: fills and centres while the page is
             narrower than the viewer, and grows with it once zoomed in so
             the overflow stays reachable. A plain centred flex item that
             outgrows its container puts its left edge out of scroll range. */}
-        <div className="flex flex-col items-center p-4 w-max min-w-full">
+        <div
+          className="flex flex-col items-center p-4 w-max min-w-full"
+          style={
+            heldSize
+              ? { minWidth: heldSize.width, minHeight: heldSize.height }
+              : undefined
+          }
+        >
           {/* In words too: the icon alone said nothing to a screen reader,
               and it stands still in Safari and with motion off, where a
               load looked like a hang. */}

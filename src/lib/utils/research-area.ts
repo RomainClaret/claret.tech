@@ -10,12 +10,7 @@
  * early-stopping paper says "evolutionary" but never "evolution".
  */
 export type ResearchArea =
-  | "neuroevolution"
-  | "ml"
-  | "nlp"
-  | "blockchain"
-  | "neuroscience"
-  | "general";
+  "neuroevolution" | "ml" | "nlp" | "blockchain" | "neuroscience" | "general";
 
 const AREAS: [ResearchArea, string[]][] = [
   [

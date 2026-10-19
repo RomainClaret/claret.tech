@@ -6,7 +6,15 @@
  */
 
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 import { ErrorFallback } from "./ErrorFallback";
 
 // Mock the external dependencies
@@ -61,11 +69,11 @@ vi.mock("lucide-react", () => ({
 }));
 
 describe("ErrorFallback", () => {
-  let mockResetError: ReturnType<typeof vi.fn>;
+  let mockResetError: Mock<() => void>;
   let mockError: Error;
 
   beforeEach(() => {
-    mockResetError = vi.fn();
+    mockResetError = vi.fn<() => void>();
     mockError = new Error("Test error message");
     mockError.name = "TestError";
     mockError.stack = "TestError: Test error message\n    at test:1:1";

@@ -14,13 +14,15 @@ import {
   beforeEach,
   afterEach,
   afterAll,
+  type Mock,
 } from "vitest";
 import { ThemeProvider, useTheme } from "./theme-provider";
+import type { Theme } from "@/lib/theme-cookie";
 
 // Use vi.hoisted for proper mock hoisting
 const { mockSetTheme } = vi.hoisted(() => {
   return {
-    mockSetTheme: vi.fn(),
+    mockSetTheme: vi.fn<(theme: Theme) => void>(),
   };
 });
 
@@ -55,7 +57,7 @@ function TestComponent() {
 }
 
 describe("ThemeProvider", () => {
-  let mockSetCookieTheme: ReturnType<typeof vi.fn>;
+  let mockSetCookieTheme: Mock<(theme: Theme) => void>;
   let mockLocalStorage: {
     getItem: ReturnType<typeof vi.fn>;
     setItem: ReturnType<typeof vi.fn>;
@@ -73,7 +75,7 @@ describe("ThemeProvider", () => {
     vi.resetModules();
 
     // Setup mocks
-    mockSetCookieTheme = vi.fn();
+    mockSetCookieTheme = vi.fn<(theme: Theme) => void>();
     mockSetTheme.mockImplementation(mockSetCookieTheme);
 
     // Mock localStorage

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * The browser stand-ins src/test/setup.ts installs must still work inside a
- * test. vitest.config.ts resets every mock before each test (mockReset), and
+ * test. vitest.config.mts resets every mock before each test (mockReset), and
  * a stand-in written as vi.fn().mockImplementation(...) loses its body to
  * that reset: the global ResizeObserver then built objects without
  * observe(), and a component that observed outside its own test's mock

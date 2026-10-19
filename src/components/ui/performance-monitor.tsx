@@ -37,14 +37,15 @@ function MiniGraph({
   data: number[];
   color?: string;
 }) {
-  if (data.length < 2) return <div className="w-16 h-4 bg-gray-800 rounded" />;
+  if (data.length < 2)
+    return <div className="w-16 h-4 bg-gray-800 rounded-sm" />;
 
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
 
   return (
-    <svg width="64" height="16" className="bg-gray-800 rounded">
+    <svg width="64" height="16" className="bg-gray-800 rounded-sm">
       <polyline
         points={data
           .map(
@@ -280,7 +281,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
   return createPortal(
     <div
       className={cn(
-        "fixed top-4 right-4 z-[9999] bg-black/90 backdrop-blur-sm border border-gray-600 rounded-lg font-mono text-xs select-none",
+        "fixed top-4 right-4 z-9999 bg-black/90 backdrop-blur-xs border border-gray-600 rounded-lg font-mono text-xs select-none",
         "shadow-lg transition-all duration-200",
         isExpanded ? "w-[400px] max-h-[80vh] overflow-hidden" : "w-36 p-2",
         className,
@@ -367,7 +368,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 onClick={() => setActiveTab(tab.id as TabType)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
                 className={cn(
-                  "px-2 py-1 text-[10px] rounded transition-colors",
+                  "px-2 py-1 text-[10px] rounded-sm transition-colors",
                   activeTab === tab.id
                     ? "bg-blue-800 text-blue-200"
                     : "bg-gray-800 text-gray-400 hover:bg-gray-700",
@@ -383,7 +384,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
           </div>
 
           {/* Monitoring Controls */}
-          <div className="mb-4 p-3 bg-gray-900 rounded border border-gray-700">
+          <div className="mb-4 p-3 bg-gray-900 rounded-sm border border-gray-700">
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-300 text-[11px] font-medium">
                 Monitoring Controls
@@ -391,13 +392,13 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
               <div className="flex gap-1">
                 <button
                   onClick={enableAllMonitoring}
-                  className="px-2 py-1 text-[9px] bg-green-800 text-green-200 rounded hover:bg-green-700 transition-colors"
+                  className="px-2 py-1 text-[9px] bg-green-800 text-green-200 rounded-sm hover:bg-green-700 transition-colors"
                 >
                   All
                 </button>
                 <button
                   onClick={disableAllMonitoring}
-                  className="px-2 py-1 text-[9px] bg-red-800 text-red-200 rounded hover:bg-red-700 transition-colors"
+                  className="px-2 py-1 text-[9px] bg-red-800 text-red-200 rounded-sm hover:bg-red-700 transition-colors"
                 >
                   FPS Only
                 </button>
@@ -420,7 +421,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                       onChange={() =>
                         toggleMonitoringOption(key as keyof MonitoringOptions)
                       }
-                      className="w-3 h-3 rounded"
+                      className="w-3 h-3 rounded-sm"
                     />
                     <span
                       className={enabled ? "text-gray-200" : "text-gray-400"}
@@ -440,7 +441,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             id="performance-monitor-panel"
             aria-labelledby={`performance-monitor-tab-${activeTab}`}
             tabIndex={0}
-            className="space-y-3 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="space-y-3 rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400"
           >
             {activeTab === "overview" && (
               <div className="space-y-3">
@@ -491,14 +492,14 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 </div>
 
                 {/* Browser Status */}
-                <div className="p-2 bg-gray-900 rounded border border-gray-700">
+                <div className="p-2 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-300 text-[11px]">
                       {browserInfo}
                     </span>
                     <span
                       className={cn(
-                        "text-[9px] px-2 py-1 rounded",
+                        "text-[9px] px-2 py-1 rounded-sm",
                         shouldReduceAnimations
                           ? "bg-green-900 text-green-300"
                           : "bg-yellow-900 text-yellow-300",
@@ -510,14 +511,14 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 </div>
 
                 {/* Animation Auto-Disable Status */}
-                <div className="p-2 bg-gray-900 rounded border border-gray-700">
+                <div className="p-2 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-300 text-[11px]">
                       Animation Status
                     </span>
                     <span
                       className={cn(
-                        "text-[9px] px-2 py-1 rounded",
+                        "text-[9px] px-2 py-1 rounded-sm",
                         isAutoDisabled
                           ? "bg-red-900 text-red-300"
                           : areAnimationsPlaying
@@ -575,7 +576,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
 
                 {/* Quick Recommendations */}
                 {getRecommendations().length > 0 && (
-                  <div className="p-2 bg-blue-900/20 rounded border border-blue-700/30">
+                  <div className="p-2 bg-blue-900/20 rounded-sm border border-blue-700/30">
                     <div className="text-blue-300 text-[10px] font-semibold mb-1">
                       Recommendations
                     </div>
@@ -598,7 +599,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
               <div className="space-y-3">
                 {/* Web Vitals Score */}
                 {getWebVitalsScore() && (
-                  <div className="text-center p-3 bg-gray-900 rounded border border-gray-700">
+                  <div className="text-center p-3 bg-gray-900 rounded-sm border border-gray-700">
                     <div className="text-2xl font-bold text-blue-400">
                       {getWebVitalsScore()}%
                     </div>
@@ -651,7 +652,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     return (
                       <div
                         key={key}
-                        className="flex justify-between items-center p-2 bg-gray-900 rounded"
+                        className="flex justify-between items-center p-2 bg-gray-900 rounded-sm"
                       >
                         <div>
                           <div className="text-gray-300">{label}</div>
@@ -682,7 +683,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             {activeTab === "memory" && (
               <div className="space-y-3">
                 {/* Memory Usage */}
-                <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-300 text-[11px]">
                       Memory Usage
@@ -757,7 +758,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             {activeTab === "network" && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Connection</div>
                     <div
                       className={cn(
@@ -777,7 +778,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     </div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Bandwidth</div>
                     <div className="text-gray-300">
                       {effectiveBandwidth
@@ -786,14 +787,14 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     </div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">RTT</div>
                     <div className="text-gray-300">
                       {rtt ? `${rtt}ms` : "N/A"}
                     </div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Save Data</div>
                     <div
                       className={saveData ? "text-yellow-400" : "text-gray-300"}
@@ -808,19 +809,19 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             {activeTab === "resources" && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Resources</div>
                     <div className="text-gray-300">{resourceCount}</div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Transfer Size</div>
                     <div className="text-gray-300">
                       {formatBytes(totalTransferSize)}
                     </div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Long Tasks</div>
                     <div
                       className={
@@ -831,7 +832,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                     </div>
                   </div>
 
-                  <div className="p-2 bg-gray-900 rounded">
+                  <div className="p-2 bg-gray-900 rounded-sm">
                     <div className="text-gray-400">Animations</div>
                     <div
                       className={
@@ -850,7 +851,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             {activeTab === "timeline" && (
               <div className="space-y-3">
                 {fpsHistory.length > 1 && (
-                  <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                  <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-300 text-[11px]">
                         FPS Timeline
@@ -889,7 +890,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 )}
 
                 {/* Manual Performance Test Controls */}
-                <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="text-gray-300 text-[11px] mb-2">
                     Performance Test
                   </div>
@@ -900,7 +901,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                           e.stopPropagation();
                           startPerformanceTest();
                         }}
-                        className="flex-1 bg-green-800 hover:bg-green-700 text-green-200 text-[10px] px-2 py-1 rounded transition-colors"
+                        className="flex-1 bg-green-800 hover:bg-green-700 text-green-200 text-[10px] px-2 py-1 rounded-sm transition-colors"
                       >
                         Start Test
                       </button>
@@ -910,7 +911,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                           e.stopPropagation();
                           stopPerformanceTest();
                         }}
-                        className="flex-1 bg-red-800 hover:bg-red-700 text-red-200 text-[10px] px-2 py-1 rounded transition-colors"
+                        className="flex-1 bg-red-800 hover:bg-red-700 text-red-200 text-[10px] px-2 py-1 rounded-sm transition-colors"
                       >
                         Stop ({testDuration}s)
                       </button>
@@ -988,7 +989,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
                       }}
-                      className="bg-blue-800 hover:bg-blue-700 text-blue-200 text-[10px] px-2 py-1 rounded transition-colors"
+                      className="bg-blue-800 hover:bg-blue-700 text-blue-200 text-[10px] px-2 py-1 rounded-sm transition-colors"
                     >
                       Export
                     </button>
@@ -1006,7 +1007,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
             {activeTab === "system" && (
               <div className="space-y-3">
                 {/* CPU Information */}
-                <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-300 text-[11px]">CPU</span>
                     <span
@@ -1062,7 +1063,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 </div>
 
                 {/* GPU Information */}
-                <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-300 text-[11px]">GPU</span>
                     <span
@@ -1145,7 +1146,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 </div>
 
                 {/* System Health */}
-                <div className="p-3 bg-gray-900 rounded border border-gray-700">
+                <div className="p-3 bg-gray-900 rounded-sm border border-gray-700">
                   <div className="text-gray-300 text-[11px] mb-2">
                     System Health
                   </div>
@@ -1168,7 +1169,7 @@ export function PerformanceMonitor({ className }: PerformanceMonitorProps) {
                 </div>
 
                 {/* Hardware Summary */}
-                <div className="p-2 bg-blue-900/20 rounded border border-blue-700/30">
+                <div className="p-2 bg-blue-900/20 rounded-sm border border-blue-700/30">
                   <div className="text-blue-300 text-[10px] font-semibold mb-1">
                     Hardware Summary
                   </div>

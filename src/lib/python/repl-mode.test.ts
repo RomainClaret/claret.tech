@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { createPythonRepl, pythonBanner } from "./repl-mode";
 import { PythonAborted } from "./protocol";
 import type { PythonClient, RunOptions, RunResult } from "./pyodide-client";
@@ -34,11 +34,11 @@ const ok = (status: RunResult["status"] = "ok"): RunResult => ({
 
 describe("createPythonRepl", () => {
   let written: string[];
-  let exit: ReturnType<typeof vi.fn>;
+  let exit: Mock<() => void>;
 
   beforeEach(() => {
     written = [];
-    exit = vi.fn();
+    exit = vi.fn<() => void>();
   });
 
   const build = (run: RunImpl) => {

@@ -43,7 +43,7 @@ export function LanguageSpectrum({
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
                 "text-xs font-medium transition-all duration-200 cursor-default",
                 "border border-transparent",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                 isHovered
                   ? "bg-muted/50 border-muted-foreground/20 text-foreground"
                   : "text-muted-foreground hover:text-foreground",

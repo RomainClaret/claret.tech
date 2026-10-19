@@ -267,24 +267,28 @@ afterEach(() => {
   }
 
   // Re-establish critical global mocks for batch mode isolation
-  global.IntersectionObserver = vi.fn(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-    takeRecords: vi.fn(() => []),
-    root: null,
-    rootMargin: "",
-    thresholds: [],
-  })) as unknown as typeof IntersectionObserver;
+  global.IntersectionObserver = vi.fn(function () {
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+      takeRecords: vi.fn(() => []),
+      root: null,
+      rootMargin: "",
+      thresholds: [],
+    };
+  }) as unknown as typeof IntersectionObserver;
 
   // Its body passed to vi.fn(), not through mockImplementation(): the
   // mockReset before each test empties the latter, and observe() was gone
   // inside every test (src/app/test-setup-globals.test.ts).
-  global.ResizeObserver = vi.fn(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  })) as unknown as typeof ResizeObserver;
+  global.ResizeObserver = vi.fn(function () {
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  }) as unknown as typeof ResizeObserver;
 
   // Re-establish matchMedia mock for framer-motion tests
   if (typeof window !== "undefined") {
@@ -478,25 +482,30 @@ document.createElement = vi.fn((tagName: string) => {
 // Mock IntersectionObserver globally. The body goes to vi.fn() itself: test
 // files keep this one at load to put it back later, and a
 // mockImplementation() would not survive the mockReset before each test
-// (src/app/test-setup-globals.test.ts).
-global.IntersectionObserver = vi.fn((_callback) => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-  takeRecords: vi.fn(() => []),
-  root: null,
-  rootMargin: "",
-  thresholds: [],
-})) as unknown as typeof IntersectionObserver;
+// (src/app/test-setup-globals.test.ts). A function, not an arrow: the code
+// calls it with `new`, which Vitest 4 refuses on an arrow.
+global.IntersectionObserver = vi.fn(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+    takeRecords: vi.fn(() => []),
+    root: null,
+    rootMargin: "",
+    thresholds: [],
+  };
+}) as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver globally. The body goes to vi.fn() itself, as for
 // IntersectionObserver: a mockImplementation() would not survive the
 // mockReset before each test.
-global.ResizeObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-})) as unknown as typeof ResizeObserver;
+global.ResizeObserver = vi.fn(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  };
+}) as unknown as typeof ResizeObserver;
 
 // Mock matchMedia - ensure it's always available
 if (typeof window !== "undefined") {
@@ -525,7 +534,16 @@ const localStorageMock = {
   length: 0,
   key: vi.fn(),
 };
-global.localStorage = localStorageMock as Storage;
+// Defined, not assigned: Vitest's global localStorage is an accessor whose
+// setter writes on to jsdom's window, where localStorage has only a getter.
+// jsdom 24's contextified window let that write through; jsdom 30's window
+// (vm.constants.DONT_CONTEXTIFY) refuses it with a TypeError, and every test
+// file failed to load.
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock as Storage,
+  configurable: true,
+  writable: true,
+});
 
 // Mock performance.now
 global.performance = {

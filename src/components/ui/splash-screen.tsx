@@ -247,7 +247,7 @@ export function SplashScreen({
     <div
       ref={progressRootRef}
       className={cn(
-        "fixed inset-0 z-[10000] bg-background flex items-center justify-center transition-all duration-500",
+        "fixed inset-0 z-10000 bg-background flex items-center justify-center transition-all duration-500",
         isExiting ? "opacity-0 pointer-events-none" : "opacity-100",
         !isVisible && "hidden",
       )}
@@ -294,7 +294,7 @@ export function SplashScreen({
                 "animate-slide-in-up animation-delay-200",
             )}
           >
-            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            <div className="text-3xl md:text-4xl font-bold bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
               Romain Claret
             </div>
             <p className="text-sm text-muted-foreground mt-2">
@@ -308,7 +308,7 @@ export function SplashScreen({
             <div className="relative w-full max-w-xs mx-auto h-2 bg-muted rounded-full overflow-hidden">
               <div
                 ref={progressBarRef}
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-purple-600 transition-[width] duration-100 ease-out rounded-full"
+                className="absolute inset-y-0 left-0 bg-linear-to-r from-primary to-purple-600 transition-[width] duration-100 ease-out rounded-full"
                 style={{
                   // Advanced through the ref; see animateProgress.
                   width: "0%",

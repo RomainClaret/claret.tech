@@ -187,9 +187,8 @@ describe("AnimationStateContext", () => {
 
   describe("User Preferences", () => {
     it("respects existing user preference", async () => {
-      const { getAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { getAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
       vi.mocked(getAnimationPreference).mockReturnValue({
         value: false,
         isUserPreference: true,
@@ -217,9 +216,8 @@ describe("AnimationStateContext", () => {
     });
 
     it("validates browser preference matches current browser", async () => {
-      const { getAnimationPreference, clearAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { getAnimationPreference, clearAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
       vi.mocked(getAnimationPreference).mockReturnValue({
         value: false,
         isUserPreference: false,
@@ -237,9 +235,8 @@ describe("AnimationStateContext", () => {
 
   describe("Animation Controls", () => {
     it("plays animations correctly", async () => {
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { storeAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
 
       const { result } = renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
@@ -267,9 +264,8 @@ describe("AnimationStateContext", () => {
     });
 
     it("stops animations correctly", async () => {
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { storeAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
 
       const { result } = renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
@@ -291,9 +287,8 @@ describe("AnimationStateContext", () => {
     });
 
     it("toggles animations correctly", async () => {
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { storeAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
 
       const { result } = renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
@@ -315,12 +310,10 @@ describe("AnimationStateContext", () => {
     });
 
     it("force enables animations correctly", async () => {
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
-      const { useFpsAutoDisable } = await import(
-        "@/lib/hooks/useFpsAutoDisable"
-      );
+      const { storeAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
+      const { useFpsAutoDisable } =
+        await import("@/lib/hooks/useFpsAutoDisable");
 
       const mockForceEnable = vi.fn();
       vi.mocked(useFpsAutoDisable).mockReturnValue({
@@ -355,9 +348,8 @@ describe("AnimationStateContext", () => {
 
   describe("Auto-disable Integration", () => {
     it("respects auto-disable state", async () => {
-      const { useFpsAutoDisable } = await import(
-        "@/lib/hooks/useFpsAutoDisable"
-      );
+      const { useFpsAutoDisable } =
+        await import("@/lib/hooks/useFpsAutoDisable");
       vi.mocked(useFpsAutoDisable).mockReturnValue({
         isAutoDisabled: true,
         cooldownActive: true,
@@ -555,9 +547,8 @@ describe("AnimationStateContext", () => {
 
     it("passes FPS data to auto-disable hook", async () => {
       const { useFpsOnly } = await import("@/lib/hooks/useFpsOnly");
-      const { useFpsAutoDisable } = await import(
-        "@/lib/hooks/useFpsAutoDisable"
-      );
+      const { useFpsAutoDisable } =
+        await import("@/lib/hooks/useFpsAutoDisable");
       const { useSafariContext } = await import("@/contexts/safari-context");
 
       vi.mocked(useFpsOnly).mockReturnValue({
@@ -590,9 +581,8 @@ describe("AnimationStateContext", () => {
 
   describe("Preference Storage", () => {
     it("stores no browser default, only a visitor's own choice", async () => {
-      const { storeAnimationPreference } = await import(
-        "@/lib/utils/safari-detection"
-      );
+      const { storeAnimationPreference } =
+        await import("@/lib/utils/safari-detection");
 
       renderHook(() => useAnimationState(), {
         wrapper: createWrapper(),
@@ -637,8 +627,7 @@ describe("AnimationStateContext", () => {
       const force = vi
         .mocked(window.addEventListener)
         .mock.calls.find(([type]) => type === "animation-force")?.[1] as
-        | ((event: Event) => void)
-        | undefined;
+        ((event: Event) => void) | undefined;
       expect(force).toBeDefined();
       act(() => force!(new Event("animation-force")));
       expect(first.result.current.areAnimationsPlaying).toBe(true);

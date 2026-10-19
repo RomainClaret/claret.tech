@@ -31,15 +31,13 @@ describe("useIntersectionObserver", () => {
       disconnect: vi.fn(),
     };
 
-    mockIntersectionObserver = vi.fn(
-      (
-        callback: IntersectionObserverCallback,
-        _options?: IntersectionObserverInit,
-      ) => {
-        observeCallback = callback;
-        return observerInstance;
-      },
-    );
+    mockIntersectionObserver = vi.fn(function (
+      callback: IntersectionObserverCallback,
+      _options?: IntersectionObserverInit,
+    ) {
+      observeCallback = callback;
+      return observerInstance;
+    });
 
     global.IntersectionObserver =
       mockIntersectionObserver as unknown as typeof IntersectionObserver;
@@ -316,7 +314,7 @@ describe("useIntersectionObserver", () => {
     });
 
     it("handles IntersectionObserver constructor error", () => {
-      mockIntersectionObserver.mockImplementation(() => {
+      mockIntersectionObserver.mockImplementation(function () {
         throw new Error("IntersectionObserver not supported");
       });
 

@@ -37,13 +37,13 @@ export function IntroductionContent({
           <div className="relative rounded-2xl p-4 md:p-6 border-2 border-blue-200/20 dark:border-blue-800/20 bg-blue-50/85 dark:bg-slate-900/85">
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-teal-600 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-blue-600 via-purple-600 to-teal-600 bg-clip-text text-transparent">
                   <span className="whitespace-nowrap">Accuracy</span>{" "}
                   <span className="whitespace-nowrap">is a lie</span>
                 </span>
               </h1>
 
-              <div className="text-2xl md:text-2xl lg:text-3xl xl:text-4xl font-semibold text-gray-600 dark:text-gray-300 h-[6rem] md:h-[5.5rem] lg:h-[7.5rem] xl:h-[8.5rem] overflow-hidden leading-tight">
+              <div className="text-2xl md:text-2xl lg:text-3xl xl:text-4xl font-semibold text-gray-600 dark:text-gray-300 h-24 md:h-22 lg:h-30 xl:h-34 overflow-hidden leading-tight">
                 <div className="mb-1">
                   <span className="text-gray-700 dark:text-gray-200">
                     {greeting.titleGreetingNewline}
@@ -69,7 +69,7 @@ export function IntroductionContent({
               <button
                 onClick={onResumeClick}
                 {...pdfReaderIntent}
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-linear-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg"
                 type="button"
               >
                 <FileText className="w-5 h-5" />
@@ -78,7 +78,7 @@ export function IntroductionContent({
 
               <button
                 onClick={onContactClick}
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-transparent border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 type="button"
               >
                 <Mail className="w-5 h-5" />

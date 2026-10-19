@@ -38,8 +38,8 @@ export function EducationStyleCard({
       {/* Main card content */}
       <div
         className={cn(
-          "relative bg-gradient-to-br from-card to-card/90",
-          "backdrop-blur-sm rounded-lg overflow-hidden",
+          "relative bg-linear-to-br from-card to-card/90",
+          "backdrop-blur-xs rounded-lg overflow-hidden",
           "shadow-lg border border-border/50",
           "transition-all duration-300",
           "hover:shadow-xl hover:border-border/80",

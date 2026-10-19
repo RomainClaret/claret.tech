@@ -121,7 +121,7 @@ export function ProjectDetailsDialog({
   const homepage = homepageHref(project.homepageUrl);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-9999 flex items-end justify-center sm:items-center sm:p-4">
       <div
         aria-hidden="true"
         data-testid="project-details-backdrop"
@@ -132,7 +132,7 @@ export function ProjectDetailsDialog({
         }}
         className={cn(
           "absolute inset-0",
-          reduce ? "bg-background/90" : "bg-background/80 backdrop-blur-sm",
+          reduce ? "bg-background/90" : "bg-background/80 backdrop-blur-xs",
         )}
       />
       {/* The dialog is the one scroller, with the header and footer
@@ -145,7 +145,7 @@ export function ProjectDetailsDialog({
         aria-describedby={descriptionId}
         tabIndex={-1}
         className={cn(
-          "relative flex w-full flex-col overflow-y-auto overscroll-contain outline-none",
+          "relative flex w-full flex-col overflow-y-auto overscroll-contain outline-hidden",
           "max-h-[85vh] supports-[height:100dvh]:max-h-[85dvh] sm:max-w-2xl",
           "rounded-t-2xl border border-border bg-background shadow-2xl sm:rounded-xl",
           !reduce && "motion-safe:animate-[slideUp_200ms_ease-out]",
@@ -165,7 +165,7 @@ export function ProjectDetailsDialog({
           <div className="min-w-0 flex-1">
             <h2
               id={titleId}
-              className="break-words text-lg font-bold sm:text-xl"
+              className="wrap-break-word text-lg font-bold sm:text-xl"
             >
               {project.name}
             </h2>
@@ -187,7 +187,7 @@ export function ProjectDetailsDialog({
             type="button"
             onClick={onClose}
             aria-label="Close details"
-            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -196,7 +196,7 @@ export function ProjectDetailsDialog({
         <div className="space-y-6 p-4 sm:p-6">
           <p
             id={descriptionId}
-            className="whitespace-pre-line break-words text-sm leading-relaxed text-muted-foreground"
+            className="whitespace-pre-line wrap-break-word text-sm leading-relaxed text-muted-foreground"
           >
             {project.description || "No detailed description available."}
           </p>
@@ -208,7 +208,7 @@ export function ProjectDetailsDialog({
                 {topics.map((topic) => (
                   <li
                     key={topic}
-                    className="accent-text-any max-w-full break-words rounded-lg px-2.5 py-1 text-xs font-medium"
+                    className="accent-text-any max-w-full wrap-break-word rounded-lg px-2.5 py-1 text-xs font-medium"
                     style={{
                       ...accentStyle(`rgb(${color})`),
                       backgroundColor: `rgba(${color}, 0.1)`,
@@ -307,7 +307,7 @@ export function ProjectDetailsDialog({
             href={project.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <ExternalLink aria-hidden="true" className="h-4 w-4" />
             View on GitHub
@@ -317,7 +317,7 @@ export function ProjectDetailsDialog({
               href={homepage}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Globe aria-hidden="true" className="h-4 w-4" />
               Live Demo

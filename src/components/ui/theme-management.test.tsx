@@ -337,7 +337,7 @@ describe("Theme Management System", () => {
 
       const button = screen.getByRole("button");
       expect(button).toHaveClass(
-        "focus-visible:outline-none",
+        "focus-visible:outline-hidden",
         "focus-visible:ring-2",
       );
     });

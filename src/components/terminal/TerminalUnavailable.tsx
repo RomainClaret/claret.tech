@@ -34,7 +34,7 @@ export function TerminalUnavailable({
       role="alert"
       // Above the page, as the terminal itself is (zIndex 10000); the old
       // fallback had none and sat behind the content.
-      className="fixed bottom-0 right-0 z-[10000] w-full md:w-[800px] h-[600px] bg-black rounded-t-lg shadow-2xl border border-red-500/50 p-4 font-mono"
+      className="fixed bottom-0 right-0 z-10000 w-full md:w-[800px] h-[600px] bg-black rounded-t-lg shadow-2xl border border-red-500/50 p-4 font-mono"
     >
       <p className="text-red-500">
         Error loading terminal. Check your connection and try again.

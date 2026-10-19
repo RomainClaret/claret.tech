@@ -2,9 +2,9 @@ import { loadOnIntent } from "@/lib/utils/load-on-intent";
 
 /**
  * The terminal loads when a visitor reaches for it, not after the splash: its
- * component and commands, plus the 290 KB xterm chunk that its stylesheet
- * import pulls in (next.config.mjs groups every @xterm module into one
- * chunk). AppWrapper mounts <Terminal> on the first open; the navigation's
+ * component and commands, plus the 334 KB xterm chunk (82 KB gzipped, xterm
+ * 6.0.0) that its stylesheet import pulls in (next.config.mjs groups every
+ * @xterm module into one chunk). AppWrapper mounts <Terminal> on the first open; the navigation's
  * toggle spreads terminalIntent, so pointing at it or focusing it starts the
  * download before the click.
  */

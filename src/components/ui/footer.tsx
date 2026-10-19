@@ -44,7 +44,7 @@ export function Footer() {
                   href={socialMediaLinks.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#333] dark:hover:!text-white"
+                  className="text-muted-foreground transition-colors hover:text-[#333]! dark:hover:text-white!"
                   aria-label="GitHub"
                 >
                   <GitHubIcon size={28} />
@@ -55,7 +55,7 @@ export function Footer() {
                   href={socialMediaLinks.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#0077B5]"
+                  className="text-muted-foreground transition-colors hover:text-[#0077B5]!"
                   aria-label="LinkedIn"
                 >
                   <LinkedInIcon size={28} />
@@ -66,7 +66,7 @@ export function Footer() {
                   href={socialMediaLinks.medium}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#00AB6C]"
+                  className="text-muted-foreground transition-colors hover:text-[#00AB6C]!"
                   aria-label="Medium"
                 >
                   <MediumIcon size={28} />
@@ -77,7 +77,7 @@ export function Footer() {
                   href={socialMediaLinks.stackoverflow}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#F48024]"
+                  className="text-muted-foreground transition-colors hover:text-[#F48024]!"
                   aria-label="Stack Overflow"
                 >
                   <StackOverflowIcon size={28} />
@@ -88,7 +88,7 @@ export function Footer() {
                   href={socialMediaLinks.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#E4405F]"
+                  className="text-muted-foreground transition-colors hover:text-[#E4405F]!"
                   aria-label="Instagram"
                 >
                   <InstagramIcon size={28} />
@@ -99,7 +99,7 @@ export function Footer() {
                   href={socialMediaLinks.orcid}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#A6CE39]"
+                  className="text-muted-foreground transition-colors hover:text-[#A6CE39]!"
                   aria-label="ORCID"
                 >
                   <OrcidIcon size={28} />
@@ -110,7 +110,7 @@ export function Footer() {
                   href={socialMediaLinks.reddit}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground transition-colors hover:!text-[#FF4500]"
+                  className="text-muted-foreground transition-colors hover:text-[#FF4500]!"
                   aria-label="Reddit"
                 >
                   <RedditIcon size={28} />
@@ -133,7 +133,7 @@ export function Footer() {
                   aria-label="View the GNU GPLv3 or later license"
                   {...legalTextsIntent}
                   onClick={openLicenseModal}
-                  className="text-primary hover:underline"
+                  className="text-primary underline underline-offset-2"
                   suppressHydrationWarning
                 >
                   GNU GPLv3 or later
@@ -143,7 +143,7 @@ export function Footer() {
                   href={footerNote.hosturl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+                  className="text-primary underline underline-offset-2"
                 >
                   {footerNote.hostname}
                 </a>
@@ -160,7 +160,7 @@ export function Footer() {
                 aria-label="View Privacy Policy"
                 {...legalTextsIntent}
                 onClick={openPrivacyModal}
-                className="text-primary hover:underline"
+                className="text-primary underline underline-offset-2"
                 suppressHydrationWarning
               >
                 Privacy Policy
@@ -172,7 +172,7 @@ export function Footer() {
                 aria-label="View Terms of Service"
                 {...legalTextsIntent}
                 onClick={openTermsModal}
-                className="text-primary hover:underline"
+                className="text-primary underline underline-offset-2"
                 suppressHydrationWarning
               >
                 Terms of Service

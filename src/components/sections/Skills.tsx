@@ -159,7 +159,7 @@ export function Skills() {
                               />
                             </div>
                             <div className="flex-1 flex flex-col justify-between h-full gap-2">
-                              <h4 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300 min-h-[3rem]">
+                              <h4 className="text-xl font-bold bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300 min-h-12">
                                 {activity.title}
                               </h4>
                             </div>
@@ -234,7 +234,7 @@ export function Skills() {
 
                                       {/* Main badge */}
                                       <div
-                                        className="relative px-2 py-3 min-h-[2.5rem] rounded-lg flex items-center justify-start gap-2 border transition-all duration-300 cursor-pointer overflow-hidden w-full"
+                                        className="relative px-2 py-3 min-h-10 rounded-lg flex items-center justify-start gap-2 border transition-all duration-300 cursor-pointer overflow-hidden w-full"
                                         style={{
                                           backgroundColor: `rgba(${activityColor}, 0.05)`,
                                           borderColor: `rgba(${activityColor}, 0.3)`,
@@ -288,12 +288,12 @@ export function Skills() {
 
                                         <TechIcon
                                           size={14}
-                                          className="relative z-10 flex-shrink-0 transition-all duration-300 group-hover/badge:scale-110"
+                                          className="relative z-10 shrink-0 transition-all duration-300 group-hover/badge:scale-110"
                                           style={{
                                             color: `rgb(${activityColor})`,
                                           }}
                                         />
-                                        <span className="text-xs md:text-sm font-medium relative z-10 text-left flex-1 break-words">
+                                        <span className="text-xs md:text-sm font-medium relative z-10 text-left flex-1 wrap-break-word">
                                           {tech}
                                         </span>
                                       </div>
@@ -302,7 +302,7 @@ export function Skills() {
                                           (motion.css) that only runs on
                                           hover, when the border shows */}
                                       <div
-                                        className="absolute inset-0 rounded-lg p-[1px] -z-10 opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 anim-border-flow anim-hover"
+                                        className="absolute inset-0 rounded-lg p-px -z-10 opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 anim-border-flow anim-hover"
                                         style={{
                                           backgroundImage: `linear-gradient(135deg,
                                             rgba(${activityColor}, 0.5) 0%,
@@ -393,7 +393,7 @@ export function Skills() {
                                 }}
                               />
                             </div>
-                            <h4 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                            <h4 className="text-lg font-bold bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
                               {category}
                             </h4>
                           </div>
@@ -452,7 +452,7 @@ export function Skills() {
                                 }}
                               >
                                 <span
-                                  className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 transition-all duration-300 group-hover/interest:scale-150"
+                                  className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-all duration-300 group-hover/interest:scale-150"
                                   style={{
                                     backgroundColor: `rgb(${categoryColor})`,
                                     boxShadow: `0 0 8px rgba(${categoryColor}, 0.5)`,

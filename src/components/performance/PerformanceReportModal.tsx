@@ -207,7 +207,7 @@ export function PerformanceReportModal({
   return createPortal(
     <AnimatePresence>
       <m.div
-        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        className="fixed inset-0 z-9999 flex items-center justify-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -215,7 +215,7 @@ export function PerformanceReportModal({
       >
         {/* Backdrop */}
         <m.div
-          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          className="absolute inset-0 bg-black/80 backdrop-blur-xs"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -239,12 +239,12 @@ export function PerformanceReportModal({
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-purple-500/5">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-linear-to-r from-primary/5 to-purple-500/5">
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">Performance Report</h2>
               {reportData && (
-                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded">
+                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-sm">
                   Score: {reportData.summary.overallScore}/100 (
                   {reportData.summary.grade})
                 </span>
@@ -303,7 +303,7 @@ export function PerformanceReportModal({
             tabIndex={0}
             role="region"
             aria-label="Report details"
-            className="flex-1 overflow-auto p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+            className="flex-1 overflow-auto p-6 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
           >
             <reportGenerator.ProgressUI />
           </div>

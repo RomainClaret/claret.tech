@@ -489,7 +489,7 @@ export function PerformanceDashboard() {
         animate={{ opacity: 1, y: 0 }}
       >
         {/* The dialog's header holds the heading; this is its title card. */}
-        <p className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+        <p className="text-3xl font-bold bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
           Performance Dashboard
         </p>
         <p className="text-muted-foreground mt-2">
@@ -580,7 +580,7 @@ export function PerformanceDashboard() {
             {performanceHistory.crossBrowserComparison.summary.criticalIssues.map(
               (issue: string, index: number) => (
                 <li key={index} className="flex items-start gap-2">
-                  <span className="w-1 h-1 bg-red-500 rounded-full mt-2 flex-shrink-0" />
+                  <span className="w-1 h-1 bg-red-500 rounded-full mt-2 shrink-0" />
                   {issue}
                 </li>
               ),
@@ -638,13 +638,13 @@ export function PerformanceDashboard() {
                   key={index}
                   className="flex items-start gap-3 p-3 rounded-lg bg-muted/50"
                 >
-                  <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
                   <span className="text-sm">{recommendation}</span>
                 </div>
               ))
           ) : (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
-              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              <CheckCircle className="w-4 h-4 shrink-0" />
               <span className="text-sm">
                 All performance metrics are within optimal ranges!
               </span>
