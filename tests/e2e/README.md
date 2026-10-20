@@ -36,22 +36,24 @@ npx playwright test tests/e2e/navigation.spec.ts --project=webkit
 
 ## The specs
 
-| Spec                          | What it covers                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `navigation.spec.ts`          | The navigation bar, section links, the terminal toggle, the phone menu         |
-| `accessibility.spec.ts`       | axe scans in both themes and high contrast, headings, labels, keyboard         |
-| `keyboard-paths.spec.ts`      | What opened on a click or showed on hover, reached from the keyboard           |
-| `project-details.spec.ts`     | A repository's details dialog, with the GitHub APIs answered by fixtures       |
-| `static-shell.spec.ts`        | The prerendered page before and without the bundle; group-variant styles       |
-| `performance.spec.ts`         | Core Web Vitals, bundle and image budgets, caching                             |
-| `motion-fallback.spec.ts`     | Content behind entrance animations, when their chunk or the bundle fails       |
-| `pdf-reader.spec.ts`          | The in-app PDF reader                                                          |
-| `terminal.spec.ts`            | The terminal and its commands                                                  |
-| `python-terminal.spec.ts`     | Python in the terminal (Chromium only)                                         |
-| `research-map.spec.ts`        | The research map (`research` in the terminal)                                  |
-| `mobile-navigation.spec.ts`   | Navigation on phones                                                           |
-| `mobile-accessibility.spec.ts`| Phones: targets, labels, 320 px reflow                                         |
-| `lighthouse.spec.ts`          | Lighthouse scores                                                              |
+| Spec                           | What it covers                                                              |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `navigation.spec.ts`           | The navigation bar, section links, the terminal toggle, the phone menu      |
+| `accessibility.spec.ts`        | axe scans in both themes and high contrast, headings, labels, keyboard      |
+| `keyboard-paths.spec.ts`       | What opened on a click or showed on hover, reached from the keyboard        |
+| `project-details.spec.ts`      | A repository's details dialog, with the GitHub APIs answered by fixtures    |
+| `static-shell.spec.ts`         | The prerendered page before and without the bundle; group-variant styles    |
+| `performance.spec.ts`          | Core Web Vitals, bundle and image budgets, caching                          |
+| `motion-fallback.spec.ts`      | Content behind entrance animations, when their chunk or the bundle fails    |
+| `pdf-reader.spec.ts`           | The in-app PDF reader                                                       |
+| `terminal.spec.ts`             | The terminal and its commands                                               |
+| `python-terminal.spec.ts`      | Python in the terminal (Chromium only); its worker as old bundles start it  |
+| `research-map.spec.ts`         | The research map (`research` in the terminal)                               |
+| `mobile-navigation.spec.ts`    | Navigation on phones                                                        |
+| `mobile-accessibility.spec.ts` | Phones: targets, labels, 320 px reflow                                      |
+| `error-reports.spec.ts`        | An error that reaches a boundary: reported; the page says so once on record |
+| `privacy.spec.ts`              | What the privacy policy promises: no cookies, no host but the site's own    |
+| `lighthouse.spec.ts`           | Lighthouse scores                                                           |
 
 CI's Playwright jobs name their specs (`.github/workflows/playwright.yml`). A
 new spec runs in CI only once a job names it; `src/app/ci-workflows.test.ts`

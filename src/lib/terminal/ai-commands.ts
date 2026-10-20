@@ -97,7 +97,7 @@ export const aiCommands: Record<string, CommandFunction> = {
       case "help":
         return aiCommands.ai([], {} as CommandContext);
 
-      case "init":
+      case "init": {
         // Dynamically load WebLLM only when needed
         const {
           webLLMClient: client,
@@ -317,6 +317,7 @@ export const aiCommands: Record<string, CommandFunction> = {
             success: false,
           };
         }
+      }
 
       case "models": {
         const { WEBLLM_CONFIG: config } = await loadWebLLM();

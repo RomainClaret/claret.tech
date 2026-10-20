@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
-import { QualityProvider, useQuality, QualityMode } from "./quality-context";
+import {
+  QualityProvider,
+  useQuality,
+  QualityMode,
+  NEURAL_SIGNAL_PROFILE,
+} from "./quality-context";
 import {
   getSnapshot as getMotionGate,
   resetMotionGateForTests,
@@ -112,9 +117,12 @@ describe("Quality Context", () => {
 
   describe("Quality Configurations", () => {
     it("MAXIMUM quality does not include rainbow effect", () => {
-      // This test validates that the rainbow effect was removed from maximum quality
-      // due to visual corruption issues
-      expect(true).toBe(true); // Placeholder - rainbow effect removed from codebase
+      // Taken out of the maximum tier for corrupting the nodes it drew over,
+      // but neural-signal.tsx still draws it for any tier that lists it. The
+      // test was `expect(true).toBe(true)`.
+      for (const [tier, profile] of Object.entries(NEURAL_SIGNAL_PROFILE)) {
+        expect(profile.effects ?? [], tier).not.toContain("rainbow");
+      }
     });
 
     it("Quality modes are properly defined", () => {
@@ -178,12 +186,6 @@ describe("Quality Context", () => {
       expect(modes).toContain("low");
       expect(modes).toContain("balanced");
       expect(modes).toContain("maximum");
-    });
-
-    it("default quality depends on browser", () => {
-      // Safari gets LOW, others get BALANCED
-      // This is tested in the browser detection tests above
-      expect(true).toBe(true);
     });
   });
 

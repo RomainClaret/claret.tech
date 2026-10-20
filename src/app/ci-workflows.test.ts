@@ -336,6 +336,51 @@ describe("the GitHub workflows", () => {
     expect(env.GH_USERNAME).toBeTruthy();
   });
 
+  it("keep the packages taken out of the browser out", () => {
+    // styled-jsx went in round 26; nothing else would notice it coming back
+    // with a component that uses it.
+    const build = workflow("ci.yml").match(
+      /\n {2}build:\n[\s\S]*?\n {2}# Phase 5/,
+    )?.[0];
+
+    expect(build).toMatch(
+      /run: node \.github\/scripts\/check-client-bundle\.mjs\s*\n/,
+    );
+  });
+
+  it("install one exact Vercel CLI in both deploy jobs", () => {
+    // Both jobs ran `npm install -g vercel@latest` with the deploy token in
+    // their environment, so whatever Vercel had published minutes before
+    // ran with it (a release came out almost daily in 2026-10). A new
+    // version is now a reviewed change.
+    const installs = [
+      ...workflow("deploy.yml").matchAll(/npm install -g vercel@(\S+)/g),
+    ].map((match) => match[1]);
+
+    expect(installs).toHaveLength(2);
+    expect(installs[0]).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(installs[1]).toBe(installs[0]);
+  });
+
+  it("tell the owner of new error reports, and only of theirs", () => {
+    // Reports are filed with the owner's token, and GitHub tells nobody of
+    // their own activity: client-error-notify.yml, as github-actions,
+    // assigns new reports and mentions the owner on a reopen.
+    const notify = workflow("client-error-notify.yml");
+
+    expect(notify).toMatch(/issues:\n\s+types: \[opened, reopened\]/);
+    expect(notify).toMatch(
+      /github\.event\.issue\.user\.login == github\.repository_owner/,
+    );
+    expect(notify).toMatch(
+      /contains\(github\.event\.issue\.labels\.\*\.name, 'client-error'\)/,
+    );
+    expect(notify).toMatch(/permissions:\n\s+issues: write\n\n/);
+    expect(notify).toMatch(/--add-assignee "\$OWNER"/);
+    // Nothing from the issue's text reaches the shell.
+    expect(notify).not.toMatch(/github\.event\.issue\.(title|body)/);
+  });
+
   it("set only environment variables something reads", () => {
     // deploy.yml handed the Medium secret to the production build under a
     // name no code read, and six CI steps set a mock of it that changed
@@ -343,6 +388,7 @@ describe("the GitHub workflows", () => {
     // counts as read by the repository's code, tests or configs, by a step
     // of its own workflow, or by a tool a step runs.
     const tools = new Set([
+      "GH_TOKEN",
       "HOME",
       "NODE_OPTIONS",
       "VERCEL_ORG_ID",

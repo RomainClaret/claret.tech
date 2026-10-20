@@ -2,7 +2,7 @@
 export interface ResearchProject {
   title: string;
   subtitle: string;
-  description: string;
+  /** Shown collapsed; the full description is in research-details.ts. */
   shortDescription?: string;
   tags: string[];
   status: "active" | "completed" | "ongoing";
@@ -61,8 +61,6 @@ export const researchSection = {
     normalText:
       "Every field I touched taught me the same lesson: minds have to grow. Engineering them top-down never worked for me.",
   },
-  journeyDescription:
-    "Started by breaking toys to build robots. Then breaking computers to make them smarter. Learned to code to control them. Studied physics and mathematics to simulate their brains. Dove into electronics and micro mechanics to build better bodies. Studied computer science to let them act, and AI to make them clever. Every step showed me I was still missing something, and eventually the missing piece was the approach itself: stop building the mind, set the conditions, let it evolve, and pay attention to what shows up. The PhD made that fast enough to try at a useful scale. Now the work is GEENNS: minds grown as teams of evolved specialists that learn to work together and keep learning without forgetting, and the harder question of how to tell genuinely new behavior from behavior that only looks new to us. The kid breaking toys wanted thinking robots. The approach changed. The question did not.",
   journeyShortDescription:
     "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching behavior arise from chaos rather than from architecture, code, or engineering. Whether that is where intelligence actually begins is the question, not the conclusion.",
   journeyBadge: "A Lifelong Question",
@@ -90,8 +88,6 @@ export const researchSection = {
       subtitle: "Lifetime Research Project (Post-PhD Phase)",
       shortDescription:
         "Intelligence is not one big network. It is a collaboration of specialists that evolution grows, freezes, and learns to recombine. GEENNS pushes that to its hard edge: get the collaboration itself to emerge, so behavior comes from evolution rather than from copying us or a dataset. The PhD proved the parts can be frozen and reused. Making the whole emerge is the work now.",
-      description:
-        "After years of chasing thinking machines, one lesson stuck: you grow a mind, you do not wire it together. GEENNS (Grid-based Emergent Evolution of Neocortical Network Substrates) takes that literally. Evolution grows small specialist networks, inspired by the repeated microcircuits of the cortex, freezes them, then evolves separate coordinators that decide how to combine them for each new task. Nothing is hand-designed: the specialists and the way they cooperate are both discovered by evolution, not by me. The PhD is the proof of concept, and it works. Frozen specialists, composed by evolved coordinators, solve problems a single network cannot, and the same specialists carry over to new tasks without retraining. The frontier I am on now is the harder half: getting the collaboration itself to emerge. Specialists that carve out their own roles without being told to. Coordination that transfers to problems it has never seen. Behavior that, when it shows up on its own, is worth studying for what it is, not for how closely it imitates a human or a training set. Further out sits the long vision: substrates that grow their own architecture and keep adapting, so knowledge accumulates as reusable, evolvable components instead of weights that get overwritten, and a mind can learn across a lifetime without forgetting what it already knew.",
       tags: [
         "Neuroevolution",
         "Lifelong Learning",
@@ -136,8 +132,6 @@ export const researchSection = {
       subtitle: "Active Research Direction",
       shortDescription:
         "Networks that are grown rather than trained never see human data, so what they do has no obligation to resemble anything we would recognize. I study that on its own terms. The open problem is telling behavior that is genuinely new from behavior that only looks new to us, because every measure we have is calibrated on human data.",
-      description:
-        "An evolutionary algorithm keeps a population of candidate networks, varies them at random, keeps the ones that do best, and repeats. Nothing in that loop ever sees human data. The networks are grown, not trained, so nothing in the process shapes them toward looking intelligent to us. Mostly they do not, and that is the part worth studying rather than the part to correct. We mostly judge machine intelligence by how closely it resembles our own. That works while machines learn from our data, and fails for anything that does not. The thesis work made these systems fast enough to run at a scale where their behavior is worth looking at. What is missing is a way to tell whether what they do is genuinely new or only looks new to us. That turns out to be a measurement problem rather than a philosophical one. The common approach scores novelty by asking a large model how unusual something looks. That measures distance in a space the model learned from us, so behavior lying outside it has no coordinates there and cannot be separated from noise. Apparent emergence then says more about the instrument than about the system. So the work is an instrument that never looks at human data, and a test system small enough to calibrate it on. Today I have the systems and the claim. I do not have the measure, which is why I keep saying evolution finds behaviors I never programmed and cannot yet prove it.",
       tags: [
         "Artificial Life",
         "Emergence",
@@ -170,8 +164,6 @@ export const researchSection = {
       subtitle: "Active Research Direction",
       shortDescription:
         "An interactive image breeder where the genome's vocabulary can vary: which functions a node computes, and how it combines its inputs. Exploring how that choice shapes what can be bred.",
-      description:
-        "You breed an image by clicking. A grid of pictures appears, you pick the ones you like, their offspring become the next grid, and after a few minutes you have something nobody designed. Picbreeder made that idea famous, and later work has changed who does the choosing: crowds, aesthetic measures, and lately vision-language models. This breeder turns a different knob: the vocabulary, meaning the set of functions a node in the genome can compute and the way it combines its inputs before computing anything. The vocabulary is the material, like the difference between oils and watercolor, or between a synthesizer with one oscillator and one with a full bank, and it may shape which images can be reached at all. The questions behind it: does what is in a palette matter more than how much is in it, how much does the way a node combines its inputs matter, and is an image a palette can express also one its search can find? Two versions are online: the latest, with the most controls, lets you shape both the CPPN and the substrate; a simpler one gives control over the CPPN only.",
       tags: [
         "Interactive Evolution",
         "Generative Art",
@@ -205,8 +197,6 @@ export const researchSection = {
       subtitle: "PhD Thesis",
       shortDescription:
         "Grow a big network from a tiny recipe, the way DNA grows a body. It never worked in practice. My thesis diagnoses why, then redesigns it to run at real scale.",
-      description:
-        "A small evolved recipe, DNA-like, can generate a large network's substrate (its neuron placement and connections), scaling far beyond hand-design. The promise is real; the practical utility was not. This thesis examines ES-HyperNEAT, the canonical algorithm, and identifies three structural barriers. First, the performance ceiling on tasks like MNIST is structural, not a search failure: extensive Bayesian hyperparameter optimization cannot break it. Second, a central bias: the encoding's generators all peak at the image center, so evolved substrates collapse onto a small central cluster of inputs, blind to the rest; partitioning the input across region-specialized experts more than doubles accuracy. Third, the quadtree produces a different graph per genome, which parallel hardware cannot batch. EMR-HyperNEAT resolves this by inverting substrate discovery (evaluate a fixed grid of candidate positions in parallel and filter by variance), turning the substrate into a tensor that runs on any JAX-supported hardware. Because the substrate is now a tensor, biological mechanisms (recurrence, per-node functions, neuromodulation) become columns appended to a matrix rather than algorithm redesigns, and substrates can be frozen and recombined by evolved mappers: the door to GEENNS. The contribution is diagnostic, not competitive: indirect encoding will not outperform gradient-trained systems yet, but adaptive substrate neuroevolution can now run at the scale where its broader question becomes tractable.",
       tags: [
         "EMR-HyperNEAT",
         "Neuroevolution",
@@ -257,8 +247,6 @@ export const researchSection = {
       subtitle: "Master's Thesis",
       shortDescription:
         "Built zero-shot conversational AI from sub-knowledge graphs. It convinced me that intelligence engineered by hand stays brittle.",
-      description:
-        "I spent 900+ hours building conversational AI from first principles: zero-shot question answering through algorithmic orchestration, with sub-knowledge graphs extracted from Wikidata and a modular architecture where each component handled one part of understanding. It worked, but that wasn't the point. Watching it take 182 seconds to answer 'What's the capital of France?', something a person answers in a fraction of a second, taught me more than the accuracy did. Every part did exactly what I designed and nothing more. This thesis was my last attempt at building intelligence top-down.",
       tags: [
         "NLP",
         "Conversational AI",
@@ -291,8 +279,6 @@ export const researchSection = {
       subtitle: "Bachelor's Thesis",
       shortDescription:
         "Built anonymous, decentralized data sharing right through the browser. It taught me that distributed systems stand or fall on trust.",
-      description:
-        "Is it possible to provide distributed storage that prevents spying WITHOUT opening Pandora's box for illegal content? That was the question. Overclouds was born: anonymous, decentralized data sharing through any browser. No installation, no corporate servers, no single point of failure. WebRTC for peer connections, WebTorrent for distribution, Ethereum for consensus. The part I cared about most was governance: the network votes on everything, from storage limits to banned content types, what's allowed, who's trusted, what gets preserved. A 'Data Tribunal' where random peers judge flagged content. Proof-of-Participation rewarding good behavior. The technical parts worked: encrypted chunks spreading across browsers, webapps loading from hashes, serverless peer discovery. Trust resisted engineering; it grew through consensus. This thesis planted the seed: evolve systems instead of building them.",
       tags: ["Blockchain", "WebRTC", "P2P Networks", "Digital Democracy"],
       status: "completed" as const,
       yearsSpent: 1,
@@ -320,8 +306,6 @@ export const researchSection = {
       subtitle: "Pre-Undergrad Research",
       shortDescription:
         "Watched brains fuse conflicting senses into one estimate. The first time I saw intelligence come from combining senses rather than picking one.",
-      description:
-        "Fresh out of high school at Harvard's Jenks Lab, I helped study how the brain judges motion when the eyes and the inner ear disagree. I expected one sense to win. What the lab found instead was optimal integration: the brain weights each sense by how precise it is at that frequency, vision at low frequencies and the inner ear at higher ones, and fuses them rather than picking one. Months on motion platforms and thousands of trials, watching a biological system do math nobody programmed into it. My part ended up on a poster at the Society for Neuroscience meeting that November, and the lab's full results appeared later in the Journal of Neurophysiology. What stayed with me was personal: the intelligence was not in any single sensor or rule, but in how they were combined. The brain was already doing what I would attempt a decade later: specialized components (the senses), weighting by reliability, and integration that emerges instead of being engineered. I just didn't know it yet.",
       tags: [
         "Sensory Fusion",
         "Bayesian Integration",

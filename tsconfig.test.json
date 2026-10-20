@@ -5,7 +5,9 @@
     "**/*.ts",
     "**/*.mts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "next.config.mjs",
+    "lighthouse.config.js"
   ],
   "exclude": ["node_modules", ".claude"]
 }

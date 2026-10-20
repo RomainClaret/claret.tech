@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { GET } from "./route";
+import { GET, maxDuration } from "./route";
 
 /**
  * The feed is built from Medium's own (through rss2json, as the blog
@@ -32,6 +32,12 @@ describe("GET /rss.xml", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it("ends within half a minute, whatever the feed does", () => {
+    // The feed's fetch refreshes in the background once stale, and Next
+    // drops its timeout there (next/dist/server/lib/patch-fetch.js).
+    expect(maxDuration).toBe(30);
   });
 
   it("reads Medium's feed, not the site's own API", async () => {

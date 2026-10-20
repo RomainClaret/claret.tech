@@ -203,6 +203,8 @@ describe("PythonClient boot", () => {
     const worker = currentWorker();
 
     expect(worker.url).toBe(PYTHON_WORKER_URL);
+    // The worker names its runtime's version itself (worker-contract.test.ts).
+    expect(worker.url).toBe("/python-worker.js");
     // The 314.x distribution is ESM first, so a classic worker would not load.
     expect(worker.options).toEqual({ type: "module" });
     expect(worker.posted).toEqual([{ t: "init", packages: [] }]);

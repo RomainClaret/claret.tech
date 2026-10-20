@@ -36,6 +36,10 @@ export async function fetchMediumFeed<T = MediumFeed>(
     {
       // Cache for 1 hour
       next: { revalidate: 3600 },
+      // Only on a cache miss: when Next refreshes a stale entry in the
+      // background it drops the signal, so the routes reading this set a
+      // maxDuration as well.
+      signal: AbortSignal.timeout(10_000),
     },
   );
   if (!response.ok) {

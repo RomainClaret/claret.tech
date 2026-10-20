@@ -173,8 +173,10 @@ export function ProgressRing({
             // The ring shows its colour; the figure on the ring's own glow
             // reads in the text colour (its colour read at 2.3 to 3.7:1).
             className={cn(
-              "font-bold tabular-nums leading-none text-foreground",
-              size <= 60 ? "text-[10px]" : "text-sm",
+              // "/none": a line height of 1, which a separate leading-none
+              // never got (tailwind-merge dropped it for the font size).
+              "font-bold tabular-nums text-foreground",
+              size <= 60 ? "text-[10px]/none" : "text-sm/none",
             )}
           >
             {Math.round(animatedProgress)}%
@@ -184,8 +186,8 @@ export function ProgressRing({
           <div
             className={cn(
               // On the ring's own glow, where muted text read at 3:1.
-              "text-foreground leading-none",
-              size <= 60 ? "text-[6px] mt-0.5" : "text-[10px] mt-1",
+              "text-foreground",
+              size <= 60 ? "text-[6px]/none mt-0.5" : "text-[10px]/none mt-1",
             )}
           >
             {label}
@@ -196,7 +198,7 @@ export function ProgressRing({
       {/* Completion checkmark - only show for larger rings */}
       {animatedProgress === 100 && size > 60 && (
         <div
-          className="absolute top-0 right-0 w-5 h-5 rounded-full flex items-center justify-center animate-scale-in"
+          className="absolute top-0 right-0 w-5 h-5 rounded-full flex items-center justify-center animate-check-pop"
           style={{ backgroundColor: color }}
         >
           <svg
@@ -214,23 +216,6 @@ export function ProgressRing({
           </svg>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes scale-in {
-          from {
-            transform: scale(0);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,57 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { BlogCardHolographic } from "@/components/ui/blog-card-holographic";
 import { blogSection } from "@/data/portfolio";
-import {
-  extractMediumImage,
-  extractMediumThumbnail,
-} from "@/lib/utils/extract-medium-image";
-import mediumColors from "@/lib/utils/medium-colors.json";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
+import { withLoadFallback } from "@/lib/utils/load-fallback";
+import { loadOnIntent } from "@/lib/utils/load-on-intent";
+import { reloadPage } from "@/lib/utils/reload-page";
+import type { KudosArticle, MediumPost } from "./BlogCards";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { cn } from "@/lib/utils";
 import { logError } from "@/lib/utils/dev-logger";
-
-interface MediumColorEntry {
-  color?: string;
-}
-
-interface MediumColors {
-  [key: string]: MediumColorEntry;
-}
-
-interface MediumPost {
-  title: string;
-  link: string;
-  pubDate: string;
-  content: string;
-  contentSnippet?: string;
-  description?: string;
-  guid: string;
-  isoDate: string;
-  categories?: string[];
-  enrichedImage?: string;
-  enrichedColor?: string;
-}
-
-interface KudosArticle {
-  id?: string; // stable deep-link anchor (absent in older cached responses)
-  title: string;
-  description: string;
-  url: string;
-  date: string;
-  author: string;
-  tags?: string[];
-  image?: string;
-  type: "research-story";
-  venue?: string;
-  publisher?: string;
-  doi?: string;
-  highlights?: string[];
-  applications?: string[];
-  perspectives?: string;
-}
 
 // Deep-link anchor for a Medium post: the URL slug (title slug plus Medium's
 // permanent post hash), stable across title edits. Exported for tests.
@@ -86,12 +45,96 @@ function extractTextContent(html: string): string {
   return textContent;
 }
 
+/** The cards' place until the articles and their code are in, as the HTML has it. */
+function BlogSkeleton() {
+  const shouldReduceAnimations = useShouldReduceAnimations();
+  return (
+    <div className="flex justify-center">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-[1200px]">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={cn(
+              "bg-card border border-border rounded-lg p-6 h-64",
+              !shouldReduceAnimations && "animate-pulse",
+            )}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-12 h-12 bg-muted rounded-full" />
+              <div className="flex-1">
+                <div className="h-4 bg-muted rounded-sm w-20 mb-2" />
+                <div className="h-3 bg-muted rounded-sm w-24" />
+              </div>
+            </div>
+            <div className="h-6 bg-muted rounded-sm mb-4 w-3/4" />
+            <div className="h-4 bg-muted rounded-sm mb-2" />
+            <div className="h-4 bg-muted rounded-sm w-5/6" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * In the cards' place while their code cannot be fetched: no connection, or
+ * a deploy since this page loaded (Vercel's Hobby plan keeps no older
+ * chunks). Without it, React.lazy threw and the page's error boundary
+ * replaced every section.
+ */
+function BlogCardsUnavailable({
+  retry,
+  retrying,
+}: {
+  retry: () => void;
+  retrying: boolean;
+}) {
+  return (
+    <div className="text-center" role="alert">
+      <p className="text-muted-foreground">The articles could not load.</p>
+      <div className="mt-4 flex justify-center gap-4 text-sm">
+        <button
+          type="button"
+          onClick={retry}
+          disabled={retrying}
+          className="text-primary hover:underline disabled:opacity-60 disabled:no-underline"
+        >
+          {retrying ? "Trying again..." : "Try again"}
+        </button>
+        {!retrying && (
+          <button
+            type="button"
+            onClick={reloadPage}
+            className="text-primary hover:underline"
+          >
+            Reload page
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The cards' code comes with the articles: its import starts beside their
+// fetch, below, and the cards show once both are in.
+const cards = loadOnIntent(() => import("./BlogCards"));
+const BlogCards = dynamic(
+  withLoadFallback(
+    () => cards.load().then((mod) => mod.BlogCards),
+    BlogCardsUnavailable,
+    {
+      onError: (error) => logError(error, "Blog cards chunk"),
+      peek: () => cards.loaded()?.BlogCards,
+    },
+  ),
+  { ssr: false, loading: BlogSkeleton },
+);
+
 export function Blog() {
   const [mediumPosts, setMediumPosts] = useState<MediumPost[]>([]);
   const [kudosArticles, setKudosArticles] = useState<KudosArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const shouldReduceAnimations = useShouldReduceAnimations();
 
   const fetchMediumPosts = async () => {
     try {
@@ -123,6 +166,7 @@ export function Blog() {
   };
 
   useEffect(() => {
+    cards.preload();
     const fetchData = async () => {
       const promises = [];
 
@@ -227,141 +271,16 @@ export function Blog() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-[1200px]">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "bg-card border border-border rounded-lg p-6 h-64",
-                    !shouldReduceAnimations && "animate-pulse",
-                  )}
-                >
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="w-12 h-12 bg-muted rounded-full" />
-                    <div className="flex-1">
-                      <div className="h-4 bg-muted rounded-sm w-20 mb-2" />
-                      <div className="h-3 bg-muted rounded-sm w-24" />
-                    </div>
-                  </div>
-                  <div className="h-6 bg-muted rounded-sm mb-4 w-3/4" />
-                  <div className="h-4 bg-muted rounded-sm mb-2" />
-                  <div className="h-4 bg-muted rounded-sm w-5/6" />
-                </div>
-              ))}
-            </div>
-          </div>
+          <BlogSkeleton />
         ) : (
-          <div className="flex justify-center">
-            <div className="grid gap-6 md:grid-cols-2 grid-rows-auto grid-stretch max-w-[1000px]">
-              {displayStaticBlogs
-                ? blogSection.blogs.map((blog, index) => (
-                    <BlogCardHolographic
-                      key={index}
-                      title={blog.title}
-                      description={blog.description}
-                      url={blog.url}
-                      image={blog.image}
-                      index={index}
-                      readingTime={Math.ceil(
-                        blog.description.split(" ").length / 200,
-                      )}
-                    />
-                  ))
-                : visibleArticles.map((article, index) => {
-                    const anchorId = articleAnchorId(article);
-
-                    // Handle Kudos articles
-                    if (article.source === "kudos") {
-                      const kudosArticle = article as KudosArticle & {
-                        source: string;
-                        sortDate: number;
-                      };
-                      return (
-                        <div
-                          key={`kudos-${kudosArticle.url}`}
-                          id={anchorId}
-                          className={cn(
-                            "h-full",
-                            anchorId &&
-                              highlightedId === anchorId &&
-                              "deep-link-highlight",
-                          )}
-                        >
-                          <BlogCardHolographic
-                            title={kudosArticle.title}
-                            description={kudosArticle.description}
-                            url={kudosArticle.url}
-                            date={kudosArticle.date}
-                            author={kudosArticle.author}
-                            image={kudosArticle.image}
-                            index={index}
-                            readingTime={Math.ceil(
-                              kudosArticle.description.split(" ").length / 200,
-                            )}
-                            anchorId={anchorId}
-                            isDeepLinked={
-                              !!anchorId && deepLinkedId === anchorId
-                            }
-                          />
-                        </div>
-                      );
-                    }
-
-                    // Handle Medium posts
-                    const post = article as MediumPost & {
-                      source: string;
-                      sortDate: number;
-                    };
-                    const content =
-                      mediumTextByKey.get(post.guid || post.link) ?? "";
-
-                    // Use enriched image from scraper, fallback to RSS extraction
-                    const imageUrl =
-                      post.enrichedImage ||
-                      extractMediumThumbnail(post) ||
-                      extractMediumImage(
-                        post.content || post.description || "",
-                      );
-
-                    // Use enriched color from scraper, fallback to cached colors
-                    const guidColor = (mediumColors as MediumColors)[post.guid];
-                    const linkColor = (mediumColors as MediumColors)[post.link];
-                    const postColor =
-                      post.enrichedColor ||
-                      guidColor?.color ||
-                      linkColor?.color;
-
-                    return (
-                      <div
-                        key={post.guid}
-                        id={anchorId}
-                        className={cn(
-                          "h-full",
-                          anchorId &&
-                            highlightedId === anchorId &&
-                            "deep-link-highlight",
-                        )}
-                      >
-                        <BlogCardHolographic
-                          title={post.title}
-                          description={content}
-                          url={post.link}
-                          date={post.pubDate}
-                          image={imageUrl || undefined}
-                          color={postColor}
-                          index={index}
-                          readingTime={Math.ceil(
-                            content.split(" ").length / 200,
-                          )}
-                          anchorId={anchorId}
-                          isDeepLinked={!!anchorId && deepLinkedId === anchorId}
-                        />
-                      </div>
-                    );
-                  })}
-            </div>
-          </div>
+          <BlogCards
+            displayStaticBlogs={displayStaticBlogs}
+            visibleArticles={visibleArticles}
+            mediumTextByKey={mediumTextByKey}
+            articleAnchorId={articleAnchorId}
+            deepLinkedId={deepLinkedId}
+            highlightedId={highlightedId}
+          />
         )}
 
         {/* View all posts links */}

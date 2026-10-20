@@ -65,7 +65,9 @@ export const kudosArticles: KudosArticle[] = [
       "Neural Networks",
       "Evolutionary Algorithms",
     ],
-    // Image will be fetched dynamically from Kudos page
+    // The photo the story's Kudos page shows (from Unsplash), served by
+    // the site itself.
+    image: "/images/kudos_gecco_2024.webp",
     venue: "GECCO '24 Companion",
     publisher: "ACM",
   },

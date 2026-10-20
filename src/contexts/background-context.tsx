@@ -278,7 +278,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
               ];
               break;
 
-            case "square":
+            case "square": {
               // 2x2 square
               const size = Math.random() > 0.5 ? 1 : 2;
               patternNodes = [
@@ -288,6 +288,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
                 { gridX: centerX - size, gridY: centerY + size },
               ];
               break;
+            }
 
             case "pentagon":
               // Pentagon pattern

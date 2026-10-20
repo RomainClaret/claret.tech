@@ -130,6 +130,21 @@ afterEach(() => {
   resetMotionGateForTests();
 });
 
+describe("GridBackground's place", () => {
+  // Set by the caller: the site grid is fixed to the viewport, the hero's
+  // fills the hero. The grid's own `absolute` lost to the site grid's
+  // `fixed` only through tailwind-merge, which cn() no longer runs.
+  it("takes its position from the caller alone", () => {
+    const { container } = render(
+      <GridBackground className="fixed inset-0 z-0 opacity-30" />,
+    );
+
+    const grid = container.firstElementChild;
+    expect(grid).toHaveClass("fixed", "inset-0", "grid-background-container");
+    expect(grid).not.toHaveClass("absolute");
+  });
+});
+
 describe("GridBackground pulses", () => {
   it("animates its nodes with CSS, not SVG <animate>", () => {
     const { container } = render(<GridBackground />);

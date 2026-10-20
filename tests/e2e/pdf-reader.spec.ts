@@ -166,6 +166,34 @@ test.describe("PDF reader", () => {
       .poll(async () => (await box.boundingBox())?.width ?? 0)
       .toBeGreaterThan(before);
     expect(await canvases(page)).toBeLessThanOrEqual(10);
+
+    // At the largest zoom, in a window narrower than the page, a drawn
+    // page's canvas is as wide as its box: globals.css caps the canvas at
+    // its box's width (max-width: 100%), and the box is sized from the
+    // page, so the zoom goes past the viewer's width. (A manual zoom has
+    // stopped the fit, which would shrink the pages to the new width.)
+    await page.setViewportSize({ width: 800, height: 900 });
+    const zoomIn = page.getByRole("button", { name: "Zoom in" });
+    while (await zoomIn.isEnabled()) await zoomIn.click();
+    const firstBox = page.locator('[data-page="1"] > div');
+    const firstCanvas = page.locator(
+      '[data-page="1"] .react-pdf__Page__canvas',
+    );
+    const viewerWidth = await page
+      .getByRole("region", { name: "Pages" })
+      .evaluate((element) => element.clientWidth);
+    await expect
+      .poll(async () => (await firstBox.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(viewerWidth);
+    await expect
+      .poll(async () => {
+        const [canvasBox, pageBox] = await Promise.all([
+          firstCanvas.boundingBox(),
+          firstBox.boundingBox(),
+        ]);
+        return Math.abs((canvasBox?.width ?? 0) - (pageBox?.width ?? 0));
+      })
+      .toBeLessThanOrEqual(1);
   });
 
   test("counts the page in view after the fallback-fonts reload", async ({
@@ -429,7 +457,7 @@ test.describe("The PDF reader over the homepage", () => {
   const noticeOnTop = (page: Page) =>
     page.evaluate(() => {
       const label = [...document.querySelectorAll("span")].find((span) =>
-        span.textContent?.includes("Cookie Selection"),
+        span.textContent?.includes("Natural Selection"),
       );
       const notice = label?.closest("div.fixed");
       if (!notice) throw new Error("No cookie notice to cover");

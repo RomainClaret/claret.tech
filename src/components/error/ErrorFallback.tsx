@@ -1,18 +1,21 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, RefreshCw, Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { AlertCircle, RefreshCw, RotateCw, Home } from "lucide-react";
+import { Button, buttonClassName } from "@/components/ui/button";
+import { reloadPage } from "@/lib/utils/reload-page";
 
 interface ErrorFallbackProps {
   error: Error;
   resetError: () => void;
+  /** The error is on record as an issue (src/lib/client-error/report.ts). */
+  reported?: boolean;
 }
 
 export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   error,
   resetError,
+  reported = false,
 }) => {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
@@ -27,9 +30,18 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
           Something went wrong
         </h1>
 
-        <p className="mb-6 text-gray-600 dark:text-gray-400">
-          We encountered an unexpected error. Don&apos;t worry, we&apos;ve been
-          notified and are working on fixing it.
+        <p className="mb-2 text-gray-600 dark:text-gray-400">
+          An error stopped this page. Try again, or go to the homepage.
+        </p>
+
+        {/* Said only once the report is on record: the page claimed "we've
+            been notified" when nothing was sent. The line is kept empty
+            until then, so the note does not move the buttons. */}
+        <p
+          role="status"
+          className="mb-6 min-h-5 text-sm text-gray-500 dark:text-gray-400"
+        >
+          {reported ? "A report of it was sent." : ""}
         </p>
 
         {process.env.NODE_ENV === "development" && (
@@ -59,15 +71,29 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
             <RefreshCw className="h-4 w-4" />
             Try Again
           </Button>
-          <Link href="/">
-            <Button
-              variant="outline"
-              className="inline-flex items-center gap-2"
-            >
-              <Home className="h-4 w-4" />
-              Go Home
-            </Button>
-          </Link>
+          {/* After a deploy, only fresh code from the server recovers. */}
+          <Button
+            onClick={reloadPage}
+            variant="outline"
+            className="inline-flex items-center gap-2"
+          >
+            <RotateCw className="h-4 w-4" />
+            Reload Page
+          </Button>
+          {/* A full navigation, not next/link: Next's error boundary resets
+              only when the path changes, so a link to "/" did nothing on the
+              homepage. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a
+            href="/"
+            className={buttonClassName({
+              variant: "outline",
+              className: "inline-flex items-center gap-2",
+            })}
+          >
+            <Home className="h-4 w-4" />
+            Go Home
+          </a>
         </div>
       </div>
     </div>

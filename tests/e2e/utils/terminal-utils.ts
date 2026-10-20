@@ -158,11 +158,15 @@ export async function waitForTerminalReady(
 
 /**
  * Type a line, confirm the keystrokes landed, submit it, and wait for
- * `expected` to show up on screen.
+ * `expected` to show up below the command's own line. Returns that text.
  *
  * The echo check is against the prompt line rather than the whole screen: a
  * focus failure otherwise surfaces much later as "the command produced no
  * output", which is a slow and misleading way to learn that nothing was typed.
+ *
+ * `expected` is matched only below the echoed prompt line. Matched against
+ * the whole screen, a pattern the command line itself satisfies (`echo x`
+ * waiting for /x/) passed the moment Enter was pressed, output or not.
  */
 export async function runCommand(
   page: Page,
@@ -180,14 +184,30 @@ export async function runCommand(
       { timeout: 15_000, intervals: [100, 250, 500] },
     )
     .toBe("echoed");
+  // The whole prompt line, not just the command: the output can repeat the
+  // command ("invalidcommand123: command not found").
+  const echoed = (await currentLine(page)).trim();
 
   await page.keyboard.press("Enter");
+  let output = "";
   await expect
-    .poll(async () => (expected.test(await screen(page)) ? "found" : "..."), {
-      timeout,
-      intervals: [250, 500, 1000],
-    })
+    .poll(
+      async () => {
+        output = below(await screen(page), echoed);
+        return expected.test(output) ? "found" : "...";
+      },
+      { timeout, intervals: [250, 500, 1000] },
+    )
     .toBe("found");
 
-  return screen(page);
+  return output;
+}
+
+/**
+ * The text after the last occurrence of `line`, or all of it once a long
+ * output has scrolled `line` out of the viewport.
+ */
+function below(text: string, line: string): string {
+  const at = text.lastIndexOf(line);
+  return at === -1 ? text : text.slice(at + line.length);
 }

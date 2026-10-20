@@ -6,14 +6,7 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "functions": {
-    "app/api/fetch-github/route.ts": {
-      "maxDuration": 10
-    },
-    "app/api/medium-posts/route.ts": {
-      "maxDuration": 10
-    }
-  },
+  "fluid": true,
   "headers": [
     {
       "source": "/animations/(.*)",

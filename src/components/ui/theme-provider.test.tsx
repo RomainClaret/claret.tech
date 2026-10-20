@@ -14,23 +14,19 @@ import {
   beforeEach,
   afterEach,
   afterAll,
-  type Mock,
 } from "vitest";
 import { ThemeProvider, useTheme } from "./theme-provider";
-import type { Theme } from "@/lib/theme-cookie";
-
-// Use vi.hoisted for proper mock hoisting
-const { mockSetTheme } = vi.hoisted(() => {
-  return {
-    mockSetTheme: vi.fn<(theme: Theme) => void>(),
-  };
-});
-
-// Mock the theme-cookie module with hoisted mock
-vi.mock("@/lib/theme-cookie", () => ({
-  setTheme: mockSetTheme,
-  Theme: "light" as const,
+// The site sets no cookie since round 25; the provider only expires the
+// old theme cookie a returning visitor may carry (lib/theme-cookie.ts).
+const { mockExpireThemeCookie } = vi.hoisted(() => ({
+  mockExpireThemeCookie: vi.fn(),
 }));
+vi.mock("@/lib/theme-cookie", () => ({
+  expireThemeCookie: mockExpireThemeCookie,
+}));
+
+/** No theme cookie: the theme stays in localStorage. */
+const noThemeCookie = () => expect(document.cookie).not.toMatch(/theme=/);
 
 // Mock dev-logger to properly call console.warn in tests
 vi.mock("@/lib/utils/dev-logger", () => ({
@@ -57,7 +53,6 @@ function TestComponent() {
 }
 
 describe("ThemeProvider", () => {
-  let mockSetCookieTheme: Mock<(theme: Theme) => void>;
   let mockLocalStorage: {
     getItem: ReturnType<typeof vi.fn>;
     setItem: ReturnType<typeof vi.fn>;
@@ -74,9 +69,7 @@ describe("ThemeProvider", () => {
     // Reset modules to ensure clean state
     vi.resetModules();
 
-    // Setup mocks
-    mockSetCookieTheme = vi.fn<(theme: Theme) => void>();
-    mockSetTheme.mockImplementation(mockSetCookieTheme);
+    mockExpireThemeCookie.mockClear();
 
     // Mock localStorage
     mockLocalStorage = {
@@ -142,8 +135,7 @@ describe("ThemeProvider", () => {
     vi.clearAllTimers();
     vi.useRealTimers();
 
-    // Reset mock implementations
-    mockSetTheme.mockReset();
+    mockExpireThemeCookie.mockReset();
 
     // Clear document body
     document.body.innerHTML = "";
@@ -194,10 +186,9 @@ describe("ThemeProvider", () => {
         expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
       });
 
-      // Applied to <html> at once; the cookie, which only a fallback reads
-      // now that no server does, is written by the visitor's own choice.
+      // Applied to <html> at once, and stored nowhere else.
       expect(mockDocumentElement.classList.add).toHaveBeenCalledWith("dark");
-      expect(mockSetCookieTheme).not.toHaveBeenCalled();
+      noThemeCookie();
     });
 
     it("never applies the HTML's theme over a stored one while it hydrates", () => {
@@ -246,8 +237,7 @@ describe("ThemeProvider", () => {
         </ThemeProvider>,
       );
 
-      // Should not call setTheme again since themes match
-      expect(mockSetCookieTheme).not.toHaveBeenCalled();
+      noThemeCookie();
       expect(screen.getByTestId("current-theme")).toHaveTextContent("light");
     });
 
@@ -261,7 +251,7 @@ describe("ThemeProvider", () => {
       );
 
       expect(screen.getByTestId("current-theme")).toHaveTextContent("light");
-      expect(mockSetCookieTheme).not.toHaveBeenCalled();
+      noThemeCookie();
     });
   });
 
@@ -280,7 +270,7 @@ describe("ThemeProvider", () => {
       });
 
       expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("dark");
+      noThemeCookie();
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith("theme", "dark");
     });
 
@@ -298,7 +288,7 @@ describe("ThemeProvider", () => {
       });
 
       expect(screen.getByTestId("current-theme")).toHaveTextContent("light");
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("light");
+      noThemeCookie();
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith("theme", "light");
     });
 
@@ -324,7 +314,17 @@ describe("ThemeProvider", () => {
   });
 
   describe("Persistence", () => {
-    it("saves theme to cookie when switching", async () => {
+    it("expires an old theme cookie once, on mount", () => {
+      render(
+        <ThemeProvider initialTheme="light">
+          <TestComponent />
+        </ThemeProvider>,
+      );
+
+      expect(mockExpireThemeCookie).toHaveBeenCalledTimes(1);
+    });
+
+    it("sets no cookie when switching: the site sets none", async () => {
       render(
         <ThemeProvider initialTheme="light">
           <TestComponent />
@@ -337,7 +337,7 @@ describe("ThemeProvider", () => {
         darkButton.click();
       });
 
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("dark");
+      noThemeCookie();
     });
 
     it("saves theme to localStorage when switching", async () => {
@@ -376,7 +376,7 @@ describe("ThemeProvider", () => {
 
       // Should still work despite localStorage error
       expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("dark");
+      noThemeCookie();
       expect(consoleSpy).toHaveBeenCalledWith(
         "[theme-provider-save]:",
         "Failed to save theme to localStorage",
@@ -452,8 +452,7 @@ describe("ThemeProvider", () => {
       });
 
       expect(screen.getByTestId("current-theme")).toHaveTextContent("dark");
-      // Just verify it was called with dark at some point
-      expect(mockSetCookieTheme).toHaveBeenCalledWith("dark");
+      noThemeCookie();
     });
 
     it("handles null/undefined localStorage values", async () => {

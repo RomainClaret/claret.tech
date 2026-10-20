@@ -1,3 +1,4 @@
+// @ts-check
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import bundleAnalyzer from "@next/bundle-analyzer";
@@ -31,61 +32,62 @@ const nextConfig = {
         return today;
       }
     })(),
+    // The built commit, which error reports name (src/lib/client-error):
+    // the page's build and the server's can differ after a deploy. Vercel's
+    // VERCEL_GIT_COMMIT_SHA cannot say: the site deploys prebuilt from the
+    // CLI, with Vercel's Git integration off. A git archive has neither.
+    BUILD_COMMIT: (() => {
+      try {
+        const head = execSync("git rev-parse HEAD", {
+          stdio: ["ignore", "pipe", "ignore"],
+        })
+          .toString()
+          .trim();
+        if (/^[0-9a-f]{40}$/.test(head)) return head.slice(0, 7);
+      } catch {
+        // No git: CI still names the commit.
+      }
+      const fromCi = process.env.GITHUB_SHA ?? "";
+      return /^[0-9a-f]{40}$/.test(fromCi) ? fromCi.slice(0, 7) : "unknown";
+    })(),
   },
 
-  // Disable source maps in production to prevent 404 errors for .map files
-  productionBrowserSourceMaps: false,
+  // Published: a client error report names a frame in a minified chunk
+  // (src/lib/client-error), and the chunk's map, at <chunk>.map, turns it
+  // into a file and a line (scripts/map-frame.mjs). The repository is
+  // public, so a map reveals nothing new. Hidden (the webpack hook below):
+  // the chunks carry no comment pointing at their maps, which cost 647 B
+  // gzipped on every homepage view for devtools' sake alone.
+  productionBrowserSourceMaps: true,
 
   // Image optimization
   images: {
-    // The shortest time an optimized image is cached. Local /images already
-    // get a year from their headers below; this is for remote sources that
-    // allow only minutes (the GitHub avatar: max-age=300), which were
-    // re-fetched and re-optimized that often. A changed avatar shows within
-    // a day.
-    minimumCacheTTL: 86400,
+    // A month. On Vercel's Hobby plan the optimizer has 5,000 transformations
+    // a month, and each cache miss or stale refresh is one: at a day, every
+    // remote image cost one a day it was seen. Local /images get a year from
+    // their headers below. A changed GitHub avatar shows within a month.
+    minimumCacheTTL: 2678400,
+    // The GitHub avatar alone, by exact path. With Medium, Unsplash and
+    // jsDelivr open, and any GitHub avatar, anyone could spend the month's
+    // transformations on their images, after which every image not yet
+    // cached failed until the month ended. The blog's pictures have their
+    // own route (src/app/api/blog-image), the Kudos photo is a local file,
+    // and no image came from raw.githubusercontent.com or jsDelivr.
     remotePatterns: [
       {
-        // Path-scoped: without a pathname these turn /_next/image into an open
-        // image proxy for anyone's repository content, which is also the
-        // surface the Next image-optimizer advisories target.
-        //
-        // github.com serves the avatar as /RomainClaret.png, a single segment
-        // with no trailing slash, so /RomainClaret/** does not match it. That
-        // scoping broke the profile image; it is pinned to the exact file
-        // instead, which is the only github.com image the site uses.
+        // github.com serves the avatar as /RomainClaret.png, a single
+        // segment with no trailing slash, so /RomainClaret/** does not match
+        // it; it is pinned to the exact file.
         protocol: "https",
         hostname: "github.com",
         pathname: "/RomainClaret.png",
       },
       {
-        protocol: "https",
-        hostname: "raw.githubusercontent.com",
-        pathname: "/RomainClaret/**",
-      },
-      {
+        // Where that address redirects (GitHub user 8895475), in case the
+        // optimizer checks a redirect's target against these patterns.
         protocol: "https",
         hostname: "avatars.githubusercontent.com",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn-images-1.medium.com",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn-images-2.medium.com",
-      },
-      {
-        protocol: "https",
-        hostname: "miro.medium.com",
-      },
-      {
-        protocol: "https",
-        hostname: "cdn.jsdelivr.net",
-      },
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
+        pathname: "/u/8895475",
       },
     ],
     formats: ["image/avif", "image/webp"],
@@ -106,7 +108,7 @@ const nextConfig = {
   },
 
   // Custom webpack config for WebLLM support and optimizations
-  webpack: (config, { isServer, dev, webpack }) => {
+  webpack: (config, { isServer, dev }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       // lottie-react imports the full lottie-web player, which carries the
@@ -146,6 +148,12 @@ const nextConfig = {
       // Note: The lucide-react package includes sourceMappingURL comments
       // but doesn't ship the actual .map files, causing 404 errors.
       // Our plugin removes these specific references while preserving other source maps.
+    }
+
+    // The maps without the sourceMappingURL comment in every chunk; see
+    // productionBrowserSourceMaps above.
+    if (!isServer && !dev) {
+      config.devtool = "hidden-source-map";
     }
 
     // Optimize bundle size (only in production)
@@ -337,18 +345,26 @@ const nextConfig = {
     const servesOverHttp = process.env.SERVE_HTTP === "true";
     const isProd = process.env.NODE_ENV === "production" && !servesOverHttp;
 
-    // Content Security Policy - strict but allows necessary resources.
-    // connect-src's https://*.hf.co: Hugging Face redirects the AI chat's
-    // model weights to its Xet CDN (us.aws.cdn.hf.co, other regions under
-    // hf.co); without it no model could load.
+    // Content Security Policy: the browser reaches only what the site uses.
+    // Beyond the site itself, that is the terminal's AI chat (`ai init`):
+    // its model from Hugging Face, which redirects weights to its Xet CDN
+    // (us.aws.cdn.hf.co, other regions under hf.co), and the model's WebGPU
+    // library from raw.githubusercontent.com; and Vercel's preview toolbar
+    // (vercel.live, its pusher socket). The GitHub, ORCID, Semantic Scholar,
+    // Kudos, S3, Vercel Speed Insights and remote image hosts it listed are
+    // reached by the server or by nothing (round 25): remote images come
+    // through the site itself, the GitHub avatar through its image
+    // optimizer and the blog's pictures through /api/blog-image.
+    // PRIVACY-POLICY.md names these hosts; src/lib/security-headers.test.ts
+    // holds both to this list.
     const ContentSecurityPolicy = `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://va.vercel-scripts.com https://vercel.live;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://vercel.live;
       worker-src 'self' blob:;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com https://avatars.githubusercontent.com https://cdn-images-1.medium.com https://cdn-images-2.medium.com https://miro.medium.com https://images.unsplash.com;
-      font-src 'self' data: https://cdn.scite.ai moz-extension: chrome-extension:;
-      connect-src 'self' https://api.github.com https://pub.orcid.org https://api.semanticscholar.org https://www.growkudos.com https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://*.hf.co https://s3.amazonaws.com https://raw.githubusercontent.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://vercel.live wss://ws-us3.pusher.com;
+      img-src 'self' data: blob:;
+      font-src 'self' data: moz-extension: chrome-extension:;
+      connect-src 'self' https://huggingface.co https://www.huggingface.co https://cdn.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn-lfs-eu-1.huggingface.co https://*.hf.co https://raw.githubusercontent.com https://vercel.live wss://ws-us3.pusher.com;
       media-src 'self';
       object-src 'none';
       frame-src 'none';
@@ -383,9 +399,11 @@ const nextConfig = {
       },
       {
         // The Pyodide runtime is ~18MB of version-pinned bytes vendored by
-        // scripts/setup-assets.js. Its filenames never change within a release,
-        // and a new release lands in a fresh deploy, so immutable is safe and
-        // saves a revalidation round-trip per asset per session.
+        // scripts/setup-assets.js, each version in a folder of its own,
+        // /pyodide/<version>/, which the worker's URL names. A new version is
+        // new URLs, so immutable is safe and saves a revalidation round-trip
+        // per asset per session. (Until round 24 the folder had no version,
+        // and a returning visitor kept the cached runtime after an update.)
         source: "/pyodide/:path*",
         headers: [
           {
@@ -440,8 +458,11 @@ const nextConfig = {
             // Isolate our browsing context group from cross-origin popups so a
             // window we open (or one that opens us) cannot reach back through
             // window.opener. Our only window.open() calls are external social
-            // links that need no opener. COEP is intentionally NOT set: it would
-            // break cross-origin images (GitHub/Medium) and WebLLM.
+            // links that need no opener. COEP is intentionally NOT set: nothing
+            // here needs cross-origin isolation, and it would hold every
+            // cross-origin load (the AI chat's model downloads) to CORP or
+            // CORS checks. Images are no longer among them: they come through
+            // the site itself (its image optimizer, /api/blog-image).
             key: "Cross-Origin-Opener-Policy",
             value: "same-origin",
           },
@@ -456,9 +477,10 @@ const nextConfig = {
         // way fetch and WebSocket are: escaped code can always evaluate
         // import("https://..."). The import throws on a non-module response,
         // but the REQUEST still happens, so any origin the policy allows is a
-        // working exfiltration endpoint - and the site-wide script-src allows
+        // working exfiltration endpoint. The site-wide script-src allowed
         // https://*.vercel.app, a wildcard over every Vercel preview
-        // deployment on the internet.
+        // deployment on the internet; it allows https://vercel.live now, and
+        // the worker needs none of it.
         //
         // Nothing in this worker legitimately talks to a third party: Pyodide,
         // the wasm and the wheels are all same-origin under /pyodide/. So the

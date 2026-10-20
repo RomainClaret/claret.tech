@@ -57,7 +57,7 @@ export function PrivacyContent() {
     <div className="space-y-6">
       <div className="bg-muted/50 border-l-4 border-primary p-6 rounded-lg">
         <p className="text-foreground text-lg">
-          🔒 Your privacy is our priority - no tracking, no data collection
+          🔒 No tracking, no cookies, no personal data stored by this site
         </p>
       </div>
       <div className={`min-h-[400px] ${isLoading ? "animate-pulse" : ""}`}>

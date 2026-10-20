@@ -42,11 +42,11 @@ export function LanguageSpectrum({
               className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
                 "text-xs font-medium transition-all duration-200 cursor-default",
-                "border border-transparent",
+                "border",
                 "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                 isHovered
                   ? "bg-muted/50 border-muted-foreground/20 text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  : "border-transparent text-muted-foreground hover:text-foreground",
               )}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}

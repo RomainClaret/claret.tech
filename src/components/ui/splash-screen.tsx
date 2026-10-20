@@ -247,9 +247,9 @@ export function SplashScreen({
     <div
       ref={progressRootRef}
       className={cn(
-        "fixed inset-0 z-10000 bg-background flex items-center justify-center transition-all duration-500",
+        "fixed inset-0 z-10000 bg-background items-center justify-center transition-all duration-500",
+        isVisible ? "flex" : "hidden",
         isExiting ? "opacity-0 pointer-events-none" : "opacity-100",
-        !isVisible && "hidden",
       )}
       role="progressbar"
       // Written through the ref as the bar fills; React sets the start.

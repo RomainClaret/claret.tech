@@ -39,22 +39,33 @@ vi.mock("@/components/ui/button", () => ({
       {children}
     </button>
   ),
+  buttonClassName: ({
+    variant = "default",
+    className,
+  }: { variant?: string; className?: string } = {}) =>
+    [`variant-${variant}`, className].filter(Boolean).join(" "),
 }));
 
+// Go Home must not be a next/link (see the test): the stand-in marks
+// itself, so a regression shows.
 vi.mock("next/link", () => ({
   __esModule: true,
   default: ({
     href,
     children,
+    className,
   }: {
     href: string;
     children: React.ReactNode;
+    className?: string;
   }) => (
-    <a href={href} data-testid="home-link">
+    <a href={href} className={className} data-next-link="">
       {children}
     </a>
   ),
 }));
+
+vi.mock("@/lib/utils/reload-page", () => ({ reloadPage: vi.fn() }));
 
 vi.mock("lucide-react", () => ({
   AlertCircle: ({ className }: { className?: string }) => (
@@ -62,6 +73,9 @@ vi.mock("lucide-react", () => ({
   ),
   RefreshCw: ({ className }: { className?: string }) => (
     <div data-testid="refresh-icon" className={className} />
+  ),
+  RotateCw: ({ className }: { className?: string }) => (
+    <div data-testid="reload-icon" className={className} />
   ),
   Home: ({ className }: { className?: string }) => (
     <div data-testid="home-icon" className={className} />
@@ -91,7 +105,7 @@ describe("ErrorFallback", () => {
 
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
       expect(
-        screen.getByText(/We encountered an unexpected error/),
+        screen.getByText(/An error stopped this page/),
       ).toBeInTheDocument();
       expect(screen.getByTestId("alert-circle-icon")).toBeInTheDocument();
       expect(screen.getByTestId("refresh-icon")).toBeInTheDocument();
@@ -110,20 +124,19 @@ describe("ErrorFallback", () => {
       expect(tryAgainButton).toHaveAttribute("data-variant", "default");
     });
 
-    it("renders go home button with link", () => {
+    it("renders go home as one link, styled as a button", () => {
       render(<ErrorFallback error={mockError} resetError={mockResetError} />);
 
-      const homeLink = screen.getByTestId("home-link");
-      expect(homeLink).toBeInTheDocument();
+      const homeLink = screen.getByRole("link", { name: /go home/i });
       expect(homeLink).toHaveAttribute("href", "/");
-
-      const buttons = screen.getAllByTestId("fallback-button");
-      const homeButton = buttons.find((button) =>
-        button.textContent?.includes("Go Home"),
-      );
-
-      expect(homeButton).toBeInTheDocument();
-      expect(homeButton).toHaveAttribute("data-variant", "outline");
+      // A full navigation: Next's error boundary resets only when the path
+      // changes, so a next/link to "/" did nothing on the homepage.
+      expect(homeLink).not.toHaveAttribute("data-next-link");
+      expect(homeLink).toHaveTextContent("Go Home");
+      // Not a button inside a link: HTML allows no interactive content in a
+      // link, and Tab stopped on both.
+      expect(homeLink.querySelector("button")).toBeNull();
+      expect(homeLink).toHaveClass("variant-outline");
     });
 
     it("applies correct CSS classes for layout", () => {
@@ -190,16 +203,35 @@ describe("ErrorFallback", () => {
     it("displays user-friendly error description", () => {
       render(<ErrorFallback error={mockError} resetError={mockResetError} />);
 
-      const description = screen.getByText(
-        /We encountered an unexpected error/,
-      );
+      const description = screen.getByText(/An error stopped this page/);
       expect(description).toHaveTextContent(
-        "We encountered an unexpected error. Don't worry, we've been notified and are working on fixing it.",
+        "An error stopped this page. Try again, or go to the homepage.",
       );
       expect(description).toHaveClass(
-        "mb-6",
+        "mb-2",
         "text-gray-600",
         "dark:text-gray-400",
+      );
+    });
+
+    it("claims no report unless the error is on record", () => {
+      // It said "we've been notified" when nothing was sent (round 24).
+      const { container, rerender } = render(
+        <ErrorFallback error={mockError} resetError={mockResetError} />,
+      );
+
+      expect(container.textContent).not.toMatch(/notified|report/i);
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+      rerender(
+        <ErrorFallback
+          error={mockError}
+          resetError={mockResetError}
+          reported
+        />,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "A report of it was sent.",
       );
     });
 
@@ -329,6 +361,16 @@ describe("ErrorFallback", () => {
   });
 
   describe("User Interactions", () => {
+    it("reloads the page, for errors a deploy causes", async () => {
+      const { reloadPage } = await import("@/lib/utils/reload-page");
+      render(<ErrorFallback error={mockError} resetError={mockResetError} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /reload page/i }));
+
+      expect(reloadPage).toHaveBeenCalledTimes(1);
+      expect(mockResetError).not.toHaveBeenCalled();
+    });
+
     it("calls resetError when Try Again button is clicked", async () => {
       render(<ErrorFallback error={mockError} resetError={mockResetError} />);
 
@@ -346,18 +388,11 @@ describe("ErrorFallback", () => {
       expect(mockResetError).toHaveBeenCalledTimes(1);
     });
 
-    it("does not call resetError when Go Home button is clicked", async () => {
+    it("does not call resetError when Go Home is clicked", async () => {
       render(<ErrorFallback error={mockError} resetError={mockResetError} />);
 
-      const buttons = screen.getAllByTestId("fallback-button");
-      const homeButton = buttons.find((button) =>
-        button.textContent?.includes("Go Home"),
-      );
-
-      expect(homeButton).toBeInTheDocument();
-
       await act(async () => {
-        fireEvent.click(homeButton!);
+        fireEvent.click(screen.getByRole("link", { name: /go home/i }));
       });
 
       expect(mockResetError).not.toHaveBeenCalled();
@@ -446,6 +481,11 @@ describe("ErrorFallback", () => {
       buttons.forEach((button) => {
         expect(button).toHaveClass("inline-flex", "items-center", "gap-2");
       });
+      expect(screen.getByRole("link", { name: /go home/i })).toHaveClass(
+        "inline-flex",
+        "items-center",
+        "gap-2",
+      );
     });
   });
 
@@ -469,9 +509,7 @@ describe("ErrorFallback", () => {
     it("applies dark mode classes to description", () => {
       render(<ErrorFallback error={mockError} resetError={mockResetError} />);
 
-      const description = screen.getByText(
-        /We encountered an unexpected error/,
-      );
+      const description = screen.getByText(/An error stopped this page/);
       expect(description).toHaveClass("dark:text-gray-400");
     });
 

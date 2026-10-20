@@ -1,0 +1,42 @@
+name: Client error reports
+
+# The error pages file their reports as issues with the site owner's token
+# (src/app/api/client-error/route.ts), and GitHub tells nobody about their
+# own activity, so the owner heard of no report. This workflow, acting as
+# github-actions, assigns each new report to the owner, and mentions the
+# owner when one is reopened (its bug is back on the build serving now):
+# both notify like anyone else's action.
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  notify:
+    # Only the owner's own reports: anyone can open an issue, and an issue
+    # carrying the label could be anyone's after a triage.
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      contains(github.event.issue.labels.*.name, 'client-error')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assign the new report to the owner
+        if: github.event.action == 'opened'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+        run: gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --add-assignee "$OWNER"
+
+      - name: Tell the owner the report was reopened
+        if: github.event.action == 'reopened'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+        run: >-
+          gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY"
+          --body "@$OWNER this error is back on the build serving now."

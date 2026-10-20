@@ -134,6 +134,7 @@ async function fetchAllRepositories(
       query,
       variables: { username, first, after },
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {

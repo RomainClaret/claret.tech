@@ -428,6 +428,10 @@ jobs:
       # page view a function call again.
       - name: Check the homepage is a static file
         run: node .github/scripts/check-static-home.mjs
+      # A package taken out of the browser on purpose stays out: read from
+      # the chunks' source maps (.github/scripts/client-bundle-deny.json).
+      - name: Check no client chunk ships a removed package
+        run: node .github/scripts/check-client-bundle.mjs
 
   # Phase 5: Summary job
   ci-summary:

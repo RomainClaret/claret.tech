@@ -330,7 +330,7 @@ ${formatCommands(aiCommands)}
           success: true,
         };
 
-      case "status":
+      case "status": {
         // Check monitoring status without starting it
         const isActive = document.querySelector(
           "[data-performance-monitor-active]",
@@ -341,6 +341,7 @@ ${formatCommands(aiCommands)}
             : "📊 Performance monitoring: INACTIVE\n⚡ No performance impact",
           success: true,
         };
+      }
 
       case "close":
         window.dispatchEvent(new CustomEvent("terminal-performance-close"));
@@ -377,7 +378,7 @@ ${formatCommands(aiCommands)}
       case undefined:
       case "":
       case "open":
-      default:
+      default: {
         // Generate access token for security
         const token = Math.random().toString(36).substring(2, 15);
         window.dispatchEvent(
@@ -386,6 +387,7 @@ ${formatCommands(aiCommands)}
           }),
         );
         return { output: "Performance dashboard opened", success: true };
+      }
     }
   },
 
@@ -1504,7 +1506,7 @@ ${formatCommands(aiCommands)}
           success: true,
         };
 
-      case "status":
+      case "status": {
         // The tier that is running, from the motion gate, which
         // QualityProvider keeps current. Storage would have to know where
         // each mode keeps it: an automatic tier and the auto-disable state
@@ -1621,6 +1623,7 @@ ${formatCommands(aiCommands)}
           output,
           success: true,
         };
+      }
 
       default:
         return {

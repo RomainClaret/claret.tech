@@ -6,6 +6,8 @@ import {
   BLOCKED_MODULES,
   NAVIGATOR_KEPT,
   NAVIGATOR_MUST_BE_GONE,
+  PYODIDE_VERSION,
+  PYTHON_WORKER_URL,
 } from "./config";
 
 /**
@@ -15,8 +17,8 @@ import {
  * and assert the properties that drift would break.
  *
  * Text matching is crude, and that is the point: it holds even though the file
- * cannot be imported into a jsdom test (it does a top-level import of an 11MB
- * wasm loader from an absolute URL).
+ * cannot be imported into a jsdom test (it runs as a module worker, reads its
+ * own URL, and imports an 11MB wasm loader from an absolute one).
  */
 // Anchored to this file rather than to the working directory, so the test does
 // not care where vitest was invoked from. jsdom replaces the global URL, which
@@ -103,6 +105,37 @@ describe("worker constants mirror config.ts", () => {
     // It also grants no I/O by itself, which is why omitting it costs nothing.
     expect(workerStrippedGlobals).not.toContain("WebAssembly");
     expect(STRIPPED_GLOBALS as readonly string[]).not.toContain("WebAssembly");
+  });
+});
+
+describe("the runtime's version", () => {
+  it("is the one the worker names, and package.json's pyodide pin", () => {
+    const { dependencies } = JSON.parse(
+      readFileSync(resolve(__dirname, "../../../package.json"), "utf8"),
+    );
+    const named = /const PYODIDE_VERSION = "([^"]+)";/.exec(source);
+
+    expect(named?.[1]).toBe(PYODIDE_VERSION);
+    expect(PYODIDE_VERSION).toBe(dependencies.pyodide);
+  });
+
+  it("is never read from the worker's URL", () => {
+    // A tab opened before a deploy starts the worker at the URL its old
+    // bundle knew, and always gets the new worker (it is never cached).
+    // When the version came from the URL, such tabs could not start Python.
+    expect(PYTHON_WORKER_URL).toBe("/python-worker.js");
+    expect(source).not.toMatch(/import\.meta\.url|searchParams/);
+  });
+
+  it("loads the runtime from its version's folder, never an unversioned one", () => {
+    // The runtime is cached as immutable for a year (next.config.mjs): from
+    // one unversioned folder, a returning visitor kept the old runtime.
+    expect(source).toMatch(
+      /const PYODIDE_URL = `\/pyodide\/\$\{PYODIDE_VERSION\}\/`;/,
+    );
+    expect(source).toMatch(/await import\(`\$\{PYODIDE_URL\}pyodide\.mjs`\)/);
+    expect(source).toMatch(/indexURL: PYODIDE_URL,/);
+    expect(source).not.toMatch(/["'`]\/pyodide\/(?!\$\{)/);
   });
 });
 

@@ -2,10 +2,7 @@ import { test, expect, type Page } from "./utils/fixtures";
 import { acknowledgeCookieNotice } from "./utils/cookie-notice";
 import { waitForSplashToEnd } from "./utils/splash";
 import AxeBuilder from "@axe-core/playwright";
-import {
-  waitForScrollCompletion,
-  waitForAnimationCompletion,
-} from "./utils/scroll-utils";
+import { waitForAnimationCompletion } from "./utils/scroll-utils";
 import {
   dismissToasts,
   ensureElementNotBlockedByToast,
@@ -180,6 +177,29 @@ test.describe("Accessibility", () => {
 
     expect(seriousViolations(accessibilityScanResults)).toEqual([]);
     expect(contrastFailures(accessibilityScanResults)).toEqual([]);
+  });
+
+  test("should pass accessibility checks on the page-not-found page", async ({
+    page,
+  }) => {
+    // Its "Return Home" was a button inside a link: HTML allows no
+    // interactive content in a link, and Tab stopped on both. axe does not
+    // report it (nested-interactive covers controls whose children are
+    // presentational, which a link's are not), and no test visited the
+    // page.
+    const response = await page.goto("/no-such-page");
+    expect(response?.status()).toBe(404);
+    await expect(
+      page.getByRole("heading", { name: "Page Not Found" }),
+    ).toBeVisible();
+    const home = page.getByRole("link", { name: "Return Home" });
+    await expect(home).toHaveCount(1);
+    await expect(home.locator("button")).toHaveCount(0);
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(seriousViolations(results)).toEqual([]);
   });
 
   test("should pass accessibility checks at a phone's width", async ({
@@ -660,135 +680,6 @@ test.describe("Accessibility", () => {
     }
   });
 
-  test("should support keyboard navigation", async ({
-    page,
-    browserName: _browserName,
-    isMobile,
-  }) => {
-    // Skip keyboard navigation tests on mobile devices
-    if (isMobile) {
-      test.skip(
-        true,
-        "Keyboard navigation tests are not applicable on mobile devices",
-      );
-    }
-    await page.goto("/");
-    await page.waitForSelector("h1", { timeout: 10000 });
-
-    // Ensure playwright parameter for test mode
-    await ensurePlaywrightParam(page);
-
-    // Dismiss any toasts that might interfere with keyboard navigation
-    await dismissToasts(page, { timeout: 5000 });
-
-    // Test tab navigation through main navigation items
-    await page.keyboard.press("Tab"); // Skip to first interactive element
-
-    // Wait a moment for focus to be established
-    await page.waitForTimeout(200);
-
-    const activeElement = await page.evaluate(
-      () => document.activeElement?.tagName,
-    );
-    expect(activeElement).toBeTruthy();
-
-    // Tab through navigation items
-    const navItems = await page.locator('nav a[href^="#"]').count();
-    for (let i = 0; i < Math.min(navItems, 3); i++) {
-      // Test first 3 items for efficiency
-      await page.keyboard.press("Tab");
-      const activeElementInfo = await page.evaluate(() => {
-        const el = document.activeElement;
-        return {
-          tag: el?.tagName,
-          href: (el as HTMLAnchorElement)?.href,
-          visible: el
-            ? window.getComputedStyle(el).visibility !== "hidden" &&
-              window.getComputedStyle(el).display !== "none"
-            : false,
-        };
-      });
-
-      // Verify focused element is visible and interactive
-      expect(activeElementInfo.visible).toBeTruthy();
-    }
-
-    // Test keyboard activation (Enter key)
-    // Find a navigation link that will definitely cause scroll (not Home)
-    const navLinks = await page
-      .locator('nav a[href^="#"]:not([href="#home"])')
-      .all();
-
-    let scrollOccurred = false;
-    for (const link of navLinks.slice(0, 3)) {
-      // Try first 3 non-home links
-      const href = await link.getAttribute("href");
-      if (!href || href === "#home") continue;
-
-      // Check if target section is already in view
-      const targetSection = page.locator(href);
-      let initiallyVisible = false;
-      try {
-        initiallyVisible =
-          (await targetSection.isVisible()) &&
-          (await page.locator(href).evaluate((el) => {
-            const rect = el.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const visible = rect.top < viewportHeight && rect.bottom > 0;
-            return visible && rect.bottom - rect.top > 100; // At least 100px visible
-          }));
-      } catch {
-        initiallyVisible = false;
-      }
-
-      if (!initiallyVisible) {
-        // This link should cause scroll
-        await link.focus();
-
-        // Wait for focus to be established with better timeout for mobile
-        await page.waitForFunction(
-          (expectedHref) => {
-            const activeEl = document.activeElement as HTMLElement;
-            return (
-              activeEl?.tagName === "A" &&
-              activeEl?.getAttribute("href") === expectedHref
-            );
-          },
-          href,
-          { timeout: 5000 },
-        );
-
-        const beforeScroll = await page.evaluate(() => window.scrollY);
-
-        // Use proper keyboard activation (Enter key)
-        await page.keyboard.press("Enter");
-
-        // Wait for scroll to complete
-        const afterScroll = await waitForScrollCompletion(page, {
-          timeout: 15000,
-          stabilityWindow: 200,
-        });
-
-        // Check if scroll occurred
-        if (Math.abs(afterScroll - beforeScroll) > 50) {
-          scrollOccurred = true;
-          break;
-        }
-      }
-    }
-
-    // If no scroll occurred, it might be because all sections are visible
-    // In that case, just verify keyboard navigation works
-    if (!scrollOccurred) {
-      // At minimum, verify Enter key doesn't cause errors
-      expect(true).toBeTruthy();
-    } else {
-      expect(scrollOccurred).toBeTruthy();
-    }
-
-    // Target section visibility is already verified in the loop above
-  });
-
   test("should have proper form labels", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
@@ -943,7 +834,7 @@ test.describe("Accessibility", () => {
       );
 
     // Enhanced wait for live regions with fallback
-    let liveRegionCount = 0;
+    let liveRegionCount: number;
     try {
       await page.waitForFunction(
         (selectors) => {
@@ -1220,37 +1111,40 @@ test.describe("Accessibility", () => {
     }
   });
 
-  test("should have focus indicators", async ({ page }) => {
+  test("should have focus indicators", async ({ page, browserName }) => {
+    // It read the computed `outline` shorthand, which is never "none": with
+    // no outline at all Chromium reports "rgb(0, 0, 238) none 3px", so it
+    // passed with no focus indicator. The skip link shows focus as a ring
+    // (focus:ring-2, a box-shadow) with its outline hidden (layout.tsx).
+    //
     // The first Tab stop is the page's own, not the notice's (first in the
     // page, shown 1 s after load): which one this test met was timing.
     await acknowledgeCookieNotice(page);
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
 
-    // Tab to first interactive element
-    await page.keyboard.press("Tab");
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
+    const indicator = () =>
+      skipLink.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { outlineStyle: style.outlineStyle, boxShadow: style.boxShadow };
+      });
+    const unfocused = await indicator();
 
-    // Check that focused element has visible focus indicator
-    const focusStyles = await page.evaluate(() => {
-      const el = document.activeElement as HTMLElement;
-      if (!el) return null;
+    // macOS WebKit's Tab skips links (Safari's default); Alt+Tab does not.
+    await page.keyboard.press(
+      browserName === "webkit" && process.platform === "darwin"
+        ? "Alt+Tab"
+        : "Tab",
+    );
+    await expect(skipLink).toBeFocused();
+    const focused = await indicator();
 
-      const styles = window.getComputedStyle(el);
-      return {
-        outline: styles.outline,
-        outlineWidth: styles.outlineWidth,
-        outlineColor: styles.outlineColor,
-        boxShadow: styles.boxShadow,
-        border: styles.border,
-      };
-    });
-
-    // Element should have some form of focus indicator
     expect(
-      focusStyles?.outline !== "none" ||
-        focusStyles?.boxShadow !== "none" ||
-        parseInt(focusStyles?.outlineWidth || "0") > 0,
-    ).toBeTruthy();
+      focused.outlineStyle !== "none" || focused.boxShadow !== "none",
+      JSON.stringify(focused),
+    ).toBe(true);
+    expect(focused).not.toEqual(unfocused);
   });
 
   test("should handle prefers-reduced-motion", async ({
@@ -1363,7 +1257,9 @@ test.describe("The cookie notice", () => {
   const clearOfNotice = (element: Element) => {
     const box = element.getBoundingClientRect();
     const notice = [...document.querySelectorAll("div.fixed")]
-      .find((candidate) => candidate.textContent?.includes("Cookie Selection"))!
+      .find((candidate) =>
+        candidate.textContent?.includes("Natural Selection"),
+      )!
       .getBoundingClientRect();
     const hit = document.elementFromPoint(
       box.left + box.width / 2,
@@ -1391,7 +1287,7 @@ test.describe("The cookie notice", () => {
       await page.goto("/?playwright=true");
       await waitForSplashToEnd(page);
       const notice = page.getByRole("region", {
-        name: "Cookies on claret.tech",
+        name: "Privacy notice",
       });
       await expect(notice).toBeVisible();
 
@@ -1418,7 +1314,7 @@ test.describe("The cookie notice", () => {
       await page.goto("/?playwright=true");
       await waitForSplashToEnd(page);
       await expect(
-        page.getByRole("button", { name: /Accept cookie notice/ }),
+        page.getByRole("button", { name: /Dismiss privacy notice/ }),
       ).toBeVisible();
 
       const legal = ["View Privacy Policy", "View Terms of Service"].map(

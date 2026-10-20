@@ -1,8 +1,13 @@
+import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 export default defineConfig([
+  // ESLint's own recommended rules, first: typescript-eslint's config after
+  // it turns off for .ts and .tsx those the compiler already checks
+  // (no-undef among them).
+  js.configs.recommended,
   ...nextVitals,
   ...nextTs,
   {
@@ -27,6 +32,11 @@ export default defineConfig([
       "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/globals": "off",
       "@next/next/no-img-element": "off",
+      // `{true && <span />}` is how a test renders a conditional child, and
+      // Playwright's fixtures take a destructuring first argument, empty
+      // when none is used.
+      "no-constant-binary-expression": "off",
+      "no-empty-pattern": "off",
     },
   },
   // Playwright's fixtures receive a function named `use`: not React's.
@@ -36,6 +46,21 @@ export default defineConfig([
       "react-hooks/rules-of-hooks": "off",
     },
   },
-  // Lint covers the site's source and its tests, not the scripts.
-  globalIgnores(["scripts/**/*.js", "coverage/**", ".next/**", "out/**"]),
+  // The CommonJS scripts (the postinstall's, the prebuild's, the
+  // publications fetch): require() is how they load modules.
+  {
+    files: ["scripts/**/*.js"],
+    languageOptions: { sourceType: "commonjs" },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  // Built, or copied in by the postinstall: not written here.
+  globalIgnores([
+    "coverage/**",
+    ".next/**",
+    "out/**",
+    "public/pyodide/**",
+    "public/pdf.worker.min.mjs",
+  ]),
 ]);

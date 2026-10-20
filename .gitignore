@@ -88,7 +88,6 @@ yarn-error.log
 pnpm-lock.yaml
 
 # Cache files
-src/lib/utils/kudos-cache.json
 src/lib/utils/medium-cache.json
 
 # Sentry

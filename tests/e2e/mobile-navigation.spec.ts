@@ -110,5 +110,12 @@ test.describe("Mobile Navigation", () => {
     await expect(menuButton).toBeVisible();
     await expect(menuButton).toHaveAttribute("aria-label", /.+/);
     await expect(menuButton).toHaveAttribute("aria-expanded", /^(true|false)$/);
+
+    // It names the panel it opens. (The desktop navigation spec checked the
+    // attribute with toBeDefined, which a missing one, null, passes.)
+    const controls = await menuButton.getAttribute("aria-controls");
+    expect(controls).toBeTruthy();
+    await openMobileMenu(page);
+    await expect(page.locator(`[id="${controls}"]`)).toBeVisible();
   });
 });

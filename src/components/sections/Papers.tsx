@@ -30,6 +30,7 @@ import {
   exportToBibTeX,
   publicationToBibTeX,
   STATIC_PUBLICATIONS,
+  withAbstracts,
   type ArxivVariant,
   type Publication,
 } from "@/lib/api/fetch-publications";
@@ -363,7 +364,6 @@ function PaperCard({
         <HolographicCard
           glowColor={nodeColor}
           insideBackgroundColor={nodeColor}
-          className="h-full"
           forceHover={isDeepLinked}
         >
           <div className="p-6 h-full flex flex-col">
@@ -658,7 +658,6 @@ function DynamicPaperCard({
         <HolographicCard
           glowColor={nodeColor}
           insideBackgroundColor={nodeColor}
-          className="h-full"
           forceHover={isDeepLinked}
         >
           <div className="p-6 h-full flex flex-col">
@@ -870,8 +869,10 @@ function DynamicPaperCard({
                   const shortDesc = publication.shortDescription;
 
                   if (isExpanded) {
-                    // Show full abstract when expanded
-                    return abstract;
+                    // The full abstract, which /api/publications brings on
+                    // mount (the page's own copy has none); until then the
+                    // short description.
+                    return publication.abstract || shortDesc || abstract;
                   } else {
                     // Show shortDescription if available, otherwise show truncated abstract
                     return shortDesc || truncateText(abstract, 200);
@@ -1033,6 +1034,9 @@ export function Papers() {
         if (typeof process === "undefined" || process.env.NODE_ENV !== "test") {
           logError(error, "Papers.fetchPublications");
         }
+        // The abstracts, which the answer would have carried, from their
+        // own chunk.
+        withAbstracts(STATIC_PUBLICATIONS).then(setDynamicPapers, () => {});
       });
   }, []);
 

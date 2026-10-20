@@ -27,6 +27,11 @@ import { useHydrated } from "@/lib/hooks/useHydrated";
 import { useWindowSize } from "@/lib/hooks/useWindowSize";
 
 interface GridBackgroundProps {
+  /**
+   * Its place, which the caller sets: the site grid is fixed to the
+   * viewport, the hero's fills the hero. A default `absolute` lost to the
+   * site grid's `fixed` only through tailwind-merge.
+   */
   className?: string;
   /**
    * This grid's opaque background hides the fixed site grid wherever it
@@ -561,10 +566,7 @@ function GridBackgroundImpl({
   return (
     <div
       ref={containerRef}
-      className={cn(
-        "absolute inset-0 overflow-hidden grid-background-container",
-        className,
-      )}
+      className={cn("overflow-hidden grid-background-container", className)}
       // Pauses the node pulses while the grid is out of view (motion.css)
       data-anim={isVisible ? "on" : "off"}
       // Under a cover only the band above it is drawn; the cover hides the

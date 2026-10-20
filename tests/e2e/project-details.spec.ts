@@ -124,7 +124,7 @@ async function openSite(page: Page, { acceptCookies = true } = {}) {
   await page.goto("/?playwright=true");
   await waitForSplashToEnd(page);
   if (acceptCookies) {
-    await page.getByRole("button", { name: "Accept cookie notice" }).click();
+    await page.getByRole("button", { name: "Dismiss privacy notice" }).click();
   }
 }
 
@@ -280,9 +280,21 @@ test.describe("A GitHub card's details", () => {
     await cardButton(page, "archived-notes").click();
     const dialog = page.getByRole("dialog", { name: "archived-notes" });
 
-    for (const name of ["Topics", "Languages", "Activity"]) {
-      await expect(dialog.getByRole("heading", { name })).toHaveCount(0);
-    }
+    // Open first: only absence checks followed the click, so a dialog that
+    // never opened, or rendered nothing, passed.
+    await expect(
+      dialog.getByRole("heading", { level: 2, name: "archived-notes" }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText("No detailed description available."),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("link", { name: /View on GitHub/ }),
+    ).toBeVisible();
+
+    // No empty block: no section heading at all (Topics, Languages, Primary
+    // language, Activity), and no demo link.
+    await expect(dialog.getByRole("heading", { level: 3 })).toHaveCount(0);
     await expect(dialog.getByRole("link", { name: /Live Demo/ })).toHaveCount(
       0,
     );
@@ -374,7 +386,7 @@ test.describe("A GitHub card's details on a phone", () => {
     // and the sheet's link still takes the tap.
     const link = dialog.getByRole("link", { name: /View on GitHub/ });
     const notice = page
-      .getByText("Cookie Selection:")
+      .getByText("Natural Selection:")
       .locator("xpath=ancestor::div[contains(@class, 'fixed')][1]");
     const [a, b] = [(await link.boundingBox())!, (await notice.boundingBox())!];
     expect(a.y < b.y + b.height && b.y < a.y + a.height).toBe(true);

@@ -14,6 +14,23 @@ const precomputedColorOf = (imageSrc: string): string | undefined =>
 const knownColorOf = (imageSrc: string): string | undefined =>
   precomputedColorOf(imageSrc) ?? colorCache.get(imageSrc);
 
+/**
+ * Only the site's own images are read for a color. A remote one (a Medium
+ * post's, the Kudos card's Unsplash image) was loaded from the visitor's
+ * browser, a request to a third party the privacy policy never named. The
+ * card keeps its fallback (its category's color, as the server gives
+ * Medium's: scripts/extract-medium-colors.js).
+ */
+const isOwnImage = (imageSrc: string): boolean => {
+  try {
+    return (
+      new URL(imageSrc, window.location.href).origin === window.location.origin
+    );
+  } catch {
+    return false;
+  }
+};
+
 export function useColorExtraction(
   imageSrc: string,
   fallbackColor: string = "rgb(85, 25, 139)",
@@ -46,7 +63,7 @@ export function useColorExtraction(
     const extractColor = async () => {
       try {
         // Validate image source
-        if (!imageSrc || imageSrc.trim() === "") {
+        if (!imageSrc || imageSrc.trim() === "" || !isOwnImage(imageSrc)) {
           setExtractedColor(fallbackColor);
           setIsLoading(false);
           return;

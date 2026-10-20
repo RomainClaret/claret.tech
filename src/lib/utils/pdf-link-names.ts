@@ -304,7 +304,7 @@ function trimUnbalanced(text: string): string {
  *  links. */
 function clean(raw: string): string {
   let text = raw
-    .replace(/[­​-‍﻿]/g, "")
+    .replace(/[\u00AD\u200B-\u200D\uFEFF]/g, "")
     .replace(/(?:\s*[.·…]){3,}/g, " ")
     .replace(/\s+/g, " ")
     .trim();

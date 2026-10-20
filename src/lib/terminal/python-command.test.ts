@@ -298,7 +298,26 @@ describe("python command", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.output).toContain("worker blocked by CSP");
+      // After a deploy only a reload brings a tab's code and the server's
+      // together again, so a boot that fails says so.
+      expect(result.output).toBe(
+        "python: worker blocked by CSP. Reload the page to try again.",
+      );
+    });
+
+    it("suggests no reload for a failure after the boot", async () => {
+      await setMissing();
+      run.mockRejectedValue(new Error("the worker went away"));
+
+      const result = await pythonCommand(
+        ["print(1)"],
+        context({ rawArgs: "print(1)" }),
+      );
+
+      expect(result).toEqual({
+        output: "python: the worker went away",
+        success: false,
+      });
     });
   });
 
@@ -354,6 +373,9 @@ describe("python command", () => {
       const result = await pythonCommand([], context({ rawArgs: "" }));
 
       expect(result.success).toBe(false);
+      expect(result.output).toBe(
+        "python: out of memory. Reload the page to try again.",
+      );
       expect(enterLineMode).not.toHaveBeenCalled();
     });
   });
@@ -428,6 +450,26 @@ describe("python command", () => {
       expect(written.join("")).not.toContain(READY.python);
       expect(result.success).toBe(false);
     });
+  });
+
+  it("says at once when the browser has no WebAssembly", async () => {
+    // Lockdown Mode: the runtime downloaded 12 MB, then waited out its 120 s
+    // boot timeout to say it "timed out while starting".
+    vi.stubGlobal("WebAssembly", undefined);
+    try {
+      const result = await pythonCommand(
+        ["print(1)"],
+        context({ rawArgs: "print(1)" }),
+      );
+
+      expect(result).toEqual({
+        output: (await import("./python-command")).NO_WEBASSEMBLY,
+        success: false,
+      });
+      expect(ensureReady).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("declines when the terminal cannot stream output", async () => {

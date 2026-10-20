@@ -2,132 +2,16 @@ import { test, expect } from "./utils/fixtures";
 import { gotoWithoutScripts } from "./utils/no-script";
 
 test.describe("Performance", () => {
-  test("should meet Core Web Vitals thresholds", async ({ page }) => {
-    // Navigate to the page
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Collect performance metrics
-    const metrics = await page.evaluate(() => {
-      return new Promise<{
-        fcp: number;
-        lcp: number;
-        tti: number;
-        tbt: number;
-        domContentLoaded: number;
-        loadComplete: number;
-      }>((resolve) => {
-        // Wait for all metrics to be available
-        setTimeout(() => {
-          const navigation = performance.getEntriesByType(
-            "navigation",
-          )[0] as PerformanceNavigationTiming;
-          const paint = performance.getEntriesByType("paint");
-          const fcp = paint.find((p) => p.name === "first-contentful-paint");
-          const lcp = performance
-            .getEntriesByType("largest-contentful-paint")
-            .pop() as PerformanceEntry & { startTime: number };
-
-          // Calculate metrics
-          resolve({
-            // First Contentful Paint
-            fcp: fcp ? fcp.startTime : 0,
-            // Largest Contentful Paint
-            lcp: lcp ? lcp.startTime : 0,
-            // Time to Interactive (approximation)
-            tti: navigation.loadEventEnd - navigation.fetchStart,
-            // Total Blocking Time (approximation)
-            tbt:
-              navigation.domContentLoadedEventEnd -
-              navigation.domContentLoadedEventStart,
-            // DOM Content Loaded
-            domContentLoaded:
-              navigation.domContentLoadedEventEnd - navigation.fetchStart,
-            // Load Complete
-            loadComplete: navigation.loadEventEnd - navigation.fetchStart,
-          });
-        }, 2000); // Wait for LCP to stabilize
-      });
-    });
-
-    // Adjusted thresholds for the current app performance
-    // These are acceptable for the production version
-    // CI environments need more relaxed thresholds (increased based on actual CI performance)
-    const isCI = process.env.CI;
-    expect(metrics.fcp).toBeLessThan(isCI ? 8000 : 4000); // FCP < 8s for CI, 4s for local
-    expect(metrics.lcp).toBeLessThan(isCI ? 7000 : 5000); // LCP < 7s for CI, 5s for local
-    expect(metrics.tti).toBeLessThan(isCI ? 25000 : 10000); // TTI < 25s for CI, 10s for local
-    expect(metrics.domContentLoaded).toBeLessThan(isCI ? 7000 : 5000);
-    expect(metrics.loadComplete).toBeLessThan(isCI ? 15000 : 10000); // Increased for CI
-  });
-
-  test("should have low Cumulative Layout Shift", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Measure CLS
-    const cls = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
-        let clsValue = 0;
-        const observer = new PerformanceObserver((list) => {
-          for (const entry of list.getEntries()) {
-            const layoutShift = entry as PerformanceEntry & {
-              hadRecentInput?: boolean;
-              value: number;
-            };
-            if (layoutShift.hadRecentInput) continue;
-            clsValue += layoutShift.value;
-          }
-        });
-
-        observer.observe({ type: "layout-shift", buffered: true });
-
-        // Collect layout shifts for 3 seconds
-        setTimeout(() => {
-          observer.disconnect();
-          resolve(clsValue);
-        }, 3000);
-      });
-    });
-
-    // CLS < 0.1 is good, but we'll accept higher for production
-    expect(cls).toBeLessThan(0.9); // CLS < 0.9 (production baseline: ~0.84)
-  });
-
-  test("should have acceptable First Input Delay", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Simulate user interaction to measure FID
-    const fid = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
-        const observer = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          if (entries.length > 0) {
-            const firstInput = entries[0] as PerformanceEntry & {
-              processingStart: number;
-              startTime: number;
-            };
-            observer.disconnect();
-            resolve(firstInput.processingStart - firstInput.startTime);
-          }
-        });
-
-        observer.observe({ type: "first-input", buffered: true });
-
-        // Simulate a click after page loads
-        setTimeout(() => {
-          document.body.click();
-          // Fallback if no input is detected
-          setTimeout(() => resolve(0), 1000);
-        }, 100);
-      });
-    });
-
-    // FID < 100ms is good
-    expect(fid).toBeLessThan(300); // FID < 300ms is acceptable
-  });
-
+  // Load timings and input delay are Lighthouse's (lighthouse.spec.ts), under
+  // throttling and against real budgets: FCP 1.5 s, LCP 2 s, TBT 1 s, TTI
+  // 3 s. This file had them too, at 8, 7 and 25 s in CI, and an input delay
+  // read after a synthetic click, which records no first input, so 0 every
+  // time. First Input Delay is not a Core Web Vital since 2024 either.
+  //
+  // Layout shift is Lighthouse's too. This file measured it for 3 s after
+  // load, and it stayed under 0.1 even with the hero's placeholder at no
+  // height, which the brains then push open (most likely because they arrive
+  // while the splash covers the page), so it caught nothing a visitor sees.
   test("should optimize images", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
@@ -225,10 +109,12 @@ test.describe("Performance", () => {
       usedBytes += counts.filter((count) => count > 0).length;
     }
 
-    // Production build, 2026-10-17: 1,290 KB of JavaScript, 0.59 to 0.60 of
-    // it run. (The limits were 60,000 KB and a share that could not fall.)
+    // Production build: 1,290 KB of JavaScript on 2026-10-17, 0.59 to 0.60
+    // of it run, and 1,321 KB on 2026-10-20 (three runs). The limit was
+    // 2,000 KB, room for the whole terminal (xterm alone is 334 KB) to load
+    // with the page unnoticed; 1,500 is 14% above the measure.
     expect(usedBytes / totalBytes).toBeGreaterThan(0.5);
-    expect(totalBytes / 1024).toBeLessThan(2000);
+    expect(totalBytes / 1024).toBeLessThan(1500);
   });
 
   test("should have efficient CSS", async ({ page, browserName, isMobile }) => {
@@ -268,13 +154,15 @@ test.describe("Performance", () => {
     }
 
     const usageRatio = totalBytes > 0 ? usedBytes / totalBytes : 1;
-
-    // At least 25% of CSS should be used (production baseline: ~30%)
-    expect(usageRatio).toBeGreaterThan(0.25);
-
-    // Total CSS should be reasonable for production
     const totalKB = totalBytes / 1024;
-    expect(totalKB).toBeLessThan(600); // Less than 600KB of CSS is acceptable for production
+
+    // Production build, 2026-10-20, five runs: 157 KB in four stylesheets,
+    // 0.934 of it used, every run. The limits were 600 KB and 0.25 ("the
+    // production baseline: ~30%"), which a stylesheet three times larger and
+    // mostly unused passed. These are the highest run plus 15%, and a used
+    // share Tailwind's generated CSS stays well above.
+    expect(usageRatio).toBeGreaterThan(0.8);
+    expect(totalKB).toBeLessThan(181);
   });
 
   test("should minimize network requests", async ({ page }) => {
@@ -301,47 +189,44 @@ test.describe("Performance", () => {
       {} as Record<string, number>,
     );
 
-    // Reasonable limits for different resource types (relaxed for modern web app)
-    expect(requestsByType.script || 0).toBeLessThan(30);
-    expect(requestsByType.stylesheet || 0).toBeLessThan(15);
-    expect(requestsByType.font || 0).toBeLessThan(15);
-    expect(requests.length).toBeLessThan(100); // Total requests
+    // Measured on 2026-10-20: 31 scripts, 2 stylesheets, 2 fonts and 46
+    // requests in all on a desktop (30 scripts on a phone, which skips the
+    // constellation's chunk). Round 25 fetched 23 scripts: this round moved
+    // code the page needs only after hydration into chunks of their own,
+    // fetched then, for 31 KB less JavaScript before it. Highest measured
+    // plus 15%; the limits were 30, 15, 15 and 100.
+    expect(requestsByType.script || 0).toBeLessThan(36);
+    expect(requestsByType.stylesheet || 0).toBeLessThanOrEqual(3);
+    expect(requestsByType.font || 0).toBeLessThanOrEqual(3);
+    expect(requests.length).toBeLessThan(53);
   });
 
-  test("should cache static assets", async ({ page }) => {
-    const cachedResources: string[] = [];
+  test("should cache static assets", async ({ page, request }) => {
+    // It counted the cached responses as `>= 0`, so no header at all passed.
+    // The rules in next.config.mjs's headers(), and Next's own for chunks.
+    const cacheControl = async (path: string) =>
+      (await request.get(path)).headers()["cache-control"];
+    const year = "public, max-age=31536000, immutable";
 
-    page.on("response", (response) => {
-      const cacheControl = response.headers()["cache-control"];
-      const url = response.url();
+    for (const path of [
+      "/images/ucd_logo.webp",
+      "/fonts/Montserrat-Regular.woff2",
+      "/animations/graphNetworkBlueAnimation.v2.json",
+    ]) {
+      expect(await cacheControl(path), path).toBe(year);
+    }
+    // Replaced under the same name at times: a day, then revalidated.
+    expect(await cacheControl("/pdfs/CV_RomainClaret.pdf")).toBe(
+      "public, max-age=86400, stale-while-revalidate=2592000",
+    );
 
-      // Check if static assets have proper caching
-      if (
-        (url.includes(".js") ||
-          url.includes(".css") ||
-          url.includes(".woff") ||
-          url.includes(".png") ||
-          url.includes(".jpg") ||
-          url.includes(".webp")) &&
-        !url.includes("hot-update")
-      ) {
-        if (
-          cacheControl &&
-          (cacheControl.includes("max-age") ||
-            cacheControl.includes("immutable") ||
-            cacheControl.includes("public"))
-        ) {
-          cachedResources.push(url);
-        }
-      }
-    });
-
+    const chunk = page.waitForResponse((response) =>
+      /^\/_next\/static\/chunks\/.+\.js$/.test(
+        new URL(response.url()).pathname,
+      ),
+    );
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Some static assets should have caching headers
-    // This might be 0 in development, so we're lenient
-    expect(cachedResources.length).toBeGreaterThanOrEqual(0);
+    expect((await chunk).headers()["cache-control"]).toContain("immutable");
   });
 
   test("should have fast Time to First Byte", async ({ page }) => {
@@ -530,68 +415,50 @@ test.describe("Performance", () => {
   });
 
   test("should optimize web fonts", async ({ page }) => {
-    const fontRequests: {
-      url: string;
-      status: number;
-      headers: Record<string, string>;
-    }[] = [];
-
+    // A face without font-display only logged a warning, and "prefer WOFF2"
+    // checked that a .woff2 URL contained ".woff2".
+    const fonts: { url: string; status: number }[] = [];
     page.on("response", (response) => {
-      const url = response.url();
-      if (
-        url.includes(".woff") ||
-        url.includes(".woff2") ||
-        url.includes(".ttf")
-      ) {
-        fontRequests.push({
-          url,
-          status: response.status(),
-          headers: response.headers(),
-        });
+      if (/\.(woff2?|ttf|otf)$/.test(new URL(response.url()).pathname)) {
+        fonts.push({ url: response.url(), status: response.status() });
       }
     });
 
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    // Check font optimization
-    for (const font of fontRequests) {
-      // Fonts should load successfully
-      expect(font.status).toBe(200);
+    const faces = await page.evaluate(() =>
+      Array.from(document.styleSheets)
+        .flatMap((sheet) => {
+          try {
+            return Array.from(sheet.cssRules);
+          } catch {
+            return [];
+          }
+        })
+        .filter((rule) => rule instanceof CSSFontFaceRule)
+        .map((rule) => {
+          const style = (rule as CSSFontFaceRule).style;
+          return {
+            src: style.getPropertyValue("src"),
+            display: style.getPropertyValue("font-display"),
+          };
+        }),
+    );
 
-      // Prefer WOFF2 format
-      if (font.url.includes(".woff2")) {
-        expect(font.url).toContain(".woff2");
-      }
+    // Montserrat's two faces (layout.tsx): text shows in the fallback font
+    // until each arrives. The fallback's own face, local("Arial") with
+    // next/font's metric overrides, downloads nothing and declares none.
+    const downloaded = faces.filter((face) => face.src.includes("url("));
+    expect(downloaded.length).toBeGreaterThanOrEqual(2);
+    for (const face of downloaded) {
+      expect(face.display, face.src).toBe("swap");
     }
-
-    // Check font-display usage
-    const fontDisplay = await page.evaluate(() => {
-      const styles = Array.from(document.styleSheets);
-      const fontFaces: string[] = [];
-
-      styles.forEach((sheet) => {
-        try {
-          const rules = Array.from(sheet.cssRules || []);
-          rules.forEach((rule) => {
-            if (rule instanceof CSSFontFaceRule) {
-              fontFaces.push(rule.cssText);
-            }
-          });
-        } catch {
-          // Cross-origin stylesheets may throw
-        }
-      });
-
-      return fontFaces;
-    });
-
-    // Font faces should use font-display: swap or optional
-    fontDisplay.forEach((face) => {
-      if (!face.includes("font-display")) {
-        console.warn("Font face missing font-display:", face);
-      }
-    });
+    expect(fonts.length).toBeGreaterThan(0);
+    for (const font of fonts) {
+      expect(font.status, font.url).toBe(200);
+      expect(font.url, font.url).toMatch(/\.woff2$/);
+    }
   });
 
   test("should have reasonable memory usage", async ({ page }) => {

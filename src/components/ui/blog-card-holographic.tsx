@@ -225,7 +225,7 @@ export function BlogCardHolographic({
     >
       <HolographicCard
         glowColor={nodeColor}
-        className="h-full transition-all duration-300 blog-card-enhanced"
+        className="transition-all duration-300 blog-card-enhanced"
         forceHover={isDeepLinked}
       >
         <div className="p-6 h-full flex flex-col">
@@ -314,7 +314,22 @@ export function BlogCardHolographic({
           {/* Image section */}
           {image && (
             <div className="relative w-full h-48 mb-4 overflow-hidden rounded-lg bg-muted/10">
-              {!imageError ? (
+              {imageError ? null : image.startsWith("/api/blog-image/") ? (
+                // Resized by the site's own route at the two widths this box
+                // needs (src/app/api/blog-image): through next/image it
+                // would go to the optimizer again, as a local image.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`${image}?w=480`}
+                  srcSet={`${image}?w=480 480w, ${image}?w=960 960w`}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  alt={title}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-contain object-center"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
                 <Image
                   src={image}
                   alt={title}
@@ -323,7 +338,8 @@ export function BlogCardHolographic({
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   onError={() => setImageError(true)}
                 />
-              ) : (
+              )}
+              {imageError && (
                 <div
                   className="absolute inset-0"
                   style={{

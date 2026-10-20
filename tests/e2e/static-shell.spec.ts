@@ -687,6 +687,35 @@ test.describe("A decoration whose chunk fails to load", () => {
 
   // The splash's animation player (lottie-web, whose global is bodymovin).
   // The splash plays it, under the error boundary around the whole site.
+  // The tab's animated icon (AppWrapper loads it after hydration): without
+  // it, the static favicon stays.
+  test("keeps the static favicon without the animated one", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const requests = await routeChunk(
+      context,
+      "/favicons/animated/renderer.js",
+      (route) => route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+
+    await expect(splash(page)).toBeVisible();
+    await expect(splash(page)).toHaveCount(0, { timeout: 10_000 });
+    await expect(anyErrorScreen(page)).toHaveCount(0);
+    await expectPageShown(page);
+    await expect(
+      page.locator('link[rel~="icon"][href="/favicon.ico"]'),
+    ).toHaveCount(1);
+    await expect(page.locator('link[rel~="icon"][href^="data:"]')).toHaveCount(
+      0,
+    );
+    // The first load and the stand-in's try.
+    await expect.poll(requests).toBe(2);
+    await closeContext(context);
+  });
+
   test("plays the splash without its animation", async ({ browser }) => {
     const context = await browser.newContext();
     const requests = await routeChunk(context, "bodymovin", (route) =>
@@ -732,10 +761,250 @@ test.describe("A decoration whose chunk fails to load", () => {
   test("shows the hero without the brains", ({ browser }) =>
     expectHeroWithout(browser, "dual-brain-background"));
 
+  // The hero's decorative layers (shooting stars, the neural background
+  // and the skills cloud), which the hero loads after hydration. WebKit
+  // never asks for them (the next describe holds that).
+  test("shows the hero without its decorative layers", async ({
+    browser,
+    browserName,
+  }) => {
+    test.skip(browserName === "webkit", "Safari fetches no layers");
+    const context = await browser.newContext();
+    const requests = await routeChunk(context, "shooting-star", (route) =>
+      route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+
+    await expect(splash(page)).toBeVisible();
+    await expect(splash(page)).toHaveCount(0, { timeout: 10_000 });
+    await expect(anyErrorScreen(page)).toHaveCount(0);
+    await expectPageShown(page);
+    await expect(page.locator(".shooting-star")).toHaveCount(0);
+    // The first load and the stand-in's try.
+    await expect.poll(requests).toBe(2);
+    await closeContext(context);
+  });
+
+  // The interest constellation's orbit: without it, its frame stays as the
+  // page's HTML has it. (Its marker keeps the quotes: the skills cloud's
+  // chunk holds the words inside a longer class string.)
+  test("keeps the constellation's frame without its orbit", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+    });
+    const requests = await routeChunk(
+      context,
+      '"select-none accent-text"',
+      (route) => route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+
+    await expect(splash(page)).toBeVisible();
+    await expect(splash(page)).toHaveCount(0, { timeout: 10_000 });
+    await expect(anyErrorScreen(page)).toHaveCount(0);
+    await expectPageShown(page);
+    await expect(page.locator("#home filter#textGlow")).toHaveCount(1);
+    // The first load and the stand-in's try.
+    await expect.poll(requests).toBe(2);
+    await closeContext(context);
+  });
+
   // BrainNetworkVisualization: the canvas each brain draws on, picked out by
   // one of its contour nodes.
   test("shows the hero without the brains' canvases", ({ browser }) =>
     expectHeroWithout(browser, '"contour1"'));
+});
+
+test.describe("The hero's decorative layers", () => {
+  // None is in the HTML: they draw once the hero is in view, and their code
+  // came with the homepage's first JavaScript all the same.
+  test("are in no script the homepage loads first", async ({ request }) => {
+    const html = await (await request.get("/?playwright=true")).text();
+    const eager = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"[^>]*>/g)]
+      .filter(([tag]) => !/nomodule/i.test(tag))
+      .map(([, src]) => src);
+    expect(eager.length).toBeGreaterThan(5);
+
+    for (const src of eager) {
+      expect(await (await request.get(src)).text(), src).not.toContain(
+        "shooting-star",
+      );
+    }
+  });
+
+  // Safari draws none of them (useShouldReduceAnimations), so it should not
+  // download them either; other browsers fetch them once.
+  test("are fetched by browsers that draw them, and only those", async ({
+    browser,
+    browserName,
+  }) => {
+    const context = await browser.newContext();
+    const requests = await routeChunk(
+      context,
+      "shooting-star",
+      (route, response) => route.fulfill({ response }),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
+    await expect(splash).toBeVisible();
+    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator("#home h1")).toBeVisible();
+
+    if (browserName === "webkit") {
+      // Settled: what the page would fetch, it has asked for by now.
+      await page.waitForTimeout(2000);
+      expect(requests()).toBe(0);
+    } else {
+      await expect.poll(requests).toBe(1);
+    }
+    await closeContext(context);
+  });
+});
+
+test.describe("The interest constellation", () => {
+  // Its orbit shows from md up; a phone draws only its empty frame (the
+  // page's HTML), and should not download the code that draws the rest.
+  test("is fetched on screens that show it, and only those", async ({
+    browser,
+  }) => {
+    for (const [width, fetched] of [
+      [390, 0],
+      [1280, 1],
+    ] as const) {
+      const context = await browser.newContext({
+        viewport: { width, height: 844 },
+      });
+      const requests = await routeChunk(
+        context,
+        '"select-none accent-text"',
+        (route, response) => route.fulfill({ response }),
+      );
+      const page = await context.newPage();
+      await page.goto("/?playwright=true");
+      const splash = page.getByRole("progressbar", {
+        name: "Loading portfolio",
+      });
+      await expect(splash).toBeVisible();
+      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+
+      if (fetched === 0) {
+        // Settled: what the page would fetch, it has asked for by now.
+        await page.waitForTimeout(2000);
+        expect(requests(), `${width} px`).toBe(0);
+      } else {
+        await expect.poll(requests, { message: `${width} px` }).toBe(1);
+      }
+      await closeContext(context);
+    }
+  });
+});
+
+test.describe("A section whose chunk fails to load", () => {
+  // The projects' cards are a chunk of their own (ProjectsContent.tsx),
+  // fetched with the repositories. Without it the section says so, with a
+  // retry and a reload (a deploy since the page loaded leaves no old chunk
+  // on Vercel's Hobby plan), and the rest of the page stays.
+  test("keeps the page, and says the projects could not load", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const requests = await routeChunk(
+      context,
+      "Follow me on GitHub for more",
+      (route) => route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    // Shown, then gone: a count of 0 alone also passes before the splash
+    // mounts.
+    const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
+    await expect(splash).toBeVisible();
+    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+
+    await page.locator("#projects").scrollIntoViewIfNeeded();
+    const alert = page.locator("#projects").getByRole("alert");
+    await expect(alert).toContainText("The projects could not load.");
+    await expect(
+      alert.getByRole("button", { name: "Try again" }),
+    ).toBeVisible();
+    await expect(
+      alert.getByRole("button", { name: "Reload page" }),
+    ).toBeVisible();
+    await expectPageShown(page);
+    // The preload beside the repositories' fetch, the load (which shares the
+    // preload's request when it is still on its way), and the stand-in's
+    // try, which Reload page shows has run and failed.
+    await expect.poll(requests).toBeGreaterThanOrEqual(2);
+    await closeContext(context);
+  });
+
+  // The blog's cards, the same way (BlogCards.tsx).
+  test("keeps the page, and says the articles could not load", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const requests = await routeChunk(context, "min read", (route) =>
+      route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
+    await expect(splash).toBeVisible();
+    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+
+    await page.locator("#blogs").scrollIntoViewIfNeeded();
+    const alert = page.locator("#blogs").getByRole("alert");
+    await expect(alert).toContainText("The articles could not load.");
+    await expect(
+      alert.getByRole("button", { name: "Try again" }),
+    ).toBeVisible();
+    await expect(
+      alert.getByRole("button", { name: "Reload page" }),
+    ).toBeVisible();
+    await expectPageShown(page);
+    await expect.poll(requests).toBeGreaterThanOrEqual(2);
+    await closeContext(context);
+  });
+
+  // The research section's long texts (research-details.ts), fetched when
+  // the browser is idle and again when a card opens without them. Without
+  // them, an opened card keeps its short text.
+  test("keeps the research cards' short texts without the long ones", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    // From GraphQA's long description, which no other chunk holds.
+    const requests = await routeChunk(context, "182 seconds", (route) =>
+      route.abort(),
+    );
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
+    await expect(splash).toBeVisible();
+    await expect(splash).toHaveCount(0, { timeout: 15_000 });
+    // The idle fetch has run, and failed.
+    await expect.poll(requests).toBe(1);
+
+    const hero = page.locator("#geenns");
+    await hero.scrollIntoViewIfNeeded();
+    const closed = await hero.innerText();
+    await hero.getByRole("button", { name: "Read full description" }).click();
+
+    await expect(hero.getByRole("button", { name: "Show less" })).toBeVisible();
+    // Only the button's label changed: the short text stayed.
+    expect(await hero.innerText()).toBe(
+      closed.replace("Read full description", "Show less"),
+    );
+    await expectPageShown(page);
+    // Opening asked for them again.
+    await expect.poll(requests).toBe(2);
+    await closeContext(context);
+  });
 });
 
 test.describe("A terminal tool whose chunk fails to load", () => {
@@ -808,7 +1077,7 @@ test.describe("A terminal tool whose chunk fails to load", () => {
     await expect.poll(requests).toBe(2);
     // Above the cookie notice too, which sits at the page's root (z-50):
     // at the same z-50 and earlier in the page, the dialog was under it.
-    const notice = page.getByText("Cookie Selection:");
+    const notice = page.getByText("Natural Selection:");
     await expect(notice).toBeVisible();
     expect(
       await notice.evaluate((element) => {

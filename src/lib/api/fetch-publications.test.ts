@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  STATIC_PUBLICATIONS,
   fetchAllPublications,
   comparePublications,
   publicationToBibTeX,
   type Publication,
 } from "./fetch-publications";
+import abstracts from "./publication-abstracts.json";
 
 // A Semantic Scholar paper with abbreviated author names (as the real API returns
 // them) and an open-access PDF, used to exercise the runtime normalization path.
@@ -41,11 +43,38 @@ describe("fetchAllPublications - author normalization & curated fields", () => {
   });
 
   async function run() {
-    // rateLimitedFetch awaits a setTimeout; advance fake timers to resolve it.
+    // rateLimitedFetch awaits a setTimeout, after the abstracts' import, so
+    // fake time advances until the run is done rather than flushing once.
     const promise = fetchAllPublications({ semanticScholarId: "test-id" });
-    await vi.runAllTimersAsync();
+    let settled = false;
+    promise.then(
+      () => (settled = true),
+      () => (settled = true),
+    );
+    while (!settled) await vi.advanceTimersByTimeAsync(1000);
     return promise;
   }
+
+  it("serves the curated papers with their abstracts", async () => {
+    // The page's own copy has none (they are in publication-abstracts.json,
+    // out of its first JavaScript); what the API serves keeps them.
+    const pubs = await run();
+
+    for (const curated of STATIC_PUBLICATIONS) {
+      expect(pubs.find((p) => p.id === curated.id)?.abstract, curated.id).toBe(
+        (abstracts as Record<string, string>)[curated.id],
+      );
+    }
+  });
+
+  it("gives up on a service that does not answer", async () => {
+    // With no timeout, a service that accepted the connection and went
+    // quiet held the publications route open until Vercel stopped it.
+    await run();
+
+    const init = vi.mocked(global.fetch).mock.calls[0][1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
 
   it("normalizes abbreviated author names using the shared config", async () => {
     const pubs = await run();

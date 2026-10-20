@@ -2,6 +2,7 @@ import { expect, afterEach, beforeEach, vi, beforeAll } from "vitest";
 import { cleanup } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { createElement } from "react";
+import { onConflict } from "@/lib/cn-conflicts";
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
@@ -249,6 +250,12 @@ beforeEach(() => {
   }
 });
 
+// cn()'s conflict reports, collected for the check after each test.
+const cnConflicts: string[] = [];
+onConflict((message) => {
+  cnConflicts.push(message);
+});
+
 // Cleanup after each test
 afterEach(() => {
   cleanup();
@@ -343,6 +350,11 @@ afterEach(() => {
       // Ignore errors in test environment
     }
   }
+
+  // Last, once the rest is clean: classes in one cn() call that override
+  // each other (src/lib/cn-conflicts.ts) fail the test that rendered them.
+  const conflicts = cnConflicts.splice(0);
+  if (conflicts.length > 0) throw new Error(conflicts.join("\n\n"));
 });
 
 // Setup requestAnimationFrame and cancelAnimationFrame immediately

@@ -40,7 +40,6 @@ export function MultiPhaseProgress({
       {phases.map((phase, index) => {
         const isActive = index === currentPhase;
         const isCompleted = index < currentPhase;
-        const isPending = index > currentPhase;
 
         return (
           <div key={index} className="flex items-center gap-3">
@@ -48,10 +47,13 @@ export function MultiPhaseProgress({
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
-                isCompleted && "bg-green-700 text-white",
-                isActive && "bg-primary text-primary-foreground",
-                isPending && "bg-muted text-muted-foreground",
-                phase.status === "error" && "bg-red-700 text-white",
+                phase.status === "error"
+                  ? "bg-red-700 text-white"
+                  : isCompleted
+                    ? "bg-green-700 text-white"
+                    : isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
               )}
             >
               {isCompleted ? "✓" : index + 1}
@@ -63,11 +65,11 @@ export function MultiPhaseProgress({
                 <span
                   className={cn(
                     "text-sm font-medium",
-                    isActive && "text-foreground",
-                    isCompleted && "text-muted-foreground",
-                    isPending && "text-muted-foreground",
-                    phase.status === "error" &&
-                      "text-red-700 dark:text-red-400",
+                    phase.status === "error"
+                      ? "text-red-700 dark:text-red-400"
+                      : isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground",
                   )}
                 >
                   {phase.name}

@@ -20,9 +20,7 @@ The following libraries are licensed under the MIT License:
 - **[React](https://github.com/facebook/react)** - JavaScript library for building user interfaces
 - **[React DOM](https://github.com/facebook/react)** - DOM bindings for React
 - **[Framer Motion](https://github.com/framer/motion)** - Animation library for React
-- **[Tailwind Merge](https://github.com/dcastil/tailwind-merge)** - Utility for merging Tailwind CSS classes
 - **[clsx](https://github.com/lukeed/clsx)** - Utility for constructing className strings
-- **[js-cookie](https://github.com/js-cookie/js-cookie)** - Simple API for handling cookies
 - **[ColorThief](https://github.com/lokesh/color-thief)** - Library for extracting colors from images
 - **[Lottie React](https://github.com/Gamote/lottie-react)** - React component for Lottie animations
 - **[Lottie Web](https://github.com/airbnb/lottie-web)** - Lottie player (its light build, which Lottie React is aliased to)
@@ -77,6 +75,7 @@ These libraries are used during development and testing but are not included in 
 - **[PostCSS](https://github.com/postcss/postcss)** - CSS transformation tool
 - **[Autoprefixer](https://github.com/postcss/autoprefixer)** - CSS vendor prefix tool
 - **[TailwindCSS](https://github.com/tailwindlabs/tailwindcss)** - Utility-first CSS framework
+- **[Tailwind Merge](https://github.com/dcastil/tailwind-merge)** - Checks `cn()` calls for Tailwind classes that override each other
 - **[playwright-lighthouse](https://github.com/abhinaba-ghosh/playwright-lighthouse)** - Lighthouse integration for Playwright
 - **[JSDOM](https://github.com/jsdom/jsdom)** - DOM implementation for Node.js
 - **[@next/bundle-analyzer](https://github.com/vercel/next.js/tree/canary/packages/next-bundle-analyzer)** - Bundle analysis tool

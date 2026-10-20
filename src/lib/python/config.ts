@@ -1,14 +1,22 @@
-/** Worker script path. Same-origin, so `worker-src 'self'` covers it. */
-export const PYTHON_WORKER_URL = "/python-worker.js";
-
 /**
  * Pinned so `python --version` can answer instantly. Booting an 11MB runtime
  * to print a version string would be absurd.
  *
- * Keep in sync with the `pyodide` dependency in package.json.
+ * The `pyodide` pin in package.json, and the version public/python-worker.js
+ * names (worker-contract.test.ts checks both), and
+ * the Python it runs, as sys.version reports it: the package's lock file
+ * may say otherwise (3.14.0 for 314.0.3, which runs 3.14.2). The e2e test
+ * "says in --version what the runtime reports" checks both.
  */
-export const PYODIDE_VERSION = "314.0.3";
-export const PYTHON_VERSION = "3.14.0";
+export const PYODIDE_VERSION = "314.0.7";
+export const PYTHON_VERSION = "3.14.2";
+
+/**
+ * Worker script path. Same-origin, so `worker-src 'self'` covers it. The
+ * worker names its runtime's version itself (/pyodide/<version>/): it is
+ * never cached, so the one a tab gets always matches its deployment's folder.
+ */
+export const PYTHON_WORKER_URL = "/python-worker.js";
 
 /** Packages vendored by scripts/setup-assets.js. Nothing else can be loaded. */
 export const VENDORED_PACKAGES = ["numpy"] as const;
@@ -101,9 +109,10 @@ export const STRIPPED_GLOBALS = [
   // is not a strategy on its own.
   "WebSocketStream",
   "EventSource",
-  // HTTP/3 egress. connect-src is not a sufficient backstop: it lists
-  // s3.amazonaws.com and raw.githubusercontent.com, and a public-writable
-  // bucket is a working exfiltration endpoint.
+  // HTTP/3 egress. connect-src is not a sufficient backstop: the site's
+  // lists third parties (raw.githubusercontent.com, Hugging Face), and until
+  // round 25 s3.amazonaws.com, where a public-writable bucket is a working
+  // exfiltration endpoint.
   "WebTransport",
   // The least obvious entry here: new FontFace(name, "url(...)") plus
   // fonts.add() and .load() performs a real network fetch, governed by

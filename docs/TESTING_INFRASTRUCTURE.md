@@ -11,8 +11,8 @@ How the tests run, and what to know before writing one.
 CI runs the unit tests in ten jobs, one npm script each: `test:api`,
 `test:utils`, the four component batches (`test:components:batch1` to
 `batch4`, hand-kept lists of files), `test:contexts`, `test:hooks`,
-`test:lib-dom` and `test:unit`; each test runs in one job (2,502 on
-2026-10-19). Two tests keep the lists honest:
+`test:lib-dom` and `test:unit`; each test runs in one job (2,640 on
+2026-10-20). Two tests keep the lists honest:
 
 - `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
   that no CI script runs or that two run, and on a listed file that no
@@ -27,14 +27,27 @@ plugin. Three of them run on ESLint 10 outside their peer range, through
 eslint-config-next's compatibility layer: a rule that stopped reporting would
 pass `npm run lint` without a word.
 
-Lint covers the tests too (`eslint src tests`), with `no-explicit-any`,
-`react-hooks/globals` and `no-img-element` off for them, and the hooks rules
-off for Playwright files, whose fixtures take a function named `use`. knip
+Lint covers everything the repository runs (`npm run lint`): `src`, `tests`,
+`scripts`, `.github/scripts`, the public workers and the root configs; until
+round 24, 23 of those files were linted by nothing. ESLint's own recommended
+rules (`@eslint/js`) apply to all of it, ahead of eslint-config-next's
+TypeScript rules, which turn `no-undef` off for TypeScript. The CommonJS
+scripts may `require`. In the tests, `no-explicit-any`, `react-hooks/globals`,
+`no-img-element`, `no-constant-binary-expression` and `no-empty-pattern`
+(Playwright's `({}, testInfo)`) are off, and the hooks rules are off for
+Playwright files, whose fixtures take a function named `use`. knip
 (`npm run knip`, in CI's quick checks) fails on a file no import reaches and
 on an export or dependency nothing uses; a helper nothing imports anymore
 has to go, or CI fails. actionlint checks the workflows the same way
 (`npm run lint:workflows`, from its Docker image), shell of the run steps
 included.
+
+Commits go through two hooks (husky 9, set up by `npm install`'s `prepare`):
+pre-commit runs lint-staged (ESLint and Prettier on the staged files) and
+the type-check; commit-msg runs commitlint (conventional commits, the subject
+in lowercase, the header at most 100 characters). husky 9 points git's
+`core.hooksPath` at `.husky/_`, which `npm install` generates and git
+ignores: a new worktree runs no hook until `npm install` has run in it.
 
 The e2e checks that measure, and can fail (2026-10-18):
 
@@ -53,14 +66,73 @@ The e2e checks that measure, and can fail (2026-10-18):
   numbers and Lighthouse's CPU benchmark go to the job log and, as JSON, to
   the test report; one slow audit cannot fail the gate alone. The budgets
   that used to sit in `lighthouse.config.js` were never read.
-- **`performance.spec.ts`:** the homepage's JavaScript under 2,000 KB and
+- **`performance.spec.ts`:** the homepage's JavaScript under 1,500 KB and
   at least half of it run, counted per byte by the innermost coverage range
-  (V8's ranges nest and include code that never ran).
+  (V8's ranges nest and include code that never ran); its CSS under 181 KB,
+  more than 80% of it used; fewer than 36 scripts, at most 3 stylesheets
+  and 3 fonts, and fewer than 53 requests until the network is idle; the
+  cache headers `next.config.mjs` and Next set; `font-display: swap` on
+  every face that loads a file. The limits are the highest measured value
+  plus 15% (1,321 KB, 157 KB and 0.934, 31, 2, 2 and 46 on 2026-10-20).
+  Web vitals are Lighthouse's (above): the FID and vitals tests recorded
+  nothing measurable.
 - **The console** (`static-shell.spec.ts`, Chromium, the performance job):
   the homepage loads with no console error and no page error, once its
-  requests settle. Production reports none of its client errors, by design,
-  so this is where a broken script or a failed request shows. Builds without
-  GitHub data stay quiet too: the GitHub routes answer "no data" with a 200.
+  requests settle. Production reports only the errors that reach an error
+  boundary (below); a failed request, or an error in an event handler or a
+  promise, reaches none and reports nothing, so this is where those show.
+  Builds without GitHub data stay quiet too: the GitHub routes answer "no
+  data" with a 200.
+- **Error reports** (`error-reports.spec.ts`, the accessibility job): an
+  error is forced in the page's boundary (`error.tsx`, on `/pdf/cv`) and in
+  the root's (`global-error.tsx`, the privacy notice): one
+  `ResizeObserver.observe()` call throws. The page posts it to
+  `/api/client-error` with a frame in the site's chunks and its build, with
+  no Referer and no cookie; the build answers 204 (it has no
+  `GITHUB_ISSUES_TOKEN`), and the page says "A report of it was sent." only
+  after a 202, routed in the test. Firefox prints a logged Error as "Error":
+  the console check reads the logged values. The route's own rules are unit
+  tests (`src/app/api/client-error/route.test.ts`, with a fake GitHub that
+  finds the issues it opened, and `src/lib/client-error/issue.test.ts`):
+  JSON from the site's own pages only (415, 403), sanitizing, the build
+  line, one signature per bug across deploys, the owner's labeled reports
+  open or closed (a closed one reopened only from the build serving now),
+  an incomplete search opening nothing, 10 new issues a day counted on
+  GitHub, 20 comments per instance, quiet after GitHub's 403 or 429, and the
+  rate limit. `.github/workflows/client-error-notify.yml` assigns new
+  reports to the owner (GitHub tells nobody of their own activity), and
+  `scripts/map-frame.mjs` maps a reported frame with the build's published,
+  hidden source maps.
+- **Privacy** (`privacy.spec.ts`, the accessibility job): no cookie after
+  a theme switch, an old `theme` cookie expired, and a full scroll of the
+  homepage contacting no host but the site's own.
+  `src/lib/security-headers.test.ts` pins the CSP's host lists and checks
+  that the privacy policy names every host the browser may reach;
+  `src/app/public-claims.test.ts` holds smaller claims (the footer's host,
+  the policy's model sizes).
+- **The Python runtime against the browser floor**
+  (`src/app/pyodide-floor.test.ts`, unit): the runtime compiles in a Node
+  with exnref off, its glue and the worker parse as ES2022, and 20 API
+  names newer than the floor are absent; two controls prove the checks
+  work. python-terminal.spec.ts also boots the worker as older bundles
+  start it (no version, an older one), in every engine.
+
+- **No denied package in a client chunk** (`.github/scripts/check-client-bundle.mjs`,
+  CI's build job): it reads every client chunk's source map and fails on a
+  package `client-bundle-deny.json` names, with the reason it gives.
+  Denied: styled-jsx (round 26 moved its keyframes to `motion.css`) and
+  tailwind-merge, which only checks `cn()` outside production (below).
+- **Tailwind classes that override each other** (`src/lib/cn-conflicts.test.ts`,
+  unit): `cn()` joins classes as written (clsx), so two classes for the
+  same property would both reach the page and the stylesheet's order would
+  pick one. The test reads every `cn()` call as a syntax tree and fails on
+  two written classes that tailwind-merge would merge, unless their
+  conditions exclude each other (`a ? x : y`, `a` and `!a`, `x === "a"` and
+  `x === "b"`). Classes from props are checked at run time: outside
+  production `cn()` calls `reportConflicts`, and `src/test/setup.ts` fails
+  the unit test whose render reported one. Round 26 audited the e2e suite
+  the same way, on a production build with the report forced on: 0 reports
+  in 844 tests, against 210 with one conflict put back.
 
 ## The Vitest setup
 
@@ -76,8 +148,39 @@ The e2e checks that measure, and can fail (2026-10-18):
   transformed modules across runs;
 - coverage locally, not in CI.
 
+## Proving a test can fail
+
+A test is only worth its cost if it fails when the code it guards breaks.
+Round 26 rewrote or deleted the tests that could not (`expect(true)`,
+`>= 0`, assertions inside `try`, a page scrolled by the test itself) and
+proved each replacement with a mutation:
+
+- Work in a scratch `git worktree` at the commit under test, never in the
+  checkout: break one line (a `perl -0` substitution), run the one test,
+  put the line back. An e2e mutation needs a production build of its own.
+- Run the test on the unbroken candidate first. A test that is already red
+  proves nothing, and neither does a substitution that changed nothing.
+- A failure is a kill only if it is the expected one: read the error. An
+  e2e run against a server that stopped fails too, so check the server
+  after a red run. One runner's exit trap once killed another's server.
+- Place a mutation where the test looks. A mutation inside a site that the
+  test's own allowlist skipped survived, as designed (the `cn()` scan's
+  list of known conflicts, while it had one).
+- For a check that only runs outside production, prove the audit can see:
+  put one known fault back and count the reports.
+
 ## Things that bite
 
+- **Unstub after unmounting.** A describe's `afterEach(vi.unstubAllGlobals)`
+  runs before the setup file's `cleanup()`, so a component unmounted then
+  calls the real global, which jsdom may lack (`cancelIdleCallback`). Call
+  `cleanup()` first in that `afterEach`.
+- **One coverage run per checkout.** Vitest 5 locks `coverage/`: a second
+  run in the same checkout stops with "already in use by another Vitest
+  process". A quick side run takes `--coverage.enabled=false`.
+- **CI's e2e runs Chromium only.** A spec can fail on the phone projects
+  for months: the research map's drawing tests did, until round 26 ran
+  every project. Run them all before calling a round done.
 - **`mockReset` empties mocks.** A `vi.fn(impl)` made in a `vi.mock` factory
   loses `impl` before each test. Give the implementation in the test
   (`vi.mocked(fn).mockImplementation(...)`), or read hoisted state from the

@@ -223,13 +223,11 @@ export function HolographicCard({
           "transition-all",
           "before:absolute before:inset-0 before:bg-linear-to-br",
           "before:from-primary/5 before:to-purple-600/5",
-          "before:rounded-lg before:-z-10 before:opacity-0",
+          "before:rounded-lg before:-z-10",
+          forceHover ? "before:opacity-100" : "before:opacity-0",
           "before:transition-opacity",
           "hover:before:opacity-100",
           "h-full",
-          forceHover && "before:opacity-100",
-          className?.includes("blog-card-enhanced") &&
-            "bg-card/95 dark:bg-card/90",
         )}
         style={{
           transform: "translateZ(0)",
@@ -286,17 +284,6 @@ export function HolographicCard({
 
         {children}
       </m.div>
-
-      <style jsx>{`
-        @keyframes holographic {
-          0% {
-            background-position: 0% 0%;
-          }
-          100% {
-            background-position: 200% 200%;
-          }
-        }
-      `}</style>
     </m.div>
   );
 }

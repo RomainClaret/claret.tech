@@ -68,6 +68,11 @@ const KNOWN_COLORS = {
 
   // Other assets
   contactMail: "rgb(107, 114, 128)", // Gray
+
+  // The Kudos story's photo: the color the card took from it in the browser
+  // (colorthief's dominant color, then the card's brightness adjustment)
+  // while the photo still came from Unsplash.
+  kudos_gecco_2024: "rgb(194, 61, 108)",
 };
 
 /**

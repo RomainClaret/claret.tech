@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 
 export default function NotFound() {
   const router = useRouter();
@@ -47,8 +47,8 @@ export default function NotFound() {
 
         {/* Action buttons */}
         <div className="flex gap-4 justify-center">
-          <Link href="/">
-            <Button>Return Home</Button>
+          <Link href="/" className={buttonClassName()}>
+            Return Home
           </Link>
           <Button variant="outline" onClick={handleGoBack}>
             Go Back

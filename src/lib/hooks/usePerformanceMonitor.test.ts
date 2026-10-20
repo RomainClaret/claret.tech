@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { restoreNavigator, stubNavigator } from "@/test/navigator";
 import { renderHook, act } from "@testing-library/react";
 import { usePerformanceMonitor } from "./usePerformanceMonitor";
+import { GpuEstimator } from "@/lib/utils/gpu-estimator";
 
 // Mock useSafari hook
 vi.mock("./useSafari", () => ({
@@ -69,7 +70,12 @@ vi.mock("@/lib/utils/gpu-estimator", () => {
   };
 
   return {
-    GpuEstimator: vi.fn(() => mockGpuEstimator),
+    // A function, not an arrow: the hook calls it with `new`, which an
+    // arrow cannot take. The TypeError went to the hook's catch, so no GPU
+    // test here reached the estimator.
+    GpuEstimator: vi.fn(function () {
+      return mockGpuEstimator;
+    }),
   };
 });
 
@@ -594,10 +600,13 @@ describe("usePerformanceMonitor", () => {
         usePerformanceMonitor(true, { gpu: true }),
       );
 
+      const estimator = vi.mocked(GpuEstimator).mock.results[0]?.value;
+      expect(estimator).toBeDefined();
+
       unmount();
 
-      // Note: Can't easily test cleanup of instance methods without more complex mocking
-      expect(true).toBe(true); // Placeholder - cleanup is tested implicitly
+      expect(estimator.stopMonitoring).toHaveBeenCalledTimes(1);
+      expect(estimator.destroy).toHaveBeenCalledTimes(1);
     });
   });
 

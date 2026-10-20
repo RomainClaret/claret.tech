@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ARXIV_VARIANTS, STATIC_PUBLICATIONS } from "./fetch-publications";
+import abstracts from "./publication-abstracts.json";
 import { papersSection } from "@/data/sections/papers";
 
 /**
@@ -36,10 +37,23 @@ describe("publications.json against the static source", () => {
     expect(servedIds).toEqual(staticIds);
   });
 
+  it("has an abstract for each static publication, and for no other", () => {
+    // Kept apart (out of the homepage's first JavaScript): a paper added to
+    // the static source needs its abstract here, by the same id.
+    expect(Object.keys(abstracts).sort()).toEqual(
+      STATIC_PUBLICATIONS.map((p) => p.id).sort(),
+    );
+    expect(STATIC_PUBLICATIONS.filter((p) => "abstract" in p)).toEqual([]);
+  });
+
   it("agrees field for field, so a refetch cannot quietly drop anything", () => {
     const drift: string[] = [];
+    const withAbstract = (source: (typeof STATIC_PUBLICATIONS)[number]) => ({
+      ...source,
+      abstract: (abstracts as Record<string, string>)[source.id],
+    });
 
-    for (const source of STATIC_PUBLICATIONS) {
+    for (const source of STATIC_PUBLICATIONS.map(withAbstract)) {
       const shipped = served.publications.find((p) => p.id === source.id);
       if (!shipped) continue; // covered by the id test above
       const keys = new Set([...Object.keys(source), ...Object.keys(shipped)]);

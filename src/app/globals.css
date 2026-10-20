@@ -661,17 +661,6 @@
       transform: translateX(10%) translateY(10%);
     }
   }
-  @keyframes holographic {
-    0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
-    }
-  }
 }
 
 @layer utilities {
@@ -691,6 +680,7 @@
     .animate-fade-in,
     .animate-slide-in-up,
     .animate-scale-in,
+    .animate-check-pop,
     .animate-float,
     .animate-gradient-xy,
     .animate-gradient-shift,

@@ -13,7 +13,6 @@ import { BackgroundProvider } from "@/contexts/background-context";
 import { SafariProvider } from "@/contexts/safari-context";
 import { AnimationStateProvider } from "@/contexts/animation-state-context";
 import { QualityProvider } from "@/contexts/quality-context";
-import { AnimatedFavicon } from "@/components/ui/animated-favicon";
 import { ToastContainer } from "@/components/ui/toast";
 import CookieNotice from "@/components/ui/cookie-notice";
 import { TestModeProvider } from "@/components/providers/test-mode-provider";
@@ -199,14 +198,6 @@ export default function RootLayout({
                 position: fixed !important;
               }
               
-              /* Basic backdrop-blur fallbacks for Safari */
-              @supports not (backdrop-filter: blur(1px)) {
-                .backdrop-blur-xs { background-color: rgba(0, 0, 0, 0.05) !important; }
-                .backdrop-blur-md { background-color: rgba(0, 0, 0, 0.1) !important; }
-                .backdrop-blur-lg { background-color: rgba(0, 0, 0, 0.15) !important; }
-                .backdrop-blur-xl { background-color: rgba(0, 0, 0, 0.2) !important; }
-              }
-              
               /* Test mode optimizations - disable pointer events on decorative elements */
               html[data-test-mode="true"] svg.neural-network,
               body[data-test-mode="true"] svg.neural-network,
@@ -323,7 +314,6 @@ export default function RootLayout({
                       <TerminalProvider>
                         <LegalModalsProvider>
                           <AppWrapper>
-                            <AnimatedFavicon />
                             <Navigation />
                             <main id="main-content" className="pt-16">
                               {children}

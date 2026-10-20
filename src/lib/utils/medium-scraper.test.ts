@@ -103,4 +103,21 @@ describe("fetchMediumArticle host guard", () => {
     expect(init.redirect).toBe("manual");
     expect(init.signal).toBeDefined();
   });
+
+  it("gives up on the article's image after a timeout too", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(
+          '<meta property="og:image" content="https://miro.medium.com/v2/resize:fit:1200/0*probe">',
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+
+    await fetchMediumArticle("https://medium.com/@romainclaret/image-probe");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const init = vi.mocked(fetch).mock.calls[1][1] as RequestInit | undefined;
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
 });

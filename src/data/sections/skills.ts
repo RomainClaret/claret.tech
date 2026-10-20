@@ -31,7 +31,9 @@ export const skillsSection = {
     subtitle:
       "Breeding neural networks that surprise me, because real intelligence disobeys its creator.",
   },
-  // Core activities with associated technologies
+  // Core activities with their technologies. A technology's icon is a Font
+  // Awesome name that src/components/icons/tech-icons.tsx draws as a Lucide
+  // icon (tech-icons.test.ts holds each to one).
   coreActivities: [
     {
       icon: "🧬",
@@ -40,7 +42,10 @@ export const skillsSection = {
         "I evolve networks instead of training them. It takes longer and costs more compute. What comes back is behavior I did not write, and working out what that behavior is worth is most of the job.",
       expandedDescription:
         "My master's thesis was a question-answering system built from engineered parts. It worked, and it was brittle in places nobody had planned for. Symbolic reasoning, distributed agents and fuzzy logic went the same way. What kept failing was designing the whole thing by hand, so I stopped. Now evolution builds the networks and I study what it finds. In my GECCO'24 study, settings found on one image task carried over to a harder one, though not to simple logic tasks. A small result, but the kind I care about: something that still holds when the problem changes.",
-      technologies: ["NEAT/CPPNs/ES-HyperNEAT", "JAX/TensorNEAT"],
+      technologies: [
+        { name: "NEAT/CPPNs/ES-HyperNEAT", icon: "fas fa-dna" },
+        { name: "JAX/TensorNEAT", icon: "fas fa-bolt" },
+      ],
     },
     {
       icon: "🔬",
@@ -49,7 +54,10 @@ export const skillsSection = {
         "Used more CPU hours than is sensible. The useful part was rarely the best score. It was learning which settings still held up when the task changed.",
       expandedDescription:
         "I breed populations rather than training single networks: mutate, select, repeat. Most of the work is finding settings under which that loop gets anywhere. My GECCO'24 study searched those settings with a guided method rather than at random. On MNIST it beat random search and earlier results for that algorithm, and the settings carried over to Fashion-MNIST, though not to simple logic tasks. The score was never the point. Making evolution fast enough to run at that scale took the rest of my PhD.",
-      technologies: ["Hyperparameter Optimization", "Distributed Computing"],
+      technologies: [
+        { name: "Hyperparameter Optimization", icon: "fas fa-sliders" },
+        { name: "Distributed Computing", icon: "fas fa-network-wired" },
+      ],
     },
     {
       icon: "🤖",
@@ -58,7 +66,10 @@ export const skillsSection = {
         "The networks I grow solve problems in parts: specialists that evolve separately, then learn to work together. It is messier than one big network, and you can look at the parts one at a time.",
       expandedDescription:
         "The idea behind GEENNS is that a mind is a team of specialists rather than one big network. Evolution grows small specialist networks, freezes the ones that work, and then evolves coordinators that decide how to combine them for each new task. In the PhD prototype, the same frozen specialists carried over to new tasks without retraining. What they do along the way is often not what I would have designed, and a fair part of it is redundant. The mess is the point. The mess is intelligence.",
-      technologies: ["Compositional Architectures", "Emergent Behaviors"],
+      technologies: [
+        { name: "Compositional Architectures", icon: "fas fa-puzzle-piece" },
+        { name: "Emergent Behaviors", icon: "fas fa-seedling" },
+      ],
     },
   ],
   frameworks: [

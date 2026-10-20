@@ -92,7 +92,6 @@ const project = (
 ): ResearchProject => ({
   title: `Title of ${anchorId}`,
   subtitle: "PhD Thesis",
-  description: "",
   tags: [],
   status: "completed",
   yearsSpent: 1,

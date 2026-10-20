@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from "vitest";
 import { NextRequest } from "next/server";
+import { blogImageId } from "@/lib/blog-images/sources";
 
 // Use vi.hoisted to ensure mocks are set up before any imports
 const mocks = vi.hoisted(() => {
@@ -56,12 +57,16 @@ const mockGetCachedColors = mocks.getCachedColors as Mock;
 const mockFetch = mocks.fetch as Mock;
 const mockNextResponse = mocks.NextResponse as { json: Mock };
 
+// A post's picture, as Medium's feed gives it.
+const PICTURE = "https://cdn-images-1.medium.com/max/1024/0*test-picture";
+const PICTURE_PATH = `/api/blog-image/${blogImageId(PICTURE)}`;
+
 describe("Medium Posts API Route", () => {
   const mockMediumPost = {
     title: "Test Medium Post",
     link: "https://medium.com/@testuser/test-post",
-    thumbnail: "https://medium.com/thumbnail.jpg",
-    content: "<p>Test content</p>",
+    thumbnail: "",
+    content: `<p>Test content</p><img src="${PICTURE}">`,
     pubDate: "2024-08-18T12:00:00.000Z",
     author: "Test Author",
     guid: "post-guid-123",
@@ -106,6 +111,15 @@ describe("Medium Posts API Route", () => {
   });
 
   describe("GET /api/medium-posts", () => {
+    it("ends within a minute, whatever its fetches do", async () => {
+      // Next drops a fetch's own timeout when it refreshes a stale cached
+      // response in the background (next/dist/server/lib/patch-fetch.js),
+      // so the route's limit is the backstop. The feed, an article page and
+      // its image take up to 10 s each.
+      const { maxDuration } = await import("./route");
+      expect(maxDuration).toBe(60);
+    });
+
     it("fetches and enriches Medium posts successfully", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce({
@@ -127,6 +141,7 @@ describe("Medium Posts API Route", () => {
         "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@testuser",
         {
           next: { revalidate: 3600 },
+          signal: expect.any(AbortSignal),
         },
       );
 
@@ -141,7 +156,7 @@ describe("Medium Posts API Route", () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toEqual({
         ...mockMediumPost,
-        enrichedImage: mockEnrichedData.image,
+        image: PICTURE_PATH,
         enrichedColor: mockEnrichedData.color,
       });
       expect(result.cachedColors).toEqual(mockCachedColors);
@@ -282,27 +297,30 @@ describe("Medium Posts API Route", () => {
       expect(result.items).toHaveLength(2);
 
       // First post should be enriched
-      expect(result.items[0].enrichedImage).toBe(mockEnrichedData.image);
+      expect(result.items[0].image).toBe(PICTURE_PATH);
       expect(result.items[0].enrichedColor).toBe(mockEnrichedData.color);
 
-      // Second post should remain unchanged (no enrichment)
-      expect(result.items[1].enrichedImage).toBeUndefined();
+      // The second keeps its picture, which comes from the feed, and only
+      // misses the color its page would have given.
+      expect(result.items[1].image).toBe(PICTURE_PATH);
       expect(result.items[1].enrichedColor).toBeUndefined();
     });
 
-    it("uses original thumbnail when enrichment returns no image", async () => {
+    it("takes a post's picture from the feed, through the site's route", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
+        json: () =>
+          Promise.resolve({
+            ...mockRss2JsonResponse,
+            items: [
+              mockMediumPost,
+              { ...mockMediumPost, guid: "no-picture", content: "<p>Text</p>" },
+            ],
+          }),
       });
-
-      // Enrichment returns color but no image
-      mockFetchMediumArticle.mockResolvedValueOnce({
-        image: null,
-        color: "#3178c6",
-      });
-
+      // The article page's own image is not what the card shows.
+      mockFetchMediumArticle.mockResolvedValue(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
@@ -310,8 +328,12 @@ describe("Medium Posts API Route", () => {
       );
 
       const result = await response.json();
-      expect(result.items[0].enrichedImage).toBe(mockMediumPost.thumbnail);
-      expect(result.items[0].enrichedColor).toBe("#3178c6");
+      expect(
+        result.items.map((item: { image: unknown }) => item.image),
+      ).toEqual([PICTURE_PATH, null]);
+      expect(JSON.stringify(result.items)).not.toContain(
+        mockEnrichedData.image,
+      );
     });
 
     it("handles empty items array gracefully", async () => {
@@ -391,6 +413,7 @@ describe("Medium Posts API Route", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(expect.any(String), {
         next: { revalidate: 3600 }, // 1 hour
+        signal: expect.any(AbortSignal),
       });
     });
   });

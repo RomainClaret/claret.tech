@@ -223,7 +223,7 @@ function ExperienceTimelineItem({
         <HolographicCard
           glowColor="var(--c)"
           insideBackgroundColor="var(--c)"
-          className="h-full cursor-pointer"
+          className="cursor-pointer"
           forceHover={isDeepLinked}
           onMouseEnter={() => {}}
           onMouseLeave={() => {}}

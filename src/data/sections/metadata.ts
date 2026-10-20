@@ -2,7 +2,7 @@
 
 export const footerNote = {
   hostname: "Vercel",
-  hosturl: "https://github.com/RomainClaret/claret.tech",
+  hosturl: "https://vercel.com",
   repository: {
     owner: "RomainClaret",
     name: "claret.tech",

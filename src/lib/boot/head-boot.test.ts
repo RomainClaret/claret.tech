@@ -72,17 +72,18 @@ afterEach(() => {
 describe("head boot: theme", () => {
   it.each([
     ["stored theme", { local: "dark", cookie: "" }, "dark"],
+    // The site sets no cookie since round 25; an old one counts for nothing.
     [
-      "cookie when storage has none",
+      "default, light, over an old cookie when storage has none",
       { local: null, cookie: "a=1; theme=dark" },
-      "dark",
+      "light",
     ],
     [
-      "cookie when storage holds junk",
+      "default, light, over an old cookie when storage holds junk",
       { local: "blue", cookie: "theme=dark" },
-      "dark",
+      "light",
     ],
-    ["default, light, when neither says", { local: null, cookie: "" }, "light"],
+    ["default, light, when nothing says", { local: null, cookie: "" }, "light"],
   ])("takes the %s", (_, { local, cookie }, expected) => {
     const storage = memoryStorage();
     if (local) storage.setItem("theme", local);
@@ -93,7 +94,7 @@ describe("head boot: theme", () => {
     expect(readStoredTheme()).toBe(expected);
   });
 
-  it("falls back to the cookie where storage is blocked", () => {
+  it("takes the default where storage is blocked, an old cookie or not", () => {
     vi.stubGlobal("localStorage", {
       getItem: () => {
         throw new Error("SecurityError");
@@ -101,8 +102,8 @@ describe("head boot: theme", () => {
     });
     setCookie("theme=dark");
 
-    expect(boot().theme).toBe("dark");
-    expect(readStoredTheme()).toBe("dark");
+    expect(boot().theme).toBe("light");
+    expect(readStoredTheme()).toBe("light");
   });
 
   it.each([

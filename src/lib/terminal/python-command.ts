@@ -42,15 +42,37 @@ function loadPython() {
       import("@/lib/python/pyodide-client"),
       import("@/lib/python/repl-mode"),
       import("@/lib/python/protocol"),
-    ]).then(([clientMod, replMod, protocolMod]) => ({
-      client: clientMod.pythonClient,
-      detectRequiredPackages: clientMod.detectRequiredPackages,
-      createPythonRepl: replMod.createPythonRepl,
-      pythonBanner: replMod.pythonBanner,
-      isPythonAborted: protocolMod.isPythonAborted,
-    }));
+    ])
+      .then(([clientMod, replMod, protocolMod]) => ({
+        client: clientMod.pythonClient,
+        detectRequiredPackages: clientMod.detectRequiredPackages,
+        createPythonRepl: replMod.createPythonRepl,
+        pythonBanner: replMod.pythonBanner,
+        isPythonAborted: protocolMod.isPythonAborted,
+      }))
+      .catch((error: unknown) => {
+        // Not kept: a failed import (a chunk a deploy removed, a dropped
+        // connection) made every later `python` fail until a reload.
+        modulesPromise = null;
+        throw error;
+      });
   }
   return modulesPromise;
+}
+
+export const NO_WEBASSEMBLY =
+  "python: Python needs WebAssembly, which this browser does not offer (it may be turned off, as in Lockdown Mode).";
+
+/**
+ * A boot or a load that failed. After a deploy, a tab's code and the
+ * server's no longer match, and only a reload brings them together.
+ */
+function failedToStart(err: unknown): CommandResult {
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    output: `python: ${message}. Reload the page to try again.`,
+    success: false,
+  };
 }
 
 /** Reset between tests, which would otherwise share one cached import. */
@@ -165,6 +187,13 @@ export const pythonCommand = async (
     return { output: invocation.message, success: false };
   }
 
+  // iOS Lockdown Mode and browsers without a JIT offer no WebAssembly. The
+  // runtime then downloaded 12 MB and waited out its 120 s boot timeout, to
+  // say "timed out while starting".
+  if (typeof WebAssembly === "undefined") {
+    return { output: NO_WEBASSEMBLY, success: false };
+  }
+
   const write = context.writer;
   if (!write) {
     return {
@@ -173,13 +202,19 @@ export const pythonCommand = async (
     };
   }
 
+  let modules: Awaited<ReturnType<typeof loadPython>>;
+  try {
+    modules = await loadPython();
+  } catch (err) {
+    return failedToStart(err);
+  }
   const {
     client,
     detectRequiredPackages,
     createPythonRepl,
     pythonBanner,
     isPythonAborted,
-  } = await loadPython();
+  } = modules;
 
   // The terminal cancels a command on Ctrl+C by aborting this signal, and
   // it may already have: loading the interpreter's code takes a while on a
@@ -221,10 +256,7 @@ export const pythonCommand = async (
       }
     } catch (err) {
       boot.clear();
-      return {
-        output: `python: ${(err as Error).message}`,
-        success: false,
-      };
+      return failedToStart(err);
     }
 
     const exitLineMode = context.exitLineMode;
@@ -245,6 +277,7 @@ export const pythonCommand = async (
 
   // One-shot: `python -c ...` or `python file.py`.
   let sawError = false;
+  let booting = true;
 
   // Ctrl+C has to reach the interpreter. The terminal aborts this controller
   // and redraws the prompt, but without this the worker kept running for the
@@ -262,6 +295,7 @@ export const pythonCommand = async (
       whenAborted(abortSignal),
     ]);
     if (booted === "aborted") return cancelled();
+    booting = false;
     boot.clear();
 
     const result = await client.run(invocation.code, {
@@ -292,6 +326,7 @@ export const pythonCommand = async (
               "";
       return { output: message, success: false };
     }
+    if (booting) return failedToStart(err);
     return { output: `python: ${(err as Error).message}`, success: false };
   } finally {
     abortSignal?.removeEventListener("abort", onAbort);

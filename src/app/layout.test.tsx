@@ -118,7 +118,6 @@ function TestLayout({ children }: { children: React.ReactNode }) {
               <div data-testid="background-provider">
                 <div data-testid="terminal-provider">
                   <div data-testid="app-wrapper">
-                    <div data-testid="animated-favicon">Animated Favicon</div>
                     <nav data-testid="navigation">Navigation</nav>
                     <main id="main-content" className="pt-16">
                       {children}
@@ -280,7 +279,6 @@ describe("RootLayout", () => {
         </TestLayout>,
       );
 
-      expect(screen.getByTestId("animated-favicon")).toBeInTheDocument();
       expect(screen.getByTestId("toast-container")).toBeInTheDocument();
       expect(screen.getByTestId("cookie-notice")).toBeInTheDocument();
     });
@@ -440,7 +438,6 @@ describe("RootLayout", () => {
 
       // Core UI components that should be present
       const requiredComponents = [
-        "animated-favicon",
         "navigation",
         "floating-nav",
         "footer",

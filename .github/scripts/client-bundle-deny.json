@@ -1,0 +1,4 @@
+{
+  "styled-jsx": "round 26 moved the two components' keyframes to src/styles/motion.css; its runtime cost every page 2.9 KB gzipped",
+  "tailwind-merge": "round 26: cn() joins classes with clsx alone; tailwind-merge only checks for conflicts outside production (src/lib/cn-conflicts.ts), and cost every page 8.7 KB gzipped"
+}

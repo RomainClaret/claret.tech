@@ -100,9 +100,16 @@ async function fetchPublicationsSimple() {
     // every entry, and only survived a run because the merge below restored
     // those from the existing JSON.
     const staticPublications = require("../src/lib/api/static-publications.json");
+    // Their abstracts live in a file of their own, out of the homepage's
+    // first JavaScript (src/lib/api/fetch-publications.ts).
+    const abstracts = require("../src/lib/api/publication-abstracts.json");
 
     // Add static publications to the list
-    staticPublications.forEach((pub) => publications.push(pub));
+    staticPublications.forEach((pub) =>
+      publications.push(
+        abstracts[pub.id] ? { ...pub, abstract: abstracts[pub.id] } : pub,
+      ),
+    );
 
     // Fetch from Semantic Scholar
     if (config.semanticScholarId) {

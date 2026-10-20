@@ -63,8 +63,9 @@ function decodeHTMLEntities(text: string): string {
  * is third-party input reaching a server-side fetch. Without this, a feed entry
  * pointing at http://169.254.169.254/ or http://localhost:3000/ is fetched from
  * inside the serverless function, and whatever comes back is run through the
- * og:image / twitter:image patterns in extractImageFromHTML and returned to any
- * anonymous caller as `enrichedImage`. The image leg below has been guarded for
+ * og:image / twitter:image patterns in extractImageFromHTML; the image found
+ * went back to any anonymous caller as `enrichedImage` until round 26 (only
+ * the color drawn from it does now). The image leg below has been guarded for
  * a while; this is the page fetch that feeds it.
  *
  * Same suffix discipline as the image check: `endsWith(".medium.com")`, never
@@ -104,7 +105,9 @@ async function extractColorFromImage(imageUrl: string): Promise<string | null> {
     // serverless function, and pipe arbitrary bytes into libvips.
     if (!isMediumImageHost(imageUrl)) return null;
 
-    const response = await fetch(imageUrl);
+    const response = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!response.ok) return null;
 
     const declaredLength = Number(response.headers.get("content-length") ?? 0);

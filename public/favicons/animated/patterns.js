@@ -757,7 +757,7 @@ function generateHybrid4() {
         });
         break;
 
-      case "cascade":
+      case "cascade": {
         // Pattern C: Cascade propagation
         if (phaseProgress === 0) {
           cascades = [];
@@ -818,6 +818,7 @@ function generateHybrid4() {
         });
         cascades = newCascades;
         break;
+      }
 
       case "burst":
         // Pattern A: Neural bursts
@@ -893,7 +894,7 @@ function generateHybrid5() {
     );
 
   // Track global pattern coherence
-  let coherence = 0.5;
+  let coherence;
 
   for (let frame = 0; frame < 12; frame++) {
     const newState = Array(gridSize)
@@ -924,7 +925,6 @@ function generateHybrid5() {
           dominantPattern = "cluster";
         }
         if (qCell.cascade > maxAmplitude) {
-          maxAmplitude = qCell.cascade;
           dominantPattern = "cascade";
         }
 
@@ -934,7 +934,7 @@ function generateHybrid5() {
         if (collapseProb < coherence) {
           // Coherent state - clear pattern behavior
           switch (dominantPattern) {
-            case "burst":
+            case "burst": {
               // Count active neighbors
               let activeNeighbors = 0;
               for (let di = -1; di <= 1; di++) {
@@ -953,8 +953,9 @@ function generateHybrid5() {
               }
               activation = qCell.burst * (1 + activeNeighbors * 0.2);
               break;
+            }
 
-            case "cluster":
+            case "cluster": {
               // Influence from nearby high-amplitude cells
               let clusterInfluence = qCell.cluster;
               for (let di = -1; di <= 1; di++) {
@@ -969,6 +970,7 @@ function generateHybrid5() {
               }
               activation = Math.min(1, clusterInfluence);
               break;
+            }
 
             case "cascade":
               // Wave-like propagation

@@ -157,6 +157,54 @@ test.describe("Terminal: python", () => {
     expect(pyodideRequested).toBe(false);
   });
 
+  test("says at once when the browser has no WebAssembly", async ({ page }) => {
+    // iOS Lockdown Mode and browsers without a JIT offer no WebAssembly. The
+    // terminal downloaded the 12 MB runtime anyway, then waited out its 120 s
+    // boot timeout to say it "timed out while starting".
+    let pyodideRequested = false;
+    page.on("request", (req) => {
+      if (req.url().includes("/pyodide/")) pyodideRequested = true;
+    });
+    await page.evaluate(() => {
+      delete (window as { WebAssembly?: unknown }).WebAssembly;
+    });
+
+    await run(page, 'python -c "print(6*7)"', /needs WebAssembly/, 10_000);
+
+    expect(pyodideRequested).toBe(false);
+  });
+
+  test("says in --version what the runtime reports", async ({ page }) => {
+    // --version answers from config.ts without a boot, so only this holds
+    // those constants to the runtime: they said Python 3.14.0 while Pyodide
+    // 314.0.3 runs 3.14.2 (round 24). The package's lock file says 3.14.0
+    // too, so only the booted runtime can tell.
+    const versions = /Python (\d+\.\d+\.\d+) \(Pyodide (\d+\.\d+\.\d+)\)/;
+    const instant = versions.exec(
+      below(
+        await run(page, "python --version", versions, 10_000),
+        "python --version",
+      ),
+    );
+
+    await focusTerminal(page);
+    await page.keyboard.type("python");
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => (/>>>/.test(await screen(page)) ? "ready" : "..."), {
+        timeout: BOOT_TIMEOUT,
+        intervals: [1000, 2000, 5000],
+      })
+      .toBe("ready");
+    // The REPL's banner prints the versions the booted worker reported.
+    const banner = new RegExp(`${versions.source} in a sandboxed`).exec(
+      await screen(page),
+    );
+
+    expect(instant).not.toBeNull();
+    expect(banner?.slice(1)).toEqual(instant?.slice(1));
+  });
+
   test("runs inline code", async ({ page }) => {
     const text = await run(page, 'python -c "print(1+1)"', /\b2\b/);
     expect(text).toContain("2");
@@ -318,23 +366,51 @@ test.describe("Terminal: python", () => {
       // open() is deliberately left alone (the emscripten FS is per-worker and
       // dies with it), but the calls that can brick the interpreter for the
       // rest of the session are denied.
+      //
+      // The old probe counted any exception as a refusal and called each
+      // function on a file that did not exist, with one argument even for
+      // rename and kill: FileNotFoundError and TypeError passed it with no
+      // guard at all. Now the files exist, file calls get valid arguments,
+      // and only the sandbox's own RuntimeError counts. The calls that would
+      // end the interpreter (abort, _exit, fork, execv, kill) get the wrong
+      // number of arguments instead: a TypeError if open, the refusal if not.
+      // shutil's calls mostly reach the blocked os ones, so without shutil's
+      // own block they still raise the refusal; copytree is caught by the
+      // folder it creates before it fails.
       const probe = [
-        "import os",
-        "blocked = []",
-        "for name in ('remove','unlink','rmdir','rename','system','kill'):",
-        "    fn = getattr(os, name, None)",
-        "    if fn is None: continue",
-        "    try:",
-        "        fn('/tmp/x')",
-        "    except RuntimeError:",
-        "        blocked.append(name)",
-        "    except Exception:",
-        "        blocked.append(name)",
-        "print('BLOCK'+'ED:', len(blocked))",
+        "import os, shutil",
+        "open('/tmp/v', 'w').write('keep')",
+        "os.makedirs('/tmp/d', exist_ok=True)",
+        "calls = [",
+        "  (os, 'remove', ('/tmp/v',)), (os, 'unlink', ('/tmp/v',)),",
+        "  (os, 'rmdir', ('/tmp/d',)), (os, 'removedirs', ('/tmp/d',)),",
+        "  (os, 'rename', ('/tmp/v', '/tmp/w')), (os, 'replace', ('/tmp/v', '/tmp/w')),",
+        "  (os, 'truncate', ('/tmp/v', 0)), (os, 'chmod', ('/tmp/v', 0)),",
+        "  (os, 'symlink', ('/tmp/v', '/tmp/s')), (os, 'link', ('/tmp/v', '/tmp/l')),",
+        "  (os, 'system', ('true',)), (os, 'popen', ('true',)),",
+        "  (os, 'execv', ()), (os, 'fork', (1,)), (os, 'kill', ()),",
+        "  (os, 'abort', (1,)), (os, '_exit', ()),",
+        "  (shutil, 'rmtree', ('/tmp/d',)), (shutil, 'move', ('/tmp/v', '/tmp/m')),",
+        "  (shutil, 'copytree', ('/tmp/d', '/tmp/c')),",
+        "]",
+        "open_ = []",
+        "for module, name, args in calls:",
+        "  if not hasattr(module, name): continue",
+        "  try:",
+        "    getattr(module, name)(*args)",
+        "    open_.append(name)",
+        "  except RuntimeError as e:",
+        "    if 'disabled in the sandbox' not in str(e): open_.append(name)",
+        "  except Exception:",
+        "    open_.append(name)",
+        "intact = (open('/tmp/v').read() == 'keep' and os.path.isdir('/tmp/d')",
+        "  and not os.path.exists('/tmp/c'))",
+        "print('OP'+'EN', open_, intact)",
       ].join("\\n");
+      const command = `python -c "${probe}"`;
 
-      const text = await run(page, `python -c "${probe}"`, /BLOCKED: \d/);
-      expect(text).toMatch(/BLOCKED: [1-9]/);
+      const text = await run(page, command, /OPEN \[.*\] (True|False)/);
+      expect(below(text, command)).toContain("OPEN [] True");
     });
 
     test("has no stdin, and says so instead of hanging", async ({ page }) => {
@@ -408,21 +484,20 @@ test.describe("Terminal: python", () => {
 
     await focusTerminal(page);
     await page.keyboard.press("Control+c");
-    await page.waitForTimeout(3000);
 
-    // Output must have stopped: the screen should not keep growing.
-    const first = await screen(page);
-    await page.waitForTimeout(2500);
-    const second = await screen(page);
-    expect(second).toBe(first);
-
+    // The screen going still proved nothing: the terminal drops a cancelled
+    // command's output itself (Terminal.tsx's writer), whether Python stopped
+    // or not. What Ctrl+C has to do is free the interpreter. With the abort
+    // unread, the next run waited behind the busy worker until the first
+    // run's 30 s limit killed it.
+    const command = "python -c \"print('AFTER'+'CTRLC')\"";
     const text = await run(
       page,
-      "echo after-interrupt",
-      /after-interrupt/,
-      20_000,
+      command,
+      /AFTERCTRLC|too long|Timeout|crashed/,
+      60_000,
     );
-    expect(text).toContain("after-interrupt");
+    expect(below(text, command)).toContain("AFTERCTRLC");
   });
 
   /**
@@ -683,4 +758,45 @@ test.describe("Terminal: python", () => {
       "numpy did not load: the wheel under /pyodide is missing or failed to import",
     ).toContain("NUMPY 10");
   });
+});
+
+// A tab opened before a deploy keeps its old bundle, which starts the worker
+// at the URL it knew: without a version, or with an older one. The worker it
+// gets is always the new one (never cached), which names its own runtime.
+// When the version came from the URL instead, such tabs could not start
+// Python. Not Chromium only: no terminal is involved.
+test.describe("The Python worker, as an older bundle starts it", () => {
+  for (const url of [
+    "/python-worker.js",
+    "/python-worker.js?pyodide=314.0.3",
+  ]) {
+    test(`boots from ${url}`, async ({ page, isMobile }, testInfo) => {
+      test.skip(isMobile, "the terminal, and Python with it, is desktop-only");
+      testInfo.setTimeout(BOOT_TIMEOUT + 30_000);
+      await page.goto("/?playwright=true");
+
+      const outcome = await page.evaluate(
+        ({ url, timeout }) =>
+          new Promise<string>((resolve) => {
+            const worker = new Worker(url, { type: "module" });
+            const timer = setTimeout(() => resolve("no answer"), timeout);
+            worker.onerror = (event) => {
+              clearTimeout(timer);
+              resolve(`error: ${event.message}`);
+            };
+            worker.onmessage = (event) => {
+              const { t, error } = event.data as { t: string; error?: string };
+              if (t !== "ready" && t !== "fatal") return;
+              clearTimeout(timer);
+              worker.terminate();
+              resolve(t === "ready" ? "ready" : `fatal: ${error}`);
+            };
+            worker.postMessage({ t: "init", packages: [] });
+          }),
+        { url, timeout: BOOT_TIMEOUT },
+      );
+
+      expect(outcome).toBe("ready");
+    });
+  }
 });

@@ -157,5 +157,29 @@ describe("rate-limiter", () => {
         String(RATE_LIMIT_CONFIG.maxRequests),
       );
     });
+
+    it("gives a route its own limit, in a bucket of its own", async () => {
+      // /api/client-error opens GitHub issues: 5 a minute, not the 100 the
+      // other routes share, and its requests do not count against them.
+      const limited = withRateLimit(okHandler, {
+        name: "reports",
+        maxRequests: 2,
+      });
+      const shared = withRateLimit(okHandler);
+      const req = makeRequest({
+        "x-real-ip": "10.0.0.7",
+        "user-agent": "vitest",
+      });
+
+      const statuses = [];
+      for (let i = 0; i < 3; i++) statuses.push((await limited(req)).status);
+      const other = await shared(req);
+
+      expect(statuses).toEqual([200, 200, 429]);
+      expect(other.status).toBe(200);
+      expect(other.headers.get("X-RateLimit-Remaining")).toBe(
+        String(RATE_LIMIT_CONFIG.maxRequests - 1),
+      );
+    });
   });
 });

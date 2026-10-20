@@ -50,6 +50,36 @@ describe("useColorExtraction", () => {
     expect(seen).not.toContain("rgb(1, 2, 3)");
   });
 
+  it("loads no remote image: the color stays the fallback", async () => {
+    // Medium's and the Kudos card's Unsplash images were loaded from the
+    // visitor's browser for their color: an undisclosed third party.
+    const made: unknown[] = [];
+    vi.stubGlobal(
+      "Image",
+      class {
+        constructor() {
+          made.push(this);
+        }
+      },
+    );
+
+    const { result } = renderHook(() =>
+      useColorExtraction(
+        "https://images.unsplash.com/photo.jpg",
+        "rgb(1, 2, 3)",
+      ),
+    );
+
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        color: "rgb(1, 2, 3)",
+        isLoading: false,
+      }),
+    );
+    expect(made).toEqual([]);
+    expect(colorThief.loaded).toBe(false);
+  });
+
   // Last: it loads colorthief, which the first test says a precomputed image
   // never does.
   it("extracts an unknown image's color as colorthief 2 did", async () => {
@@ -66,7 +96,7 @@ describe("useColorExtraction", () => {
     colorThief.getColorSync.mockReturnValue({ array: () => [100, 150, 200] });
 
     const { result } = renderHook(() =>
-      useColorExtraction("https://images.example/photo.jpg", "rgb(0, 0, 0)"),
+      useColorExtraction("/images/not-precomputed.jpg", "rgb(0, 0, 0)"),
     );
 
     await waitFor(() =>

@@ -141,4 +141,34 @@ test.describe("Keyboard paths", () => {
       "1",
     );
   });
+
+  test("takes a section link from the keyboard to its focused section", async ({
+    page,
+    browserName,
+    isMobile,
+  }) => {
+    test.skip(
+      isMobile,
+      "Phones keep the section links in the menu (mobile-navigation.spec.ts)",
+    );
+    // Two tests held this and could not fail: one ended in
+    // `if (!scrollOccurred) expect(true)`, the other in `scrollY >= 0`. The
+    // link scrolls to its section and moves focus there, as a native
+    // in-page link does.
+    const nav = page.locator("#main-navigation");
+    await tabTo(
+      page,
+      nav.getByRole("link", { name: "Research", exact: true }),
+      browserName,
+    );
+    await expect(
+      nav.getByRole("link", { name: "Papers", exact: true }),
+    ).toBeFocused();
+
+    await page.keyboard.press("Enter");
+
+    const papers = page.locator("#papers");
+    await expect(papers).toBeInViewport();
+    await expect(papers).toBeFocused();
+  });
 });

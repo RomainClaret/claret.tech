@@ -118,6 +118,10 @@ jobs:
               - 'tests/e2e/accessibility.spec.ts'
               - 'tests/e2e/project-details.spec.ts'
               - 'tests/e2e/keyboard-paths.spec.ts'
+              # The error pages' reports, in both engines' stack formats.
+              - 'tests/e2e/error-reports.spec.ts'
+              # What the privacy policy promises: no cookies, no other hosts.
+              - 'tests/e2e/privacy.spec.ts'
               - 'src/**/*aria*.{ts,tsx}'
               - 'src/**/*a11y*.{ts,tsx}'
               - 'src/**/*accessibility*.{ts,tsx}'
@@ -397,7 +401,7 @@ jobs:
         # desktop and a 390 px phone, with the GitHub APIs answered by
         # fixtures since CI builds have no GitHub data. keyboard-paths: what
         # showed on hover or opened on a click, reached from the keyboard.
-        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts tests/e2e/keyboard-paths.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts tests/e2e/keyboard-paths.spec.ts tests/e2e/error-reports.spec.ts tests/e2e/privacy.spec.ts --project=${{ matrix.browser }} --max-failures=3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true

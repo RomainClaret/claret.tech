@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { researchAreaOf } from "./research-area";
 import { STATIC_PUBLICATIONS } from "@/lib/api/fetch-publications";
 import { papersSection } from "@/data/sections/papers";
+import abstracts from "@/lib/api/publication-abstracts.json";
 
 /**
  * Matched as substrings, the area words filed the Blockchain paper under
@@ -24,6 +25,19 @@ describe("researchAreaOf", () => {
     );
     expect(researchAreaOf(otherWork("claret2023geenns"))).toBe(
       "neuroevolution",
+    );
+  });
+
+  it("files each paper the same before its abstract comes and after", () => {
+    // The page draws the curated papers without their abstracts, which
+    // /api/publications brings on mount: a card's colour must not change.
+    const withAbstract = STATIC_PUBLICATIONS.map((publication) => ({
+      ...publication,
+      abstract: (abstracts as Record<string, string>)[publication.id],
+    }));
+
+    expect(STATIC_PUBLICATIONS.map(researchAreaOf)).toEqual(
+      withAbstract.map(researchAreaOf),
     );
   });
 

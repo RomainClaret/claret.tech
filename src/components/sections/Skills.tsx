@@ -31,33 +31,6 @@ const activityColors: { [key: string]: string } = {
   "🔬": "34, 197, 94", // Green for research
 };
 
-// Map technology names to their icon classes
-const techIconMap: { [key: string]: string } = {
-  JAX: "fas fa-zap",
-  Python: "fab fa-python",
-  Neuroevolution: "fas fa-dna",
-  "Evolution Algorithms": "fas fa-brain-circuit",
-  "Evolutionary Strategies": "fas fa-dna",
-  "Genetic Programming": "fas fa-code-branch",
-  PyTorch: "fas fa-fire",
-  "Reinforcement Learning": "fas fa-robot",
-  "Multi-Agent Systems": "fas fa-network-wired",
-  "Embodied AI": "fas fa-robot",
-  "Deep Learning": "fas fa-sparkles",
-  "Machine Learning": "fas fa-brain",
-  Robotics: "fas fa-robot",
-  "Artificial Life": "fas fa-atom",
-  "Lifelong Learning": "fas fa-infinity",
-  "Open-source": "fab fa-github",
-  Docker: "fab fa-docker",
-  Teaching: "fas fa-graduation-cap",
-  Research: "fas fa-flask",
-  FastAPI: "fas fa-bolt",
-  Jupyter: "fas fa-book",
-  "GitHub Actions": "fab fa-github",
-  Documentation: "fas fa-file-alt",
-};
-
 // Hoisted out of the render loop, where it was being rebuilt once per panel
 // on every render.
 const RESEARCH_CATEGORY_COLORS = {
@@ -125,7 +98,6 @@ export function Skills() {
                   >
                     <HolographicCard
                       glowColor={activityColor}
-                      className="h-full"
                       delay={(300 + index * 100) / 1000}
                     >
                       <div className="p-6 h-full flex flex-col">
@@ -209,9 +181,7 @@ export function Skills() {
                         <div className="mt-auto w-full">
                           <div className="grid grid-cols-1 gap-2 min-h-[120px] items-start w-full">
                             {activity.technologies.map((tech, techIndex) => {
-                              const TechIcon = getTechIcon(
-                                techIconMap[tech] || "fas fa-code",
-                              );
+                              const TechIcon = getTechIcon(tech.icon);
 
                               return (
                                 <ScaleIn
@@ -282,7 +252,7 @@ export function Skills() {
                                             )`,
                                             backgroundSize: "200% 200%",
                                             animation:
-                                              "holographic 4s linear infinite",
+                                              "holographic-sweep 4s linear infinite",
                                           }}
                                         />
 
@@ -294,7 +264,7 @@ export function Skills() {
                                           }}
                                         />
                                         <span className="text-xs md:text-sm font-medium relative z-10 text-left flex-1 wrap-break-word">
-                                          {tech}
+                                          {tech.name}
                                         </span>
                                       </div>
 
@@ -362,7 +332,6 @@ export function Skills() {
                     >
                       <HolographicCard
                         glowColor={categoryColor}
-                        className="h-full"
                         transitionDuration={400}
                         delay={(500 + index * 100) / 1000}
                       >

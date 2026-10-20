@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Theme, setTheme as setCookieTheme } from "@/lib/theme-cookie";
-import { readStoredTheme, systemTheme } from "@/lib/boot/head-boot";
+import { expireThemeCookie } from "@/lib/theme-cookie";
+import { readStoredTheme, systemTheme, type Theme } from "@/lib/boot/head-boot";
 import { logWarning } from "@/lib/utils/dev-logger";
 
 interface ThemeContextValue {
@@ -38,10 +38,9 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   const appliedOnMountRef = useRef(false);
 
   const setTheme = (newTheme: Theme) => {
-    setCookieTheme(newTheme);
     setThemeState(newTheme);
 
-    // Also store in localStorage as fallback
+    // Kept in this browser only: no cookie, which every request would carry.
     try {
       localStorage.setItem("theme", newTheme);
     } catch {
@@ -67,6 +66,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
       setThemeState(stored);
     };
     sync();
+    expireThemeCookie();
     // A page restored from the back/forward cache keeps the theme it was
     // left with, and another page may have changed it since.
     const onPageShow = (event: PageTransitionEvent) => {

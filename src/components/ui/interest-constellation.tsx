@@ -7,6 +7,7 @@ import { useAnimationState } from "@/contexts/animation-state-context";
 import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import { getTechIcon } from "@/components/icons";
 import { accentStyle } from "@/components/ui/accent-text";
+import { ConstellationFilters } from "@/components/ui/interest-constellation-shell";
 
 interface Interest {
   interestName: string;
@@ -526,28 +527,7 @@ export function InterestConstellation({
             pointerEvents: "none",
           }}
         >
-          <defs>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-            <filter id="textGlow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-              <feComponentTransfer in="coloredBlur" result="brighterBlur">
-                <feFuncA
-                  type="discrete"
-                  tableValues="0 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8 .8"
-                />
-              </feComponentTransfer>
-              <feMerge>
-                <feMergeNode in="brighterBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+          <ConstellationFilters />
 
           {/* Drawn once measured: a width exists only in the browser, and
               below md, where the orbit is hidden, never. */}
@@ -782,7 +762,7 @@ export function InterestConstellation({
                           textHeight + verticalPadding + animationBuffer;
 
                         // Calculate X position based on text anchor
-                        let boxX = labelPos.x;
+                        let boxX: number;
 
                         if (labelPos.textAnchor === "start") {
                           // Text starts at x, box starts slightly before for padding

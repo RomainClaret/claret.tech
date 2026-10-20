@@ -4,19 +4,9 @@ import { ThemeProvider, useTheme } from "./theme-provider";
 import { ThemeToggle } from "./theme-toggle";
 import type { LucideIconProps, MockStorage } from "@/test/mock-types";
 
-// Mock js-cookie
-const mockCookies = {
-  get: vi.fn(),
-  set: vi.fn(),
-};
-
-vi.mock("js-cookie", () => ({
-  default: mockCookies,
-}));
-
-// Mock theme-cookie module
+// The provider expires an old theme cookie on mount (lib/theme-cookie.ts).
 vi.mock("@/lib/theme-cookie", () => ({
-  setTheme: vi.fn(),
+  expireThemeCookie: vi.fn(),
 }));
 
 // Mock Lucide icons

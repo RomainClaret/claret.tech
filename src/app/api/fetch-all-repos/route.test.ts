@@ -146,6 +146,7 @@ describe("Fetch All Repositories API Route", () => {
           "User-Agent": "Node",
         },
         body: expect.stringContaining("testuser"),
+        signal: expect.any(AbortSignal),
       });
 
       const result = await response.json();
@@ -458,6 +459,7 @@ describe("Fetch All Repositories API Route", () => {
           "User-Agent": "Node",
         },
         body: expect.any(String),
+        signal: expect.any(AbortSignal),
       });
 
       const result = await response.json();

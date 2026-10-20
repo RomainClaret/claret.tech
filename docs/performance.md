@@ -870,6 +870,235 @@ skipped, both phones 24. Unit: act's 8 jobs (each of their 7 installs ran the
 script) and the eight timed macOS runs of the 10 scripts, 2,502 tests each
 time, each in one job. npm audit: 7.
 
+### Round 24: error reports, Pyodide's cache, lint, a Safari regression (2026-10-19)
+
+- **The error pages report their errors.** They said "we've been notified"
+  with nothing sent. An error that reaches one of the three boundaries (the
+  page's `error.tsx`, AppWrapper's `ErrorBoundary`, which catches the
+  layout's own parts, and `global-error.tsx`) is now posted to
+  `/api/client-error`, which files it as an issue in this repository, and
+  the page says a report was sent only after a 202. The report code costs
+  1,340 B gzipped on every page: Next loads the error pages' chunks
+  eagerly, and each of the three carries a copy (`app/error` +479,
+  `app/global-error` +470, `app/layout` +391; `not-found` +33 is round
+  24's one-control fix).
+- **Safari 16.4 to 17.x keep their translucent backgrounds.** A
+  `@supports not (backdrop-filter: ...)` block in the layout, from the
+  first commit, fired on those versions, which blur through
+  `-webkit-backdrop-filter`, and gave the nav buttons, tooltips, scrims,
+  toasts and cookie notice 5 to 20% black. No floor browser lacks both
+  forms, so the block went.
+- **Pyodide's runtime moves with its version.** `/pyodide/*` is cached as
+  immutable for a year and came from one unversioned folder, so a version
+  bump would have left returning visitors on the old runtime, or on a mix
+  of two. It sits in `/pyodide/<version>/` now, named by the worker's URL,
+  and runs 314.0.7 (numpy 2.4.6, +53,104 B raw over 16.5 MB). And
+  `python --version` said Python 3.14.0, copied from the package's lock
+  file; the interpreter is 3.14.2. Not known: whether the Python terminal
+  runs on Chrome and Edge 111, in the browserslist, since Pyodide is
+  tested from Chrome 112.
+- **Lint covers everything the repository runs.** 23 files (the root
+  configs, `scripts/`, `.github/scripts`, the public workers) were linted by
+  nothing; with ESLint's own recommended rules on, lint found 38 issues,
+  none a bug (case blocks without braces, overwritten defaults, double
+  negations, two invisible characters in a regex), and 4 unused names
+  outside `src`.
+- **Tooling:** knip 6.42, postcss 8.5.31 (CSS byte-identical),
+  `@vitejs/plugin-react` 6 (no Babel), dotenv 18, lint-staged 17,
+  commitlint 21 and husky 9.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped         | `04447db`          | `2b6c3dd`          |
+| ---------------------- | ------------------ | ------------------ |
+| Homepage JS            | 338,513 (16 files) | 339,890 (16 files) |
+| All CSS                | 26,419             | 26,397             |
+| Motion features (lazy) | 28,343             | 28,343             |
+| Terminal chunk (lazy)  | 82,428             | 82,428             |
+| PDF chunk (lazy)       | 139,563            | 139,564            |
+| pdf.js worker (lazy)   | 305,155            | 305,155            |
+
+Final code (`2b6c3dd`; `432ad4d` after it changed only a test) in the
+container: `npm ci` (the patch script, and 314.0.7 alone in
+`public/pyodide`), lint, type-check, knip, format, CI's build and the
+static-home check passed. Lighthouse, three spec runs: performance 100,
+FCP 442 ms, LCP 687 to 861 ms, TBT 0 ms, CLS 0.016 (CPU benchmark 3,931 to
+3,955); accessibility, best practices and SEO 100 in every audit. e2e:
+Chromium 163 passed and 1 skipped (with the 404 scan, the error reports and
+the Python terminal), WebKit's accessibility job with the error reports,
+pdf-reader and the research map 77 and 1 skipped, both phones 24. In
+Firefox the error-report spec failed 2 of 4 on its console check: Firefox
+prints a logged Error as "Error". The test reads the logged value since
+`432ad4d`: 24 of 24 in the three engines, two repeats without retries. The
+Pyodide worker booted 314.0.7 and ran numpy in all three (the Python spec
+runs in Chromium only). Unit: act's 7 test jobs (one `npm ci` lost to a
+network reset, rerun) and two macOS runs of the 10 scripts, 2,556 tests
+each time. npm audit: 7.
+
+### Round 25: error reports fixed before they ship, privacy claims made true (2026-10-19)
+
+- **Round 24's error reports, fixed before their first deploy.** A report
+  now names the build its page ran (a commit inlined at build time) and
+  the one serving. One bug keeps one signature across deploys. The search
+  takes only the owner's labeled reports, closed ones too: a closed report
+  is reopened only when the build serving now runs into it. The route
+  takes JSON from the site's own pages only, caps new issues across
+  instances by a GitHub count, and goes quiet when GitHub limits it. The
+  error screens can reload the page. A workflow assigns new reports to the
+  owner, whom GitHub would not otherwise tell. The builds publish hidden
+  source maps (16.9 MB deployed, 0 B to visitors), which
+  `scripts/map-frame.mjs` reads.
+- **Python in tabs opened before a deploy.** The worker read its runtime's
+  version from its URL, which an older bundle does not give: it now names
+  its own. A failed load is no longer kept; with no WebAssembly (Lockdown
+  Mode), `python` says so at once instead of waiting out 120 s. A unit test
+  holds the runtime to the browser floor (no exnref, ES2022 glue), and the
+  unused UMD build left the deployment (-18,912 B).
+- **Privacy: the code first, then the words.** The site sets no cookie (a
+  theme cookie no server had read since the homepage became static is
+  gone, and expired for returning visitors). Cards no longer load remote
+  images in the browser to read a color (the Kudos card reached Unsplash).
+  Reports send no cookie, Referer or query. The CSP allows the browser
+  only the hosts it uses (17 hosts to 10, images from the site alone). The
+  legal texts are built once with the site, without the drifted fallback
+  copies. Then the policy, terms, notice and modal were made exactly true,
+  with tests that hold the policy to the CSP's hosts and the model sizes.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped         | `becc3db`          | `21caf49`          |
+| ---------------------- | ------------------ | ------------------ |
+| Homepage JS            | 339,875 (16 files) | 340,027 (16 files) |
+| All CSS                | 26,420             | 26,426             |
+| Motion features (lazy) | 28,343             | 28,343             |
+| Terminal chunk (lazy)  | 82,428             | 82,428             |
+| PDF chunk (lazy)       | 139,563            | 139,564            |
+| pdf.js worker (lazy)   | 305,155            | 305,155            |
+
+Final HEAD (`21caf49`) in the container: `npm ci`, lint, type-check, knip,
+format, CI's build and the static-home check passed. Lighthouse, three spec
+runs: performance 100, FCP 442 to 443 ms, LCP 858 to 868 ms, TBT 0 ms, CLS
+0.014 (CPU benchmark 3,845 to 3,952); accessibility, best practices and
+SEO 100 in every audit. e2e: Chromium 169 passed and 1 skipped (with the
+privacy spec, the error reports and the Python terminal), WebKit 82 passed
+(the accessibility job, privacy, error reports, pdf-reader, the research
+map, and the Python worker as older bundles start it; 23 skipped, mostly
+Chromium-only Python tests), Firefox 9 (error reports, privacy, the
+worker), both phones 24; the Pyodide worker booted and ran numpy in all
+three engines. Unit: act's 8 jobs and two macOS runs of the 10 scripts,
+2,578 tests each time. npm audit: 7.
+
+### Round 26: the free Hobby plan, tests that could not fail, a lighter homepage (2026-10-20)
+
+- **The Hobby plan.** The site runs on Vercel's free plan, which the
+  round's checks now assume.
+  - **Deploys:** the CLI uploads only the files Vercel lacks (17.6 MB for
+    a 639-file deployment last time), so the hidden source maps stay. The
+    deploy job installs `vercel@64.7.0`, not `latest`, since it runs
+    beside the deploy token.
+  - **Images:** Hobby includes 5,000 transformations a month, each cache
+    MISS or STALE counting one; past that, uncached images answer 402.
+    The optimizer took any image from seven hosts, two of them unused, so
+    anyone could spend the quota. It now takes the GitHub avatar alone,
+    kept 31 days. Medium's images come from `/api/blog-image/<id>`, which
+    serves only the images the Medium feed names, resized by sharp and
+    cached a month at the edge. The Kudos photo is a file of the site,
+    and its scraper is gone.
+  - **Functions:** Fluid compute is on in `vercel.json`, whose `functions`
+    block named paths that do not exist. Every server fetch to a third
+    party times out after 10 s, and the routes Next revalidates in the
+    background (where it drops a fetch's `signal`) have a `maxDuration`.
+  - **Words:** the privacy policy's Hosting paragraph (an hour of request
+    logs, 24 hours of firewall traffic, the API in Washington, D.C.) and
+    its services (Kudos out; Crossref and rss2json.com, which the server
+    contacts, in).
+- **Tests that could not fail.** Eighteen commits rewrote the tests that
+  asserted nothing that could fail (`expect(true)`, `>= 0`, assertions
+  inside `try`, a test scrolling to the section itself) and proved each
+  rewrite with a mutation, or deleted the test where another covers the
+  behavior. The method is in `TESTING_INFRASTRUCTURE.md`. Running every
+  project at the end found three more failures: a new keyboard test on
+  phones, the research map's drawing tests on phones (failing since
+  before the round), and the request-count budget, which the new chunks
+  passed.
+- **Eager JavaScript.** Code the page needs only after hydration moved to
+  chunks of its own: the animated favicon, the project and article cards
+  (fetched with their data), the hero's background layers (never on
+  Safari, which draws none), the interest constellation (wide screens
+  only), the publications' abstracts and the research section's long
+  texts. styled-jsx left (its two keyframes moved to `motion.css`), as
+  did 27 dead icon entries and tailwind-merge: `cn()` joins classes with
+  clsx, after a syntax-tree scan and an audit of the e2e suite settled
+  every Tailwind conflict where it is written. CI's build fails if a
+  client chunk ships styled-jsx or tailwind-merge
+  (`.github/scripts/check-client-bundle.mjs`).
+
+Each change against the commit before it, on the Mac (CI's e2e build,
+homepage scripts without the polyfills, gzip -9):
+
+| Commit    | Change                                     | Bytes   | Files |
+| --------- | ------------------------------------------ | ------- | ----- |
+| `b010632` | before the eager-JS commits                | 300,006 | 15    |
+| `d8bd363` | 27 dead icon entries                       | 298,768 | 15    |
+| `6c85a90` | styled-jsx out                             | 295,910 | 15    |
+| `e9d0391` | animated favicon, lazy                     | 294,882 | 15    |
+| `5c562ab` | project cards, with the repositories       | 288,228 | 15    |
+| `d186880` | article cards, with the articles           | 285,704 | 15    |
+| `92da77f` | hero layers, after hydration               | 277,413 | 16    |
+| `0feda8d` | constellation, wide screens only           | 274,965 | 16    |
+| `a30e392` | abstracts left to the API                  | 271,421 | 16    |
+| `4f6b0c5` | research texts, when idle                  | 268,540 | 16    |
+| `90b1deb` | papers filed by title (a fix of the above) | 268,550 | 16    |
+| `925cc94` | the conflict report                        | 268,620 | 16    |
+| `0d09a11` | conflicts settled                          | 268,576 | 16    |
+| `b75aa2a` | `cn()` with clsx                           | 260,427 | 15    |
+| `ce9dceb` | an icon per technology, 9 icons fewer      | 260,024 | 15    |
+
+`39eb6da` (between `6c85a90` and `e9d0391`) adds the CI check only.
+`ce9dceb` and `9b1b0cc` (the ring labels' line height, no change in size)
+came last, both chosen by Romain from before/after screenshots. Not kept:
+a split-chunks group for the root boundaries' shared helpers saved 1,162 B
+for 8 more requests.
+
+The round's start and end, built the same way in the Playwright container
+(CI's e2e build, gzip -9):
+
+| Bytes, gzipped                       | `bca23f5`          | `f082507`          |
+| ------------------------------------ | ------------------ | ------------------ |
+| Homepage JS, without the polyfills   | 300,625 (15 files) | 260,808 (15 files) |
+| Polyfills (`noModule`, never loaded) | 39,405             | 39,405             |
+| All CSS                              | 26,426             | 26,454             |
+| Terminal chunk (lazy)                | 82,428             | 82,428             |
+| PDF chunk (lazy)                     | 139,563            | 139,564            |
+
+The new chunks at `f082507`: project cards 8,833 B; hero layers 6,478
+(never fetched on Safari); abstracts 4,450 (only when /api/publications
+fails); research texts 4,253; article cards 3,842; constellation 3,314
+(wide screens only); animated favicon 1,386. The homepage asks for 31
+scripts on a desktop (23 at `bca23f5`), the extra ones after hydration.
+
+Final HEAD (`f082507`) in the container: `npm ci`, lint, type-check, knip,
+format, CI's build, the static-home check and the client-bundle deny list
+passed. e2e, every spec: Chromium 196 passed and 13 skipped. WebKit 166
+passed, 39 skipped and 4 failed: the two splash-timer tests in
+static-shell.spec.ts, which fail at `bca23f5` too (WebKit in this container
+hydrates too slowly for them); the dashboard-spring test in
+terminal.spec.ts, marginal there (this WebKit draws a frame every 1 to
+2.5 s at both commits; macOS WebKit draws 26 to 29 in 600 ms at both); and
+one axe scan that caught the skill manifesto mid-fade (6 of 6 reruns
+passed). Both phones: 286 passed and 127 skipped; the same two splash-timer
+tests failed on Mobile Safari, and three chunk-abort cases were flaky under
+load (3 of 3 reruns passed each). Firefox (terminal, Python, error reports,
+privacy): 39 passed. The Pyodide worker booted and ran numpy in all three
+engines. Lighthouse, three runs alternating with `bca23f5` on one machine:
+performance 100 and TBT 0 ms for both, CLS 0.014, FCP 443 to 569 ms
+against 443, LCP 648 to 831 ms against 691 to 870 (CPU benchmark 3,737 to
+3,861); accessibility, best practices and SEO 100. Unit: CI's ten scripts
+on macOS twice, 2,640 tests each time, and act's 8 jobs. npm audit: 7, as
+before.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
@@ -884,8 +1113,8 @@ time, each in one job. npm audit: 7.
   favoured the baseline. The full list: `.env.local`, `node_modules` (a
   link), `public/pdf.worker.min.mjs`, `public/profile.json`,
   `public/pdfs/RomainClaret_CV.pdf`, `public/pyodide/` (the terminal's
-  Python), and the two caches `src/lib/utils/kudos-cache.json` and
-  `medium-cache.json`. Compare sizes within one checkout: two builds of the
+  Python), and the cache `src/lib/utils/medium-cache.json` (round 26
+  removed the Kudos scraper and its cache). Compare sizes within one checkout: two builds of the
   same commit, one in the main checkout and one in a fresh worktree, gave
   `/` sizes 809 B apart, with every chunk id changed (2026-10-11).
 - **Check for strays.** A test run that hangs can leave a forked vitest worker
@@ -2008,3 +2237,111 @@ Round 23 (2026-10-19):
 - **A compile cache helps only where it is warm.** `NODE_COMPILE_CACHE`
   saved 5.5% on a CI-like cold start and 23% warm; Vitest drops it under
   v8 coverage, and CI starts empty.
+
+Round 24 (2026-10-19):
+
+- **A rule's name is not its coverage.** axe's `nested-interactive` passed
+  a `<button>` inside an `<a>` on the 404 page: two Tab stops for one
+  action, and no finding. Assert the structure the rule should protect.
+- **A fallback can be the bug.** A `@supports not (backdrop-filter: ...)`
+  block from the first commit fired on Safari 16.4 to 17.x, which blur
+  through `-webkit-backdrop-filter`, and gave the nav buttons, tooltips,
+  scrims, toasts and cookie notice 5 to 20% black for their translucent
+  backgrounds. Check a fallback's condition against every engine of the
+  floor, prefixed forms included.
+- **Tailwind 4 reads `_` as a space in an arbitrary variant.**
+  `[&_.react-pdf__Page__canvas]:max-w-none` compiled to
+  `.react-pdf Page canvas`, which matches nothing. The zoom worked anyway
+  (each page box has an explicit width), as an e2e test at a narrow
+  viewport showed.
+- **"The error pages" are three boundaries.** `error.tsx` wraps only the
+  page. The layout's own parts inside AppWrapper (navigation, terminal,
+  research map) fall to AppWrapper's `ErrorBoundary`, and the root
+  layout's other children (the cookie notice, the toasts) to
+  `global-error.tsx`. A report from `error.tsx` alone would have missed
+  most real crashes.
+- **A production error can be forced on one component.** An init script
+  that makes `ResizeObserver.prototype.observe` throw for one element fails
+  the component that observes it, in an effect, as a real bug would.
+  Breaking the whole API instead changed nothing visible: the guarded hook
+  that mounts the sections just kept them unmounted.
+- **Production stack frames carry URL encoding.** A dynamic route's chunks
+  sit under `app/pdf/%5Bslug%5D/`, and Vercel's skew protection appends
+  `?dpl=`: a frame pattern without `%` skipped the page's own frame for one
+  in React.
+- **A package's metadata can misstate its runtime.** Pyodide 314.0.3's lock
+  file says Python 3.14.0; its interpreter is 3.14.2, and `python --version`
+  repeated the lock from 2026-08-03 (`b24b125`) to this round. Compare a
+  pinned constant with the running thing.
+- **An immutable cache needs versioned URLs.** `/pyodide/*` was immutable
+  for a year, from one unversioned folder: a version bump would have left
+  returning visitors on the old runtime, or on a mix of two.
+
+Round 25 (2026-10-19):
+
+- **A never-cached script should name its own version.** Round 24 put the
+  Pyodide version in the worker's URL; a tab opened before that deploy
+  starts the worker at the URL its old bundle knew, gets the new worker,
+  and the new worker refused it. The worker and its folder ship together,
+  so the worker now names its version itself.
+- **A memoized failure is permanent.** `loadPython()` kept its import's
+  promise, rejected or not: one failed chunk load made every later
+  `python` fail until a reload.
+- **Source maps can cost visitors nothing.** `productionBrowserSourceMaps`
+  added a `sourceMappingURL` comment to every chunk (+647 B gzipped on the
+  homepage); `hidden-source-map` publishes the same maps without it.
+- **On a prebuilt CLI deploy, Vercel's Git variables are not to be trusted.**
+  `VERCEL_GIT_COMMIT_SHA` named nothing useful; inline the commit at build
+  time (`git rev-parse HEAD`, else `GITHUB_SHA`).
+- **GitHub tells nobody about their own activity.** Issues filed with the
+  owner's token notified no one; a workflow acting as github-actions can.
+- **A per-instance cap on serverless caps nothing.** Each instance starts
+  at zero and Vercel runs as many as traffic calls for: count where the
+  writes land (a GitHub search), and keep the instance's count as well.
+- **`text/plain` needs no preflight.** A route that reads any content type
+  can be posted to by any page, from its visitors' browsers; require JSON
+  and check `Sec-Fetch-Site`.
+- **Same-origin requests carry the full Referer.** Under
+  `strict-origin-when-cross-origin`, a fetch to the site itself sends the
+  page's address with its query: telemetry needs
+  `referrerPolicy: "no-referrer"` (and `credentials: "omit"`).
+- **A refactor can leave a cookie behind.** The server stopped reading the
+  theme cookie when the homepage became static; the client kept writing
+  it, and every request carried it for a year.
+- **Reading a color from a remote image is a third-party request.** A
+  scroll test that records every host the page contacts found Unsplash.
+- **A fallback nobody can see still drifts.** The legal routes' fallback
+  copies had stale dates and missing sections, and the modals could not
+  even show them; built at build time, the routes need none.
+- **Node keeps flags only for wasm features not yet shipped.** exnref can
+  be turned off to guard the browser floor; tail calls and GC cannot.
+- **A claim needs its source.** The site said the default model was
+  0.5 GB; Hugging Face's listing says 0.70.
+- **An open image optimizer is a quota anyone can spend.** On Vercel's
+  Hobby plan every cache miss is a transformation, and `remotePatterns`
+  with whole hosts let any page ask for any image there. Allow the
+  images the site shows, or serve them from a route that knows which.
+- **Next drops a fetch's `signal` when it revalidates in the
+  background** (`patch-fetch.js`): a timeout on the fetch does not bound
+  that request, so the route needs a `maxDuration`.
+- **Moving data out of a module breaks what computes from it at first
+  render.** The papers' card colours read the abstracts, which the page
+  no longer had until the API answered: two cards were gray in the HTML.
+  Only the full unit run caught it.
+- **A splitting commit adds requests.** Six new chunks took the homepage
+  from 23 scripts to 31, all after hydration: the bytes before it fell,
+  and a request-count budget failed. Count both.
+- **tailwind-merge hides conflicts, props included.** The site grid's
+  `fixed` beat the grid's own `absolute` only because tailwind-merge
+  dropped the earlier class. Without it, the stylesheet's order would
+  have decided. A syntax-tree scan finds the written conflicts; only a
+  run-time report finds the ones that come from props.
+- **A chunk split pays only above its requests.** A shared-helpers group
+  saved 1,162 B for 8 more requests: not kept.
+- **A test that feeds a component its own data can pass on a dead
+  mapping.** All six Skills chips drew the fallback icon: the
+  component's map from names to icons matched no real technology, while
+  its test mocked the old names the map knew. Hold mappings to the real
+  data, or keep each value beside its key.
+- **CI's Chromium-only e2e hides phone failures.** Two specs failed on
+  both phone projects, one of them since before the round.

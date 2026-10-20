@@ -31,7 +31,7 @@ export function IntroductionAnimations({
       <div className="absolute inset-0 overflow-hidden">
         <ShootingStars />
         {/* Opaque: hides the site grid behind the hero (GridBackground). */}
-        <GridBackground covers />
+        <GridBackground covers className="absolute inset-0" />
         <NeuralBackground />
       </div>
 

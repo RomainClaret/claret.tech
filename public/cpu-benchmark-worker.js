@@ -153,7 +153,7 @@ self.onmessage = function (event) {
       });
       break;
 
-    case "quick-benchmark":
+    case "quick-benchmark": {
       // Run a quick benchmark for initial assessment
       const quickScore = runCpuBenchmark(200);
       self.postMessage({
@@ -161,6 +161,7 @@ self.onmessage = function (event) {
         data: { score: quickScore },
       });
       break;
+    }
 
     default:
       self.postMessage({

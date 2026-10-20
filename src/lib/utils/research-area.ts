@@ -8,6 +8,11 @@
  * an "ai" inside a word filed the vestibular poster under machine
  * learning. HyperNEAT and NEAT are neuroevolution's own words: the
  * early-stopping paper says "evolutionary" but never "evolution".
+ *
+ * The curated papers' abstracts arrive after the page
+ * (publication-abstracts.json), so their titles have to file them alone,
+ * or a card would change colour when its abstract comes. Two of those
+ * titles say only "Evolved" and "Evolving".
  */
 export type ResearchArea =
   "neuroevolution" | "ml" | "nlp" | "blockchain" | "neuroscience" | "general";
@@ -15,7 +20,15 @@ export type ResearchArea =
 const AREAS: [ResearchArea, string[]][] = [
   [
     "neuroevolution",
-    ["neural", "evolution", "neuroevolution", "hyperneat", "neat"],
+    [
+      "neural",
+      "evolution",
+      "evolved",
+      "evolving",
+      "neuroevolution",
+      "hyperneat",
+      "neat",
+    ],
   ],
   ["ml", ["machine learning", "deep learning", "ai"]],
   ["nlp", ["language", "nlp", "chatbot", "question"]],

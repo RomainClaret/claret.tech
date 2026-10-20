@@ -47,6 +47,18 @@ const SplashScreen = dynamic(
   { ssr: false },
 );
 
+// The tab's animated icon, drawn into a canvas on the client: nothing of it is
+// in the page's HTML, so its code comes after hydration, not with the page.
+// When the chunk cannot be fetched, the static favicon stays.
+const AnimatedFavicon = dynamic(
+  withLoadFallback(
+    () => import("./animated-favicon").then((mod) => mod.AnimatedFavicon),
+    () => null,
+    { onError: (error) => logError(error, "Favicon chunk") },
+  ),
+  { ssr: false },
+);
+
 // Fetched on intent and first mounted on the first open (load-terminal.ts).
 // After a failed load, TerminalUnavailable tries again on Retry and on every
 // reopen.
@@ -223,6 +235,7 @@ export function AppWrapper({ children }: AppWrapperProps) {
           The module and its tests are kept; only the unused mount is gone. */}
       <PerformanceMonitorProvider>
         <ProjectsProvider>
+          <AnimatedFavicon />
           <ServiceWorkerCleanup />
           <PenguinConsole />
           {/* Site-wide grid background with very low opacity - Disabled on Safari for performance */}

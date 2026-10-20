@@ -42,14 +42,14 @@ const renderCookieNoticeAndWait = async (acknowledged = false) => {
     try {
       await waitFor(
         () => {
-          const element = screen.queryByText(/Cookie Selection/);
+          const element = screen.queryByText(/Natural Selection/);
           expect(element).toBeInTheDocument();
         },
         { timeout },
       );
     } catch (error) {
       // Enhanced error reporting for debugging
-      console.error("Failed to find Cookie Selection element:", error);
+      console.error("Failed to find Natural Selection element:", error);
       console.error("DOM content:", document.body.innerHTML);
       throw error;
     }
@@ -110,7 +110,7 @@ describe("CookieNotice", () => {
     it("does not show notice initially", () => {
       render(<CookieNotice />);
 
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
     });
 
     it("shows notice after delay when not previously acknowledged", async () => {
@@ -124,13 +124,13 @@ describe("CookieNotice", () => {
       render(<CookieNotice />);
 
       // Should not be visible immediately
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
 
       // Wait for the component to appear after the real 1000ms delay
       const isCI = !!process.env.CI;
       await waitFor(
         () => {
-          expect(screen.getByText(/Cookie Selection/)).toBeInTheDocument();
+          expect(screen.getByText(/Natural Selection/)).toBeInTheDocument();
         },
         { timeout: isCI ? 15000 : 5000 },
       );
@@ -149,25 +149,22 @@ describe("CookieNotice", () => {
       // Advance timer
       vi.advanceTimersByTime(1000);
 
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
     });
   });
 
   describe("Cookie Notice Content", () => {
-    it("displays the evolution-themed cookie message", async () => {
+    it("displays the evolution-themed notice: no cookies", async () => {
+      // It said "Cookie Selection" and that Vercel's analytics was there
+      // "to understand site performance": the site sets no cookie (round
+      // 25), and Web Analytics counts visits.
       await renderCookieNoticeAndWait();
-      expect(screen.getByText(/🧬 Cookie Selection:/)).toBeInTheDocument();
+      expect(screen.getByText(/🧬 Natural Selection:/)).toBeInTheDocument();
+      expect(screen.getByText(/no cookies survived/)).toBeInTheDocument();
       expect(
-        screen.getByText(
-          /Only the essential survive: theme genes and performance adaptations/,
-        ),
+        screen.getByText(/cookieless analytics only counts\s+visits/),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(/privacy-focused analytics \(Vercel\)/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/No invasive tracking, no third-party advertising/),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(/site performance/)).not.toBeInTheDocument();
     });
 
     it("includes legal document links", async () => {
@@ -190,7 +187,7 @@ describe("CookieNotice", () => {
     it("includes 'Got it!' accept button", async () => {
       await renderCookieNoticeAndWait();
       expect(
-        screen.getByRole("button", { name: /Accept cookie notice/ }),
+        screen.getByRole("button", { name: /Dismiss privacy notice/ }),
       ).toBeInTheDocument();
       expect(screen.getByText("Got it!")).toBeInTheDocument();
     });
@@ -246,18 +243,18 @@ describe("CookieNotice", () => {
     it("hides notice when 'Got it!' button is clicked", async () => {
       await renderCookieNoticeAndWait();
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       fireEvent.click(acceptButton);
 
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
     });
 
     it("saves acknowledgment to localStorage when accepted", async () => {
       await renderCookieNoticeAndWait();
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       fireEvent.click(acceptButton);
@@ -271,7 +268,7 @@ describe("CookieNotice", () => {
     it("does not show notice again after acknowledgment", async () => {
       await renderCookieNoticeAndWait();
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       fireEvent.click(acceptButton);
@@ -285,14 +282,14 @@ describe("CookieNotice", () => {
       render(<CookieNotice />);
 
       // Should not appear (no need for timer since localStorage returns "true")
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
     });
   });
 
   describe("Styling and Layout", () => {
     it("applies fixed bottom positioning", async () => {
       await renderCookieNoticeAndWait();
-      const notice = screen.getByText(/Cookie Selection/).closest(".fixed");
+      const notice = screen.getByText(/Natural Selection/).closest(".fixed");
 
       expect(notice).toHaveClass("fixed");
       expect(notice).toHaveClass("bottom-0");
@@ -302,7 +299,7 @@ describe("CookieNotice", () => {
 
     it("has proper z-index for layering", async () => {
       await renderCookieNoticeAndWait();
-      const notice = screen.getByText(/Cookie Selection/).closest(".z-50");
+      const notice = screen.getByText(/Natural Selection/).closest(".z-50");
 
       expect(notice).toHaveClass("z-50");
     });
@@ -310,7 +307,7 @@ describe("CookieNotice", () => {
     it("includes backdrop styling", async () => {
       await renderCookieNoticeAndWait();
       const notice = screen
-        .getByText(/Cookie Selection/)
+        .getByText(/Natural Selection/)
         .closest(".bg-gray-900\\/95");
 
       expect(notice).toHaveClass("bg-gray-900/95");
@@ -323,7 +320,7 @@ describe("CookieNotice", () => {
     it("has slide-up animation", async () => {
       await renderCookieNoticeAndWait();
       const notice = screen
-        .getByText(/Cookie Selection/)
+        .getByText(/Natural Selection/)
         .closest(".animate-slide-up");
 
       expect(notice).toHaveClass("animate-slide-up");
@@ -332,10 +329,10 @@ describe("CookieNotice", () => {
     it("uses responsive layout classes", async () => {
       await renderCookieNoticeAndWait();
       const container = screen
-        .getByText(/Cookie Selection/)
+        .getByText(/Natural Selection/)
         .closest(".max-w-7xl");
       const flexContainer = screen
-        .getByText(/Cookie Selection/)
+        .getByText(/Natural Selection/)
         .closest(".flex");
 
       expect(container).toBeInTheDocument();
@@ -345,16 +342,14 @@ describe("CookieNotice", () => {
   });
 
   describe("Accessibility", () => {
-    it("comes first in the page, as a region named for the site's cookies", async () => {
+    it("comes first in the page, as a region named for what it is", async () => {
       // GOV.UK's placement, before the skip links: keyboard and screen
       // reader users meet it first, and once it is gone the next Tab goes
       // on to the skip link. Last in <body>, it came after the whole page,
       // and after "Got it!" WebKit sent the next Tab to the browser itself.
       await renderCookieNoticeAndWait();
 
-      const region = screen.getByRole("region", {
-        name: "Cookies on claret.tech",
-      });
+      const region = screen.getByRole("region", { name: "Privacy notice" });
       expect(document.body.firstElementChild).toContainElement(region);
       expect(region).toHaveAttribute("data-nosnippet");
     });
@@ -371,7 +366,7 @@ describe("CookieNotice", () => {
       // And when it unmounts while still showing.
       const second = await renderCookieNoticeAndWait();
       const again = document.body.firstElementChild;
-      expect(again).toContainElement(screen.getByText(/Cookie Selection/));
+      expect(again).toContainElement(screen.getByText(/Natural Selection/));
       second.unmount();
       expect(again?.isConnected).toBe(false);
     });
@@ -385,12 +380,12 @@ describe("CookieNotice", () => {
         screen.getByRole("button", { name: /Open Terms of Service/ }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /Accept cookie notice/ }),
+        screen.getByRole("button", { name: /Dismiss privacy notice/ }),
       ).toBeInTheDocument();
     });
 
     it("names its button by its visible text first", async () => {
-      // "Got it!" was named "Accept cookie notice" (WCAG 2.5.3, label in
+      // "Got it!" was named "Dismiss privacy notice" (WCAG 2.5.3, label in
       // name): a voice command saying what is on screen missed it.
       await renderCookieNoticeAndWait();
 
@@ -407,7 +402,7 @@ describe("CookieNotice", () => {
       );
 
       fireEvent.click(
-        screen.getByRole("button", { name: /Accept cookie notice/ }),
+        screen.getByRole("button", { name: /Dismiss privacy notice/ }),
       );
 
       expect(root.style.getPropertyValue("--cookie-notice-height")).toBe("");
@@ -422,7 +417,7 @@ describe("CookieNotice", () => {
         name: /Open Terms of Service/,
       });
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       expect(privacyLink.tagName.toLowerCase()).toBe("button");
@@ -439,7 +434,7 @@ describe("CookieNotice", () => {
         name: /Open Terms of Service/,
       });
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       // Verify elements can be focused (tabIndex >= -1) instead of checking actual focus
@@ -487,13 +482,13 @@ describe("CookieNotice", () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText(/Cookie Selection/)).toBeInTheDocument();
+          expect(screen.getByText(/Natural Selection/)).toBeInTheDocument();
         },
-        { timeout: !!process.env.CI ? 15000 : 5000 },
+        { timeout: process.env.CI ? 15000 : 5000 },
       );
 
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
 
       // Should not crash when clicking accept
@@ -543,15 +538,15 @@ describe("CookieNotice", () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText(/Cookie Selection/)).toBeInTheDocument();
+          expect(screen.getByText(/Natural Selection/)).toBeInTheDocument();
         },
-        { timeout: !!process.env.CI ? 15000 : 5000 },
+        { timeout: process.env.CI ? 15000 : 5000 },
       );
 
       // Re-render should not cause issues
       rerender(<CookieNotice />);
 
-      expect(screen.getByText(/Cookie Selection/)).toBeInTheDocument();
+      expect(screen.getByText(/Natural Selection/)).toBeInTheDocument();
 
       // Restore fake timers
       vi.useFakeTimers();
@@ -568,14 +563,14 @@ describe("CookieNotice", () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText(/Cookie Selection/)).toBeInTheDocument();
+          expect(screen.getByText(/Natural Selection/)).toBeInTheDocument();
         },
-        { timeout: !!process.env.CI ? 15000 : 5000 },
+        { timeout: process.env.CI ? 15000 : 5000 },
       );
 
       // Accept the notice
       const acceptButton = screen.getByRole("button", {
-        name: /Accept cookie notice/,
+        name: /Dismiss privacy notice/,
       });
       fireEvent.click(acceptButton);
 
@@ -583,7 +578,7 @@ describe("CookieNotice", () => {
       rerender(<CookieNotice />);
 
       // Should remain hidden
-      expect(screen.queryByText(/Cookie Selection/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Natural Selection/)).not.toBeInTheDocument();
 
       // Restore fake timers
       vi.useFakeTimers();

@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Effective Date: 2025-09-03**
+**Effective Date: 2026-10-19**
 
 ## 1. Acceptance of Terms
 
@@ -40,7 +40,7 @@ This website contains links to external websites and resources. These links are 
 
 If you use any API endpoints provided by this website:
 
-- Rate limits apply (100 requests per minute per IP)
+- Rate limits apply (about 100 requests a minute per visitor; 5 for error reports)
 - APIs are provided as-is for informational purposes
 - Do not use APIs for commercial purposes without permission
 - Respect the rate limits and fair use policies
@@ -82,7 +82,7 @@ To the fullest extent permitted by law, I shall not be liable for any indirect, 
 
 ## 9. Privacy
 
-Your use of this website is also governed by our Privacy Policy. We respect your privacy and do not track or collect personal information.
+Your use of this website is also governed by our Privacy Policy. We respect your privacy: no tracking, and no personal data stored by this site.
 
 ## 10. Modifications
 

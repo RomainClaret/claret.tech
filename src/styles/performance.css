@@ -127,15 +127,6 @@
   }
 }
 
-@keyframes holographic {
-  0% {
-    background-position: 0% 0%;
-  }
-  100% {
-    background-position: 200% 200%;
-  }
-}
-
 /* Non-Safari browsers: GPU-accelerated keyframes */
 @supports not (-webkit-backdrop-filter: blur(1px)) {
   @keyframes shimmer-gpu {

@@ -377,7 +377,8 @@ export function PerformanceReportGenerator({
 
       const reportData = {
         timestamp: new Date().toISOString(),
-        url: window.location.href,
+        // The page, not its query or hash, which may hold anything.
+        url: window.location.origin + window.location.pathname,
         userAgent: navigator.userAgent,
         viewport: {
           width: window.innerWidth,

@@ -724,10 +724,8 @@ export async function toggleThemeReliably(
                 toast.style.zIndex = "-9999";
                 toast.style.visibility = "hidden";
                 toast.style.opacity = "0";
-                // Try to remove it entirely
-                try {
-                  toast.remove();
-                } catch {}
+                // And remove it: Element.remove() does not throw
+                toast.remove();
               }
             });
           });

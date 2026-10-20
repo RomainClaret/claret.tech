@@ -755,11 +755,10 @@ export function PDFViewer({
                     // wide as the widest page, so in a mixed-orientation
                     // document a block-level wrapper leaves every portrait
                     // page flush left with all the slack piled on the right.
-                    // max-w-none overrides react-pdf's own
-                    // .react-pdf__Page__canvas { max-width: 100% }, which
-                    // otherwise caps a zoomed page at the viewer width and
-                    // makes the zoom control stop having any effect.
-                    className="mb-4 flex justify-center [&_.react-pdf__Page__canvas]:max-w-none"
+                    // globals.css caps the canvas at 100% of its box, and the
+                    // box is sized from the page, so a zoom still goes past
+                    // the viewer's width (pdf-reader.spec's zoom test).
+                    className="mb-4 flex justify-center"
                     ref={(el) => {
                       if (el) pageRefs.current[page] = el;
                     }}

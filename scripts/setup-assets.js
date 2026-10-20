@@ -21,11 +21,11 @@ const crypto = require("crypto");
 const ROOT = path.join(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
 
-// Pyodide runtime files. pyodide.js (UMD) is included alongside pyodide.mjs so
-// the worker can fall back to importScripts() if a module worker is a problem.
+// Pyodide runtime files: what the module worker (public/python-worker.js)
+// loads. The package's UMD build, pyodide.js, was copied too, for an
+// importScripts() fallback no worker had; 314.0.0 dropped classic workers.
 const PYODIDE_FILES = [
   "pyodide.mjs",
-  "pyodide.js",
   "pyodide.asm.mjs",
   "pyodide.asm.wasm",
   "python_stdlib.zip",
@@ -120,7 +120,7 @@ async function setupPdfWorker() {
  */
 async function setupPyodide() {
   const pkgDir = path.join(ROOT, "node_modules/pyodide");
-  const destDir = path.join(PUBLIC, "pyodide");
+  const pyodideDir = path.join(PUBLIC, "pyodide");
 
   if (!fs.existsSync(pkgDir)) {
     throw new Error(
@@ -132,7 +132,15 @@ async function setupPyodide() {
     await fsp.readFile(path.join(pkgDir, "package.json"), "utf8"),
   ).version;
 
+  // Each version in a folder of its own, which the worker's URL names: the
+  // runtime is served as immutable for a year (next.config.mjs), so a new
+  // version needs new URLs.
+  const destDir = path.join(pyodideDir, version);
   await fsp.mkdir(destDir, { recursive: true });
+  await pruneOtherVersions(pyodideDir, version);
+
+  // A copy left by an earlier setup, which vendored the UMD build too.
+  await fsp.rm(path.join(destDir, "pyodide.js"), { force: true });
 
   let copied = 0;
   for (const name of PYODIDE_FILES) {
@@ -146,15 +154,28 @@ async function setupPyodide() {
     `pyodide ${version}: ${PYODIDE_FILES.length} runtime files ready (${copied} updated)`,
   );
 
-  // Record the version so the worker can assert the assets match the package
-  // it was written against, and so `python --version` can answer without
-  // booting an 11 MB runtime.
-  await fsp.writeFile(
-    path.join(destDir, "version.json"),
-    `${JSON.stringify({ pyodide: version }, null, 2)}\n`,
-  );
-
   await setupPyodidePackages(pkgDir, destDir, version);
+}
+
+/**
+ * Removes what other versions left in public/pyodide, which is gitignored, so
+ * only a checkout that installed an earlier version has any: their folders,
+ * and the files of the unversioned layout used up to 314.0.3. Anything else
+ * there is left alone.
+ */
+async function pruneOtherVersions(pyodideDir, version) {
+  const leftovers = new Set([...PYODIDE_FILES, "pyodide.js", "version.json"]);
+  for (const entry of await fsp.readdir(pyodideDir, { withFileTypes: true })) {
+    const stale = entry.isDirectory()
+      ? /^\d+\.\d+\.\d+$/.test(entry.name) && entry.name !== version
+      : leftovers.has(entry.name) || entry.name.endsWith(".whl");
+    if (!stale) continue;
+    await fsp.rm(path.join(pyodideDir, entry.name), {
+      recursive: true,
+      force: true,
+    });
+    log(`  removed ${entry.name} (another version, or the unversioned layout)`);
+  }
 }
 
 /**

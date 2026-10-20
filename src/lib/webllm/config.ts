@@ -5,19 +5,19 @@ export const WEBLLM_CONFIG = {
       id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
       name: "Llama 3.2 1B",
       description: "Fast, lightweight model for quick responses",
-      size: "0.5GB",
+      size: "0.7GB",
     },
     {
       id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
       name: "Llama 3.2 3B",
       description: "Balanced performance and quality",
-      size: "1.7GB",
+      size: "1.8GB",
     },
     {
       id: "Phi-3.5-mini-instruct-q4f16_1-MLC",
       name: "Phi 3.5 Mini",
       description: "Microsoft's efficient small model",
-      size: "2.0GB",
+      size: "2.2GB",
     },
     {
       id: "gemma-2-2b-it-q4f16_1-MLC",
@@ -35,13 +35,13 @@ export const WEBLLM_CONFIG = {
       id: "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC",
       name: "TinyLlama 1.1B",
       description: "Ultra-light model for basic tasks",
-      size: "0.7GB",
+      size: "0.6GB",
     },
     {
       id: "RedPajama-INCITE-Chat-3B-v1-q4f16_1-MLC",
       name: "RedPajama 3B",
       description: "Open-source model with good performance",
-      size: "1.8GB",
+      size: "1.6GB",
     },
   ],
 

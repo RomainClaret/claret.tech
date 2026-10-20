@@ -132,6 +132,22 @@ describe("PerformanceReportGenerator", () => {
     expect(result.current.isGenerating).toBe(false);
   });
 
+  it("sends the page's address without its query or hash", async () => {
+    window.history.replaceState(null, "", "/?token=secret#section");
+    try {
+      await generate({
+        ok: true,
+        json: async () => ({ report: {} }),
+      } as unknown as Response);
+
+      const [, init] = vi.mocked(fetch).mock.calls[0];
+      const sent = JSON.parse(String(init?.body)) as { url: string };
+      expect(sent.url).toBe(`${window.location.origin}/`);
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("names the status when the answer is not the API's", async () => {
     // A platform's own error page, not JSON.
     const result = await generate(failed(502, "<html>Bad gateway</html>"));

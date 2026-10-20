@@ -62,7 +62,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const IMAGE = "https://images.unsplash.com/photo-kudos.jpg";
+// A picture of the site's own, as the Kudos story's is.
+const IMAGE = "/images/kudos_gecco_2024.webp";
 
 describe("BlogCardHolographic color", () => {
   it("extracts from the image only once the card is within reach", () => {
@@ -101,6 +102,45 @@ describe("BlogCardHolographic color", () => {
 
     expect(extraction.sources.every((source) => source === "")).toBe(true);
     expect(observers).toHaveLength(0);
+  });
+});
+
+describe("BlogCardHolographic picture", () => {
+  const ROUTE = "/api/blog-image/0123456789abcdef";
+  const renderPost = () =>
+    render(
+      <BlogCardHolographic
+        title="Medium article"
+        description="An article"
+        url="https://example.com/medium"
+        date="2026-01-01"
+        image={ROUTE}
+        index={0}
+        color="12, 34, 56"
+      />,
+    );
+
+  it("loads a post's picture from the site's route, at the two widths it draws", () => {
+    renderPost();
+
+    const picture = screen.getByRole("img", { name: "Medium article" });
+    expect(picture).toHaveAttribute("src", `${ROUTE}?w=480`);
+    expect(picture).toHaveAttribute(
+      "srcset",
+      `${ROUTE}?w=480 480w, ${ROUTE}?w=960 960w`,
+    );
+    expect(picture).toHaveAttribute("loading", "lazy");
+  });
+
+  it("keeps its colored backdrop when the picture fails", () => {
+    const { container } = renderPost();
+
+    fireEvent.error(screen.getByRole("img", { name: "Medium article" }));
+
+    expect(screen.queryByRole("img", { name: "Medium article" })).toBeNull();
+    expect(
+      container.querySelector('[style*="linear-gradient(135deg"]'),
+    ).not.toBeNull();
   });
 });
 

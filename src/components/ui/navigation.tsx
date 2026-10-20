@@ -298,9 +298,11 @@ export function Navigation() {
                             <div
                               className={cn(
                                 "p-1.5 rounded-lg transition-all duration-200",
-                                "bg-linear-to-br from-card/50 to-card/30",
+                                "bg-linear-to-br",
+                                isActive
+                                  ? "from-primary/30 to-primary/20"
+                                  : "from-card/50 to-card/30",
                                 "group-hover:scale-110 group-hover:from-primary/20 group-hover:to-primary/10",
-                                isActive && "from-primary/30 to-primary/20",
                               )}
                             >
                               <Icon

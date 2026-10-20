@@ -25,8 +25,10 @@ import {
   Scaling,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
+import type { researchDetails as ResearchDetailsData } from "@/data/sections/research-details";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
+import { whenIdle } from "@/lib/utils/when-idle";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { m, AnimatePresence } from "framer-motion";
@@ -45,8 +47,30 @@ import { accentStyle } from "@/components/ui/accent-text";
 // open the card next to the one a link names.
 const visibleProjects = researchSection.projects.filter(isDisplayed);
 
+type ResearchDetails = typeof ResearchDetailsData;
+
+/**
+ * The section's long texts (research-details.ts), out of the page's first
+ * JavaScript: none is in the HTML, as a card shows its short text until it
+ * is opened. Fetched once the browser is idle after load, and again when
+ * something opens while they are missing; meanwhile, the short text.
+ */
+function useResearchDetails(): [ResearchDetails | null, () => void] {
+  const [details, setDetails] = useState<ResearchDetails | null>(null);
+  const load = useCallback(() => {
+    import("@/data/sections/research-details").then(
+      (mod) => setDetails(mod.researchDetails),
+      () => {},
+    );
+  }, []);
+  useEffect(() => whenIdle(load), [load]);
+  return [details, load];
+}
+
 interface ResearchCardProps {
   project: (typeof researchSection.projects)[0];
+  /** The full description, once research-details.ts has arrived. */
+  description?: string;
   index: number;
   isActive: boolean;
   onToggle: () => void;
@@ -119,6 +143,7 @@ const iconMap = {
 
 function ResearchCard({
   project,
+  description,
   index: _index,
   isActive,
   onToggle,
@@ -164,11 +189,7 @@ function ResearchCard({
           isHighlighted && "deep-link-highlight",
         )}
       >
-        <HolographicCard
-          glowColor={nodeColor}
-          className="h-full"
-          forceHover={isDeepLinked}
-        >
+        <HolographicCard glowColor={nodeColor} forceHover={isDeepLinked}>
           <div className="p-4 sm:p-6">
             {/* Header */}
             <div className="flex items-start gap-3 mb-4">
@@ -237,7 +258,7 @@ function ResearchCard({
                   <div className="pt-4 border-t border-border mt-4">
                     {/* Full Description */}
                     <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                      {project.description}
+                      {description ?? project.shortDescription}
                     </p>
 
                     {/* Highlights Section */}
@@ -411,6 +432,13 @@ export function Research() {
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
   const [isPhdExpanded, setIsPhdExpanded] = useState(false);
+  const [details, loadDetails] = useResearchDetails();
+  // Something opened before the long texts came (or their chunk failed):
+  // ask again.
+  const opened = isJourneyExpanded || isPhdExpanded || activeIndex > 0;
+  useEffect(() => {
+    if (opened && !details) loadDetails();
+  }, [opened, details, loadDetails]);
   const {
     isOpen,
     pdfUrl,
@@ -493,7 +521,7 @@ export function Research() {
         </div>
 
         {/* Research Journey - Expandable Description */}
-        {researchSection.journeyDescription && (
+        {researchSection.journeyShortDescription && (
           <SlideInUp className="mb-8 sm:mb-12">
             <m.div
               className="relative max-w-4xl mx-auto"
@@ -563,7 +591,8 @@ export function Research() {
                   >
                     <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl mx-auto">
                       {isJourneyExpanded
-                        ? researchSection.journeyDescription
+                        ? (details?.journeyDescription ??
+                          researchSection.journeyShortDescription)
                         : researchSection.journeyShortDescription}
                     </p>
                   </m.div>
@@ -763,7 +792,8 @@ export function Research() {
                   >
                     <p className="text-sm sm:text-base text-muted-foreground">
                       {isPhdExpanded
-                        ? visibleProjects[0].description
+                        ? (details?.descriptions[visibleProjects[0].title] ??
+                          visibleProjects[0].shortDescription)
                         : visibleProjects[0].shortDescription}
                     </p>
                   </m.div>
@@ -999,6 +1029,7 @@ export function Research() {
               <SlideInUp key={index + 1}>
                 <ResearchCard
                   project={project}
+                  description={details?.descriptions[project.title]}
                   index={index + 1}
                   isActive={activeIndex === index + 1}
                   onToggle={() =>

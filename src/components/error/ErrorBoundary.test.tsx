@@ -8,11 +8,19 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import React, { useEffect } from "react";
+import { reportClientError } from "@/lib/client-error/report";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 // Mock the external dependencies
 vi.mock("@/lib/utils/error-logger", () => ({
   logError: vi.fn(),
+}));
+
+vi.mock("@/lib/utils/reload-page", () => ({ reloadPage: vi.fn() }));
+
+// Production-mode tests below would otherwise post to /api/client-error.
+vi.mock("@/lib/client-error/report", () => ({
+  reportClientError: vi.fn(() => Promise.resolve(false)),
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -27,7 +35,10 @@ vi.mock("@/components/ui/button", () => ({
   }) => (
     <button
       onClick={onClick}
-      data-testid="error-boundary-button"
+      // "Try Again" keeps the id the tests below know it by.
+      data-testid={
+        children === "Reload Page" ? "reload-button" : "error-boundary-button"
+      }
       data-variant={variant}
     >
       {children}
@@ -153,6 +164,61 @@ describe("ErrorBoundary", () => {
       expect(
         screen.getByText("Oops! Something went wrong"),
       ).toBeInTheDocument();
+    });
+
+    it("offers a reload, for errors a deploy causes", async () => {
+      // A ChunkLoadError after a deploy: Try Again renders the same stale
+      // code again; only the server's current code recovers.
+      const { reloadPage } = await import("@/lib/utils/reload-page");
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent />
+        </ErrorBoundary>,
+      );
+
+      fireEvent.click(screen.getByTestId("reload-button"));
+
+      expect(reloadPage).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports the error it catches", () => {
+      // The layout's own parts (navigation, terminal, research map) fail
+      // here, outside error.tsx: without this, their errors went unreported.
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent message="Reported error" />
+        </ErrorBoundary>,
+      );
+
+      expect(reportClientError).toHaveBeenCalledTimes(1);
+      expect(
+        (vi.mocked(reportClientError).mock.calls[0][0] as Error).message,
+      ).toBe("Reported error");
+    });
+
+    it("says a report was sent only once it is on record", async () => {
+      vi.mocked(reportClientError).mockResolvedValueOnce(true);
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent />
+        </ErrorBoundary>,
+      );
+
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(
+        await screen.findByText("A report of it was sent."),
+      ).toHaveAttribute("role", "status");
+    });
+
+    it("says nothing of a report when none was filed", async () => {
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent />
+        </ErrorBoundary>,
+      );
+
+      await act(async () => {});
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
     it("captures different types of errors", () => {
@@ -381,7 +447,7 @@ describe("ErrorBoundary", () => {
       class TestBoundary extends ErrorBoundary {
         constructor(props: any) {
           super(props);
-          this.state = { hasError: true, error: null };
+          this.state = { hasError: true, error: null, reported: false };
         }
       }
 

@@ -2,6 +2,10 @@
 import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
 
+// A backstop for the feed fetch's 10 s timeout, which Next drops when it
+// refreshes the stale cached feed in the background.
+export const maxDuration = 30;
+
 /**
  * Escape text for an XML element or attribute.
  *

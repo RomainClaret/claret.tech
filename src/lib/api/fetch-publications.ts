@@ -20,8 +20,27 @@ const AUTHOR_NAME_FIXES: Record<string, string> = authorNameFixes;
  * entry, and public/publications.json is a third copy on top of that.
  *
  * Same arrangement as author-name-fixes.json above, and for the same reason.
+ *
+ * Without their abstracts: those are in publication-abstracts.json, by id,
+ * out of the homepage's first JavaScript (no card shows one until expanded,
+ * and /api/publications brings them all on mount). withAbstracts adds them.
  */
 export const STATIC_PUBLICATIONS = staticPublications as Publication[];
+
+/** The publications with their abstracts, from their own file and chunk. */
+export async function withAbstracts(
+  publications: Publication[],
+): Promise<Publication[]> {
+  const { default: abstracts } =
+    (await import("./publication-abstracts.json")) as {
+      default: Record<string, string>;
+    };
+  return publications.map((publication) =>
+    !publication.abstract && abstracts[publication.id]
+      ? { ...publication, abstract: abstracts[publication.id] }
+      : publication,
+  );
+}
 
 /**
  * What an arXiv copy is. The one list the type, the card labels and the data
@@ -133,6 +152,7 @@ async function rateLimitedFetch(
     headers: {
       "User-Agent": "claret.tech-portfolio/1.0 (https://claret.tech)",
     },
+    signal: AbortSignal.timeout(10_000),
   });
 
   // Respect rate limits
@@ -287,7 +307,7 @@ export async function fetchAllPublications(config: {
   const seenTitles = new Set<string>();
 
   // Add static publications first
-  for (const pub of STATIC_PUBLICATIONS) {
+  for (const pub of await withAbstracts(STATIC_PUBLICATIONS)) {
     allPublications.push(pub);
     seenTitles.add(pub.title.toLowerCase());
   }

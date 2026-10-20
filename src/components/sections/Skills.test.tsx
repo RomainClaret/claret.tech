@@ -130,7 +130,11 @@ vi.mock("@/data/portfolio", () => ({
           "Developing novel evolutionary computation methods for AI optimization.",
         expandedDescription:
           "Developing novel evolutionary computation methods for AI optimization. This includes genetic algorithms, evolution strategies, and neuroevolution techniques applied to complex problem domains including robotics and artificial life.",
-        technologies: ["Python", "JAX", "Neuroevolution"],
+        technologies: [
+          { name: "Python", icon: "fas fa-code" },
+          { name: "JAX", icon: "fas fa-bolt" },
+          { name: "Neuroevolution", icon: "fas fa-dna" },
+        ],
       },
       {
         icon: "🤖",
@@ -139,7 +143,11 @@ vi.mock("@/data/portfolio", () => ({
           "Creating intelligent systems using deep learning and reinforcement learning.",
         expandedDescription:
           "Creating intelligent systems using deep learning and reinforcement learning. Focus on multi-agent systems, embodied AI, and lifelong learning approaches for continuous adaptation.",
-        technologies: ["PyTorch", "Reinforcement Learning", "Deep Learning"],
+        technologies: [
+          { name: "PyTorch", icon: "fas fa-sliders" },
+          { name: "Reinforcement Learning", icon: "fas fa-network-wired" },
+          { name: "Deep Learning", icon: "fas fa-brain" },
+        ],
       },
       {
         icon: "🔬",
@@ -148,7 +156,11 @@ vi.mock("@/data/portfolio", () => ({
           "Conducting cutting-edge research and educating the next generation.",
         expandedDescription:
           "Conducting cutting-edge research in artificial life and educating the next generation of AI researchers through mentoring and open-source contributions.",
-        technologies: ["Research", "Teaching", "Open-source"],
+        technologies: [
+          { name: "Research", icon: "fas fa-puzzle-piece" },
+          { name: "Teaching", icon: "fas fa-seedling" },
+          { name: "Open-source", icon: "fas fa-sparkles" },
+        ],
       },
     ],
     researchPhilosophySection: {
@@ -601,45 +613,26 @@ describe("Skills Component", () => {
   });
 
   describe("Technology Icons", () => {
-    it("renders tech icons with correct mappings", () => {
+    it("draws each technology with the icon its data names", () => {
+      // The component kept its own map from names to icons, which matched
+      // none of the real technologies after their renaming, while this test
+      // passed on the old names it mocked. The icon now comes with each
+      // technology (tech-icons.test.ts holds the real data to the map).
       render(<Skills />);
 
-      // Check for various tech icon mappings
-      expect(screen.getByTestId("tech-icon-fab fa-python")).toBeInTheDocument();
-      expect(screen.getByTestId("tech-icon-fas fa-zap")).toBeInTheDocument(); // JAX
-      expect(screen.getByTestId("tech-icon-fas fa-fire")).toBeInTheDocument(); // PyTorch
-    });
-
-    it("falls back to default icon for unmapped technologies", async () => {
-      // Test with unmapped technology
-      vi.resetModules();
-      vi.doMock("@/data/portfolio", () => ({
-        skillsSection: {
-          display: true,
-          title: "Skills & Expertise",
-          subtitle: {
-            highlightedText: "Core competencies",
-            normalText: " in artificial intelligence",
-          },
-          coreExpertiseSection: { title: "Core Activities" },
-          coreActivities: [
-            {
-              icon: "🧬",
-              title: "Test Activity",
-              description: "Test description",
-              expandedDescription: "Expanded description",
-              technologies: ["UnknownTech"],
-            },
-          ],
-          researchPhilosophySection: { title: "Research", subtitle: "Test" },
-          researchInterests: {},
-        },
-      }));
-
-      const { Skills: TestSkills } = await import("./Skills");
-      render(<TestSkills />);
-
-      expect(screen.getByTestId("tech-icon-fas fa-code")).toBeInTheDocument();
+      for (const icon of [
+        "fas fa-code",
+        "fas fa-bolt",
+        "fas fa-dna",
+        "fas fa-sliders",
+        "fas fa-network-wired",
+        "fas fa-brain",
+        "fas fa-puzzle-piece",
+        "fas fa-seedling",
+        "fas fa-sparkles",
+      ]) {
+        expect(screen.getByTestId(`tech-icon-${icon}`)).toBeInTheDocument();
+      }
     });
   });
 

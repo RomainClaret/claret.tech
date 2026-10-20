@@ -71,6 +71,17 @@ so this workflow is the only way to production.
 Manual dispatch only. Runs `scripts/fetch-publications.js` and opens a pull
 request with the changes (`docs/publications.md`).
 
+### 6. Client Error Reports (`client-error-notify.yml`)
+
+Runs when an issue is opened or reopened. The error pages file reports as
+issues labeled `client-error`, with the owner's token
+(`src/app/api/client-error/route.ts`), and GitHub notifies nobody of their
+own activity. For the owner's own `client-error` issues only, this workflow,
+acting as github-actions with `issues: write`, assigns a new report to the
+owner and mentions the owner when one is reopened (its bug is back on the
+build serving now), so the owner is notified. It runs `gh` only, and nothing
+from an issue's text reaches the shell.
+
 ## Setup Instructions
 
 ### 1. Vercel Setup

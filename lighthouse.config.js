@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Lighthouse settings for tests/e2e/lighthouse.spec.ts, which holds the
  * thresholds. Only settings Lighthouse reads: it removed `budgets` in

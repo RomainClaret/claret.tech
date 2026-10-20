@@ -193,3 +193,38 @@ html[data-quality="low"] .grid-pulse {
   opacity: calc(0.8 - 0.8 * var(--grid-burst, 1));
   animation: grid-burst 300ms linear 1;
 }
+
+/*
+ * Two animations components injected with styled-jsx, which does not scope
+ * keyframe names: its `holographic` replaced globals.css's once a card
+ * hydrated, and its `scale-in` sat beside @utility animate-scale-in. Kept as
+ * they ran, under names of their own, with styled-jsx out of the page's
+ * JavaScript.
+ */
+
+/* The tech badges' and stats cards' sweep (Skills.tsx, holographic-stats-card.tsx). */
+@keyframes holographic-sweep {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+/*
+ * The progress ring's check badge. Scale only: its opacity was pinned to 1
+ * by animate-scale-in's !important. Reduced motion stills it (globals.css).
+ */
+@keyframes check-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.animate-check-pop {
+  animation: check-pop 0.3s ease-out forwards;
+}

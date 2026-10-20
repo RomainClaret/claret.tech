@@ -96,7 +96,7 @@ export function HolographicStatsCard({
               rgba(255, 0, 0, 0.1) 100%
             )`,
             backgroundSize: "200% 200%",
-            animation: "holographic 4s linear infinite",
+            animation: "holographic-sweep 4s linear infinite",
           }}
         />
 

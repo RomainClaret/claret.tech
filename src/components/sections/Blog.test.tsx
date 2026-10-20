@@ -99,10 +99,6 @@ vi.mock("@/lib/hooks/useColorExtraction", () => ({
     error: null,
   }),
 }));
-vi.mock("@/lib/utils/extract-medium-image", () => ({
-  extractMediumImage: () => undefined,
-  extractMediumThumbnail: () => undefined,
-}));
 vi.mock("@/lib/utils/dev-logger", () => ({
   logError: vi.fn(),
 }));

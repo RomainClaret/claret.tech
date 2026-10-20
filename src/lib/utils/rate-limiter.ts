@@ -70,14 +70,26 @@ function getClientId(request: NextRequest): string {
   return clientId;
 }
 
+/** A route's own limit: its requests count in a bucket of their own. */
+export interface RouteLimit {
+  /** Names the bucket; the default limit's routes share one. */
+  name: string;
+  /** Requests a client may make in the window. */
+  maxRequests: number;
+}
+
 /**
  * Rate limiting middleware for API routes
  */
 export async function rateLimit(
   request: NextRequest,
   handler: () => Promise<NextResponse>,
+  limit?: RouteLimit,
 ): Promise<NextResponse> {
-  const clientId = getClientId(request);
+  const clientId = limit
+    ? `${limit.name}:${getClientId(request)}`
+    : getClientId(request);
+  const maxRequests = limit?.maxRequests ?? RATE_LIMIT_CONFIG.maxRequests;
   const now = Date.now();
   const resetTime = now + RATE_LIMIT_CONFIG.windowMs;
 
@@ -97,11 +109,11 @@ export async function rateLimit(
   }
 
   // Calculate rate limit headers
-  const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequests - entry.count);
+  const remaining = Math.max(0, maxRequests - entry.count);
   const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
 
   // Check if rate limit exceeded
-  if (entry.count > RATE_LIMIT_CONFIG.maxRequests) {
+  if (entry.count > maxRequests) {
     devLog(`Rate limit exceeded for client: ${clientId}`);
 
     return NextResponse.json(
@@ -113,7 +125,7 @@ export async function rateLimit(
         status: 429,
         headers: {
           "Retry-After": retryAfter.toString(),
-          "X-RateLimit-Limit": RATE_LIMIT_CONFIG.maxRequests.toString(),
+          "X-RateLimit-Limit": maxRequests.toString(),
           "X-RateLimit-Remaining": "0",
           "X-RateLimit-Reset": new Date(entry.resetTime).toISOString(),
         },
@@ -127,10 +139,7 @@ export async function rateLimit(
   // Add rate limit headers to successful responses (skip in test environment)
   if (RATE_LIMIT_CONFIG.standardHeaders) {
     try {
-      response.headers?.set?.(
-        "X-RateLimit-Limit",
-        RATE_LIMIT_CONFIG.maxRequests.toString(),
-      );
+      response.headers?.set?.("X-RateLimit-Limit", maxRequests.toString());
       response.headers?.set?.("X-RateLimit-Remaining", remaining.toString());
       response.headers?.set?.(
         "X-RateLimit-Reset",
@@ -149,9 +158,10 @@ export async function rateLimit(
  */
 export function withRateLimit(
   handler: (request: NextRequest) => Promise<NextResponse>,
+  limit?: RouteLimit,
 ) {
   return async (request: NextRequest) => {
-    return rateLimit(request, () => handler(request));
+    return rateLimit(request, () => handler(request), limit);
   };
 }
 

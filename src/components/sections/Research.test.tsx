@@ -5,9 +5,12 @@ import {
   fireEvent,
   waitFor,
   act,
+  cleanup,
+  within,
 } from "@testing-library/react";
 import { Research } from "./Research";
 import { isDisplayed, researchSection } from "@/data/sections/research";
+import { researchDetails } from "@/data/sections/research-details";
 import * as scrollModule from "@/lib/utils/scroll-to-section";
 
 /**
@@ -250,6 +253,104 @@ describe("Research", () => {
         expect(toggle).toHaveTextContent("Show less");
         expect(toggle).toHaveAttribute("aria-expanded", "true");
       }
+    });
+  });
+
+  describe("Long texts", () => {
+    // research-details.ts, out of the page's first JavaScript: fetched when
+    // the browser is idle after load, or when something opens first.
+    afterEach(() => {
+      // Unmount first: the component cancels its idle callback as it goes.
+      cleanup();
+      vi.unstubAllGlobals();
+    });
+
+    it("has every project's full description, and the journey's", () => {
+      expect(Object.keys(researchDetails.descriptions).sort()).toEqual(
+        researchSection.projects.map((project) => project.title).sort(),
+      );
+      expect(researchDetails.journeyDescription.length).toBeGreaterThan(
+        researchSection.journeyShortDescription.length,
+      );
+    });
+
+    // Not idle yet: nothing has asked for them, so only an opening does.
+    function renderBeforeIdle() {
+      vi.stubGlobal("requestIdleCallback", () => 1);
+      vi.stubGlobal("cancelIdleCallback", () => {});
+      render(<Research />);
+    }
+    const [featured, firstInGrid] =
+      researchSection.projects.filter(isDisplayed);
+
+    it("fetches them when the browser is idle, before anything opens", async () => {
+      let idle = () => {};
+      vi.stubGlobal("requestIdleCallback", (callback: () => void) => {
+        idle = callback;
+        return 1;
+      });
+      vi.stubGlobal("cancelIdleCallback", () => {});
+      render(<Research />);
+
+      await act(async () => {
+        idle();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read full description" }),
+      );
+
+      // Already there: no short text in between.
+      expect(
+        screen.getByText(researchDetails.descriptions[featured.title]),
+      ).toBeInTheDocument();
+    });
+
+    it("opens the PhD on its short text, then shows the full one", async () => {
+      renderBeforeIdle();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read full description" }),
+      );
+
+      expect(screen.getByText(featured.shortDescription!)).toBeInTheDocument();
+      expect(
+        await screen.findByText(researchDetails.descriptions[featured.title]),
+      ).toBeInTheDocument();
+    });
+
+    it("opens the story on its short text, then shows the full one", async () => {
+      renderBeforeIdle();
+
+      fireEvent.click(screen.getByRole("button", { name: "Read full story" }));
+
+      expect(
+        screen.getByText(researchSection.journeyShortDescription),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText(researchDetails.journeyDescription),
+      ).toBeInTheDocument();
+    });
+
+    it("opens a grid card on its short text, then shows the full one", async () => {
+      renderBeforeIdle();
+      const [toggle] = screen.getAllByRole("button", {
+        name: "Click to expand",
+      });
+
+      fireEvent.click(toggle);
+
+      const opened = within(
+        document.getElementById(toggle.getAttribute("aria-controls")!)!,
+      );
+      expect(
+        opened.getByText(firstInGrid.shortDescription!),
+      ).toBeInTheDocument();
+      expect(
+        await opened.findByText(
+          researchDetails.descriptions[firstInGrid.title],
+        ),
+      ).toBeInTheDocument();
     });
   });
 

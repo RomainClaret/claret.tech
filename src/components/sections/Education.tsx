@@ -74,7 +74,6 @@ function EducationCard({
         insideBackgroundColor={extractedColor
           .replace("rgb(", "")
           .replace(")", "")}
-        className="h-full"
       >
         <div className="p-4 sm:p-6 lg:p-8">
           {/* Header with logo and progress */}

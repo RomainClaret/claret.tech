@@ -75,7 +75,7 @@ export function probeDevice(): DeviceProbe {
     return { weak: true, reason: "software-webgl", renderer: null };
   }
 
-  let renderer: string | null = null;
+  let renderer: string | null;
   try {
     const info = hardware.getExtension("WEBGL_debug_renderer_info");
     renderer = String(

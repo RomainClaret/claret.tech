@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { Papers } from "./Papers";
+import abstracts from "@/lib/api/publication-abstracts.json";
 import { papersSection } from "@/data/portfolio";
 import {
   STATIC_PUBLICATIONS,
@@ -822,6 +823,41 @@ describe("Papers", () => {
       }
     });
 
+    it("shows a card's short description, not 'No abstract', until its abstract comes", async () => {
+      // The page's own copy of the publications has no abstracts: they come
+      // with /api/publications, here still on its way.
+      global.fetch = vi.fn(() => new Promise<Response>(() => {}));
+      const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
+      render(<Papers />);
+
+      fireEvent.click(
+        within(cardOf(paper.title)).getByRole("button", { name: "Read more" }),
+      );
+
+      expect(
+        within(cardOf(paper.title)).getByText(paper.shortDescription!),
+      ).toBeInTheDocument();
+      expect(
+        within(cardOf(paper.title)).queryByText("No abstract available"),
+      ).toBeNull();
+    });
+
+    it("brings the abstracts from their own file when the API fails", async () => {
+      global.fetch = vi.fn(() => Promise.reject(new Error("offline")));
+      const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
+      render(<Papers />);
+
+      fireEvent.click(
+        within(cardOf(paper.title)).getByRole("button", { name: "Read more" }),
+      );
+
+      expect(
+        await within(cardOf(paper.title)).findByText(
+          (abstracts as Record<string, string>)[paper.id],
+        ),
+      ).toBeInTheDocument();
+    });
+
     it("expands paper cards to show full content", async () => {
       render(<Papers />);
 
@@ -1527,9 +1563,14 @@ describe("Papers", () => {
     it("uses semantic HTML for paper cards", () => {
       render(<Papers />);
 
-      // Should use article elements for paper cards
-      const articles = document.querySelectorAll("article");
-      expect(articles.length).toBeGreaterThanOrEqual(0);
+      // A card's title is a heading under the section's. The test counted
+      // <article> elements as `>= 0`, which no markup fails (there are none).
+      expect(
+        screen.getByRole("heading", {
+          level: 3,
+          name: "Blockchain, a techie overview",
+        }),
+      ).toBeInTheDocument();
     });
 
     it("provides alt text for paper images", () => {

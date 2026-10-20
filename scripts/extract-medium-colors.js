@@ -101,13 +101,6 @@ async function fetchMediumPosts() {
   return data.items;
 }
 
-async function extractColorFromImage(imageUrl) {
-  // For now, we'll return a default color
-  // In a real implementation, you would download the image and extract colors
-  // This would require additional dependencies like sharp and color-thief-node
-  return null;
-}
-
 function getCategoryFromPost(post) {
   const categories = post.categories || [];
   const content = (post.content || "").toLowerCase();
@@ -147,7 +140,7 @@ async function extractMediumColors(outputFile = OUTPUT_FILE) {
         console.log("✓ Using cached Medium colors (less than 24 hours old)");
         return;
       }
-    } catch (error) {
+    } catch {
       // File doesn't exist, continue with extraction
     }
 
@@ -159,46 +152,19 @@ async function extractMediumColors(outputFile = OUTPUT_FILE) {
     for (const post of posts) {
       const imageUrl = extractMediumThumbnail(post);
       const postId = post.guid || post.link;
+      // The post's category picks its color: taking one from the thumbnail
+      // was never written (a stub returned null for every image).
+      const category = getCategoryFromPost(post);
+      colorMap[postId] = {
+        color: BLOG_COLORS[category] || BLOG_COLORS.default,
+        image: imageUrl || null,
+        title: post.title,
+        category,
+      };
 
-      if (imageUrl) {
-        // Try to extract color from image
-        const extractedColor = await extractColorFromImage(imageUrl);
-
-        if (extractedColor) {
-          colorMap[postId] = {
-            color: extractedColor,
-            image: imageUrl,
-            title: post.title,
-            category: getCategoryFromPost(post),
-          };
-        } else {
-          // Use category-based color as fallback
-          const category = getCategoryFromPost(post);
-          colorMap[postId] = {
-            color: BLOG_COLORS[category] || BLOG_COLORS.default,
-            image: imageUrl,
-            title: post.title,
-            category: category,
-          };
-        }
-
-        console.log(
-          `  ✓ ${post.title.substring(0, 50)}... -> ${colorMap[postId].color}`,
-        );
-      } else {
-        // No image, use category color
-        const category = getCategoryFromPost(post);
-        colorMap[postId] = {
-          color: BLOG_COLORS[category] || BLOG_COLORS.default,
-          image: null,
-          title: post.title,
-          category: category,
-        };
-
-        console.log(
-          `  ✓ ${post.title.substring(0, 50)}... -> ${colorMap[postId].color} (no image)`,
-        );
-      }
+      console.log(
+        `  ✓ ${post.title.substring(0, 50)}... -> ${colorMap[postId].color}${imageUrl ? "" : " (no image)"}`,
+      );
     }
 
     // Save to file

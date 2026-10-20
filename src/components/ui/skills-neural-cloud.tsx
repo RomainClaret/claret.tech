@@ -34,7 +34,6 @@ import {
   Hand,
   Handshake,
   Heart,
-  Hourglass,
   Infinity as InfinityIcon,
   Layers,
   Leaf,
@@ -139,7 +138,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Brain,
   Bug,
   Clock,
-  Code2,
   Cog,
   Coins,
   Compass,
@@ -154,7 +152,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Hand,
   Handshake,
   Heart,
-  Hourglass,
   Infinity: InfinityIcon,
   Layers,
   Leaf,
@@ -609,8 +606,8 @@ export function SkillsNeuralCloud({
               const iconSize = 18;
               const padding = 8;
 
-              let badgeWidth: number = 24; // Default width
-              let badgeHeight: number = 20; // Ensure it's always a number
+              let badgeWidth: number;
+              let badgeHeight: number;
               let isCircular = false;
 
               if (node.type === "icon") {

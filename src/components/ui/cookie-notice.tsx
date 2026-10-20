@@ -85,7 +85,7 @@ export default function CookieNotice() {
     <div
       ref={noticeRef}
       role="region"
-      aria-label="Cookies on claret.tech"
+      aria-label="Privacy notice"
       data-nosnippet=""
       className="fixed bottom-0 left-0 right-0 z-50 px-4 md:px-16 py-4 bg-gray-900/95 backdrop-blur-xs border-t border-gray-800 shadow-lg animate-slide-up"
     >
@@ -94,12 +94,11 @@ export default function CookieNotice() {
           <div className="flex-1 text-center sm:text-left">
             <p className="text-gray-300 text-sm">
               <span className="font-semibold text-white">
-                🧬 Cookie Selection:
+                🧬 Natural Selection:
               </span>{" "}
-              Only the essential survive: theme genes and performance
-              adaptations. We use privacy-focused analytics (Vercel) to
-              understand site performance. No invasive tracking, no third-party
-              advertising. View our{" "}
+              no cookies survived. Your theme and display settings stay in this
+              browser, and Vercel&apos;s cookieless analytics only counts
+              visits. No tracking, no ads. View our{" "}
               <button
                 {...legalTextsIntent}
                 onClick={openPrivacyModal}
@@ -125,7 +124,7 @@ export default function CookieNotice() {
               onClick={handleAccept}
               className="px-6 py-2 bg-primary-purple hover:bg-primary-pink text-white font-medium rounded-lg transition-colors text-sm"
               // Its visible text first (WCAG 2.5.3, label in name).
-              aria-label="Got it! Accept cookie notice"
+              aria-label="Got it! Dismiss privacy notice"
             >
               Got it!
             </button>

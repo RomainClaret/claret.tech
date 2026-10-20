@@ -37,6 +37,10 @@ const focusedNode = (page: Page) =>
   page.evaluate(
     () => (document.activeElement as HTMLElement | null)?.dataset.node ?? null,
   );
+// Phones open the map as a list (research-map-dialog.tsx), which "The
+// research map on a phone" covers. These tests use the drawing.
+const DRAWING = "Phones start in the list; these tests use the drawing";
+
 const terminalHasFocus = (page: Page) =>
   page.evaluate(
     () =>
@@ -45,7 +49,11 @@ const terminalHasFocus = (page: Page) =>
   );
 
 test.describe("The research map", () => {
-  test("opens from the terminal, which steps aside", async ({ page }) => {
+  test("opens from the terminal, which steps aside", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, DRAWING);
     const map = await openMap(page);
 
     // Above every dialog, the terminal would cover the map and take its
@@ -77,7 +85,11 @@ test.describe("The research map", () => {
     await expect.poll(() => terminalHasFocus(page)).toBe(true);
   });
 
-  test("takes the keyboard from Tab to an item's details", async ({ page }) => {
+  test("takes the keyboard from Tab to an item's details", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, DRAWING);
     await openMap(page);
 
     // The map is one Tab stop, on the newest item.
@@ -106,7 +118,9 @@ test.describe("The research map", () => {
 
   test("opens a paper in the reader over the map, and Tab stays in the reader", async ({
     page,
+    isMobile,
   }) => {
+    test.skip(isMobile, DRAWING);
     const map = await openMap(page);
     await item(page, "claret2026emr").click();
 
@@ -129,7 +143,11 @@ test.describe("The research map", () => {
     await expect(map).toBeVisible();
   });
 
-  test("goes to an item's card with Show on page", async ({ page }) => {
+  test("goes to an item's card with Show on page", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, DRAWING);
     const map = await openMap(page);
     await item(page, "claret2026emr").click();
 

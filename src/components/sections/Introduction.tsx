@@ -7,10 +7,11 @@ import { loadPdfModal } from "@/components/ui/pdf-modal-loader";
 import { useIntersectionObserver } from "@/lib/hooks/useIntersectionObserver";
 import { useBackground } from "@/contexts/background-context";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { ConditionalMotion } from "@/components/ui/conditional-motion";
 import { IntroductionContent } from "./IntroductionContent";
-import { IntroductionAnimations } from "./IntroductionAnimations";
-import { InterestConstellation } from "@/components/ui/interest-constellation";
+import { ConstellationShell } from "@/components/ui/interest-constellation-shell";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { greeting } from "@/data/portfolio";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
 import { logError } from "@/lib/utils/dev-logger";
@@ -44,8 +45,50 @@ const PDFModal = dynamic(loadPdfModal, {
   loading: () => null,
 });
 
+// The hero's decorative layers: shooting stars, the neural background and
+// the skills cloud. None is in the page's HTML (they draw once the hero is in
+// view), so their code is a chunk of its own, fetched after hydration. Safari
+// draws none of them, and so fetches none. A chunk that cannot be fetched
+// leaves the hero without them. Declared after the brains and the reader:
+// Introduction.chunk.test.tsx reads the brains' call first.
+const IntroductionAnimations = dynamic(
+  withLoadFallback(
+    () =>
+      import("./IntroductionAnimations").then(
+        (mod) => mod.IntroductionAnimations,
+      ),
+    () => null,
+    { onError: (error) => logError(error, "Hero layers chunk") },
+  ),
+  { ssr: false },
+);
+
+// The interest constellation: the page's HTML has only its frame, the shell,
+// and its orbit draws once measured, from md up, where it shows. Its code
+// comes after hydration on those screens and never on a phone; the shell
+// stands in meanwhile, and if the chunk cannot be fetched.
+const constellationShell = () => (
+  <ConstellationShell className="pointer-events-auto" />
+);
+const InterestConstellation = dynamic(
+  withLoadFallback(
+    () =>
+      import("@/components/ui/interest-constellation").then(
+        (mod) => mod.InterestConstellation,
+      ),
+    constellationShell,
+    { onError: (error) => logError(error, "Constellation chunk") },
+  ),
+  { ssr: false, loading: constellationShell },
+);
+
 export function Introduction() {
   const shouldReduceAnimations = useShouldReduceAnimations();
+  // Both settle in the render after hydration, so Safari never asks for the
+  // layers' chunk: during hydration it reads as not Safari.
+  const isHydrated = useHydrated();
+  // Tailwind's md, where the constellation shows. False while hydrating.
+  const showsConstellation = useMediaQuery("(min-width: 48rem)");
   const {
     isOpen,
     pdfUrl,
@@ -138,10 +181,12 @@ export function Introduction() {
     >
       {/* Background animations - only render when animations are enabled */}
       <ConditionalMotion>
-        <IntroductionAnimations
-          isVisible={isVisible && !shouldReduceAnimations}
-          screenDimensions={screenDimensions}
-        />
+        {isHydrated && !shouldReduceAnimations && (
+          <IntroductionAnimations
+            isVisible={isVisible}
+            screenDimensions={screenDimensions}
+          />
+        )}
       </ConditionalMotion>
 
       {/* Main content */}
@@ -152,7 +197,6 @@ export function Introduction() {
             <IntroductionContent
               onResumeClick={handleResumeClick}
               onContactClick={handleContactClick}
-              className="relative"
             />
           </div>
 
@@ -168,12 +212,16 @@ export function Introduction() {
               {/* Interest Constellation overlay - exactly like original */}
               <div className="hidden md:block absolute inset-0 pointer-events-none z-20">
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <InterestConstellation
-                    interests={greeting.interests}
-                    isVisible={isVisible}
-                    className="pointer-events-auto"
-                    brainNodes={brainNodes}
-                  />
+                  {showsConstellation ? (
+                    <InterestConstellation
+                      interests={greeting.interests}
+                      isVisible={isVisible}
+                      className="pointer-events-auto"
+                      brainNodes={brainNodes}
+                    />
+                  ) : (
+                    constellationShell()
+                  )}
                 </div>
               </div>
             </div>

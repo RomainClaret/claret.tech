@@ -10,6 +10,7 @@ import {
   render,
   screen,
   fireEvent,
+  createEvent,
   waitFor,
   act,
 } from "@testing-library/react";
@@ -459,13 +460,15 @@ describe("Navigation", () => {
       render(<Navigation />);
 
       const homeLink = screen.getAllByText("Home")[0];
-      const mockPreventDefault = vi.fn();
-
+      // fireEvent's init does not take a preventDefault to spy on, so the
+      // mock this passed was never called and never asserted. The event
+      // itself says whether its default was prevented.
+      const click = createEvent.click(homeLink);
       await act(async () => {
-        fireEvent.click(homeLink, { preventDefault: mockPreventDefault });
+        fireEvent(homeLink, click);
       });
 
-      // The component should prevent default and handle scrolling
+      expect(click.defaultPrevented).toBe(true);
       expect(mockScrollTo).toHaveBeenCalled();
     });
   });
@@ -492,30 +495,23 @@ describe("Navigation", () => {
     });
 
     it("updates active section based on scroll position", async () => {
-      // Mock scrollY to simulate scrolling to skills section
-      Object.defineProperty(window, "scrollY", { value: 400, writable: true });
-
       render(<Navigation />);
-
-      // Simulate scroll event
       const scrollHandler = mockAddEventListener.mock.calls.find(
         ([event]) => event === "scroll",
       )?.[1];
+      expect(scrollHandler).toBeTypeOf("function");
 
-      if (scrollHandler && typeof scrollHandler === "function") {
-        act(() => {
-          scrollHandler(new Event("scroll"));
-        });
-      }
-
-      // Home should be active initially after scroll simulation
-      await waitFor(() => {
-        const homeLinks = screen.getAllByText("Home");
-
-        // Check if home link has the active styling (this tests the component logic)
-        // Initially home is active, but after scroll skills should become active
-        expect(homeLinks[0].closest("a")).toHaveClass("text-primary");
+      // Skills sits at 500 (the stub above) and the nav's 64 px count, so
+      // 600 is past it. At 400 the old version still had Home active, as it
+      // is from the start, so a handler that did nothing passed.
+      Object.defineProperty(window, "scrollY", { value: 600, writable: true });
+      act(() => {
+        (scrollHandler as (event: Event) => void)(new Event("scroll"));
       });
+
+      const link = (name: string) => screen.getAllByText(name)[0].closest("a");
+      await waitFor(() => expect(link("Skills")).toHaveClass("text-primary"));
+      expect(link("Home")).not.toHaveClass("text-primary");
     });
 
     it("applies background styling when scrolled", async () => {

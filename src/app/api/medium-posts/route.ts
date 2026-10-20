@@ -8,6 +8,12 @@ import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
 import { mediumUsername } from "@/lib/utils/medium-username";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
+import { blogImagePath } from "@/lib/blog-images/sources";
+
+// A backstop for the fetches' own 10 s timeouts (the feed, then each
+// article page, then its image): Next drops a fetch's signal when it
+// refreshes a stale cached response in the background.
+export const maxDuration = 60;
 
 interface MediumPost {
   title: string;
@@ -18,7 +24,9 @@ interface MediumPost {
   author: string;
   guid: string;
   categories: string[];
-  enrichedImage?: string;
+  description?: string;
+  /** The picture, through /api/blog-image: never a Medium URL to load. */
+  image?: string | null;
   // null when the article's page gave no colour (fetchMediumArticle)
   enrichedColor?: string | null;
 }
@@ -52,25 +60,26 @@ async function handler(request: NextRequest) {
           {
             title: "Test Article 1",
             link: "https://medium.com/@romainclaret/test-article-1",
-            thumbnail: "https://via.placeholder.com/400x200",
+            thumbnail: "",
             content: "<p>This is a test article for automated testing.</p>",
             pubDate: new Date().toISOString(),
             author: "Romain Claret",
             guid: "test-1",
             categories: ["Testing", "Development"],
-            enrichedImage: "https://via.placeholder.com/400x200",
+            // The site's own pictures: a test contacts no other host.
+            image: "/images/paper_geenns_2024.webp",
             enrichedColor: "#007ACC",
           },
           {
             title: "Test Article 2",
             link: "https://medium.com/@romainclaret/test-article-2",
-            thumbnail: "https://via.placeholder.com/400x200",
+            thumbnail: "",
             content: "<p>Another test article for automated testing.</p>",
             pubDate: new Date(Date.now() - 86400000).toISOString(),
             author: "Romain Claret",
             guid: "test-2",
             categories: ["Testing", "Automation"],
-            enrichedImage: "https://via.placeholder.com/400x200",
+            image: "/images/jax_es_hyperneat.webp",
             enrichedColor: "#28A745",
           },
         ],
@@ -104,22 +113,19 @@ async function handler(request: NextRequest) {
       cachedColors?: unknown;
     }>(username);
 
-    // Enrich posts with scraped images and colors
+    // Each post's picture comes from the feed, through the site's own
+    // route, which serves only what the feed names (src/lib/blog-images);
+    // its color from the article page.
     if (data.items && Array.isArray(data.items)) {
       const enrichedItems = await Promise.all(
         data.items.map(async (post: MediumPost) => {
+          const image = blogImagePath(post);
           try {
-            // Fetch better image and color from Medium article page
-            const { image, color } = await fetchMediumArticle(post.link);
-
-            return {
-              ...post,
-              enrichedImage: image || post.thumbnail,
-              enrichedColor: color,
-            };
+            const { color } = await fetchMediumArticle(post.link);
+            return { ...post, image, enrichedColor: color };
           } catch (error) {
             logError(error, `Error enriching post ${post.link}`);
-            return post;
+            return { ...post, image };
           }
         }),
       );

@@ -32,11 +32,20 @@
  * outright instead of gating it: nothing needs the network afterward.
  */
 
-import { loadPyodide } from "/pyodide/pyodide.mjs";
-
 // Pin the channel before any Python runs. Python that reaches a JS handle can
 // reassign self.postMessage; it cannot reach this binding.
 const post = self.postMessage.bind(self);
+
+// The runtime's folder. It is cached as immutable for a year, so each
+// version has a folder of its own: from one unversioned folder, a returning
+// visitor kept the old runtime after an update, or got a mix of two. The
+// worker names its version itself, because it ships in the same deployment
+// as the folder and is never cached (next.config.mjs): a tab opened before
+// a deploy starts it at whatever URL its old bundle knew, and gets this
+// one. When the version named it in its URL instead, those tabs could not
+// start Python. worker-contract.test.ts holds this to config.ts.
+const PYODIDE_VERSION = "314.0.7";
+const PYODIDE_URL = `/pyodide/${PYODIDE_VERSION}/`;
 
 // --- constants (mirrored from src/lib/python/config.ts) ---------------------
 
@@ -511,8 +520,9 @@ const missingPackages = [];
 async function boot(packages) {
   post({ t: "boot", phase: "downloading" });
 
+  const { loadPyodide } = await import(`${PYODIDE_URL}pyodide.mjs`);
   pyodide = await loadPyodide({
-    indexURL: "/pyodide/",
+    indexURL: PYODIDE_URL,
     stdout: (text) => emit("out", text + "\n"),
     stderr: (text) => emit("err", text + "\n"),
   });

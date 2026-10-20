@@ -166,7 +166,7 @@ class PerformanceReportGenerator {
 
   // Generate HTML report
   generateHTMLReport(data) {
-    const { crossBrowser, trends, loadTests, history, summary } = data;
+    const { crossBrowser, trends, loadTests, summary } = data;
 
     const html = `
 <!DOCTYPE html>
