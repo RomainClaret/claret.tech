@@ -22,8 +22,9 @@ const AUTHOR_NAME_FIXES: Record<string, string> = authorNameFixes;
  * Same arrangement as author-name-fixes.json above, and for the same reason.
  *
  * Without their abstracts: those are in publication-abstracts.json, by id,
- * out of the homepage's first JavaScript (no card shows one until expanded,
- * and /api/publications brings them all on mount). withAbstracts adds them.
+ * out of the homepage's first JavaScript (no card shows one, only its details
+ * dialog, and /api/publications brings them all on mount). withAbstracts adds
+ * them.
  */
 export const STATIC_PUBLICATIONS = staticPublications as Publication[];
 

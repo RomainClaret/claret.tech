@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { Blog, mediumAnchorId } from "./Blog";
+import { extractTextContent } from "./BlogCards";
 
 // Mock portfolio data - must be inline to avoid hoisting issues
 vi.mock("@/data/portfolio", () => ({
@@ -59,7 +66,7 @@ vi.mock("lucide-react", () => ({
   User: () => <div data-testid="user-icon" />,
   Share2: () => <div data-testid="share-icon" />,
   Eye: () => <div data-testid="eye-icon" />,
-  ChevronDown: () => <div data-testid="chevron-down-icon" />,
+  ArrowRight: () => <div data-testid="arrow-right-icon" />,
   Link2: () => <div data-testid="link2-icon" />,
   Check: () => <div data-testid="check-icon" />,
 }));
@@ -112,7 +119,7 @@ class MockResizeObserver {
 }
 
 const LONG_TEXT =
-  "This description is deliberately written to be much longer than one hundred and fifty characters so that the Read more toggle renders and the deep link auto-expand behavior is observable in the test.";
+  "This description is deliberately written to be much longer than one hundred and fifty characters so that the Read more button renders and the post's details dialog is observable in the test.";
 
 // Seven Medium posts (newest first by date) so the sixth-article cap is real.
 const mediumItems = Array.from({ length: 7 }, (_, i) => ({
@@ -180,6 +187,113 @@ describe("Blog", () => {
     });
   });
 
+  describe("A post's details", () => {
+    it("opens a post's whole text from its Read more, and comes back", async () => {
+      render(<Blog />);
+      const button = await screen.findByRole("button", {
+        name: "Read more about Teaching AI to Evolve",
+      });
+
+      fireEvent.click(button);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Teaching AI to Evolve",
+      });
+      expect(dialog).toHaveTextContent(LONG_TEXT);
+      expect(
+        screen.getAllByRole("link", { name: "Read" }).at(-1),
+      ).toHaveAttribute("href", kudosItems[0].url);
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).toBeNull();
+      });
+      expect(button).toHaveFocus();
+    });
+  });
+
+  describe("A post's details whose code cannot load", () => {
+    afterEach(() => {
+      vi.doUnmock("./BlogDetailsDialog");
+      vi.resetModules();
+    });
+
+    it("says so with the start of the post's text, and gives the focus back", async () => {
+      // Longer than the stand-in shows: it does not scroll.
+      const story = `${LONG_TEXT} ${LONG_TEXT}`;
+      global.fetch = vi.fn((input: RequestInfo | URL) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              String(input).includes("medium-posts")
+                ? { items: [] }
+                : { articles: [{ ...kudosItems[0], description: story }] },
+            ),
+        } as Response),
+      ) as unknown as typeof fetch;
+      const imports = { count: 0 };
+      vi.resetModules();
+      vi.doMock("./BlogDetailsDialog", () => {
+        imports.count++;
+        throw new Error("chunk failed");
+      });
+      const { Blog: Fresh } = await import("./Blog");
+      render(<Fresh />);
+      const button = await screen.findByRole("button", {
+        name: "Read more about Teaching AI to Evolve",
+      });
+
+      // Pointing at Read more starts fetching the dialog's code.
+      fireEvent.pointerEnter(button);
+      await waitFor(() => expect(imports.count).toBe(1));
+
+      fireEvent.click(button);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Teaching AI to Evolve",
+      });
+      expect(dialog).toHaveTextContent("Could not load the details.");
+      expect(dialog).toHaveTextContent(`${LONG_TEXT.slice(0, 100)}`);
+      expect(dialog.textContent).toContain("…");
+      expect(dialog.textContent).not.toContain(story);
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).toBeNull();
+      });
+      expect(button).toHaveFocus();
+    });
+  });
+
+  describe("extractTextContent", () => {
+    it("keeps a post's paragraphs, a blank line between two", () => {
+      expect(
+        extractTextContent(
+          "<h2>Title</h2><p>One <em>sentence</em>.</p><ul><li>A</li><li>B</li></ul><p>Last.</p>",
+        ),
+      ).toBe("Title\n\nOne sentence.\n\nA\n\nB\n\nLast.");
+    });
+
+    it("keeps a line break, and drops the source's own whitespace", () => {
+      expect(
+        extractTextContent(
+          "<p>\n  Line one<br>line two\n</p>\n<p>Spaced\n   text<br></p><p>End</p>",
+        ),
+      ).toBe("Line one\nline two\n\nSpaced text\n\nEnd");
+    });
+
+    it("leaves out a photo's credit, and keeps the text after it", () => {
+      // Medium's shape: a photo under a post's first lines, its credit in
+      // the caption. The text was cut at the first "Photo by", which left
+      // both posts on the site at their first sentence.
+      expect(
+        extractTextContent(
+          '<p>The start.</p><figure><img alt="" src="https://cdn-images-1.medium.com/max/1024/0*a" /><figcaption>Photo by <a href="https://unsplash.com/@someone">Someone</a> on <a href="https://unsplash.com">Unsplash</a></figcaption></figure><p>The rest of the post.</p>',
+        ),
+      ).toBe("The start.\n\nThe rest of the post.");
+    });
+  });
+
   describe("Deep Links", () => {
     it("renders anchor ids for Kudos and Medium cards", async () => {
       render(<Blog />);
@@ -195,7 +309,7 @@ describe("Blog", () => {
       ).toBeInTheDocument();
     });
 
-    it("scrolls to, glows, and expands the deep-linked post, then releases on wheel", async () => {
+    it("scrolls to and glows the deep-linked post, without opening it, then releases on wheel", async () => {
       window.location.hash = "#medium-post-1-abcdef0";
 
       render(<Blog />);
@@ -212,14 +326,40 @@ describe("Blog", () => {
       await waitFor(() => {
         expect(wrapper.querySelector('[data-force-hover="true"]')).toBeTruthy();
       });
-      // Auto-expanded (Show less visible on the linked card)
-      expect(screen.getAllByText("Show less").length).toBeGreaterThan(0);
+      // Points at the post: only its -full link opens the text.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      expect(screen.queryByRole("dialog")).toBeNull();
 
       // Wheel releases the glow back to normal hover behavior
       fireEvent.wheel(window);
       await waitFor(() => {
         expect(wrapper.querySelector('[data-force-hover="true"]')).toBeFalsy();
       });
+    });
+
+    it("opens the post's whole text for its -full link", async () => {
+      window.location.hash = "#medium-post-1-abcdef0-full";
+
+      render(<Blog />);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Medium Post 1",
+      });
+      expect(dialog).toHaveTextContent(LONG_TEXT);
+      expect(document.getElementById("medium-post-1-abcdef0")).toHaveClass(
+        "deep-link-highlight",
+      );
+    });
+
+    it("opens an older post's whole text for its -full link", async () => {
+      // The 7th (oldest) article is normally cut by the slice(0, 6) cap.
+      window.location.hash = "#medium-post-7-abcdef6-full";
+
+      render(<Blog />);
+
+      expect(
+        await screen.findByRole("dialog", { name: "Medium Post 7" }),
+      ).toBeInTheDocument();
     });
 
     it("renders the deep-linked article even when it is older than the visible six", async () => {

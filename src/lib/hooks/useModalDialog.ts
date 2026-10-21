@@ -5,7 +5,7 @@ import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect
 import { lockPageScroll } from "@/lib/utils/scroll-lock";
 
 /** What Tab moves between inside a dialog. */
-const FOCUSABLE = [
+export const FOCUSABLE = [
   "a[href]",
   "button:not([disabled])",
   "input:not([disabled])",
@@ -23,15 +23,30 @@ const FOCUSABLE = [
  */
 const openDialogs: object[] = [];
 
+/**
+ * Where focus goes back on close: an element, taken when the dialog opens,
+ * or a function asked when it closes (a dialog a link opened finds its
+ * card's button only then).
+ */
+export type ReturnFocus =
+  HTMLElement | null | (() => HTMLElement | null | undefined);
+
 interface ModalDialogOptions {
   /** Keep the page under the dialog from scrolling, and restore its place. */
   lockScroll?: boolean;
+  /**
+   * With `lockScroll`, whether closing puts the page back where it was when
+   * the dialog opened (the default). A dialog a link opened while the page
+   * was still scrolling to the link's card took a place the page has since
+   * left: it passes false and stays at the card.
+   */
+  restoreScroll?: boolean;
   /**
    * Where focus goes back on close. Defaults to what had focus when the
    * dialog opened, which is not always the control that opened it: Safari
    * does not focus a button it clicks.
    */
-  returnFocus?: HTMLElement | null;
+  returnFocus?: ReturnFocus;
 }
 
 /**
@@ -48,21 +63,28 @@ interface ModalDialogOptions {
  * dialog from any control in between. With dialogs stacked, only the one on
  * top answers keys. On close, focus goes back without scrolling to it, and
  * with `lockScroll` the page returns to where it was, instantly ("auto"
- * would follow globals.css's `scroll-behavior: smooth` and glide there).
+ * would follow globals.css's `scroll-behavior: smooth` and glide there),
+ * unless `restoreScroll` is false.
  */
 export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
   open: boolean,
   onClose: () => void,
-  { lockScroll = false, returnFocus }: ModalDialogOptions = {},
+  {
+    lockScroll = false,
+    restoreScroll = true,
+    returnFocus,
+  }: ModalDialogOptions = {},
 ): RefObject<T | null> {
   const dialogRef = useRef<T>(null);
   const onCloseRef = useRef(onClose);
   const returnFocusRef = useRef(returnFocus);
+  const restoreScrollRef = useRef(restoreScroll);
   // The latest of each, written at every commit rather than during render.
   // Layout effects run in order, so the one below already sees them.
   useIsomorphicLayoutEffect(() => {
     onCloseRef.current = onClose;
     returnFocusRef.current = returnFocus;
+    restoreScrollRef.current = restoreScroll;
   });
 
   // Before the browser paints the dialog, not after: mounted from a lazily
@@ -71,8 +93,9 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
   // monitor instead, a Tab left the dialog).
   useIsomorphicLayoutEffect(() => {
     if (!open) return;
-    const previous =
-      returnFocusRef.current ?? (document.activeElement as HTMLElement | null);
+    const focused = document.activeElement as HTMLElement | null;
+    const given = returnFocusRef.current;
+    const previous = typeof given === "function" ? focused : (given ?? focused);
     const scrollY = window.scrollY;
     // Counted: a dialog closing over another leaves the page locked.
     const release = lockScroll ? lockPageScroll() : null;
@@ -164,9 +187,14 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
       openDialogs.splice(openDialogs.indexOf(entry), 1);
       if (release) {
         release();
-        window.scrollTo({ top: scrollY, behavior: "instant" });
+        if (restoreScrollRef.current) {
+          window.scrollTo({ top: scrollY, behavior: "instant" });
+        }
       }
-      previous?.focus({ preventScroll: true });
+      const latest = returnFocusRef.current;
+      const target =
+        typeof latest === "function" ? (latest() ?? previous) : previous;
+      target?.focus({ preventScroll: true });
     };
   }, [open, lockScroll]);
 

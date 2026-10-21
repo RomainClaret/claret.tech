@@ -58,6 +58,11 @@ jobs:
       - name: Check the diff-base script
         run: bash .github/scripts/diff-base.test.sh
 
+      # The deploy waits on it (deploy.yml's browser-tests job): a wrong
+      # answer ships an untested commit, or blocks every deploy.
+      - name: Check the browser-tests gate script
+        run: bash .github/scripts/browser-tests-passed.test.sh
+
       - name: Get base commit
         id: base_commit
         env:
@@ -142,6 +147,9 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/**'
               - '.github/scripts/**'
+              # act's setup, which ci-workflows.test.ts reads.
+              - '.actrc'
+              - '.github/act/**'
 
   # Phase 2: Quick validation jobs (run in parallel)
   quick-checks:

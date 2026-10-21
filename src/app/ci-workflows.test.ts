@@ -88,6 +88,16 @@ function jobCondition(text: string, job: string): string {
   return block.join("\n");
 }
 
+/** A job's lines, from its key to the next key at its level. */
+function jobBlock(text: string, job: string): string {
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => line === `  ${job}:`);
+  const end = lines.findIndex(
+    (line, index) => index > start && /^ {2}\S/.test(line),
+  );
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
 describe("the GitHub workflows", () => {
   it("check the format without rewriting the files", () => {
     // `npm run format -- --check` ran `prettier --write ... --check`, and
@@ -161,6 +171,113 @@ describe("the GitHub workflows", () => {
     expect(jobCondition(workflow("playwright.yml"), "mobile-tests")).toMatch(
       /outputs\.src == 'true'/,
     );
+  });
+
+  it("run every browser suite on main, which the deploy takes as tested", () => {
+    // Change detection skipped the suites whose files a push left alone, so
+    // a green run on main could leave one out (37212624117 passed without
+    // the phone tests). The deploy waits for a green run on main with
+    // nothing skipped (.github/scripts/browser-tests-passed.sh).
+    const text = workflow("playwright.yml");
+    const lines = text.split("\n");
+    const jobs = lines
+      .slice(lines.indexOf("jobs:") + 1)
+      .flatMap((line) => line.match(/^ {2}([\w-]+):\s*$/)?.[1] ?? [])
+      .filter((job) => !["detect-changes", "playwright-summary"].includes(job));
+
+    expect(jobs.length).toBeGreaterThan(5);
+    for (const job of jobs) {
+      const condition = jobCondition(text, job)
+        .replace(/^\s*if: \|\s*/, "")
+        .replace(/^always\(\) && !cancelled\(\) &&\s*\(/, "");
+      expect(condition, job).toMatch(
+        /^github\.ref == 'refs\/heads\/main' \|\|/,
+      );
+    }
+  });
+
+  it("count with sh's words, not bash's brace ranges", () => {
+    // A job in a container runs its steps under `sh -e`, which leaves
+    // {1..30} as it is: the wait for the server ran once, one 2 s sleep,
+    // where it was to wait up to 60 s (GitHub's log of run 37233882557
+    // printed "attempt {1..30}/30"). seq counts in both shells.
+    const ranges = workflows.flatMap(({ name, text }) =>
+      [...text.matchAll(/\{\d+\.\.\d+\}/g)].map(
+        (match) => `${name}: ${match[0]}`,
+      ),
+    );
+
+    expect(ranges).toEqual([]);
+  });
+
+  it("write nothing to Vercel or GitHub under act", () => {
+    // .actrc hands act .env.act.local, which holds the real Vercel token:
+    // given --input environment=production, an act run reached the
+    // production deploy (act -n, 2026-10-21), and given a GitHub token it
+    // would open a pull request. act sets ACT; GitHub leaves it unset.
+    const writes = workflows.flatMap(({ name, text }) => {
+      const lines = text.split("\n");
+      return lines.flatMap((line, index) => {
+        if (line.trim().startsWith("#")) return [];
+        if (!/vercel deploy|peter-evans\/create-pull-request/.test(line)) {
+          return [];
+        }
+        // Back to the line that starts the step.
+        let start = index;
+        while (start > 0 && !/^\s*- /.test(lines[start])) start -= 1;
+        const step = lines.slice(start, index + 1).join("\n");
+        return [`${name}:${index + 1} ${/if:.*!env\.ACT\b/.test(step)}`];
+      });
+    });
+
+    expect(writes.length).toBeGreaterThanOrEqual(3);
+    expect(writes.filter((write) => write.endsWith(" false"))).toEqual([]);
+  });
+
+  it("deploy only a commit whose browser tests passed", () => {
+    // The deploy waited for ci.yml alone, so a commit whose browser tests
+    // had failed, or not finished, could reach production. Previews wait
+    // too (Romain, 2026-10-21).
+    const text = workflow("deploy.yml");
+    const needs = (job: string) =>
+      jobBlock(text, job).match(/^ {4}needs: (.+)$/m)?.[1];
+
+    expect(needs("browser-tests")).toBe("ci");
+    expect(jobBlock(text, "browser-tests")).toContain(
+      "run: bash .github/scripts/browser-tests-passed.sh",
+    );
+    for (const job of ["deploy-preview", "deploy-production"]) {
+      expect(needs(job), job).toBe("[ci, browser-tests]");
+    }
+  });
+
+  it("let the deploy's check skip only what the browser tests skip", () => {
+    // browser-tests-passed.sh takes an older commit's run when nothing
+    // after it is a file playwright.yml skips: a file in its list that the
+    // workflow tests would let untested code through.
+    const lines = workflow("playwright.yml").split("\n");
+    const push = lines.indexOf("  push:");
+    const list = lines.findIndex(
+      (line, index) => index > push && line.trim() === "paths-ignore:",
+    );
+    const ignored: string[] = [];
+    for (const line of lines.slice(list + 1)) {
+      // The trailing comments stay out ('**.md'  # Skip documentation...).
+      const path = line.match(/^\s+- '([^']+)'/)?.[1];
+      if (!path) break;
+      ignored.push(path);
+    }
+    // A bash case pattern's * crosses "/", as a ** filter does; no other
+    // glob translates.
+    const patterns = ignored.map((path) => path.replace(/\*\*/g, "*"));
+    for (const pattern of patterns) {
+      expect(pattern).not.toMatch(/[?[\]{}!]|\*\*/);
+    }
+    const script = read(".github/scripts/browser-tests-passed.sh");
+    const skipped = script.match(/^\s+(.+)\) return 0 ;;$/m)?.[1].split(" | ");
+
+    expect(ignored.length).toBeGreaterThan(2);
+    expect(skipped?.sort()).toEqual(patterns.sort());
   });
 
   it("run every end-to-end spec in a job", () => {
@@ -239,7 +356,13 @@ describe("the GitHub workflows", () => {
           (match) => `${name}: ${match[1]}`,
         ),
       ),
-      ...[...read(".actrc").matchAll(/=node:(\d+)-/g)].map(
+      // act's image: .github/act/Dockerfile builds it on a Node image, and
+      // .actrc names its tag. Its pattern once read `=node:24-` in .actrc,
+      // and a new image name would have matched nothing, in silence.
+      ...[
+        ...read(".github/act/Dockerfile").matchAll(/^FROM node:(\d+)-/gm),
+      ].map((match) => `.github/act/Dockerfile: ${match[1]}`),
+      ...[...read(".actrc").matchAll(/=claret-act:(\d+)\b/g)].map(
         (match) => `.actrc: ${match[1]}`,
       ),
       // nvm's pick on the Mac: Node 25's npm 11.6.2 once wrote a lockfile
@@ -249,6 +372,12 @@ describe("the GitHub workflows", () => {
 
     expect(Number(major)).toBeGreaterThanOrEqual(24);
     expect(used.length).toBeGreaterThan(5);
+    for (const file of [".github/act/Dockerfile", ".actrc"]) {
+      expect(
+        used.some((entry) => entry.startsWith(`${file}:`)),
+        file,
+      ).toBe(true);
+    }
     expect(used.filter((entry) => !entry.endsWith(`: ${major}`))).toEqual([]);
   });
 

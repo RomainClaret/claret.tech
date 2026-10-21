@@ -59,8 +59,8 @@ function decodeHTMLEntities(text: string): string {
 /**
  * Medium's own article hosts. Anything else is not ours to fetch.
  *
- * The article URL arrives as `post.link` out of the rss2json response, so it
- * is third-party input reaching a server-side fetch. Without this, a feed entry
+ * The article URL arrives as `post.link` out of Medium's feed, so it is
+ * third-party input reaching a server-side fetch. Without this, a feed entry
  * pointing at http://169.254.169.254/ or http://localhost:3000/ is fetched from
  * inside the serverless function, and whatever comes back is run through the
  * og:image / twitter:image patterns in extractImageFromHTML; the image found

@@ -40,10 +40,12 @@ dispatched (it ran on every push beside `ci.yml` until 2026-10).
 
 End-to-end tests against a production build, on pushes and pull requests to
 `main` (docs-only changes skipped) and by hand (`force_all_tests` runs every
-job). Path filters pick the jobs; any change under `src/`, `public/` or
-`scripts/` runs them all (Lighthouse only on pushes, or on a pull request
-labelled `performance`). Each job names its spec files, and
-`src/app/ci-workflows.test.ts` fails on a spec that no job names.
+job). On `main` every job runs, whatever changed: the deploy takes a green
+run there as everything tested. Elsewhere path filters pick the jobs; any
+change under `src/`, `public/` or `scripts/` runs them all (Lighthouse only
+on pushes, or on a pull request labelled `performance`). Each job names its
+spec files, and `src/app/ci-workflows.test.ts` fails on a spec that no job
+names.
 
 ### 4. Deploy Workflow (`deploy.yml`) - MANUAL ONLY
 
@@ -60,8 +62,25 @@ labelled `performance`). Each job names its spec files, and
 **Jobs:**
 
 - **CI Checks**: Runs all CI workflow checks first
+- **Browser tests passed**: after CI, waits for the commit's run of
+  `playwright.yml` (the browser tests, which CI does not run) and stops the
+  deploy unless it passed with no job skipped. A push of docs alone has no
+  run: the newest run before it counts, if only files that workflow skips
+  changed since (`.github/scripts/browser-tests-passed.sh`).
 - **Deploy Preview**: Deploys preview builds when "preview" is selected
 - **Deploy Production**: Deploys to production when "production" is selected
+
+Previews wait for the browser tests too. When the check refuses:
+
+- the run failed: fix the tests and push, or re-run the run if it failed for
+  nothing, then deploy again;
+- a job was skipped, no run was found, or code changed after the newest run:
+  run "Playwright Tests" on `main` by hand (Actions, Run workflow), then
+  deploy again.
+
+A preview of a branch other than `main` is refused: the browser tests run on
+pushes to `main`, and a pull request's run (of a merge commit) does not
+count.
 
 **Note**: Vercel's automatic GitHub deployments are disabled in vercel.json,
 so this workflow is the only way to production.
@@ -135,15 +154,23 @@ the API routes read `GH_USERNAME` from it at run time.
    curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
    ```
 
-2. Copy the example secrets file:
+2. Build the image act runs the jobs in (`.actrc` names it): Node 24 with
+   jq, gh and the docker CLI, as GitHub's runners have them
+   (`.github/act/Dockerfile`). Rebuild it when that file changes.
+
+   ```bash
+   docker build --platform linux/amd64 -t claret-act:24 .github/act
+   ```
+
+3. Copy the example secrets file:
 
    ```bash
    cp .env.act.local.example .env.act.local
    ```
 
-3. Fill in your values in `.env.act.local`
+4. Fill in your values in `.env.act.local`
 
-4. Run the unit jobs as CI does (`.actrc` sets the Node 24 image):
+5. Run the unit jobs as CI does (`.actrc` sets the image and the secrets):
 
    ```bash
    act workflow_dispatch -W .github/workflows/ci-act.yml
@@ -152,13 +179,58 @@ the API routes read `GH_USERNAME` from it at run time.
    act workflow_dispatch -W .github/workflows/ci-act.yml --action-offline-mode
    ```
 
+act never deploys or opens a pull request: those steps skip when `ACT` is
+set, which act does, since `.env.act.local` holds real tokens.
+
+#### Rehearse a push
+
+What GitHub will run for a push of the local commits, CI and the browser
+tests, as act runs it (about an hour for both on an M4 Max). Run it from a
+fresh clone, where `origin/main` is HEAD as GitHub's checkout leaves it:
+from the working copy paths-filter compares the push's `before` with the old
+`origin/main`, finds no change, and every CI job skips.
+
+```bash
+before=$(git rev-parse origin/main)
+git clone . ../rehearsal && cd ../rehearsal
+cat > ../push.json <<EOF
+{ "ref": "refs/heads/main", "before": "$before", "after": "$(git rev-parse HEAD)",
+  "deleted": false, "repository": { "default_branch": "main" } }
+EOF
+act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
+  --network bridge --secret-file /dev/null \
+  --artifact-server-path ../act-artifacts --concurrent-jobs 3
+act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
+  --network bridge --secret-file /dev/null \
+  --artifact-server-path ../act-artifacts --concurrent-jobs 1
+```
+
+- `before` is the full 40-character commit (paths-filter takes nothing
+  shorter as a commit).
+- `--network bridge`: on the host network every browser-test job starts its
+  server on the same port 3000. `--concurrent-jobs` counts jobs, not a
+  job's matrix entries, which run 4 at a time.
+- `--secret-file /dev/null`: no real token in a rehearsal. `--reuse=false`:
+  otherwise every job's copy (about 3 GB) stays.
+- On Apple Silicon, native containers are about twice as fast: build the
+  image with `--platform linux/arm64 -t claret-act:24-arm64`, add
+  `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
+  and give the browser jobs' image (`mcr.microsoft.com/playwright:v1.64.0-jammy`)
+  its arm64 variant for the run, the amd64 one back after.
+- Read each job's test step: under act 0.2.89 `actions/upload-artifact@v7`
+  fails (its artifact server answers with an empty body), so navigation,
+  accessibility and performance end red after their tests passed.
+- The deploy cannot be rehearsed before the push: its gate refuses a commit
+  GitHub has not tested.
+
 ## Workflow Triggers
 
 - **CI**: Runs on all pushes and pull requests (superseded runs cancelled)
 - **CI under act**: workflow_dispatch only
 - **Playwright**: workflow_dispatch, plus pushes/PRs targeting main
   (docs-only changes skipped); superseded runs cancelled
-- **Deploy**: Manual trigger only from GitHub Actions tab (workflow_dispatch)
+- **Deploy**: Manual trigger only from GitHub Actions tab (workflow_dispatch),
+  for a commit whose browser tests passed
 - **Update Publications**: workflow_dispatch only
 
 ## Environment URLs

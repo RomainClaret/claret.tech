@@ -18,8 +18,6 @@ import {
   FileText,
   Sparkles,
   Star,
-  Presentation,
-  Play,
 } from "lucide-react";
 import { ArxivWordmark, OrcidIcon } from "@/components/icons";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
@@ -45,7 +43,21 @@ import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { logError } from "@/lib/utils/dev-logger";
 import { accentStyle } from "@/components/ui/accent-text";
 import { researchAreaOf } from "@/lib/utils/research-area";
-import { useOpenOnDeepLink } from "@/lib/hooks/useOpenOnDeepLink";
+import {
+  DETAILS_TRIGGER,
+  useDetailsDialog,
+} from "@/lib/hooks/useDetailsDialog";
+import { lazyDetails } from "@/components/ui/lazy-details";
+import type { OpenPaper } from "./PaperDetailsDialog";
+import {
+  AuthorNames,
+  detectPublicationStatus,
+  otherWorkKind,
+  publicationKind,
+  ReadPdfButton,
+  RESEARCH_COLORS,
+  WatchVideoButton,
+} from "./paper-parts";
 
 // Fetched on intent and mounted only while open (pdf-reader-preload.ts).
 const PDFModal = dynamic(loadPdfModal, {
@@ -53,135 +65,31 @@ const PDFModal = dynamic(loadPdfModal, {
   loading: () => null,
 });
 
-// Research area colors
-const RESEARCH_COLORS: Record<string, string> = {
-  neuroevolution: "139, 92, 246", // Purple
-  ml: "59, 130, 246", // Blue
-  nlp: "34, 197, 94", // Green
-  blockchain: "245, 158, 11", // Amber
-  neuroscience: "236, 72, 153", // Pink
-  general: "107, 114, 128", // Gray
-};
+/** Which paper's details are open: by id, so late abstracts fill them. */
+type PaperSubject =
+  | { kind: "publication"; id: string; accent: string }
+  | { kind: "other"; index: number; accent: string };
 
-// Detect publication status
-function detectPublicationStatus(
-  pub: Publication | (typeof papersSection.papersCards)[0],
-): {
-  status:
-    | "published"
-    | "under_review"
-    | "open_review"
-    | "preprint"
-    | "to_appear"
-    | "presented";
-  label: string;
-  color: string;
-} {
-  const title = pub.title.toLowerCase();
-  const venue = "venue" in pub ? pub.venue?.toLowerCase() || "" : "";
+/** Opens a card's details, from its button, in the card's colour. */
+type OpenDetails = (trigger: HTMLElement, accent: string) => void;
 
-  // Explicitly marked as forthcoming (accepted / to appear)
-  if (pub.status === "to-appear") {
-    return { status: "to_appear", label: "To Appear", color: "59, 130, 246" }; // Blue
-  }
+// A paper's details (PaperDetailsDialog.tsx): a chunk of its own.
+const { Dialog: PaperDetailsDialog, intent: paperIntent } = lazyDetails(
+  () => import("./PaperDetailsDialog").then((mod) => mod.PaperDetailsDialog),
+  "Paper details chunk",
+);
 
-  // Explicitly marked as presented (talks and posters that are not publications)
-  if (pub.status === "presented") {
-    return { status: "presented", label: "Presented", color: "20, 184, 166" }; // Teal
-  }
-
-  // Explicitly marked as a preprint (never formally published)
-  if (pub.status === "preprint") {
-    return { status: "preprint", label: "Preprint", color: "139, 92, 246" }; // Purple
-  }
-
-  // Check for arXiv/preprint
-  if (venue.includes("arxiv") || title.includes("preprint")) {
-    return { status: "preprint", label: "Preprint", color: "139, 92, 246" }; // Purple
-  }
-
-  // Check for open review
-  if (venue.includes("openreview") || title.includes("open review")) {
-    return {
-      status: "open_review",
-      label: "Open Review",
-      color: "251, 146, 60",
-    }; // Orange
-  }
-
-  // Check for under review
-  if (
-    venue.includes("under review") ||
-    venue.includes("submitted") ||
-    title.includes("under review")
-  ) {
-    return {
-      status: "under_review",
-      label: "Under Review",
-      color: "250, 204, 21",
-    }; // Yellow
-  }
-
-  // Default to published
-  return { status: "published", label: "Published", color: "34, 197, 94" }; // Green
-}
-
-// Unified styling for the Read Paper / Read Poster buttons: solid, saturated,
-// and identical across all cards so they read as actions, not tags.
-const READ_PDF_VARIANTS = {
-  paper: { color: "37, 99, 235", Icon: BookOpen, label: "Read Paper" }, // Blue
-  poster: { color: "194, 65, 12", Icon: FileText, label: "Read Poster" }, // Orange 700: white reads at 5.2:1
-  presentation: {
-    color: "4, 120, 87", // Emerald 700: white reads at 5.5:1
-    Icon: Presentation,
-    label: "Read Presentation",
-  },
-} as const;
-
-// Solid button that opens a locally hosted PDF in the in-app reader.
-function ReadPdfButton({
-  variant,
-  pdf,
-  title,
-  onOpenPDF,
-}: {
-  variant: keyof typeof READ_PDF_VARIANTS;
-  pdf: string;
-  title: string;
-  onOpenPDF: (url: string, title: string, fileName: string) => void;
-}) {
-  const { color, Icon, label } = READ_PDF_VARIANTS[variant];
-  return (
-    <button
-      {...pdfReaderIntent}
-      onClick={() =>
-        onOpenPDF(pdf, title, pdf.split("/").pop() || "document.pdf")
+/** A paper's name and short text: its dialog's title, and its stand-in's. */
+const paperText = (open: OpenPaper) =>
+  open.kind === "publication"
+    ? {
+        title: open.publication.title,
+        summary: open.publication.shortDescription || open.publication.abstract,
       }
-      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white shadow-md transition-all hover:shadow-lg hover:brightness-110 active:scale-95"
-      style={{ backgroundColor: `rgb(${color})` }}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </button>
-  );
-}
-
-// Same look as ReadPdfButton, but an external link: opens the paper's video
-// (e.g. a YouTube talk) in a new tab instead of the in-app PDF reader.
-function WatchVideoButton({ url }: { url: string }) {
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white shadow-md transition-all hover:shadow-lg hover:brightness-110 active:scale-95"
-      style={{ backgroundColor: "rgb(220, 38, 38)" }} // Red
-    >
-      <Play className="w-3.5 h-3.5" />
-      Watch Video
-    </a>
-  );
-}
+    : {
+        title: open.paper.title,
+        summary: open.paper.shortDescription || open.paper.subtitle,
+      };
 
 // The arXiv copy of a paper is sometimes the published one and sometimes a
 // longer one. Which of the two it is, is the whole reason to click, so the
@@ -239,12 +147,10 @@ function ArxivLine({
   );
 }
 
-// Highlighted in author lists so it is obvious where Romain sits.
-const HIGHLIGHTED_AUTHOR = "Romain Claret";
-
 interface PaperCardProps {
   paper: (typeof papersSection.papersCards)[0];
   onOpenPDF: (url: string, title: string, fileName: string) => void;
+  onOpenDetails: OpenDetails;
   shouldReduceAnimations: boolean;
   isDeepLinked?: boolean;
 }
@@ -253,11 +159,10 @@ interface PaperCardProps {
 function PaperCard({
   paper,
   onOpenPDF,
+  onOpenDetails,
   shouldReduceAnimations,
   isDeepLinked = false,
 }: PaperCardProps) {
-  // Arriving via a deep link opens it.
-  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
   const [bibtexCopied, setBibtexCopied] = useState(false);
 
   const handleBibTeXClick = async () => {
@@ -346,13 +251,7 @@ function PaperCard({
     );
   };
 
-  const paperType = paper.title.toLowerCase().includes("thesis")
-    ? "thesis"
-    : paper.title.toLowerCase().includes("poster") ||
-        !!paper.posterPdf ||
-        paper.footerLink.some((l) => l.name.toLowerCase() === "poster")
-      ? "poster"
-      : "paper";
+  const kind = otherWorkKind(paper);
 
   return (
     <SlideInUp className="h-full">
@@ -376,12 +275,12 @@ function PaperCard({
                     style={{ backgroundColor: `rgba(${nodeColor}, 0.1)` }}
                     whileHover={{ scale: 1.1 }}
                   >
-                    {paperType === "thesis" ? (
+                    {kind === "Thesis" ? (
                       <Sparkles
                         className="w-6 h-6"
                         style={{ color: `rgb(${nodeColor})` }}
                       />
-                    ) : paperType === "poster" ? (
+                    ) : kind === "Poster" ? (
                       <FileText
                         className="w-6 h-6"
                         style={{ color: `rgb(${nodeColor})` }}
@@ -406,11 +305,7 @@ function PaperCard({
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className="text-xs text-muted-foreground">
-                      {paperType === "thesis"
-                        ? "Thesis"
-                        : paperType === "poster"
-                          ? "Poster"
-                          : "Paper"}
+                      {kind}
                     </span>
                     {/* Publication status tag */}
                     <span
@@ -505,42 +400,29 @@ function PaperCard({
               <div className="text-sm text-muted-foreground flex items-start gap-1 mb-3">
                 <Users className="w-3 h-3 shrink-0 mt-0.5" />
                 <p className="line-clamp-2">
-                  {paper.authors.map((author, i) => (
-                    <span key={i}>
-                      {i > 0 && ", "}
-                      {author === HIGHLIGHTED_AUTHOR ? (
-                        <span className="font-semibold text-foreground">
-                          {author}
-                        </span>
-                      ) : (
-                        author
-                      )}
-                    </span>
-                  ))}
+                  <AuthorNames authors={paper.authors} />
                 </p>
               </div>
             )}
 
-            {/* Abstract with expand/collapse */}
+            {/* The short text; the whole one opens in the details dialog */}
             <div className="flex-1 mb-4 min-h-[72px]">
-              <p
-                className={cn(
-                  "text-sm text-muted-foreground transition-all duration-300",
-                  !isExpanded && "line-clamp-3",
-                )}
-              >
-                {isExpanded
-                  ? paper.subtitle
-                  : paper.shortDescription || paper.subtitle}
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {paper.shortDescription || paper.subtitle}
               </p>
               {paper.subtitle && paper.subtitle.length > 100 && (
                 <button
                   type="button"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  aria-expanded={isExpanded}
+                  {...{ [DETAILS_TRIGGER]: "" }}
+                  aria-haspopup="dialog"
+                  aria-label={`Read more about ${paper.title}`}
+                  {...paperIntent}
+                  onClick={(event) =>
+                    onOpenDetails(event.currentTarget, nodeColor)
+                  }
                   className="text-xs text-primary hover:underline mt-1"
                 >
-                  {isExpanded ? "Show less" : "Read more"}
+                  Read more
                 </button>
               )}
             </div>
@@ -596,17 +478,17 @@ function truncateText(text: string, maxLength: number = 200): string {
 function DynamicPaperCard({
   publication,
   onOpenPDF,
+  onOpenDetails,
   shouldReduceAnimations,
   isDeepLinked = false,
 }: {
   publication: Publication;
   onOpenPDF: (url: string, title: string, fileName: string) => void;
+  onOpenDetails: OpenDetails;
   shouldReduceAnimations: boolean;
   isDeepLinked?: boolean;
 }) {
   const [bibtexCopied, setBibtexCopied] = useState(false);
-  // Arriving via a deep link opens it.
-  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
 
   const { logoUrl } = useConferenceLogo(
     publication.venue
@@ -670,12 +552,12 @@ function DynamicPaperCard({
                     style={{ backgroundColor: `rgba(${nodeColor}, 0.1)` }}
                     whileHover={{ scale: 1.1 }}
                   >
-                    {publication.venue?.toLowerCase().includes("journal") ? (
+                    {publicationKind(publication) === "Journal" ? (
                       <BookOpen
                         className="w-6 h-6"
                         style={{ color: `rgb(${nodeColor})` }}
                       />
-                    ) : publication.venue?.toLowerCase().includes("poster") ? (
+                    ) : publicationKind(publication) === "Poster" ? (
                       <FileText
                         className="w-6 h-6"
                         style={{ color: `rgb(${nodeColor})` }}
@@ -706,11 +588,7 @@ function DynamicPaperCard({
                       />
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {publication.venue?.toLowerCase().includes("journal")
-                        ? "Journal"
-                        : publication.venue?.toLowerCase().includes("poster")
-                          ? "Poster"
-                          : "Conference"}
+                      {publicationKind(publication)}
                     </span>
                     {/* Publication status tag */}
                     <span
@@ -833,19 +711,7 @@ function DynamicPaperCard({
               <div className="text-sm text-muted-foreground flex items-start gap-1 min-h-[48px]">
                 <Users className="w-3 h-3 shrink-0 mt-0.5" />
                 <p className="line-clamp-2">
-                  {publication.authors.map((author, i) => (
-                    <span key={i}>
-                      {i > 0 && ", "}
-                      {author === HIGHLIGHTED_AUTHOR ? (
-                        <span className="font-semibold text-foreground">
-                          {author}
-                        </span>
-                      ) : (
-                        author
-                      )}
-                    </span>
-                  ))}
-                  {/* The line-clamp-2 will automatically handle overflow */}
+                  <AuthorNames authors={publication.authors} />
                 </p>
               </div>
               {publication.venue && (
@@ -855,29 +721,16 @@ function DynamicPaperCard({
               )}
             </div>
 
-            {/* Abstract with expand/collapse */}
+            {/* The short text; the whole abstract opens in the details
+                dialog (/api/publications brings it on mount: the page's own
+                copy has none) */}
             <div className="flex-1 mb-4 min-h-[72px]">
-              <p
-                className={cn(
-                  "text-sm text-muted-foreground transition-all duration-300",
-                  !isExpanded && "line-clamp-3",
-                )}
-              >
-                {(() => {
-                  const abstract =
-                    publication.abstract || "No abstract available";
-                  const shortDesc = publication.shortDescription;
-
-                  if (isExpanded) {
-                    // The full abstract, which /api/publications brings on
-                    // mount (the page's own copy has none); until then the
-                    // short description.
-                    return publication.abstract || shortDesc || abstract;
-                  } else {
-                    // Show shortDescription if available, otherwise show truncated abstract
-                    return shortDesc || truncateText(abstract, 200);
-                  }
-                })()}
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {publication.shortDescription ||
+                  truncateText(
+                    publication.abstract || "No abstract available",
+                    200,
+                  )}
               </p>
               {(() => {
                 const abstract = publication.abstract || "";
@@ -891,11 +744,16 @@ function DynamicPaperCard({
                   (hasLongContent || hasDifferentContent) && (
                     <button
                       type="button"
-                      onClick={() => setIsExpanded(!isExpanded)}
-                      aria-expanded={isExpanded}
+                      {...{ [DETAILS_TRIGGER]: "" }}
+                      aria-haspopup="dialog"
+                      aria-label={`Read more about ${publication.title}`}
+                      {...paperIntent}
+                      onClick={(event) =>
+                        onOpenDetails(event.currentTarget, nodeColor)
+                      }
                       className="text-xs text-primary hover:underline mt-1"
                     >
-                      {isExpanded ? "Show less" : "Read more"}
+                      Read more
                     </button>
                   )
                 );
@@ -1006,6 +864,11 @@ export function Papers() {
   const [filterType, setFilterType] = useState<"all" | "papers" | "theses">(
     "all",
   );
+  // Until /api/publications answers (or the abstracts' own chunk does), a
+  // publication's dialog says its abstract is on the way.
+  const [abstractsPending, setAbstractsPending] = useState(true);
+  // A paper's details, one dialog for the section.
+  const paperDetails = useDetailsDialog<PaperSubject>();
   const {
     isOpen,
     pdfUrl,
@@ -1028,6 +891,7 @@ export function Papers() {
           setDynamicPapers(data.publications);
           setTotalCitations(data.totalCitations || 0);
         }
+        setAbstractsPending(false);
       })
       .catch((error) => {
         // Only log in non-test environments to avoid test stderr pollution
@@ -1036,14 +900,17 @@ export function Papers() {
         }
         // The abstracts, which the answer would have carried, from their
         // own chunk.
-        withAbstracts(STATIC_PUBLICATIONS).then(setDynamicPapers, () => {});
+        withAbstracts(STATIC_PUBLICATIONS)
+          .then(setDynamicPapers, () => {})
+          .finally(() => setAbstractsPending(false));
       });
   }, []);
 
   // Deep links: a #<publication id | paper anchorId> hash (the BibTeX-style
   // keys, e.g. #claret2026emr) scrolls to that card, pulses a highlight, and
-  // holds its hover glow until the user interacts (see useCardDeepLink). The
-  // target may be hidden by the filter pills, so onMatch shows everything.
+  // holds its hover glow until the user interacts (see useCardDeepLink); with
+  // -full (#claret2026emr-full) it also opens the paper's details. The target
+  // may be hidden by the filter pills, so onMatch shows everything.
   const { deepLinkedId, highlightedId } = useCardDeepLink(
     [
       ...dynamicPapers.map((p) => p.id),
@@ -1051,8 +918,55 @@ export function Papers() {
         p.anchorId ? [p.anchorId] : [],
       ),
     ],
-    { onMatch: () => setFilterType("all") },
+    {
+      onMatch: () => setFilterType("all"),
+      onOpen: (id) => {
+        const publication = dynamicPapers.find((p) => p.id === id);
+        const index = papersSection.papersCards.findIndex(
+          (p) => p.anchorId === id,
+        );
+        // Not the card's own colour, which its logo or image gives as it
+        // loads: its research area's, the card's colour until then.
+        if (publication) {
+          paperDetails.showFromLink(
+            {
+              kind: "publication",
+              id,
+              accent: RESEARCH_COLORS[researchAreaOf(publication)],
+            },
+            id,
+          );
+        } else if (index >= 0) {
+          paperDetails.showFromLink(
+            {
+              kind: "other",
+              index,
+              accent:
+                RESEARCH_COLORS[
+                  researchAreaOf(papersSection.papersCards[index])
+                ],
+            },
+            id,
+          );
+        }
+      },
+    },
   );
+
+  // The open paper, from the latest data: an abstract that arrives while its
+  // dialog is open fills it.
+  const openSubject = paperDetails.open?.item;
+  const openPublication =
+    openSubject?.kind === "publication"
+      ? dynamicPapers.find((p) => p.id === openSubject.id)
+      : undefined;
+  const openOther =
+    openSubject?.kind === "other"
+      ? papersSection.papersCards[openSubject.index]
+      : undefined;
+  const openPaper: OpenPaper | undefined = openPublication
+    ? { kind: "publication", publication: openPublication }
+    : openOther && { kind: "other", paper: openOther };
 
   if (!papersSection.display) {
     return null;
@@ -1183,6 +1097,12 @@ export function Papers() {
                       <DynamicPaperCard
                         publication={publication}
                         onOpenPDF={openPDF}
+                        onOpenDetails={(trigger, accent) =>
+                          paperDetails.show(
+                            { kind: "publication", id: publication.id, accent },
+                            trigger,
+                          )
+                        }
                         shouldReduceAnimations={shouldReduceAnimations}
                         isDeepLinked={deepLinkedId === publication.id}
                       />
@@ -1219,6 +1139,17 @@ export function Papers() {
                       <PaperCard
                         paper={paper}
                         onOpenPDF={openPDF}
+                        onOpenDetails={(trigger, accent) =>
+                          paperDetails.show(
+                            {
+                              kind: "other",
+                              // In the whole list: the filter may hide some.
+                              index: papersSection.papersCards.indexOf(paper),
+                              accent,
+                            },
+                            trigger,
+                          )
+                        }
                         shouldReduceAnimations={shouldReduceAnimations}
                         isDeepLinked={
                           !!paper.anchorId && deepLinkedId === paper.anchorId
@@ -1277,7 +1208,20 @@ export function Papers() {
             </div>
           </div>
 
-          {/* PDF Modal */}
+          {/* A paper's details, once for the section, outside the cards */}
+          {paperDetails.dialog && openSubject && openPaper && (
+            <PaperDetailsDialog
+              open={openPaper}
+              {...paperText(openPaper)}
+              accent={openSubject.accent}
+              abstractPending={abstractsPending}
+              dialog={paperDetails.dialog}
+              onOpenPDF={openPDF}
+            />
+          )}
+
+          {/* PDF Modal: opened from a dialog, it mounts after it and so
+              paints above it, and takes the keys while it is open. */}
           {isOpen && (
             <PDFModal
               isOpen={isOpen}

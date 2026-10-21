@@ -528,14 +528,6 @@ test.describe("Accessibility", () => {
     page,
     isMobile,
   }) => {
-    // Add extended timeout for mobile devices
-    if (isMobile) {
-      test.slow(); // Triple the timeout for mobile tests
-    }
-
-    const testStartTime = Date.now();
-    const MAX_TEST_DURATION = 70000; // 70 seconds (before 90s timeout)
-
     // no catch->skip wrapper: a thrown expect must fail this test on mobile too
     await page.goto("/");
     await page.waitForSelector("h1", { timeout: 10000 });
@@ -545,94 +537,43 @@ test.describe("Accessibility", () => {
       await openMobileMenuForAccessibility(page);
     }
 
-    // Check buttons have accessible names (with mobile optimizations)
-    const buttons = await page.locator("button:visible");
-    const buttonCount = await buttons.count();
+    // Every visible button and link, read in one pass. Read one call at a
+    // time, with `nth(i)` resolved again for each call, a button's label,
+    // text and title could come from three different buttons while
+    // sections mounted: one failure in four runs (2026-10-21). One pass
+    // also reads them all, where phones stopped at the first ten to save
+    // time. A link inside an aria-hidden subtree needs no name; the old
+    // filter skipped every link holding an aria-hidden icon instead, which
+    // are the links most likely to have none. A name comes from a label, a
+    // labelling element, text, a title or an image's alt (the GitHub
+    // avatar's link has only the last).
+    const unnamed = (selector: string) =>
+      page.locator(selector).evaluateAll((elements) =>
+        elements
+          .filter((element) => {
+            if (element.closest('[aria-hidden="true"]')) return false;
+            if (element.getAttribute("href") === "#") return false;
+            const labelledBy = (element.getAttribute("aria-labelledby") ?? "")
+              .split(/\s+/)
+              .map(
+                (id) => (id && document.getElementById(id)?.textContent) || "",
+              );
+            const alts = Array.from(element.querySelectorAll("img[alt]"))
+              .filter((image) => !image.closest('[aria-hidden="true"]'))
+              .map((image) => image.getAttribute("alt") ?? "");
+            return ![
+              element.getAttribute("aria-label") ?? "",
+              ...labelledBy,
+              element.textContent ?? "",
+              element.getAttribute("title") ?? "",
+              ...alts,
+            ].some((name) => name.trim());
+          })
+          .map((element) => element.outerHTML.slice(0, 200)),
+      );
 
-    // Limit checking on mobile to prevent timeouts
-    const maxButtonsToCheck = isMobile
-      ? Math.min(buttonCount, 10)
-      : buttonCount;
-
-    for (let i = 0; i < maxButtonsToCheck; i++) {
-      const button = buttons.nth(i);
-
-      // Skip if element is not in viewport on mobile (performance optimization)
-      if (isMobile && !(await button.isVisible())) {
-        continue;
-      }
-
-      const ariaLabel = await button.getAttribute("aria-label");
-      const textContent = await button.textContent();
-      const title = await button.getAttribute("title");
-
-      // Button should have either aria-label, text content, or title
-      expect(ariaLabel || textContent?.trim() || title).toBeTruthy();
-
-      // Early exit if approaching timeout
-      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-        console.warn("ARIA labels test approaching timeout, ending early");
-        break;
-      }
-    }
-
-    // Check links have accessible names (with mobile optimizations)
-    const links = await page
-      .locator("a:visible")
-      .filter({ hasNot: page.locator('[aria-hidden="true"]') });
-
-    // Wait for links to be present and count them
-    await links
-      .first()
-      .waitFor({ state: "attached", timeout: 5000 })
-      .catch(() => {});
-    const linkCount = await links.count();
-
-    // Limit checking to prevent timeouts - max 20 links for CI
-    const maxLinksToCheck = Math.min(linkCount, isMobile ? 10 : 20);
-
-    for (let i = 0; i < maxLinksToCheck; i++) {
-      const link = links.nth(i);
-
-      // Skip if element is not accessible within timeout
-      try {
-        await link.waitFor({ state: "visible", timeout: 2000 });
-      } catch {
-        continue;
-      }
-
-      // Skip if element is not in viewport on mobile (performance optimization)
-      if (isMobile && !(await link.isVisible())) {
-        continue;
-      }
-
-      // Get attributes with timeout protection
-      const ariaLabel = await link.getAttribute("aria-label").catch(() => null);
-      const textContent = await link.textContent().catch(() => null);
-      const title = await link.getAttribute("title").catch(() => null);
-      const href = await link.getAttribute("href").catch(() => null);
-
-      // Skip empty fragment links
-      if (href === "#") continue;
-
-      // Link should have either aria-label, text content, or title.
-      // This used to be `if (process.env.CI) continue;` guarded by a
-      // console.warn, i.e. the one environment that gates merges was the one
-      // environment where a link with no accessible name could not fail the
-      // build. A missing accessible name is deterministic markup, not a race,
-      // so it fails everywhere now.
-      const hasAccessibleName = ariaLabel || textContent?.trim() || title;
-      expect(
-        hasAccessibleName,
-        `link has no accessible name (no aria-label, no text, no title): href="${href}"`,
-      ).toBeTruthy();
-
-      // Early exit if approaching timeout
-      if (Date.now() - testStartTime > MAX_TEST_DURATION) {
-        console.warn("ARIA labels test approaching timeout, ending early");
-        break;
-      }
-    }
+    expect(await unnamed("button:visible")).toEqual([]);
+    expect(await unnamed("a:visible")).toEqual([]);
   });
 
   test("should have sufficient color contrast", async ({ page }) => {

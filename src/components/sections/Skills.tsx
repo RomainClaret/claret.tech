@@ -8,15 +8,19 @@ import {
   Cpu,
   Lightbulb,
   Brain,
-  ChevronDown,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { SkillManifesto } from "@/components/ui/skill-manifesto";
 import { LanguageSpectrum } from "@/components/ui/language-spectrum";
 import { m } from "framer-motion";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { lazyDetails } from "@/components/ui/lazy-details";
+import {
+  DETAILS_TRIGGER,
+  useDetailsDialog,
+} from "@/lib/hooks/useDetailsDialog";
+import type { SkillDetailsDialogProps } from "./SkillDetailsDialog";
 
 const coreActivityIcons: { [key: string]: LucideIcon } = {
   "🧬": Microscope,
@@ -40,12 +44,60 @@ const RESEARCH_CATEGORY_COLORS = {
   Seeking: "245, 158, 11",
 } as const;
 
+const categoryColor = (category: string) =>
+  RESEARCH_CATEGORY_COLORS[category as keyof typeof RESEARCH_CATEGORY_COLORS] ||
+  "107, 114, 128";
+
+// A card's details (SkillDetailsDialog.tsx): a chunk of its own.
+const { Dialog: SkillDetailsDialog, intent: skillIntent } = lazyDetails(
+  () => import("./SkillDetailsDialog").then((mod) => mod.SkillDetailsDialog),
+  "Skill details chunk",
+);
+
+/** Which card's details are open: a core activity, or a philosophy card. */
+type SkillSubject =
+  | { kind: "activity"; index: number }
+  | { kind: "philosophy"; category: string };
+
+/** What a card's dialog shows, from the section's data. */
+function skillDetailsOf(
+  subject: SkillSubject,
+): Omit<SkillDetailsDialogProps, "dialog"> {
+  if (subject.kind === "activity") {
+    const activity = skillsSection.coreActivities[subject.index];
+    return {
+      open: { kind: "activity", activity },
+      title: activity.title,
+      summary: activity.description,
+      icon: coreActivityIcons[activity.icon],
+      accent: activityColors[activity.icon],
+      context: skillsSection.coreExpertiseSection.title,
+    };
+  }
+  const panel =
+    skillsSection.researchInterests[
+      subject.category as keyof typeof skillsSection.researchInterests
+    ];
+  return {
+    open: { kind: "philosophy", panel },
+    title: subject.category,
+    summary: panel.description,
+    icon: Brain,
+    accent: categoryColor(subject.category),
+    context: skillsSection.researchPhilosophySection.title,
+  };
+}
+
+// The cards' Read more: a click anywhere on a card opens its details, and
+// this is its control for the keyboard and for screen readers, and the way
+// back when the dialog closes.
+const readMoreClass =
+  "flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+
 export function Skills() {
-  const [expandedActivity, setExpandedActivity] = useState<number | null>(null);
-  // Tracked separately from expandedActivity so opening a philosophy panel
-  // does not silently collapse a Core Activity card above it.
-  const [expandedInterest, setExpandedInterest] = useState<number | null>(null);
-  // Force refresh: Updated tech order and alignment fixes
+  // One dialog for the section's cards, which grew in place before and
+  // pushed the page around.
+  const skillDetails = useDetailsDialog<SkillSubject>();
 
   if (!skillsSection.display) {
     return null;
@@ -91,109 +143,89 @@ export function Skills() {
 
               return (
                 <SlideInUp key={index} className="h-full">
+                  {/* A click anywhere on the card opens its details;
+                      pointing at it or focusing it fetches their code. */}
                   <m.div
-                    className="relative h-full min-h-[400px]"
+                    className="relative h-full cursor-pointer"
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    onClick={skillDetails.onCardClick({
+                      kind: "activity",
+                      index,
+                    })}
+                    {...skillIntent}
                   >
                     <HolographicCard
                       glowColor={activityColor}
                       delay={(300 + index * 100) / 1000}
                     >
                       <div className="p-6 h-full flex flex-col">
-                        {/* Fixed height header wrapper */}
-                        <div className="h-[90px] mb-2">
-                          {/* Header with animated icon */}
-                          <div className="flex items-start gap-4 h-full">
-                            <div className="relative group">
-                              <m.div
-                                className="w-14 h-14 rounded-full flex items-center justify-center"
-                                style={{
-                                  backgroundColor: `rgba(${activityColor}, 0.1)`,
-                                }}
-                                whileHover={{ scale: 1.1 }}
-                              >
-                                <IconComponent
-                                  className="w-7 h-7"
-                                  style={{ color: `rgb(${activityColor})` }}
-                                />
-                              </m.div>
-                              {/* Breathing pulse effect: a CSS loop
-                                  (motion.css) */}
-                              <div
-                                className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
-                                style={{
-                                  backgroundColor: `rgb(${activityColor})`,
-                                  opacity: 0.1,
-                                  willChange: "transform",
-                                  animationDelay: `${(300 + index * 100) / 1000 + 0.5}s`,
-                                }}
+                        {/* Header with animated icon */}
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className="relative group shrink-0">
+                            <m.div
+                              className="w-14 h-14 rounded-full flex items-center justify-center"
+                              style={{
+                                backgroundColor: `rgba(${activityColor}, 0.1)`,
+                              }}
+                              whileHover={{ scale: 1.1 }}
+                            >
+                              <IconComponent
+                                className="w-7 h-7"
+                                style={{ color: `rgb(${activityColor})` }}
                               />
-                            </div>
-                            <div className="flex-1 flex flex-col justify-between h-full gap-2">
-                              <h4 className="text-xl font-bold bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300 min-h-12">
-                                {activity.title}
-                              </h4>
-                            </div>
+                            </m.div>
+                            {/* Breathing pulse effect: a CSS loop
+                                (motion.css) */}
+                            <div
+                              className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
+                              style={{
+                                backgroundColor: `rgb(${activityColor})`,
+                                opacity: 0.1,
+                                willChange: "transform",
+                                animationDelay: `${(300 + index * 100) / 1000 + 0.5}s`,
+                              }}
+                            />
                           </div>
+                          <h4 className="text-xl font-bold bg-linear-to-r from-foreground to-foreground hover:from-primary hover:to-purple-600 bg-clip-text text-transparent transition-all duration-300">
+                            {activity.title}
+                          </h4>
                         </div>
 
-                        {/* Expandable Description */}
-                        <div className="mb-6">
-                          <p
-                            className={cn(
-                              "text-sm text-muted-foreground transition-all duration-300",
-                              expandedActivity === index ? "" : "line-clamp-4",
-                            )}
-                          >
-                            {expandedActivity === index
-                              ? activity.expandedDescription
-                              : activity.description}
+                        {/* The short text; the story opens in the dialog */}
+                        <div className="mb-4">
+                          <p className="text-sm text-muted-foreground">
+                            {activity.description}
                           </p>
                           <button
-                            className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
-                            onClick={() =>
-                              setExpandedActivity(
-                                expandedActivity === index ? null : index,
-                              )
-                            }
-                            aria-label={
-                              expandedActivity === index
-                                ? `Show less about ${activity.title}`
-                                : `Read more about ${activity.title}`
-                            }
-                            aria-expanded={expandedActivity === index}
+                            type="button"
+                            {...{ [DETAILS_TRIGGER]: "" }}
+                            aria-haspopup="dialog"
+                            aria-label={`Read more about ${activity.title}`}
+                            className={`${readMoreClass} mt-1`}
                           >
-                            {expandedActivity === index
-                              ? "Show less"
-                              : "Read more"}
-                            <ChevronDown
-                              className={cn(
-                                "w-3 h-3 transition-transform duration-300",
-                                expandedActivity === index && "rotate-180",
-                              )}
+                            Read more
+                            <ArrowRight
                               aria-hidden="true"
+                              className="w-3 h-3"
                             />
                           </button>
                         </div>
 
-                        {/* Technologies with improved styling */}
-                        <div className="mt-auto w-full">
-                          <div className="grid grid-cols-1 gap-2 min-h-[120px] items-start w-full">
+                        {/* Technologies, in one row */}
+                        <div className="mt-auto">
+                          <div className="flex flex-wrap gap-2">
                             {activity.technologies.map((tech, techIndex) => {
                               const TechIcon = getTechIcon(tech.icon);
 
                               return (
-                                <ScaleIn
-                                  key={techIndex}
-                                  className="group/tech w-full"
-                                >
+                                <ScaleIn key={techIndex} className="group/tech">
                                   <m.div
-                                    className="relative w-full"
+                                    className="relative"
                                     whileHover={{ scale: 1.05 }}
                                   >
                                     {/* Tech badge with holographic effects */}
-                                    <div className="relative group/badge w-full">
+                                    <div className="relative group/badge">
                                       {/* Glow effect on hover */}
                                       <m.div
                                         className="absolute -inset-1 rounded-lg opacity-0 group-hover/badge:opacity-40 blur-md transition-opacity duration-300"
@@ -204,7 +236,7 @@ export function Skills() {
 
                                       {/* Main badge */}
                                       <div
-                                        className="relative px-2 py-3 min-h-10 rounded-lg flex items-center justify-start gap-2 border transition-all duration-300 cursor-pointer overflow-hidden w-full"
+                                        className="relative px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 border transition-all duration-300 overflow-hidden"
                                         style={{
                                           backgroundColor: `rgba(${activityColor}, 0.05)`,
                                           borderColor: `rgba(${activityColor}, 0.3)`,
@@ -263,7 +295,7 @@ export function Skills() {
                                             color: `rgb(${activityColor})`,
                                           }}
                                         />
-                                        <span className="text-xs md:text-sm font-medium relative z-10 text-left flex-1 wrap-break-word">
+                                        <span className="text-xs font-medium relative z-10 wrap-break-word">
                                           {tech.name}
                                         </span>
                                       </div>
@@ -314,40 +346,44 @@ export function Skills() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(skillsSection.researchInterests).map(
               ([category, panel], index) => {
-                const categoryColor =
-                  RESEARCH_CATEGORY_COLORS[
-                    category as keyof typeof RESEARCH_CATEGORY_COLORS
-                  ] || "107, 114, 128";
+                const color = categoryColor(category);
 
                 return (
-                  <SlideInUp key={category}>
+                  <SlideInUp key={category} className="h-full">
+                    {/* The card shows the panel's key point; the framing and
+                        all the points open in the dialog. */}
                     <m.div
-                      className="h-full"
+                      className="h-full cursor-pointer"
                       whileHover={{ scale: 1.02 }}
                       transition={{
                         type: "spring",
                         stiffness: 300,
                         damping: 20,
                       }}
+                      onClick={skillDetails.onCardClick({
+                        kind: "philosophy",
+                        category,
+                      })}
+                      {...skillIntent}
                     >
                       <HolographicCard
-                        glowColor={categoryColor}
+                        glowColor={color}
                         transitionDuration={400}
                         delay={(500 + index * 100) / 1000}
                       >
-                        <div className="p-5 h-full">
-                          <div className="flex items-center gap-2 mb-3 min-h-[60px]">
+                        <div className="p-5 h-full flex flex-col">
+                          <div className="flex items-center gap-2 mb-3">
                             <div className="relative group">
                               <m.div
                                 className="w-10 h-10 rounded-full flex items-center justify-center"
                                 style={{
-                                  backgroundColor: `rgba(${categoryColor}, 0.1)`,
+                                  backgroundColor: `rgba(${color}, 0.1)`,
                                 }}
                                 whileHover={{ scale: 1.1 }}
                               >
                                 <Brain
                                   className="w-5 h-5"
-                                  style={{ color: `rgb(${categoryColor})` }}
+                                  style={{ color: `rgb(${color})` }}
                                 />
                               </m.div>
                               {/* Breathing pulse effect: a CSS loop
@@ -355,7 +391,7 @@ export function Skills() {
                               <div
                                 className="absolute inset-0 rounded-full pointer-events-none anim-decor anim-breathe-115"
                                 style={{
-                                  backgroundColor: `rgb(${categoryColor})`,
+                                  backgroundColor: `rgb(${color})`,
                                   opacity: 0.1,
                                   willChange: "transform",
                                   animationDelay: `${(500 + index * 100) / 1000 + 0.5}s`,
@@ -367,71 +403,38 @@ export function Skills() {
                             </h4>
                           </div>
 
-                          {/* Framing paragraph. Without it the bullets below
-                              read as a list of fragments with no referent. */}
-                          <div className="mb-4">
-                            <p
-                              className={cn(
-                                "text-sm text-muted-foreground transition-all duration-300",
-                                expandedInterest === index
-                                  ? ""
-                                  : "line-clamp-3",
-                              )}
-                            >
-                              {expandedInterest === index
-                                ? panel.expandedDescription
-                                : panel.description}
-                            </p>
+                          {/* The key point: the panel's first, which stands
+                              alone (skills.ts) */}
+                          <p className="flex items-start gap-2 text-sm mb-4">
+                            <span
+                              aria-hidden="true"
+                              className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                              style={{
+                                backgroundColor: `rgb(${color})`,
+                                boxShadow: `0 0 8px rgba(${color}, 0.5)`,
+                              }}
+                            />
+                            <span className="text-muted-foreground">
+                              {panel.bullets[0]}
+                            </span>
+                          </p>
+
+                          <div className="mt-auto flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{panel.bullets.length} points</span>
+                            <span aria-hidden="true">•</span>
                             <button
-                              className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
-                              onClick={() =>
-                                setExpandedInterest(
-                                  expandedInterest === index ? null : index,
-                                )
-                              }
-                              aria-label={
-                                expandedInterest === index
-                                  ? `Show less about ${category}`
-                                  : `Read more about ${category}`
-                              }
-                              aria-expanded={expandedInterest === index}
+                              type="button"
+                              {...{ [DETAILS_TRIGGER]: "" }}
+                              aria-haspopup="dialog"
+                              aria-label={`Read more about ${category}`}
+                              className={readMoreClass}
                             >
-                              {expandedInterest === index
-                                ? "Show less"
-                                : "Read more"}
-                              <ChevronDown
-                                className={cn(
-                                  "w-3 h-3 transition-transform duration-300",
-                                  expandedInterest === index && "rotate-180",
-                                )}
+                              Read more
+                              <ArrowRight
                                 aria-hidden="true"
+                                className="w-3 h-3"
                               />
                             </button>
-                          </div>
-
-                          <div className="space-y-2">
-                            {panel.bullets.map((interest, idx) => (
-                              <m.div
-                                key={idx}
-                                className="flex items-start gap-2 text-sm group/interest"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{
-                                  delay: 0.6 + index * 0.1 + idx * 0.05,
-                                }}
-                              >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-all duration-300 group-hover/interest:scale-150"
-                                  style={{
-                                    backgroundColor: `rgb(${categoryColor})`,
-                                    boxShadow: `0 0 8px rgba(${categoryColor}, 0.5)`,
-                                  }}
-                                />
-                                <span className="text-muted-foreground group-hover/interest:text-foreground transition-colors duration-300">
-                                  {interest}
-                                </span>
-                              </m.div>
-                            ))}
                           </div>
                         </div>
                       </HolographicCard>
@@ -450,6 +453,14 @@ export function Skills() {
           </div>
         )}
       </div>
+
+      {/* A card's details, once for the section, outside the cards */}
+      {skillDetails.open && skillDetails.dialog && (
+        <SkillDetailsDialog
+          {...skillDetailsOf(skillDetails.open.item)}
+          dialog={skillDetails.dialog}
+        />
+      )}
     </div>
   );
 }

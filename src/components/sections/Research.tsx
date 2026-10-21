@@ -1,37 +1,26 @@
 "use client";
 
-import { isDisplayed, researchSection } from "@/data/sections/research";
+import { researchSection } from "@/data/sections/research";
 import { SlideInUp, ScaleIn } from "@/components/ui/animated";
 import Link from "next/link";
 import {
-  ExternalLink,
+  ArrowRight,
   GitBranch,
-  Beaker,
-  CheckCircle2,
-  Clock,
   Zap,
   FileText,
-  Trophy,
   Brain,
   Calendar,
   Award,
   Sparkles,
-  Shield,
-  Bot,
-  Ear,
   BookOpen,
-  ChevronDown,
   Rocket,
-  Scaling,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useId, useState } from "react";
-import type { researchDetails as ResearchDetailsData } from "@/data/sections/research-details";
+import { useId } from "react";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
-import { whenIdle } from "@/lib/utils/when-idle";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
-import { m, AnimatePresence } from "framer-motion";
+import { m } from "framer-motion";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { usePDFViewer } from "@/lib/hooks/usePDFViewer";
 import { pdfReaderIntent } from "@/lib/pdf-reader-preload";
@@ -40,57 +29,33 @@ import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { useAnimationGate } from "@/lib/hooks/useMotionGate";
 import dynamic from "next/dynamic";
 import { accentStyle } from "@/components/ui/accent-text";
-
-// Hidden cards are dropped once, here, so the hero, the grid, the stats and
-// the deep links all index the same list. activeIndex is shared between
-// the deep-link lookup and the grid, so filtering only the grid would
-// open the card next to the one a link names.
-const visibleProjects = researchSection.projects.filter(isDisplayed);
-
-type ResearchDetails = typeof ResearchDetailsData;
-
-/**
- * The section's long texts (research-details.ts), out of the page's first
- * JavaScript: none is in the HTML, as a card shows its short text until it
- * is opened. Fetched once the browser is idle after load, and again when
- * something opens while they are missing; meanwhile, the short text.
- */
-function useResearchDetails(): [ResearchDetails | null, () => void] {
-  const [details, setDetails] = useState<ResearchDetails | null>(null);
-  const load = useCallback(() => {
-    import("@/data/sections/research-details").then(
-      (mod) => setDetails(mod.researchDetails),
-      () => {},
-    );
-  }, []);
-  useEffect(() => whenIdle(load), [load]);
-  return [details, load];
-}
+import {
+  DETAILS_TRIGGER,
+  useDetailsDialog,
+} from "@/lib/hooks/useDetailsDialog";
+import { lazyDetails } from "@/components/ui/lazy-details";
+import type { ResearchSubject } from "./ResearchDetailsDialog";
+import {
+  iconMap,
+  isLocalPdf,
+  pdfFileName,
+  projectColor,
+  iconKey,
+  statusConfig,
+  visibleProjects,
+  type ResearchProject,
+} from "./research-shared";
 
 interface ResearchCardProps {
-  project: (typeof researchSection.projects)[0];
-  /** The full description, once research-details.ts has arrived. */
-  description?: string;
-  index: number;
-  isActive: boolean;
-  onToggle: () => void;
+  project: ResearchProject;
+  /** A click anywhere on the card opens its details (useDetailsDialog). */
+  onOpen: (event: React.MouseEvent<HTMLElement>) => void;
   isLeftSide?: boolean;
   /** Arrived via a deep link: hold the glow. */
   isDeepLinked?: boolean;
   /** Briefly ring-pulse this card after a deep link lands on it. */
   isHighlighted?: boolean;
-  onOpenPDF: (url: string, title: string, fileName: string) => void;
 }
-
-/**
- * A locally hosted PDF, which opens in the in-app reader rather than a new tab.
- *
- * Same predicate Papers uses for the same decision, so GitHub and journal
- * links keep behaving like links.
- */
-const isLocalPdf = (url: string) => url.startsWith("/") && url.endsWith(".pdf");
-
-const pdfFileName = (url: string) => url.split("/").pop() || "document.pdf";
 
 // Fetched on intent and mounted only while open (pdf-reader-preload.ts),
 // same as Papers.
@@ -99,66 +64,37 @@ const PDFModal = dynamic(loadPdfModal, {
   loading: () => null,
 });
 
-const statusConfig = {
-  active: {
-    icon: Zap,
-    text: "Active Research",
-    color: "text-green-700 dark:text-green-400",
-    bgColor: "bg-green-500/20",
-    borderColor: "border-green-500/30",
-    glowColor: "shadow-green-500/25",
-    rgbColor: "34, 197, 94",
-  },
-  ongoing: {
-    icon: Clock,
-    text: "Ongoing",
-    color: "text-yellow-700 dark:text-yellow-400",
-    bgColor: "bg-yellow-500/20",
-    borderColor: "border-yellow-500/30",
-    glowColor: "shadow-yellow-500/25",
-    rgbColor: "250, 204, 21",
-  },
-  completed: {
-    icon: CheckCircle2,
-    text: "Completed",
-    color: "text-blue-700 dark:text-blue-400",
-    bgColor: "bg-blue-500/20",
-    borderColor: "border-blue-500/30",
-    glowColor: "shadow-blue-500/25",
-    rgbColor: "59, 130, 246",
-  },
-};
+// A card's details (ResearchDetailsDialog.tsx): a chunk of its own with the
+// section's long texts.
+const { Dialog: ResearchDetailsDialog, intent: researchIntent } = lazyDetails(
+  () =>
+    import("./ResearchDetailsDialog").then((mod) => mod.ResearchDetailsDialog),
+  "Research details chunk",
+);
 
-// Icon mapping for all icons
-const iconMap = {
-  Brain: Brain,
-  Bot: Bot,
-  Shield: Shield,
-  Ear: Ear,
-  Beaker: Beaker,
-  Zap: Zap,
-  Sparkles: Sparkles,
-  Scaling: Scaling,
-};
+/** A card's name and short text: its dialog's title, and its stand-in's. */
+const subjectText = (subject: ResearchSubject) =>
+  subject.kind === "journey"
+    ? {
+        title: "My Research Journey",
+        summary: researchSection.journeyShortDescription,
+      }
+    : {
+        title: visibleProjects[subject.index].title,
+        summary: visibleProjects[subject.index].shortDescription,
+      };
 
 function ResearchCard({
   project,
-  description,
-  index: _index,
-  isActive,
-  onToggle,
+  onOpen,
   isLeftSide = false,
   isDeepLinked = false,
   isHighlighted = false,
-  onOpenPDF,
 }: ResearchCardProps) {
   const status = statusConfig[project.status];
-  const Icon = project.icon
-    ? iconMap[project.icon as keyof typeof iconMap] || Beaker
-    : Beaker;
+  const Icon = iconMap[iconKey(project)];
   const year = project.year;
-  const nodeColor = project.color || "139, 92, 246";
-  const detailsId = useId();
+  const nodeColor = projectColor(project);
 
   return (
     <m.div
@@ -181,9 +117,13 @@ function ResearchCard({
         </div>
       )}
 
+      {/* A click anywhere on the card opens its details above the page
+          (it grew in place, pushing the grid around); pointing at it or
+          focusing it fetches the dialog's code. */}
       <div
         id={project.anchorId}
-        onClick={onToggle}
+        onClick={onOpen}
+        {...researchIntent}
         className={cn(
           "h-full cursor-pointer",
           isHighlighted && "deep-link-highlight",
@@ -244,170 +184,33 @@ function ResearchCard({
               </span>
             </div>
 
-            {/* Expandable Content */}
-            <AnimatePresence>
-              {isActive && (
-                <m.div
-                  id={detailsId}
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-4 border-t border-border mt-4">
-                    {/* Full Description */}
-                    <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                      {description ?? project.shortDescription}
-                    </p>
-
-                    {/* Highlights Section */}
-                    {project.highlights && project.highlights.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                          <Trophy className="w-4 h-4 text-primary" />
-                          Key Contributions
-                        </h4>
-                        <div className="grid gap-2">
-                          {project.highlights.map((highlight, i) => (
-                            <div
-                              key={i}
-                              className="flex items-start gap-2 text-sm"
-                            >
-                              <Sparkles className="w-3 h-3 text-primary mt-0.5 shrink-0" />
-                              <span className="text-muted-foreground">
-                                {highlight}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tags Section */}
-                    {project.tags && project.tags.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                          <Award className="w-4 h-4 text-primary" />
-                          Technologies & Methods
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {project.tags.map((tag, i) => (
-                            <span
-                              key={i}
-                              className="px-2.5 py-1 text-xs font-medium rounded-lg transition-all hover:scale-105 accent-text"
-                              style={{
-                                ...accentStyle(`rgb(${nodeColor})`),
-                                backgroundColor: `rgba(${nodeColor}, 0.1)`,
-                                border: `1px solid rgba(${nodeColor}, 0.3)`,
-                              }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Links Section */}
-                    {project.links && project.links.length > 0 && (
-                      <div className="pt-4 border-t border-border">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-primary" />
-                          Resources & Publications
-                        </h4>
-                        <div className="flex flex-wrap gap-3">
-                          {project.links.map((link, i) => {
-                            const linkClass =
-                              "inline-flex items-center gap-1.5 text-sm text-primary hover:underline transition-colors font-medium";
-
-                            // stopPropagation on both branches: the whole card
-                            // is a click target that toggles expansion, so
-                            // without it opening a PDF also collapses the card
-                            // you opened it from.
-                            if (isLocalPdf(link.url)) {
-                              return (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  className={linkClass}
-                                  {...pdfReaderIntent}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenPDF(
-                                      link.url,
-                                      project.title,
-                                      pdfFileName(link.url),
-                                    );
-                                  }}
-                                >
-                                  <BookOpen className="w-4 h-4" />
-                                  {link.name}
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <Link
-                                key={i}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={linkClass}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {link.name.includes("GitHub") ? (
-                                  <GitBranch className="w-4 h-4" />
-                                ) : (
-                                  <ExternalLink className="w-4 h-4" />
-                                )}
-                                {link.name}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </m.div>
-              )}
-            </AnimatePresence>
-
-            {/* Quick Stats / Expand Toggle */}
+            {/* What the details hold, and the way to them */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-4">
-              {!isActive && project.links && (
+              {project.links && (
                 <span className="flex items-center gap-1">
                   <FileText className="w-3 h-3" />
                   {project.links.length}{" "}
                   {project.links.length === 1 ? "Resource" : "Resources"}
                 </span>
               )}
-              {!isActive && project.highlights && (
+              {project.highlights && (
                 <span className="flex items-center gap-1">
                   <Award className="w-3 h-3" />
                   {project.highlights.length} Achievements
                 </span>
               )}
               {/* The card opens from a click anywhere on it; this is its
-                  control for the keyboard and for screen readers. */}
+                  control for the keyboard and for screen readers, and the
+                  way back when the dialog closes. */}
               <button
                 type="button"
-                aria-expanded={isActive}
-                aria-controls={detailsId}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggle();
-                }}
+                {...{ [DETAILS_TRIGGER]: "" }}
+                aria-haspopup="dialog"
+                aria-label={`Read more about ${project.title}`}
                 className="flex items-center gap-1 ml-auto text-primary cursor-pointer rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {isActive ? "Click to collapse" : "Click to expand"}
-                <ChevronDown
-                  aria-hidden="true"
-                  className={cn(
-                    "w-3 h-3 transition-transform duration-300",
-                    isActive && "rotate-180",
-                  )}
-                />
+                Read more
+                <ArrowRight aria-hidden="true" className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -429,16 +232,9 @@ export function Research() {
   const { ref: timelineRef, active: timelineActive } = useAnimationGate({
     respectPlaying: false,
   });
-  const [activeIndex, setActiveIndex] = useState<number>(0);
-  const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
-  const [isPhdExpanded, setIsPhdExpanded] = useState(false);
-  const [details, loadDetails] = useResearchDetails();
-  // Something opened before the long texts came (or their chunk failed):
-  // ask again.
-  const opened = isJourneyExpanded || isPhdExpanded || activeIndex > 0;
-  useEffect(() => {
-    if (opened && !details) loadDetails();
-  }, [opened, details, loadDetails]);
+  // The cards' details, the hero's and the journey's: one dialog for the
+  // section, with the long texts (ResearchDetailsDialog.tsx).
+  const cardDetails = useDetailsDialog<ResearchSubject>();
   const {
     isOpen,
     pdfUrl,
@@ -451,42 +247,22 @@ export function Research() {
 
   // Above the display check: hooks cannot sit behind an early return.
   //
-  // The hero registers a second target, #<anchor>-full. Its plain anchor only
-  // points at the card, while the -full variant also opens the description,
-  // so a link can share the card without forcing the long read on the reader.
-  const { deepLinkedId, highlightedId } = useCardDeepLink(
-    visibleProjects.flatMap((p, i) =>
-      p.anchorId
-        ? i === 0
-          ? [p.anchorId, `${p.anchorId}-full`]
-          : [p.anchorId]
-        : [],
-    ),
-  );
+  // #<anchor> points at a card; #<anchor>-full also opens its details
+  // (useCardDeepLink's onOpen), so a link can share a card without forcing
+  // the long read on the reader.
   const heroAnchor = visibleProjects[0].anchorId;
-  const heroFullAnchor = heroAnchor ? `${heroAnchor}-full` : undefined;
-  const heroIsLinked =
-    !!heroAnchor &&
-    (deepLinkedId === heroAnchor || deepLinkedId === heroFullAnchor);
-
-  // Arriving via a deep link opens the targeted card, in the render the link
-  // arrives in.
-  //
-  // Only the hero distinguishes the two variants. Grid cards always open,
-  // because collapsed they show a three-line teaser, so a link that left one
-  // shut would land the reader on something they still have to click.
-  const [seenLink, setSeenLink] = useState<string | null>(null);
-  if (deepLinkedId !== seenLink) {
-    setSeenLink(deepLinkedId);
-    if (deepLinkedId && deepLinkedId === heroFullAnchor) {
-      setIsPhdExpanded(true);
-    } else if (deepLinkedId) {
-      const target = visibleProjects.findIndex(
-        (p) => p.anchorId === deepLinkedId,
-      );
-      if (target > 0) setActiveIndex(target);
-    }
-  }
+  const { deepLinkedId, highlightedId } = useCardDeepLink(
+    visibleProjects.flatMap((p) => (p.anchorId ? [p.anchorId] : [])),
+    {
+      onOpen: (id) => {
+        const index = visibleProjects.findIndex((p) => p.anchorId === id);
+        if (index >= 0) {
+          cardDetails.showFromLink({ kind: "project", index }, id);
+        }
+      },
+    },
+  );
+  const heroIsLinked = !!heroAnchor && deepLinkedId === heroAnchor;
 
   if (!researchSection.display) {
     return null;
@@ -520,7 +296,7 @@ export function Research() {
           </p>
         </div>
 
-        {/* Research Journey - Expandable Description */}
+        {/* Research Journey: a teaser, the story in the dialog */}
         {researchSection.journeyShortDescription && (
           <SlideInUp className="mb-8 sm:mb-12">
             <m.div
@@ -576,39 +352,23 @@ export function Research() {
                     My Research Journey
                   </h3>
 
-                  {/* Keyed m.div rather than AnimatePresence mode="wait".
-                      With mode="wait" the incoming child only mounts once the
-                      outgoing one finishes exiting, and when exit animations do
-                      not run the swap stalls: the button label flips but the
-                      text never changes. Keying a plain m.div makes React
-                      swap the node outright and framer just fades the new one
-                      in, which cannot get stuck. */}
-                  <m.div
-                    key={isJourneyExpanded ? "full" : "short"}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-                      {isJourneyExpanded
-                        ? (details?.journeyDescription ??
-                          researchSection.journeyShortDescription)
-                        : researchSection.journeyShortDescription}
-                    </p>
-                  </m.div>
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl mx-auto">
+                    {researchSection.journeyShortDescription}
+                  </p>
 
                   <div className="flex justify-center mt-6">
                     <m.button
                       type="button"
-                      onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
-                      aria-expanded={isJourneyExpanded}
+                      aria-haspopup="dialog"
+                      {...researchIntent}
+                      onClick={(event) =>
+                        cardDetails.show(
+                          { kind: "journey" },
+                          event.currentTarget,
+                        )
+                      }
                       className="group flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-300"
-                      style={{
-                        borderColor: "rgba(245, 158, 11, 0.3)",
-                        backgroundColor: isJourneyExpanded
-                          ? "rgba(245, 158, 11, 0.1)"
-                          : "transparent",
-                      }}
+                      style={{ borderColor: "rgba(245, 158, 11, 0.3)" }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
@@ -616,13 +376,10 @@ export function Research() {
                         className="text-sm font-medium accent-text"
                         style={accentStyle("rgb(245, 158, 11)")}
                       >
-                        {isJourneyExpanded ? "Show less" : "Read full story"}
+                        Read the full story
                       </span>
-                      <ChevronDown
-                        className={cn(
-                          "w-4 h-4 transition-transform duration-300",
-                          isJourneyExpanded && "rotate-180",
-                        )}
+                      <ArrowRight
+                        className="w-4 h-4"
                         style={{ color: "rgb(245, 158, 11)" }}
                         aria-hidden="true"
                       />
@@ -706,17 +463,11 @@ export function Research() {
             id={heroAnchor}
             className={cn(
               "relative",
-              (highlightedId === heroAnchor ||
-                highlightedId === heroFullAnchor) &&
-                "deep-link-highlight",
+              highlightedId === heroAnchor && "deep-link-highlight",
             )}
             whileHover={{ scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            {/* useCardDeepLink scrolls to getElementById(hash), so the -full
-                variant needs an element of its own. Zero-size and at the top
-                of the card, so both anchors land on the same place. */}
-            <span id={heroFullAnchor} aria-hidden="true" />
             {/* Unified Badge - Elegant single pill design */}
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
               <div className="bg-background px-5 py-1.5 rounded-full border border-primary/50 shadow-lg shadow-primary/10">
@@ -775,41 +526,27 @@ export function Research() {
                   </p>
                 </div>
 
-                {/* Expandable Description with Toggle */}
+                {/* The short description, and the way to the full one */}
                 <div className="text-center mb-6 sm:mb-8 max-w-3xl mx-auto">
-                  {/* Keyed m.div rather than AnimatePresence mode="wait".
-                      With mode="wait" the incoming child only mounts once the
-                      outgoing one finishes exiting, and when exit animations do
-                      not run the swap stalls: the button label flips but the
-                      text never changes. Keying a plain m.div makes React
-                      swap the node outright and framer just fades the new one
-                      in, which cannot get stuck. */}
-                  <m.div
-                    key={isPhdExpanded ? "full" : "short"}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <p className="text-sm sm:text-base text-muted-foreground">
-                      {isPhdExpanded
-                        ? (details?.descriptions[visibleProjects[0].title] ??
-                          visibleProjects[0].shortDescription)
-                        : visibleProjects[0].shortDescription}
-                    </p>
-                  </m.div>
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    {visibleProjects[0].shortDescription}
+                  </p>
 
-                  {/* Toggle Button */}
                   <div className="flex justify-center mt-4">
                     <m.button
                       type="button"
-                      onClick={() => setIsPhdExpanded(!isPhdExpanded)}
-                      aria-expanded={isPhdExpanded}
+                      {...{ [DETAILS_TRIGGER]: "" }}
+                      aria-haspopup="dialog"
+                      {...researchIntent}
+                      onClick={(event) =>
+                        cardDetails.show(
+                          { kind: "project", index: 0 },
+                          event.currentTarget,
+                        )
+                      }
                       className="group flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300"
                       style={{
-                        borderColor: `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.3)`,
-                        backgroundColor: isPhdExpanded
-                          ? `rgba(${visibleProjects[0].color || "139, 92, 246"}, 0.1)`
-                          : "transparent",
+                        borderColor: `rgba(${projectColor(visibleProjects[0])}, 0.3)`,
                       }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -817,18 +554,15 @@ export function Research() {
                       <span
                         className="text-xs font-medium accent-text"
                         style={accentStyle(
-                          `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                          `rgb(${projectColor(visibleProjects[0])})`,
                         )}
                       >
-                        {isPhdExpanded ? "Show less" : "Read full description"}
+                        Read full description
                       </span>
-                      <ChevronDown
-                        className={cn(
-                          "w-3 h-3 transition-transform duration-300",
-                          isPhdExpanded && "rotate-180",
-                        )}
+                      <ArrowRight
+                        className="w-3 h-3"
                         style={{
-                          color: `rgb(${visibleProjects[0].color || "139, 92, 246"})`,
+                          color: `rgb(${projectColor(visibleProjects[0])})`,
                         }}
                         aria-hidden="true"
                       />
@@ -1029,12 +763,10 @@ export function Research() {
               <SlideInUp key={index + 1}>
                 <ResearchCard
                   project={project}
-                  description={details?.descriptions[project.title]}
-                  index={index + 1}
-                  isActive={activeIndex === index + 1}
-                  onToggle={() =>
-                    setActiveIndex(activeIndex === index + 1 ? -1 : index + 1)
-                  }
+                  onOpen={cardDetails.onCardClick({
+                    kind: "project",
+                    index: index + 1,
+                  })}
                   isLeftSide={index % 2 === 0}
                   isDeepLinked={
                     !!project.anchorId && deepLinkedId === project.anchorId
@@ -1042,7 +774,6 @@ export function Research() {
                   isHighlighted={
                     !!project.anchorId && highlightedId === project.anchorId
                   }
-                  onOpenPDF={openPDF}
                 />
               </SlideInUp>
             ))}
@@ -1050,7 +781,20 @@ export function Research() {
         </div>
       </div>
 
-      {/* PDF Modal */}
+      {/* A card's details, once for the section, outside the cards: inside
+          a clickable card, every click in the dialog would reach the card
+          (portal events bubble along the component tree). */}
+      {cardDetails.open && cardDetails.dialog && (
+        <ResearchDetailsDialog
+          subject={cardDetails.open.item}
+          {...subjectText(cardDetails.open.item)}
+          dialog={cardDetails.dialog}
+          onOpenPDF={openPDF}
+        />
+      )}
+
+      {/* PDF Modal: opened from a dialog, it mounts after it and so paints
+          above it, and takes the keys while it is open. */}
       {isOpen && (
         <PDFModal
           isOpen={isOpen}

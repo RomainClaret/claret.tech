@@ -10,6 +10,8 @@
 /.next/
 /.next.stale-*/
 /out/
+# Written by next dev when it detects an AI agent; kept local
+/AGENTS.md
 
 # Production
 /build

@@ -39,6 +39,22 @@ describe("FloatingNav", () => {
     vi.useRealTimers();
   });
 
+  it("stays out of phones, upright and turned", () => {
+    // Below 640 px wide, or 500 px tall (a phone turned), its column fixed
+    // at the right covered the hero's View Resume and a strip of content.
+    // mobile-navigation.spec.ts holds it in the browsers.
+    renderShown();
+
+    const rail = screen
+      .getByRole("button", { name: "Scroll to next section" })
+      .closest(".fixed");
+    expect(rail).toHaveClass(
+      "hidden",
+      "[@media(min-width:640px)_and_(min-height:501px)]:flex",
+    );
+    expect(rail).not.toHaveClass("flex");
+  });
+
   it("keeps the Home button out of the Tab order while it is invisible", () => {
     renderShown();
 

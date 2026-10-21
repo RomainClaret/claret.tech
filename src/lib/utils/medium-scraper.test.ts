@@ -20,8 +20,8 @@ vi.mock("fs", () => {
 import { fetchMediumArticle } from "./medium-scraper";
 
 /**
- * The article URL reaches a server-side fetch straight from the rss2json
- * response, so it is third-party input. These tests pin the host guard.
+ * The article URL reaches a server-side fetch straight from Medium's feed,
+ * so it is third-party input. These tests pin the host guard.
  *
  * The assertion that matters in each rejection case is `fetch` not being
  * called at all: returning nulls while still having made the request would

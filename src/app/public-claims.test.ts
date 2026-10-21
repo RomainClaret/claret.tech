@@ -21,8 +21,9 @@ describe("what the site tells visitors", () => {
 
   it("names the services the server fetches from, and no other", () => {
     // It named Kudos, which the server stopped scraping in round 26, and
-    // not Crossref or rss2json.com (Medium's feed), which it contacts. A
-    // host in the server's code stands for a request to it.
+    // not Crossref or rss2json.com (Medium's feed), which it contacted; it
+    // reads Medium's feed itself since 2026-10. A host in the server's code
+    // stands for a request to it.
     const services: Record<string, string> = {
       "api.github.com": "GitHub",
       "api.semanticscholar.org": "Semantic Scholar",

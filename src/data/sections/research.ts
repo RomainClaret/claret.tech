@@ -2,7 +2,7 @@
 export interface ResearchProject {
   title: string;
   subtitle: string;
-  /** Shown collapsed; the full description is in research-details.ts. */
+  /** On the card; the full description, in research-details.ts, opens in its dialog. */
   shortDescription?: string;
   tags: string[];
   status: "active" | "completed" | "ongoing";
@@ -61,8 +61,10 @@ export const researchSection = {
     normalText:
       "Every field I touched taught me the same lesson: minds have to grow. Engineering them top-down never worked for me.",
   },
+  // The journey card's teaser; the story itself (journeyDescription) is in
+  // research-details.ts and opens in the section's dialog.
   journeyShortDescription:
-    "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots. Pursued that dream through physics, mechanics, neuroscience, AI, until they all revealed the same truth: minds evolve into existence. The irony? Decades of education had turned me into the robot, trained to engineer things. I can't escape that mindset, but now I'm breeding artificial life into existence, watching behavior arise from chaos rather than from architecture, code, or engineering. Whether that is where intelligence actually begins is the question, not the conclusion.",
+    "Most researchers find their field. I had a question that wouldn't let me settle: child me wanted thinking robots.",
   journeyBadge: "A Lifelong Question",
 
   /**

@@ -65,6 +65,9 @@ afterEach(() => {
 // A picture of the site's own, as the Kudos story's is.
 const IMAGE = "/images/kudos_gecco_2024.webp";
 
+// The section's dialog, for cards whose tests are about something else.
+const noDetails = () => {};
+
 describe("BlogCardHolographic color", () => {
   it("extracts from the image only once the card is within reach", () => {
     render(
@@ -75,6 +78,7 @@ describe("BlogCardHolographic color", () => {
         date="2026-01-01"
         image={IMAGE}
         index={0}
+        onOpenDetails={noDetails}
       />,
     );
     // Far down the page: nothing extracted yet.
@@ -97,6 +101,7 @@ describe("BlogCardHolographic color", () => {
         image={IMAGE}
         index={0}
         color="12, 34, 56"
+        onOpenDetails={noDetails}
       />,
     );
 
@@ -117,6 +122,7 @@ describe("BlogCardHolographic picture", () => {
         image={ROUTE}
         index={0}
         color="12, 34, 56"
+        onOpenDetails={noDetails}
       />,
     );
 
@@ -157,6 +163,7 @@ describe("BlogCardHolographic links", () => {
         image={IMAGE}
         index={0}
         color="12, 34, 56"
+        onOpenDetails={noDetails}
       />,
     );
 
@@ -169,7 +176,10 @@ describe("BlogCardHolographic links", () => {
 });
 
 describe("BlogCardHolographic description", () => {
-  it("says whether its long description is open", () => {
+  it("opens its whole text in the section's dialog, in its colour", () => {
+    // The card grew in place and pushed the grid around; its text opens
+    // above the page now, and the card stays as it is.
+    const onOpenDetails = vi.fn();
     render(
       <BlogCardHolographic
         title="Long article"
@@ -179,17 +189,34 @@ describe("BlogCardHolographic description", () => {
         image={IMAGE}
         index={0}
         color="12, 34, 56"
+        onOpenDetails={onOpenDetails}
       />,
     );
-    const toggle = screen.getByRole("button", {
-      name: "Read more description",
+    const button = screen.getByRole("button", {
+      name: "Read more about Long article",
     });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(button).toHaveAttribute("aria-haspopup", "dialog");
+    expect(button).not.toHaveAttribute("aria-expanded");
 
-    fireEvent.click(toggle);
+    fireEvent.click(button);
 
-    expect(toggle).toHaveAccessibleName("Show less description");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(onOpenDetails).toHaveBeenCalledWith(button, "12, 34, 56");
+    expect(screen.getByText(/A long description/)).toHaveClass("line-clamp-3");
+  });
+
+  it("has no Read more for a text the card shows whole", () => {
+    render(
+      <BlogCardHolographic
+        title="Short article"
+        description="A short description."
+        url="https://example.com/short"
+        index={0}
+        color="12, 34, 56"
+        onOpenDetails={noDetails}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Read more/ })).toBeNull();
   });
 });
 
@@ -203,6 +230,7 @@ describe("BlogCardHolographic share", () => {
       image={IMAGE}
       index={0}
       color="12, 34, 56"
+      onOpenDetails={noDetails}
     />
   );
   const toasts: string[] = [];

@@ -1099,6 +1099,187 @@ against 443, LCP 648 to 831 ms against 691 to 870 (CPU benchmark 3,737 to
 on macOS twice, 2,640 tests each time, and act's 8 jobs. npm audit: 7, as
 before.
 
+### Round 27: cards that open in a dialog, a more compact page (2026-10-21)
+
+- **What changed.** The research, skills, paper and blog cards grew in
+  place to show their long text, which pushed the rest of the page around:
+  opening one research card took its grid from 800 to 1,332 px at 1280 px.
+  Their details open in a dialog above the page now, in the frame of the
+  GitHub project dialog (`src/components/ui/details-dialog.tsx`), one per
+  section, rendered outside the cards. Experience and Education still
+  expand, by Romain's choice.
+  - **Skills.** A philosophy card shows its first point, the key one, and
+    how many it has; its dialog has the framing and all six. The four
+    cards stand in one row, 226 px tall at 1280 px (790 before) and 772 px
+    at 390 px (2,308). The core activities lost their fixed heights.
+  - **Research.** The journey's card shows a two-sentence teaser, and its
+    902-character story opens in the dialog: the old short text (595
+    characters) told a different story at about the same length.
+  - **Links.** `#<card>` points at the card, as before. `#<card>-full`
+    also opens its details, and closing turns the link into `#<card>` and
+    leaves the page at the card, the focus on its Read more.
+- **Loading.** Each section's dialog is a chunk of its own, fetched when a
+  card or its Read more is pointed at or focused, and the card's short text
+  in a stand-in when the chunk cannot load: `lazyDetails`
+  (`src/components/ui/lazy-details.tsx`) builds both. The research and
+  skills long texts came with the page's first JavaScript or an idle fetch,
+  and come with their dialogs now. A Medium post's text keeps its
+  paragraphs, and its extraction moved into the blog cards' chunk.
+
+The sections' heights, before (`6499311`) and after (`d68b534`):
+
+| Section  | 1280 px        | 390 px         |
+| -------- | -------------- | -------------- |
+| Skills   | 1,904 -> 1,294 | 4,318 -> 2,596 |
+| Research | 2,451 -> 2,321 | 3,682 -> 3,329 |
+| Papers   | 4,735, same    | 8,197, same    |
+| Blog     | 948, same      | 948, same      |
+
+Eager JavaScript, each change against the commit before it, on the Mac
+(CI's e2e build, homepage scripts without the polyfills, gzip -9):
+
+| Commit    | Change                                  | Bytes   | Files |
+| --------- | --------------------------------------- | ------- | ----- |
+| `6499311` | before the round                        | 260,024 | 15    |
+| `6d76b2b` | the shared dialog pieces (five commits) | 260,289 | 15    |
+| `c598c87` | research cards open a dialog            | 260,590 | 15    |
+| `2a4c087` | the PhD and the journey; no idle fetch  | 260,149 | 15    |
+| `3730a17` | the paper cards' shared parts           | 260,167 | 15    |
+| `6252afa` | papers open a dialog                    | 261,190 | 15    |
+| `903689c` | one lazy loader and stand-in            | 261,101 | 15    |
+| `dab6eab` | skills open a dialog, compact cards     | 261,160 | 15    |
+| `2ac093e` | the skills' long texts come with it     | 260,100 | 15    |
+| `b62bd7c` | blog posts open a dialog                | 260,012 | 15    |
+
+The dialogs' chunks: research 6,532 B (with its long texts), skills 3,316
+(with theirs), papers 2,421 and blog 1,921; the blog cards' chunk went from
+3,842 to 4,487 with the Medium text's extraction. The homepage asks for 29
+scripts and 46 requests until the network is idle on a desktop (30 and 45
+before) and 28 and 42 on a phone (29 and 43): one script fewer, the
+research texts' idle fetch, and two Experience logos more, now within the
+browser's lazy-loading distance of the first screen.
+
+Each commit's new tests were proved by mutation (66 mutations from the
+papers commit on, all killed). One choice differs from the plan: the blog's
+dialog has a chunk of its own, where the plan put it in the blog cards'
+chunk, which every visit fetches.
+
+Final HEAD (`d68b534`) in the Playwright container (Node 24.21): `npm ci`,
+lint, type-check, knip, format, CI's build, the static-home check and the
+client-bundle deny list passed (56 client chunks). e2e, every spec: Chromium
+216 passed, 13 skipped and 3 failed; WebKit 189 passed, 41 skipped and 2
+failed; both phones 328 passed, 131 skipped and 5 failed; Firefox (terminal,
+Python, error reports, privacy) 39 passed. Two failures in every engine are
+console checks (`static-shell.spec.ts`'s hydration test and
+`error-reports.spec.ts`'s global-error test): rss2json answered this machine
+403 all day, and `/api/medium-posts` turns that into a 500, which the
+browser logs. Both fail the same way at `6499311`. Chromium's ARIA-label
+scan failed once under load and passed 5 of 5 reruns; Mobile Safari's 4 s
+splash-timer test fails in this container, as at round 26's end.
+Lighthouse, three runs alternating with `6499311`: performance 100 and TBT
+0 ms for both, CLS 0.014, FCP 442 to 444 ms against 443, LCP 819 to 821 ms
+against 820 to 833 (CPU benchmark 3,822 to 3,902). Unit: CI's ten scripts
+on macOS twice, 2,671 tests each time; act's 8 jobs passed; actionlint.
+
+Follow-ups the same day, from the round's findings:
+
+- **Medium's feed, read directly.** rss2json began answering servers with
+  a Cloudflare challenge. On the live site `/api/medium-posts` answered
+  500 (no Medium posts, and a console error for every visitor) and
+  `/rss.xml` was empty. The server reads `medium.com/feed/@<user>` itself
+  now (`src/lib/utils/medium-rss.ts`, which the build's color script loads
+  too). A feed that cannot be had gives 200 with no posts, cached five
+  minutes. The privacy policy names Medium alone.
+- **The PDF reader under `next dev`.** pdf.js 5.4's plain build declares
+  an unused `var __webpack_exports__`. Webpack before 5.103 keeps the name
+  (webpack/webpack#20097), and inside `next dev`'s eval source maps it
+  hides the module's exports, so the reader's chunk failed to load in dev
+  only (vercel/next.js#89177, open). The alias points at pdf.js's minified
+  legacy build, which a test holds; the reader's chunk went from 139,615
+  to 139,371 B.
+- **`AGENTS.md`,** which `next dev` writes when it detects an AI agent, is
+  gitignored.
+- **The button and link name scan** in `accessibility.spec.ts` reads each
+  element once (see the testing guide's "Things that bite").
+- **A Medium post's text, past its first photo.** The text was cut at the
+  first "Photo by", and Medium puts a photo under a post's first lines:
+  both posts were down to their first sentence (64 and 127 of 854 and
+  1,559 characters). Their cards had no Read more, and a `-full` link
+  opened a one-line dialog whose closing left the focus at the top of the
+  page. The photos' captions, where the credits are, are left out instead.
+- **A link's highlight after the splash.** On a page opened at `#<card>`,
+  the card's 2.6 s highlight started with the link, and the splash covered
+  about 2 s of it (a production build: the highlight from 0.13 to 2.71 s,
+  the splash until 2.10 s). AppWrapper says when the page is shown
+  (`src/contexts/page-shown-context.tsx`, false while the splash covers
+  it), and the highlight starts then; the scroll to the card does not wait.
+  Eager JavaScript went from 259,980 to 260,075 B.
+
+Then, from checking those against the live dev server (Romain's choices):
+
+- **The deploy waits for the browser tests.** The height budgets, the
+  dialog and link tests and the accessibility scans run in
+  `playwright.yml`, and the deploy waited for `ci.yml` alone. A job before
+  both deploys, previews included, now waits for the commit's run
+  (`.github/scripts/browser-tests-passed.sh`, with a test of its own that
+  `ci.yml` runs) and refuses a failed run, one with a job skipped, or code
+  no run tested; a docs-only push takes the run before it. On `main` every
+  browser-test job runs whatever changed: a green run there had skipped
+  the phone tests (37212624117). Asked of GitHub, the check passed
+  `d8da49f`'s run and refused `07318f1`'s.
+- **The hero's buttons on a phone's first screen.** Below 640 px the hero
+  has 16 px above it (64), 16 px paragraph text (18) and 24 px above the
+  buttons (32): View Resume ends at 645 px (766) of a 390 x 664 page area,
+  an iPhone 12's in Safari, in Chromium and WebKit, on macOS and in Linux.
+  On a first visit the cookie notice, 185 px tall, covers it until closed;
+  a 320 px phone stays about 120 px short.
+- **The focus after a link's dialog** goes to the card's first control
+  when the card has no Read more (a text too short for one): it went to
+  the page itself, so Tab started from the top. No card is that short
+  today.
+- **The dialog tests' Medium posts are their own.** The page asks
+  `/api/medium-posts` with no query string, so the API's test posts never
+  reached a browser test. `card-details.spec.ts` answers the route with a
+  post shaped like the real ones (a photo under its first lines, the
+  credit in its caption) and a short one. Its accessibility scan runs one
+  test per dialog: all eight in one test ran out of 60 s in the Linux
+  container.
+
+And from rehearsing the next push with act (Romain's choices):
+
+- **The rehearsal.** act ran `ci.yml` and `playwright.yml` as GitHub would
+  for a push of the 564 local commits (from `d8da49f`), every job, in native
+  arm64 containers (`.github/workflows/README.md`, "Rehearse a push"). CI
+  passed whole, twice: the five quick checks (knip and actionlint for the
+  first time in a CI shape) and 2,693 unit tests on the final HEAD
+  (`07e72e8`). The browser tests failed one WebKit test (below), and with it
+  fixed passed in every job: navigation 7 a browser, accessibility 84 and
+  83, performance 75, the terminal's nine shards, the phones 26, Lighthouse 2. Artifact uploads fail under act 0.2.89 and do not count.
+- **The server waits ran once.** A job in a container runs its steps under
+  `sh -e`, dash in the Playwright image, which leaves `{1..30}` as it is:
+  each of the five waits for the server was one 2 s sleep, where it was to
+  wait up to 60 s (GitHub's own log printed "attempt {1..30}/30"). They
+  count with `seq` now.
+- **act's image and its manners.** `node:24-bookworm` had no jq, gh or
+  docker, which CI's steps use: `.github/act/Dockerfile` adds them
+  (`claret-act:24`, never pulled). act also could deploy: `.env.act.local`
+  holds the real Vercel token, and with `--input environment=production` a
+  dry run reached the production deploy. The deploy steps and Update
+  Publications' pull request skip when `ACT` is set.
+- **No section rail on phones.** The floating section nav, a 40 x 324 px
+  column fixed at the right, covered the end of the hero's View Resume
+  (38 x 43 to 56 px) and a strip of content on phones, and most of the
+  height in landscape: it shows from 640 px wide and 501 px tall only.
+- **The API's test posts are gone.** `/api/medium-posts` answered two
+  made-up posts to `?playwright=true`, which no page or test asked for.
+- **WebKit and frame counts.** The one browser test that failed in the
+  rehearsal waits for 12 frames as the dashboard opens; Linux WebKit drew
+  the page with the terminal open at 4.7 to 7.9 frames a second alone on 4
+  CPUs, 0.5 beside another browser, and it failed 4 runs in 5 under CI's 4
+  workers. It skips WebKit, which cannot see a 300 to 500 ms spring at that
+  rate, and the dashboard dims the page without a blur on Safari, as the
+  other dialogs do (about 20 frames a second with it open).
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another

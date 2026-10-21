@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
   fireEvent,
-  act,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { Skills } from "./Skills";
+import { skillsSection as realSkills } from "@/data/sections/skills";
+import type { skillsDetails as SkillsDetails } from "@/data/sections/skills-details";
 import type {
   SlideInUpProps,
   ScaleInProps,
@@ -87,8 +89,8 @@ vi.mock("lucide-react", () => ({
   Brain: (props: LucideIconProps) => (
     <div data-testid="brain-icon" {...props} />
   ),
-  ChevronDown: (props: LucideIconProps) => (
-    <div data-testid="chevron-down-icon" {...props} />
+  ArrowRight: (props: LucideIconProps) => (
+    <div data-testid="arrow-right-icon" {...props} />
   ),
 }));
 
@@ -110,8 +112,11 @@ vi.mock("@/lib/utils", () => ({
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
 }));
 
-vi.mock("@/data/portfolio", () => ({
-  skillsSection: {
+// The section's data for these tests. Hoisted so a test that imports the
+// section afresh can register it again: tests before it mock other data
+// with vi.doMock, which outlives them.
+const { mockSkillsSection } = vi.hoisted(() => ({
+  mockSkillsSection: {
     display: true,
     title: "Skills & Expertise",
     subtitle: {
@@ -128,8 +133,6 @@ vi.mock("@/data/portfolio", () => ({
         title: "Evolutionary Algorithms",
         description:
           "Developing novel evolutionary computation methods for AI optimization.",
-        expandedDescription:
-          "Developing novel evolutionary computation methods for AI optimization. This includes genetic algorithms, evolution strategies, and neuroevolution techniques applied to complex problem domains including robotics and artificial life.",
         technologies: [
           { name: "Python", icon: "fas fa-code" },
           { name: "JAX", icon: "fas fa-bolt" },
@@ -141,8 +144,6 @@ vi.mock("@/data/portfolio", () => ({
         title: "Machine Learning",
         description:
           "Creating intelligent systems using deep learning and reinforcement learning.",
-        expandedDescription:
-          "Creating intelligent systems using deep learning and reinforcement learning. Focus on multi-agent systems, embodied AI, and lifelong learning approaches for continuous adaptation.",
         technologies: [
           { name: "PyTorch", icon: "fas fa-sliders" },
           { name: "Reinforcement Learning", icon: "fas fa-network-wired" },
@@ -154,8 +155,6 @@ vi.mock("@/data/portfolio", () => ({
         title: "Research & Teaching",
         description:
           "Conducting cutting-edge research and educating the next generation.",
-        expandedDescription:
-          "Conducting cutting-edge research in artificial life and educating the next generation of AI researchers through mentoring and open-source contributions.",
         technologies: [
           { name: "Research", icon: "fas fa-puzzle-piece" },
           { name: "Teaching", icon: "fas fa-seedling" },
@@ -170,7 +169,6 @@ vi.mock("@/data/portfolio", () => ({
     researchInterests: {
       "Current Focus": {
         description: "Short framing for current focus.",
-        expandedDescription: "Longer framing for current focus.",
         bullets: [
           "Neuroevolution algorithms",
           "Lifelong learning systems",
@@ -179,7 +177,6 @@ vi.mock("@/data/portfolio", () => ({
       },
       "Why Evolution": {
         description: "Short framing for why evolution.",
-        expandedDescription: "Longer framing for why evolution.",
         bullets: [
           "Natural optimization principles",
           "Adaptive system design",
@@ -188,7 +185,6 @@ vi.mock("@/data/portfolio", () => ({
       },
       "My Approach": {
         description: "Short framing for my approach.",
-        expandedDescription: "Longer framing for my approach.",
         bullets: [
           "Open-source development",
           "Reproducible research",
@@ -197,7 +193,6 @@ vi.mock("@/data/portfolio", () => ({
       },
       Seeking: {
         description: "Short framing for seeking.",
-        expandedDescription: "Longer framing for seeking.",
         bullets: [
           "Industry collaborations",
           "Research partnerships",
@@ -210,6 +205,27 @@ vi.mock("@/data/portfolio", () => ({
       { name: "French", proficiency: 100 },
       { name: "German", proficiency: 70 },
     ],
+  },
+}));
+vi.mock("@/data/portfolio", () => ({ skillsSection: mockSkillsSection }));
+
+// The cards' long texts, which come with the dialog.
+vi.mock("@/data/sections/skills-details", () => ({
+  skillsDetails: {
+    activities: {
+      "Evolutionary Algorithms":
+        "Developing novel evolutionary computation methods for AI optimization. This includes genetic algorithms, evolution strategies, and neuroevolution techniques applied to complex problem domains including robotics and artificial life.",
+      "Machine Learning":
+        "Creating intelligent systems using deep learning and reinforcement learning. Focus on multi-agent systems, embodied AI, and lifelong learning approaches for continuous adaptation.",
+      "Research & Teaching":
+        "Conducting cutting-edge research in artificial life and educating the next generation of AI researchers through mentoring and open-source contributions.",
+    },
+    philosophy: {
+      "Current Focus": "Longer framing for current focus.",
+      "Why Evolution": "Longer framing for why evolution.",
+      "My Approach": "Longer framing for my approach.",
+      Seeking: "Longer framing for seeking.",
+    },
   },
 }));
 
@@ -348,107 +364,80 @@ describe("Skills Component", () => {
     });
   });
 
-  describe("Expandable Descriptions", () => {
-    it("shows read more buttons initially", () => {
+  describe("Card details", () => {
+    // The 3 core activities, then the 4 philosophy cards.
+    const cards = [
+      "Evolutionary Algorithms",
+      "Machine Learning",
+      "Research & Teaching",
+      "Current Focus",
+      "Why Evolution",
+      "My Approach",
+      "Seeking",
+    ];
+    const cardOf = (title: string) =>
+      screen
+        .getByRole("button", { name: `Read more about ${title}` })
+        .closest<HTMLElement>('[data-testid="holographic-card"]')!;
+
+    it("opens each card's details in a dialog, from a real button", async () => {
+      // The cards grew in place and pushed the page around; their details
+      // open above the page now, outside the card, and closing gives the
+      // focus back to the button.
       render(<Skills />);
-
-      const readMoreButtons = screen.getAllByText("Read more");
-      // 3 core activities + 4 research philosophy panels.
-      expect(readMoreButtons).toHaveLength(7);
-    });
-
-    it("expands activity description when read more is clicked", () => {
-      render(<Skills />);
-
-      const firstReadMore = screen.getAllByText("Read more")[0];
-      fireEvent.click(firstReadMore);
-
       expect(
-        screen.getByText(
-          /This includes genetic algorithms, evolution strategies/,
-        ),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Show less")).toBeInTheDocument();
-    });
+        screen.getAllByRole("button", { name: /^Read more about / }),
+      ).toHaveLength(cards.length);
 
-    it("collapses expanded description when show less is clicked", () => {
-      render(<Skills />);
+      for (const title of cards) {
+        const button = screen.getByRole("button", {
+          name: `Read more about ${title}`,
+        });
+        expect(button).toHaveAttribute("aria-haspopup", "dialog");
+        expect(button).not.toHaveAttribute("aria-expanded");
 
-      // Expand first activity
-      const firstReadMore = screen.getAllByText("Read more")[0];
-      fireEvent.click(firstReadMore);
+        fireEvent.click(button);
+        const dialog = await screen.findByRole("dialog", { name: title });
+        expect(cardOf(title)).not.toContainElement(dialog);
 
-      // Then collapse it
-      const showLess = screen.getByText("Show less");
-      fireEvent.click(showLess);
-
-      expect(
-        screen.queryByText(
-          /This includes genetic algorithms, evolution strategies/,
-        ),
-      ).not.toBeInTheDocument();
-      // Back to all 7 collapsed: 3 core activities + 4 philosophy panels.
-      expect(screen.getAllByText("Read more")).toHaveLength(7);
-    });
-
-    it("only expands one activity at a time", () => {
-      render(<Skills />);
-
-      // Expand first activity
-      const readMoreButtons = screen.getAllByText("Read more");
-      fireEvent.click(readMoreButtons[0]);
-
-      expect(screen.getByText("Show less")).toBeInTheDocument();
-
-      // Expand second activity (should collapse first)
-      fireEvent.click(readMoreButtons[1]);
-
-      expect(
-        screen.getByText(/Focus on multi-agent systems/),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/This includes genetic algorithms/),
-      ).not.toBeInTheDocument();
-    });
-
-    it("names each toggle after its panel and says whether it is open", () => {
-      render(<Skills />);
-
-      const toggles = screen.getAllByRole("button", {
-        name: /^Read more about /,
-      });
-      // 3 core activities + 4 research philosophy panels, none open.
-      expect(toggles).toHaveLength(7);
-      for (const toggle of toggles) {
-        expect(toggle).toHaveAttribute("aria-expanded", "false");
+        fireEvent.keyDown(document, { key: "Escape" });
+        await waitFor(() => {
+          expect(screen.queryByRole("dialog")).toBeNull();
+        });
+        expect(button).toHaveFocus();
       }
-      expect(toggles[0]).toHaveAccessibleName(
-        "Read more about Evolutionary Algorithms",
-      );
-
-      fireEvent.click(toggles[0]);
-      fireEvent.click(toggles[3]);
-
-      expect(toggles[0]).toHaveAccessibleName(
-        "Show less about Evolutionary Algorithms",
-      );
-      expect(toggles[0]).toHaveAttribute("aria-expanded", "true");
-      expect(toggles[3]).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("renders chevron icons that rotate when expanded", () => {
+    it("opens a card's details from a click anywhere on it", async () => {
       render(<Skills />);
 
-      const chevronIcons = screen.getAllByTestId("chevron-down-icon");
-      // One per toggle: 3 core activities + 4 research philosophy panels.
-      expect(chevronIcons).toHaveLength(7);
+      fireEvent.click(screen.getByText("Machine Learning"));
 
-      // Click to expand and check for rotation class
-      const firstReadMore = screen.getAllByText("Read more")[0];
-      fireEvent.click(firstReadMore);
+      expect(
+        await screen.findByRole("dialog", { name: "Machine Learning" }),
+      ).toBeInTheDocument();
+    });
 
-      // Chevron should have rotation class (tested via className)
-      expect(chevronIcons[0]).toHaveClass("rotate-180");
+    it("shows an activity's story and its technologies in its dialog, not on the card", async () => {
+      render(<Skills />);
+      expect(cardOf("Evolutionary Algorithms")).not.toHaveTextContent(
+        /This includes genetic algorithms/,
+      );
+
+      fireEvent.click(screen.getByText("Evolutionary Algorithms"));
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Evolutionary Algorithms",
+      });
+      expect(dialog).toHaveTextContent(
+        /This includes genetic algorithms, evolution strategies/,
+      );
+      expect(dialog).toHaveTextContent("Core Activities");
+      expect(
+        within(dialog)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Python", "JAX", "Neuroevolution"]);
     });
   });
 
@@ -462,86 +451,58 @@ describe("Skills Component", () => {
       expect(screen.getByText("Seeking")).toBeInTheDocument();
     });
 
-    it("frames each category with a description above its bullets", () => {
+    it("shows each card's key point and how many points it has", () => {
       render(<Skills />);
 
-      // The bullets are fragments without this: "Measuring it honestly" under
+      for (const [category, first, second] of [
+        [
+          "Current Focus",
+          "Neuroevolution algorithms",
+          "Lifelong learning systems",
+        ],
+        [
+          "Why Evolution",
+          "Natural optimization principles",
+          "Adaptive system design",
+        ],
+        ["My Approach", "Open-source development", "Reproducible research"],
+        ["Seeking", "Industry collaborations", "Research partnerships"],
+      ]) {
+        const card = screen
+          .getByRole("button", { name: `Read more about ${category}` })
+          .closest('[data-testid="holographic-card"]')!;
+        expect(card).toHaveTextContent(first);
+        expect(card).not.toHaveTextContent(second);
+        expect(card).toHaveTextContent("3 points");
+      }
+    });
+
+    it("frames a card's points in its dialog, and lists them all", async () => {
+      render(<Skills />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read more about Current Focus" }),
+      );
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Current Focus",
+      });
+      // The points are fragments without this: "Measuring it honestly" under
       // a bare "Current Focus" heading leaves the reader no referent for "it".
+      expect(dialog).toHaveAccessibleDescription(
+        "Short framing for current focus.",
+      );
+      expect(dialog).toHaveTextContent("Longer framing for current focus.");
+      expect(dialog).toHaveTextContent("Research Philosophy");
       expect(
-        screen.getByText("Short framing for current focus."),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Short framing for why evolution."),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Short framing for my approach."),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Short framing for seeking."),
-      ).toBeInTheDocument();
-    });
-
-    it("expands a category description without hiding its bullets", () => {
-      render(<Skills />);
-
-      // The philosophy toggles follow the 3 core activity ones in the DOM.
-      fireEvent.click(screen.getAllByText("Read more")[3]);
-
-      expect(
-        screen.getByText("Longer framing for current focus."),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("Short framing for current focus."),
-      ).not.toBeInTheDocument();
-      // Bullets stay put; only the paragraph swaps.
-      expect(screen.getByText("Neuroevolution algorithms")).toBeInTheDocument();
-    });
-
-    it("keeps category panels independent from the core activity cards", () => {
-      render(<Skills />);
-
-      fireEvent.click(screen.getAllByText("Read more")[0]); // a core activity
-      // The list re-indexes once the first toggle flips to "Show less", so
-      // this lands on the first philosophy panel. The assertions below pin
-      // down which element was actually hit.
-      fireEvent.click(screen.getAllByText("Read more")[2]);
-
-      // Expanding a panel must not collapse the activity: they are separate
-      // pieces of state, so both stay open.
-      expect(
-        screen.getByText(
-          /This includes genetic algorithms, evolution strategies/,
-        ),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Longer framing for current focus."),
-      ).toBeInTheDocument();
-    });
-
-    it("renders research interest items for each category", () => {
-      render(<Skills />);
-
-      // Current Focus
-      expect(screen.getByText("Neuroevolution algorithms")).toBeInTheDocument();
-      expect(screen.getByText("Lifelong learning systems")).toBeInTheDocument();
-      expect(screen.getByText("Embodied AI research")).toBeInTheDocument();
-
-      // Why Evolution
-      expect(
-        screen.getByText("Natural optimization principles"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Adaptive system design")).toBeInTheDocument();
-      expect(screen.getByText("Emergent intelligence")).toBeInTheDocument();
-
-      // My Approach
-      expect(screen.getByText("Open-source development")).toBeInTheDocument();
-      expect(screen.getByText("Reproducible research")).toBeInTheDocument();
-      expect(screen.getByText("Practical applications")).toBeInTheDocument();
-
-      // Seeking
-      expect(screen.getByText("Industry collaborations")).toBeInTheDocument();
-      expect(screen.getByText("Research partnerships")).toBeInTheDocument();
-      expect(screen.getByText("PhD opportunities")).toBeInTheDocument();
+        within(dialog)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([
+        "Neuroevolution algorithms",
+        "Lifelong learning systems",
+        "Embodied AI research",
+      ]);
     });
 
     it("renders brain icons for research categories", () => {
@@ -705,20 +666,64 @@ describe("Skills Component", () => {
     });
   });
 
-  describe("Interactive Elements", () => {
-    it("handles click events on expandable descriptions", async () => {
-      render(<Skills />);
+  describe("Long texts", () => {
+    // skills-details.ts comes with the details dialog's code, out of the
+    // page's first JavaScript: none of it is on the page until a dialog
+    // opens.
+    it("has every card's long text, by its title or category, and no other", async () => {
+      const { skillsDetails } = await vi.importActual<{
+        skillsDetails: typeof SkillsDetails;
+      }>("@/data/sections/skills-details");
 
-      const readMoreButton = screen.getAllByText("Read more")[0];
-      expect(readMoreButton).toBeInTheDocument();
+      expect(Object.keys(skillsDetails.activities).sort()).toEqual(
+        realSkills.coreActivities.map((activity) => activity.title).sort(),
+      );
+      expect(Object.keys(skillsDetails.philosophy).sort()).toEqual(
+        Object.keys(realSkills.researchInterests).sort(),
+      );
+    });
+  });
 
-      await act(async () => {
-        fireEvent.click(readMoreButton);
+  describe("A card's details whose code cannot load", () => {
+    afterEach(() => {
+      vi.doUnmock("./SkillDetailsDialog");
+      vi.resetModules();
+    });
+
+    it("says so with the card's own text, and gives the focus back", async () => {
+      const imports = { count: 0 };
+      vi.resetModules();
+      vi.doMock("@/data/portfolio", () => ({
+        skillsSection: mockSkillsSection,
+      }));
+      vi.doMock("./SkillDetailsDialog", () => {
+        imports.count++;
+        throw new Error("chunk failed");
+      });
+      const { Skills: Fresh } = await import("./Skills");
+      render(<Fresh />);
+      const button = screen.getByRole("button", {
+        name: "Read more about Why Evolution",
       });
 
+      // Pointing at a card starts fetching its details' code.
+      fireEvent.pointerEnter(
+        button.closest('[data-testid="holographic-card"]')!,
+      );
+      await waitFor(() => expect(imports.count).toBe(1));
+
+      fireEvent.click(button);
+      const dialog = await screen.findByRole("dialog", {
+        name: "Why Evolution",
+      });
+      expect(dialog).toHaveTextContent("Short framing for why evolution.");
+      expect(dialog).toHaveTextContent("Could not load the details.");
+
+      fireEvent.keyDown(document, { key: "Escape" });
       await waitFor(() => {
-        expect(screen.getByText("Show less")).toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).toBeNull();
       });
+      expect(button).toHaveFocus();
     });
   });
 });

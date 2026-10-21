@@ -11,6 +11,7 @@ import Maximize2 from "lucide-react/dist/esm/icons/maximize-2";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { cn } from "@/lib/utils";
 import { lockPageScroll } from "@/lib/utils/scroll-lock";
+import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 
 interface PerformanceModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
   // motion behind it would make it report an idle page.
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Safari, as the site's other dialogs see it (details-dialog.tsx).
+  const reduce = useShouldReduceAnimations();
 
   // Escape, and the scroll lock, in place before the browser paints the
   // dashboard: loaded lazily, a passive effect ran later, and an Escape
@@ -85,9 +88,14 @@ export function PerformanceModal({ isOpen, onClose }: PerformanceModalProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Backdrop */}
+          {/* Backdrop. Dimmed without the blur on Safari, as the other
+              dialogs do: Linux WebKit drew 5 frames in 15 s with the page
+              blurred behind it, on 4 CPUs (2026-10-21). */}
           <m.div
-            className="absolute inset-0 bg-black/80 backdrop-blur-xs"
+            className={cn(
+              "absolute inset-0",
+              reduce ? "bg-black/90" : "bg-black/80 backdrop-blur-xs",
+            )}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

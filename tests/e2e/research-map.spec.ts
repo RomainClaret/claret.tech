@@ -158,6 +158,12 @@ test.describe("The research map", () => {
     await expect(page.locator("#claret2026emr")).toBeInViewport({
       timeout: 15_000,
     });
+    // At the card, not in its details: only #claret2026emr-full opens them.
+    // A moment for a dialog that would open, whose code loads first.
+    await page.waitForTimeout(500);
+    await expect(
+      page.getByRole("dialog", { name: /^Tensor-Accelerated/ }),
+    ).toHaveCount(0);
     // Back, but minimized, out of the card's way.
     await expect(
       page.getByRole("button", { name: "Restore terminal" }).first(),

@@ -6,6 +6,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname.current,
 }));
 
+import { PageShownContext } from "@/contexts/page-shown-context";
 import { useCardDeepLink } from "./useCardDeepLink";
 
 /**
@@ -227,6 +228,141 @@ describe("useCardDeepLink", () => {
 
     expect(result.current.deepLinkedId).toBeNull();
     expect(scrollCalls).toHaveLength(0);
+  });
+
+  it("points a -full link at its card and asks to open it, once", () => {
+    // #<card>-full opens the card's details; the card itself is the target
+    // (an empty element of its own, as the hero had, held the link too).
+    placeCard("card-a", 3000);
+    placeCard("card-b", 6000);
+    const onOpen = vi.fn();
+    // As a page loaded at the link: replaceState fires no hashchange, where
+    // assigning location.hash queues one that jsdom delivers after mount.
+    history.replaceState(null, "", "#card-a-full");
+    const { result, rerender } = renderHook(
+      ({ targets }) => useCardDeepLink(targets, { onOpen }),
+      { initialProps: { targets: ["card-a"] } },
+    );
+
+    expect(result.current.deepLinkedId).toBe("card-a");
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith("card-a");
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(window.pageYOffset).toBe(3000 - 64);
+
+    // More cards arrive under the same link: not opened again.
+    rerender({ targets: ["card-a", "card-b"] });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // The link followed again is a new arrival.
+    act(() => {
+      history.replaceState(null, "", "#card-b");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    act(() => {
+      history.replaceState(null, "", "#card-a-full");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves a -full link alone when it opens nothing", () => {
+    placeCard("card-a", 3000);
+    window.location.hash = "#card-a-full";
+
+    const { result } = renderHook(() => useCardDeepLink(["card-a"]));
+
+    expect(result.current.deepLinkedId).toBeNull();
+  });
+
+  it("takes an exact target over a -full one", () => {
+    placeCard("note-full", 3000);
+    const onOpen = vi.fn();
+    window.location.hash = "#note-full";
+
+    const { result } = renderHook(() =>
+      useCardDeepLink(["note", "note-full"], { onOpen }),
+    );
+
+    expect(result.current.deepLinkedId).toBe("note-full");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("keeps its card while a dialog is open over the page", () => {
+    // A dialog's portal lies outside every card: a click in it, or on its
+    // backdrop, released the card the dialog was about.
+    placeCard("card-a", 3000);
+    window.location.hash = "#card-a";
+    const { result } = renderHook(() => useCardDeepLink(["card-a"]));
+    const dialog = document.createElement("div");
+    dialog.setAttribute("aria-modal", "true");
+    document.body.append(dialog);
+
+    act(() => {
+      dialog.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      window.dispatchEvent(new Event("wheel"));
+    });
+    expect(result.current.deepLinkedId).toBe("card-a");
+
+    dialog.remove();
+    act(() => {
+      window.dispatchEvent(new Event("wheel"));
+    });
+    expect(result.current.deepLinkedId).toBeNull();
+  });
+
+  it("highlights its card for 2.6 s, from the link when the page is shown", () => {
+    placeCard("card-a", 3000);
+    // A page loaded at the link: no hashchange (see the -full test above).
+    history.replaceState(null, "", "#card-a");
+
+    const { result } = renderHook(() => useCardDeepLink(["card-a"]));
+
+    expect(result.current.highlightedId).toBe("card-a");
+    act(() => {
+      vi.advanceTimersByTime(2599);
+    });
+    expect(result.current.highlightedId).toBe("card-a");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.highlightedId).toBeNull();
+  });
+
+  it("goes to its card under the splash, and highlights it once it has gone", () => {
+    // A page opened at a link: the highlight started with the link, and the
+    // splash covered about 2 of its 2.6 s.
+    placeCard("card-a", 3000);
+    history.replaceState(null, "", "#card-a");
+    let shown = false;
+    const { result, rerender } = renderHook(() => useCardDeepLink(["card-a"]), {
+      wrapper: ({ children }) => (
+        <PageShownContext.Provider value={shown}>
+          {children}
+        </PageShownContext.Provider>
+      ),
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.deepLinkedId).toBe("card-a");
+    expect(window.pageYOffset).toBe(3000 - 64);
+    expect(result.current.highlightedId).toBeNull();
+
+    shown = true;
+    rerender();
+    expect(result.current.highlightedId).toBe("card-a");
+    act(() => {
+      vi.advanceTimersByTime(2599);
+    });
+    expect(result.current.highlightedId).toBe("card-a");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.highlightedId).toBeNull();
   });
 
   /**

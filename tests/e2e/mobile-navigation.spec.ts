@@ -99,6 +99,26 @@ test.describe("Mobile Navigation", () => {
     await expect(page.getByTestId("mobile-navigation-menu")).toBeHidden();
   });
 
+  // The section rail (floating-nav.tsx) is for screens with room for it:
+  // on a phone its column, fixed at the right, covered the end of the
+  // hero's View Resume and a strip of whatever was under it, and in
+  // landscape most of the height. Phones scroll by touch, and the menu
+  // lists the sections.
+  test("leaves the section rail out, upright and turned", async ({ page }) => {
+    const rail = page
+      .locator("div.fixed.right-8")
+      .filter({ has: page.locator('[aria-label="Scroll to next section"]') });
+
+    // It mounts half a second after hydration: attached first, so that
+    // hidden means hidden, not not there yet.
+    await expect(rail).toBeAttached();
+    await expect(rail).toBeHidden();
+
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(rail).toBeAttached();
+    await expect(rail).toBeHidden();
+  });
+
   test("should have accessible mobile navigation", async ({ page }) => {
     test.slow(); // Triple the timeout for mobile tests
 

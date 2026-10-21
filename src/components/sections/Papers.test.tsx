@@ -102,7 +102,10 @@ vi.mock("@/data/portfolio", () => ({
         status: "presented",
         posterPdf: "/pdfs/poster_static_mock.pdf",
         shortDescription: "Research on neural network architectures",
-        subtitle: "Exploring neural network architectures for vision tasks.",
+        // Over 100 characters, so it has a Read more too: the third card's,
+        // which a dialog that took the first card's text would not name.
+        subtitle:
+          "Exploring neural network architectures for vision tasks, from the first convolutional layers to the classifier.",
         image: "/images/thesis_2018.webp",
         footerLink: [
           {
@@ -284,25 +287,43 @@ vi.mock("framer-motion", () => {
   return { ...mocked, m: mocked.motion };
 });
 
-// Mock dynamic import - Next.js dynamic returns a component
-vi.mock("next/dynamic", () => ({
-  default: (_loader: DynamicImportFn, _options: DynamicImportOptions) => {
-    // Return a mock PDFModal component
-    const MockPDFModal = ({
-      isOpen,
-      onClose,
-      pdfUrl,
-      title,
-      _downloadFileName,
-    }: PDFViewerModalProps) =>
-      isOpen ? (
-        <div data-testid="pdf-modal" data-pdf-url={pdfUrl} data-title={title}>
-          <button onClick={onClose}>Close PDF</button>
-        </div>
-      ) : null;
-    return MockPDFModal;
-  },
-}));
+// Mock dynamic import - Next.js dynamic returns a component: the PDF reader as
+// a stub, and the section's other one, a paper's details, through its own
+// loader (the real dialog, or its stand-in when the chunk fails).
+vi.mock("next/dynamic", async () => {
+  const { lazy, Suspense } = await import("react");
+  return {
+    default: (loader: DynamicImportFn, _options: DynamicImportOptions) => {
+      const MockPDFModal = ({
+        isOpen,
+        onClose,
+        pdfUrl,
+        title,
+        _downloadFileName,
+      }: PDFViewerModalProps) =>
+        isOpen ? (
+          <div data-testid="pdf-modal" data-pdf-url={pdfUrl} data-title={title}>
+            <button onClick={onClose}>Close PDF</button>
+          </div>
+        ) : null;
+      // withLoadFallback's loaders resolve to the component itself.
+      const Lazy = lazy(async () => ({
+        default: (await loader()) as unknown as React.ComponentType<
+          Record<string, unknown>
+        >,
+      }));
+      return function Dynamic(props: Record<string, unknown>) {
+        return "pdfUrl" in props ? (
+          <MockPDFModal {...(props as unknown as PDFViewerModalProps)} />
+        ) : (
+          <Suspense fallback={null}>
+            <Lazy {...props} />
+          </Suspense>
+        );
+      };
+    },
+  };
+});
 
 // Mock fetch for dynamic publications
 const mockPublications: Publication[] = [
@@ -779,19 +800,13 @@ describe("Papers", () => {
   });
 
   describe("Card Interactions", () => {
-    // The nearest ancestor of a card's title that holds its Read more toggle.
-    const cardOf = (title: string) => {
-      let node: HTMLElement | null = screen.getByText(title);
-      while (
-        node &&
-        !within(node).queryByRole("button", { name: /Read more|Show less/ })
-      ) {
-        node = node.parentElement;
-      }
-      return node!;
-    };
+    const readMore = (title: string) =>
+      screen.getByRole("button", { name: `Read more about ${title}` });
 
-    it("says whether each card's description is open", async () => {
+    it("opens each card's details in a dialog, from a real button", async () => {
+      // The card grew in place and pushed the grid around; its details open
+      // above the page now, outside the card, and closing gives the focus
+      // back to the button.
       global.fetch = vi.fn(() =>
         Promise.resolve({
           json: () =>
@@ -809,37 +824,101 @@ describe("Papers", () => {
 
       for (const title of [
         "Blockchain, a techie overview",
+        "Master's Thesis: Deep Learning Applications",
         "Neuroevolution Research Paper",
       ]) {
-        const toggle = within(cardOf(title)).getByRole("button", {
-          name: "Read more",
+        const button = readMore(title);
+        expect(button).toHaveAttribute("aria-haspopup", "dialog");
+        expect(button).not.toHaveAttribute("aria-expanded");
+
+        fireEvent.click(button);
+        const dialog = await screen.findByRole("dialog", { name: title });
+        expect(
+          button.closest('[data-testid="holographic-card"]'),
+        ).not.toContainElement(dialog);
+
+        fireEvent.keyDown(document, { key: "Escape" });
+        await waitFor(() => {
+          expect(screen.queryByRole("dialog")).toBeNull();
         });
-        expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-        fireEvent.click(toggle);
-
-        expect(toggle).toHaveTextContent("Show less");
-        expect(toggle).toHaveAttribute("aria-expanded", "true");
+        expect(button).toHaveFocus();
       }
     });
 
-    it("shows a card's short description, not 'No abstract', until its abstract comes", async () => {
+    it("shows a publication's short text in its dialog, and says the abstract is coming", async () => {
       // The page's own copy of the publications has no abstracts: they come
       // with /api/publications, here still on its way.
       global.fetch = vi.fn(() => new Promise<Response>(() => {}));
       const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
       render(<Papers />);
 
-      fireEvent.click(
-        within(cardOf(paper.title)).getByRole("button", { name: "Read more" }),
+      fireEvent.click(readMore(paper.title));
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
+
+      expect(
+        within(dialog).getByText(paper.shortDescription!),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("status")).toHaveTextContent(
+        "Loading the abstract",
+      );
+      expect(within(dialog).queryByText("No abstract available")).toBeNull();
+    });
+
+    it("fills an open dialog with the abstract that arrives", async () => {
+      let answer: (response: Response) => void = () => {};
+      global.fetch = vi.fn(
+        () => new Promise<Response>((resolve) => (answer = resolve)),
+      );
+      const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
+      render(<Papers />);
+      fireEvent.click(readMore(paper.title));
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
+
+      await act(async () =>
+        answer({
+          json: () =>
+            Promise.resolve({
+              publications: [{ ...paper, abstract: "The LATE abstract." }],
+              totalCitations: 0,
+              count: 1,
+            }),
+        } as Response),
       );
 
       expect(
-        within(cardOf(paper.title)).getByText(paper.shortDescription!),
+        await within(dialog).findByText("The LATE abstract."),
       ).toBeInTheDocument();
+      expect(within(dialog).queryByRole("status")).toBeNull();
+    });
+
+    it("stops saying the abstract is coming when the answer has none", async () => {
+      const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
+      let answer: (response: Response) => void = () => {};
+      global.fetch = vi.fn(
+        () => new Promise<Response>((resolve) => (answer = resolve)),
+      );
+      render(<Papers />);
+      fireEvent.click(readMore(paper.title));
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
+      expect(within(dialog).getByRole("status")).toBeInTheDocument();
+
+      await act(async () =>
+        answer({
+          json: () =>
+            Promise.resolve({
+              publications: [{ ...paper, abstract: undefined }],
+              totalCitations: 0,
+              count: 1,
+            }),
+        } as Response),
+      );
+
+      await waitFor(() => {
+        expect(within(dialog).queryByRole("status")).toBeNull();
+      });
       expect(
-        within(cardOf(paper.title)).queryByText("No abstract available"),
-      ).toBeNull();
+        within(dialog).getByText(paper.shortDescription!),
+      ).toBeInTheDocument();
     });
 
     it("brings the abstracts from their own file when the API fails", async () => {
@@ -847,37 +926,52 @@ describe("Papers", () => {
       const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
       render(<Papers />);
 
-      fireEvent.click(
-        within(cardOf(paper.title)).getByRole("button", { name: "Read more" }),
-      );
+      fireEvent.click(readMore(paper.title));
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
 
       expect(
-        await within(cardOf(paper.title)).findByText(
+        await within(dialog).findByText(
           (abstracts as Record<string, string>)[paper.id],
         ),
       ).toBeInTheDocument();
+      expect(within(dialog).queryByRole("status")).toBeNull();
     });
 
-    it("expands paper cards to show full content", async () => {
+    it("shows an Other Work card's whole text in its dialog, not on the card", async () => {
       render(<Papers />);
+      const button = readMore("Blockchain, a techie overview");
+      const card = button.closest('[data-testid="holographic-card"]')!;
+      expect(card).not.toHaveTextContent(/blockchain hysteria/);
 
-      // Scoped to the blockchain card rather than taking the first "Read more"
-      // on the page: the publications grid renders above the static cards, so
-      // an index picks whichever card happens to sort first.
-      const card = screen
-        .getByText("Blockchain, a techie overview")
-        .closest("div[class]")!.parentElement!;
-      const readMore = within(card as HTMLElement).getByText("Read more");
+      fireEvent.click(button);
 
-      fireEvent.click(readMore);
-
-      await waitFor(() => {
-        expect(screen.getByText(/blockchain hysteria/)).toBeInTheDocument();
+      const dialog = await screen.findByRole("dialog", {
+        name: "Blockchain, a techie overview",
       });
+      expect(dialog).toHaveTextContent(/blockchain hysteria/);
+      expect(card).not.toHaveTextContent(/blockchain hysteria/);
+    });
 
-      expect(
-        within(card as HTMLElement).getByText("Show less"),
-      ).toBeInTheDocument();
+    it("opens a paper's PDF from its dialog, which stays open under it", async () => {
+      // The page's own list, which the answer would replace with the mock's.
+      global.fetch = vi.fn(() => new Promise<Response>(() => {}));
+      const paper = STATIC_PUBLICATIONS.find(
+        (p) => p.paperPdf && p.shortDescription,
+      )!;
+      render(<Papers />);
+      fireEvent.click(readMore(paper.title));
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
+
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /Read Paper/ }),
+      );
+
+      expect(mockOpenPDF).toHaveBeenCalledWith(
+        paper.paperPdf,
+        paper.title,
+        paper.paperPdf!.split("/").pop(),
+      );
+      expect(dialog).toBeInTheDocument();
     });
 
     it("copies the BibTeX entry to clipboard for dynamic papers", async () => {
@@ -1225,36 +1319,102 @@ describe("Papers", () => {
     });
   });
 
+  describe("Abstracts that cannot be had", () => {
+    afterEach(() => {
+      vi.doUnmock("@/lib/api/publication-abstracts.json");
+      vi.resetModules();
+    });
+
+    it("stops saying the abstract is coming when the API and its file both fail", async () => {
+      vi.resetModules();
+      vi.doMock("@/lib/api/publication-abstracts.json", () => {
+        throw new Error("chunk failed");
+      });
+      global.fetch = vi.fn(() => Promise.reject(new Error("offline")));
+      const { Papers: Fresh } = await import("./Papers");
+      const paper = STATIC_PUBLICATIONS.find((p) => p.shortDescription)!;
+      render(<Fresh />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: `Read more about ${paper.title}` }),
+      );
+      const dialog = await screen.findByRole("dialog", { name: paper.title });
+
+      await waitFor(() => {
+        expect(within(dialog).queryByRole("status")).toBeNull();
+      });
+      expect(dialog).toHaveTextContent(paper.shortDescription!);
+    });
+  });
+
+  describe("A paper's details whose code cannot load", () => {
+    afterEach(() => {
+      vi.doUnmock("./PaperDetailsDialog");
+      vi.resetModules();
+    });
+
+    it("says so with the paper's own short text, and gives the focus back", async () => {
+      const imports = { count: 0 };
+      vi.resetModules();
+      vi.doMock("./PaperDetailsDialog", () => {
+        imports.count++;
+        throw new Error("chunk failed");
+      });
+      const { Papers: Fresh } = await import("./Papers");
+      render(<Fresh />);
+      const title = "Blockchain, a techie overview";
+      const button = screen.getByRole("button", {
+        name: `Read more about ${title}`,
+      });
+
+      // Pointing at the button starts fetching the dialog's code.
+      fireEvent.pointerEnter(button);
+      await waitFor(() => expect(imports.count).toBe(1));
+
+      fireEvent.click(button);
+      const dialog = await screen.findByRole("dialog", { name: title });
+      expect(dialog).toHaveTextContent(
+        "Demystifying blockchain when everyone thought it would change everything.",
+      );
+      expect(dialog).toHaveTextContent("Could not load the details.");
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).toBeNull();
+      });
+      expect(button).toHaveFocus();
+    });
+  });
+
   describe("Deep Links", () => {
     afterEach(() => {
       window.location.hash = "";
     });
 
-    it("scrolls to and expands the publication targeted by the URL hash", async () => {
-      window.scrollTo = vi.fn();
-      const mockDeepPubs: Publication[] = [
-        {
-          id: "deep-1",
-          title: "Deep Linked Paper",
-          authors: ["Author A"],
-          venue: "Conference 2026",
-          year: "2026",
-          abstract:
-            "A very long abstract that goes well past the two hundred character truncation threshold so that the collapsed and expanded states are clearly distinguishable in this test. It keeps going with enough filler words to comfortably exceed the limit and finally includes the marker END-OF-ABSTRACT.",
-          shortDescription: "The short teaser.",
-          source: "static" as const,
-        },
-      ];
+    // A publication whose abstract is much longer than its teaser.
+    const deepLinked: Publication = {
+      id: "deep-1",
+      title: "Deep Linked Paper",
+      authors: ["Author A"],
+      venue: "Conference 2026",
+      year: "2026",
+      abstract:
+        "A very long abstract that goes well past the two hundred character truncation threshold so that the teaser and the whole text are clearly distinguishable in this test. It keeps going with enough filler words to comfortably exceed the limit and finally includes the marker END-OF-ABSTRACT.",
+      shortDescription: "The short teaser.",
+      source: "static" as const,
+    };
+    const answerWith = (publications: Publication[]) => {
       global.fetch = vi.fn(() =>
         Promise.resolve({
           json: () =>
-            Promise.resolve({
-              publications: mockDeepPubs,
-              totalCitations: 0,
-              count: 1,
-            }),
+            Promise.resolve({ publications, totalCitations: 0, count: 1 }),
         } as Response),
       );
+    };
+
+    it("points at the publication for #deep-1, without opening it", async () => {
+      window.scrollTo = vi.fn();
+      answerWith([deepLinked]);
       window.location.hash = "#deep-1";
 
       render(<Papers />);
@@ -1263,15 +1423,45 @@ describe("Papers", () => {
         expect(screen.getByText("Deep Linked Paper")).toBeInTheDocument();
       });
       // The card wrapper carries the anchor id
-      expect(document.getElementById("deep-1")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(document.getElementById("deep-1")).toHaveClass(
+          "deep-link-highlight",
+        );
+      });
       // The offset scroll fired
-      await waitFor(() => {
-        expect(window.scrollTo).toHaveBeenCalled();
+      expect(window.scrollTo).toHaveBeenCalled();
+      await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByText(/END-OF-ABSTRACT/)).toBeNull();
+    });
+
+    it("opens the publication's details for #deep-1-full", async () => {
+      window.scrollTo = vi.fn();
+      answerWith([deepLinked]);
+      window.location.hash = "#deep-1-full";
+
+      render(<Papers />);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Deep Linked Paper",
       });
-      // The abstract auto-expanded (full abstract replaces the teaser)
-      await waitFor(() => {
-        expect(screen.getByText(/END-OF-ABSTRACT/)).toBeInTheDocument();
+      expect(dialog).toHaveTextContent(/END-OF-ABSTRACT/);
+      // Pointed at the card itself.
+      expect(document.getElementById("deep-1")).toHaveClass(
+        "deep-link-highlight",
+      );
+    });
+
+    it("opens an Other Work card's details for its -full link", async () => {
+      window.scrollTo = vi.fn();
+      window.location.hash = "#claret2016blockchain-full";
+
+      render(<Papers />);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Blockchain, a techie overview",
       });
+      expect(dialog).toHaveTextContent(/blockchain hysteria/);
     });
 
     it("holds the hover glow on the deep-linked card until the user interacts", async () => {

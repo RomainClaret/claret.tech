@@ -7,13 +7,16 @@
 
 const fs = require("fs").promises;
 const path = require("path");
+// The server's own reader of Medium's feed: Node 24 runs the TypeScript file
+// with its types stripped (it imports nothing for that reason).
+const { parseMediumRss } = require("../src/lib/utils/medium-rss.ts");
 
 // The feed of the account the site's blog reads, by the same rule as
 // src/lib/utils/medium-username.ts: NEXT_PUBLIC_MEDIUM_USERNAME without a
 // leading "@", else romainclaret.
 function mediumRssUrl(value = process.env.NEXT_PUBLIC_MEDIUM_USERNAME) {
   const username = (value || "").trim().replace(/^@+/, "") || "romainclaret";
-  return `https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@${username}`;
+  return `https://medium.com/feed/@${username}`;
 }
 
 const OUTPUT_FILE = path.join(__dirname, "../src/lib/utils/medium-colors.json");
@@ -92,13 +95,10 @@ const BLOG_COLORS = {
 // saved map, as if the account had no posts.
 async function fetchMediumPosts() {
   const response = await fetch(mediumRssUrl());
-  const data = await response.json();
-
-  if (data.status !== "ok" || !data.items) {
-    throw new Error("Failed to fetch Medium posts");
+  if (!response.ok) {
+    throw new Error(`Medium's feed answered ${response.status}`);
   }
-
-  return data.items;
+  return parseMediumRss(await response.text());
 }
 
 function getCategoryFromPost(post) {
@@ -178,7 +178,7 @@ async function extractMediumColors(outputFile = OUTPUT_FILE) {
     console.error("❌ Error extracting Medium colors:", error);
 
     // The map is tracked, and this runs before every build: a failed feed
-    // (offline, or rss2json refusing) keeps the saved one. An empty map only
+    // (offline, or Medium refusing) keeps the saved one. An empty map only
     // when there is none, since Blog.tsx imports the file.
     try {
       await fs.access(outputFile);

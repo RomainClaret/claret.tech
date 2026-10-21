@@ -7,8 +7,9 @@ import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { withLoadFallback } from "@/lib/utils/load-fallback";
 import { loadOnIntent } from "@/lib/utils/load-on-intent";
 import { reloadPage } from "@/lib/utils/reload-page";
-import type { KudosArticle, MediumPost } from "./BlogCards";
+import type { BlogSubject, KudosArticle, MediumPost } from "./BlogCards";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
+import { useDetailsDialog } from "@/lib/hooks/useDetailsDialog";
 import { cn } from "@/lib/utils";
 import { logError } from "@/lib/utils/dev-logger";
 
@@ -20,29 +21,6 @@ export function mediumAnchorId(link: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-// Extract text content from HTML safely using DOMParser
-function extractTextContent(html: string): string {
-  if (typeof html !== "string") return "";
-
-  // Strip out tracking pixels and scripts before processing
-  const cleanedHtml = html
-    .replace(/<img[^>]*medium\.com\/_\/stat[^>]*>/gi, "") // Remove Medium tracking pixels
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ""); // Remove scripts
-
-  // Use DOMParser for safe HTML parsing (doesn't execute scripts)
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(cleanedHtml, "text/html");
-  let textContent = doc.body.textContent || "";
-
-  // Remove "Photo by" credits and everything after
-  const photoByIndex = textContent.indexOf("Photo by");
-  if (photoByIndex !== -1) {
-    textContent = textContent.substring(0, photoByIndex).trim();
-  }
-
-  return textContent;
 }
 
 /** The cards' place until the articles and their code are in, as the HTML has it. */
@@ -132,6 +110,9 @@ const BlogCards = dynamic(
 
 export function Blog() {
   const [mediumPosts, setMediumPosts] = useState<MediumPost[]>([]);
+  // A post's whole text, in a dialog the cards open (BlogCards.tsx); here
+  // so a link to it can open it too.
+  const blogDetails = useDetailsDialog<BlogSubject>();
   const [kudosArticles, setKudosArticles] = useState<KudosArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -207,19 +188,6 @@ export function Blog() {
     [kudosArticles, mediumPosts],
   );
 
-  // Parse each Medium post's snippet once per fetch instead of on every
-  // render: extractTextContent spins up a DOMParser per call.
-  const mediumTextByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const post of mediumPosts) {
-      map.set(
-        post.guid || post.link,
-        extractTextContent(post.contentSnippet || post.content),
-      );
-    }
-    return map;
-  }, [mediumPosts]);
-
   // Deep-link anchors: Kudos stories use their curated id; Medium posts use
   // the permanent slug from their URL.
   const articleAnchorId = (
@@ -228,12 +196,24 @@ export function Blog() {
     article.source === "kudos" ? article.id : mediumAnchorId(article.link);
 
   // Deep links: a #<article anchor> hash scrolls to that card, pulses a
-  // highlight, and holds its hover glow until the user interacts.
+  // highlight, and holds its hover glow until the user interacts; with -full
+  // it also opens the post's whole text.
   const { deepLinkedId, highlightedId } = useCardDeepLink(
     allArticles.flatMap((article) => {
       const id = articleAnchorId(article);
       return id ? [id] : [];
     }),
+    {
+      onOpen: (id) => {
+        const article = allArticles.find((a) => articleAnchorId(a) === id);
+        if (article) {
+          blogDetails.showFromLink(
+            { url: article.source === "kudos" ? article.url : article.link },
+            id,
+          );
+        }
+      },
+    },
   );
 
   if (!blogSection.display) {
@@ -276,10 +256,10 @@ export function Blog() {
           <BlogCards
             displayStaticBlogs={displayStaticBlogs}
             visibleArticles={visibleArticles}
-            mediumTextByKey={mediumTextByKey}
             articleAnchorId={articleAnchorId}
             deepLinkedId={deepLinkedId}
             highlightedId={highlightedId}
+            details={blogDetails}
           />
         )}
 

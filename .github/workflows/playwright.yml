@@ -117,6 +117,8 @@ jobs:
             accessibility:
               - 'tests/e2e/accessibility.spec.ts'
               - 'tests/e2e/project-details.spec.ts'
+              # The research, skills, paper and blog cards' details dialogs.
+              - 'tests/e2e/card-details.spec.ts'
               - 'tests/e2e/keyboard-paths.spec.ts'
               # The error pages' reports, in both engines' stack formats.
               - 'tests/e2e/error-reports.spec.ts'
@@ -275,7 +277,7 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "✅ Server is ready (attempt $i/30)"
               break
@@ -378,7 +380,7 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "✅ Server is ready (attempt $i/30)"
               break
@@ -399,9 +401,11 @@ jobs:
         # project-details: a GitHub card's details open in one dialog above
         # the page (focus, Tab, Escape, the links take their own clicks), on
         # desktop and a 390 px phone, with the GitHub APIs answered by
-        # fixtures since CI builds have no GitHub data. keyboard-paths: what
+        # fixtures since CI builds have no GitHub data. card-details: the
+        # research, skills, paper and blog cards' dialogs, their links and
+        # the sections' compactness. keyboard-paths: what
         # showed on hover or opened on a click, reached from the keyboard.
-        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts tests/e2e/keyboard-paths.spec.ts tests/e2e/error-reports.spec.ts tests/e2e/privacy.spec.ts --project=${{ matrix.browser }} --max-failures=3
+        run: npx playwright test tests/e2e/accessibility.spec.ts tests/e2e/project-details.spec.ts tests/e2e/card-details.spec.ts tests/e2e/keyboard-paths.spec.ts tests/e2e/error-reports.spec.ts tests/e2e/privacy.spec.ts --project=${{ matrix.browser }} --max-failures=3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true
@@ -426,7 +430,10 @@ jobs:
   # Performance tests (chromium only for efficiency)
   performance-tests:
     needs: detect-changes
+    # On main always: the deploy takes a green run there as everything
+    # tested, and refuses one with a skipped job (browser-tests-passed.sh).
     if: |
+      github.ref == 'refs/heads/main' ||
       github.event.inputs.force_all_tests == 'true' ||
       needs.detect-changes.outputs.performance == 'true' ||
       needs.detect-changes.outputs.src == 'true' ||
@@ -480,7 +487,7 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "✅ Server is ready (attempt $i/30)"
               break
@@ -532,7 +539,10 @@ jobs:
   terminal-tests:
     needs: detect-changes
     # Only run if terminal-related files or core src changed
+    # On main always: the deploy takes a green run there as everything
+    # tested, and refuses one with a skipped job (browser-tests-passed.sh).
     if: |
+      github.ref == 'refs/heads/main' ||
       github.event.inputs.force_all_tests == 'true' ||
       needs.detect-changes.outputs.terminal == 'true' ||
       needs.detect-changes.outputs.src == 'true' ||
@@ -604,7 +614,7 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "✅ Server is ready (attempt $i/30)"
               break
@@ -658,7 +668,10 @@ jobs:
     needs: detect-changes
     # On any change to the site too: the 320 px reflow test goes through the
     # whole homepage, and the mobile filter alone matched almost no file.
+    # On main always: the deploy takes a green run there as everything
+    # tested, and refuses one with a skipped job (browser-tests-passed.sh).
     if: |
+      github.ref == 'refs/heads/main' ||
       github.event.inputs.force_all_tests == 'true' ||
       needs.detect-changes.outputs.mobile == 'true' ||
       needs.detect-changes.outputs.src == 'true' ||
@@ -713,7 +726,7 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
           # Wait for server to be ready with retry logic
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
               echo "✅ Server is ready (attempt $i/30)"
               break
@@ -767,15 +780,18 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.64.0-jammy
       options: --user root
     needs: detect-changes  # Simplified dependencies to avoid cycles
+    # On main always: the deploy takes a green run there as everything
+    # tested, and refuses one with a skipped job (browser-tests-passed.sh).
     if: |
-      (github.event.inputs.force_all_tests == 'true' ||
-       github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'performance')) &&
-      (github.event.inputs.force_all_tests == 'true' ||
-       needs.detect-changes.outputs.lighthouse == 'true' ||
-       needs.detect-changes.outputs.performance == 'true' ||
-       needs.detect-changes.outputs.src == 'true' ||
-       needs.detect-changes.outputs.dependencies == 'true' ||
-       needs.detect-changes.outputs.workflows == 'true')
+      github.ref == 'refs/heads/main' ||
+      ((github.event.inputs.force_all_tests == 'true' ||
+        github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'performance')) &&
+       (github.event.inputs.force_all_tests == 'true' ||
+        needs.detect-changes.outputs.lighthouse == 'true' ||
+        needs.detect-changes.outputs.performance == 'true' ||
+        needs.detect-changes.outputs.src == 'true' ||
+        needs.detect-changes.outputs.dependencies == 'true' ||
+        needs.detect-changes.outputs.workflows == 'true'))
 
     steps:
       - uses: actions/checkout@v6

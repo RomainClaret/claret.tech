@@ -42,8 +42,12 @@ export function FloatingNav() {
   const showDownButton = isInitialized && currentIndex < sections.length - 1;
   const showLatestButton = isInitialized && currentIndex < sections.length - 1;
 
+  // Only on screens with room for it, 640 px wide and 501 px tall: on a
+  // phone its column (40 x 324 px) covered the end of the hero's View
+  // Resume and a strip of whatever was under it, and turned, most of the
+  // height. Phones scroll by touch, and their menu lists the sections.
   return (
-    <div className="fixed bottom-[calc(2rem+var(--cookie-notice-height,0px))] right-8 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-[calc(2rem+var(--cookie-notice-height,0px))] right-8 z-40 hidden [@media(min-width:640px)_and_(min-height:501px)]:flex flex-col items-end gap-3">
       {/* Section Dots Indicator */}
       <div className="relative mb-2 group">
         <div className="flex flex-col items-center gap-1.5">

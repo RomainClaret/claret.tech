@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { scrollToSection, NAV_OFFSET } from "./scroll-to-section";
+import {
+  alignToSection,
+  scrollToSection,
+  NAV_OFFSET,
+} from "./scroll-to-section";
 
 /**
  * The regression these cover: on the homepage a nav click called
@@ -193,5 +197,42 @@ describe("scrollToSection", () => {
 
       expect(document.activeElement).toBe(document.body);
     });
+  });
+});
+
+describe("alignToSection", () => {
+  // After a dialog a link opened closes: the card it was about, at once.
+  beforeEach(() => {
+    Object.defineProperty(window, "pageYOffset", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(document.documentElement, "scrollHeight", {
+      value: 20000,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = "";
+  });
+
+  it("puts a card that has moved right under the nav, instantly", () => {
+    const calls = stubScroll({ smoothWorks: false });
+    placeSection("card", 3000);
+
+    alignToSection("card");
+
+    expect(calls).toEqual([{ top: 3000 - NAV_OFFSET, behavior: "instant" }]);
+  });
+
+  it("leaves a card that is already there", () => {
+    const calls = stubScroll({ smoothWorks: false });
+    placeSection("card", 1000 + NAV_OFFSET + 3);
+
+    alignToSection("card");
+
+    expect(calls).toEqual([]);
   });
 });

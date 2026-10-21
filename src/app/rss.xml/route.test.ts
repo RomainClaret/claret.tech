@@ -2,24 +2,44 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET, maxDuration } from "./route";
 
 /**
- * The feed is built from Medium's own (through rss2json, as the blog
- * section's API reads it), not by calling the site's API over HTTP. That
- * cost every poll a second request through the API's rate limiter, made the
- * API scrape each post's page for images the feed never uses, and had a
- * local or preview build read production's API.
+ * The feed is built from Medium's own, as the blog section's API reads it,
+ * not by calling the site's API over HTTP. That cost every poll a second
+ * request through the API's rate limiter, made the API scrape each post's
+ * page for images the feed never uses, and had a local or preview build
+ * read production's API.
  */
-const FEED =
-  "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@romainclaret";
+const FEED = "https://medium.com/feed/@romainclaret";
+
+interface Post {
+  title: string;
+  link: string;
+  pubDate: string;
+  content: string;
+}
+
+/** Text in CDATA, a "]]>" split across two sections, as Medium writes it. */
+const cdata = (value: string) =>
+  `<![CDATA[${value.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
+const escape = (value: string) =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Medium's RSS for these posts. */
+const rss = (posts: Post[]) =>
+  `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel>${posts
+    .map(
+      (post) =>
+        `<item><title>${cdata(post.title)}</title><link>${escape(post.link)}</link><pubDate>${post.pubDate}</pubDate><content:encoded>${cdata(post.content)}</content:encoded></item>`,
+    )
+    .join("")}</channel></rss>`;
 
 /** Medium's feed for FEED; anything else (the site's own API) has no posts. */
-const answering = (items: unknown[]) =>
+const answering = (posts: Post[]) =>
   vi.fn(
     async (url: RequestInfo | URL) =>
       ({
         ok: true,
         status: 200,
-        json: async () =>
-          String(url) === FEED ? { status: "ok", items } : { items: [] },
+        text: async () => (String(url) === FEED ? rss(posts) : '{"items":[]}'),
       }) as Response,
   );
 

@@ -35,8 +35,12 @@ export function IntroductionContent({
 
           {/* Container with blur background */}
           <div className="relative rounded-2xl p-4 md:p-6 border-2 border-blue-200/20 dark:border-blue-800/20 bg-blue-50/85 dark:bg-slate-900/85">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+            {/* The title keeps one line: its size follows this box (12% of
+                its width, the phrase being about 7.9 em wide), each step
+                keeping its old size where that fits. In the two columns from
+                1024 px it broke after "Accuracy". */}
+            <div className="space-y-4 @container">
+              <h1 className="[font-size:min(2.25rem,12cqi)] md:[font-size:min(3rem,12cqi)] lg:[font-size:min(3.75rem,12cqi)] xl:[font-size:min(4.5rem,12cqi)] font-bold leading-tight">
                 <span className="bg-linear-to-r from-blue-600 via-purple-600 to-teal-600 bg-clip-text text-transparent">
                   <span className="whitespace-nowrap">Accuracy</span>{" "}
                   <span className="whitespace-nowrap">is a lie</span>
@@ -60,12 +64,16 @@ export function IntroductionContent({
               </div>
             </div>
 
-            <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed mt-6">
+            {/* On phones (below 640 px) 16 px text and a 24 px gap above the
+                buttons, with 16 px above the hero (Introduction): View
+                Resume ended 766 px down a page area of 664 (an iPhone 12's
+                in Safari), and ends at 645 now. */}
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed mt-6">
               {greeting.subTitle}
             </p>
 
             {/* Action buttons - centered */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6 sm:mt-8">
               <button
                 onClick={onResumeClick}
                 {...pdfReaderIntent}

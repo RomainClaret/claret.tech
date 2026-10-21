@@ -49,6 +49,12 @@ vi.mock("./PerformanceDashboard", () => ({
   PerformanceDashboard: () => <div data-testid="dashboard" />,
 }));
 
+// Safari, as the site detects it (useShouldReduceAnimations).
+const safari = vi.hoisted(() => ({ reduce: false }));
+vi.mock("@/lib/hooks/useSafari", () => ({
+  useShouldReduceAnimations: () => safari.reduce,
+}));
+
 // vi.mock is hoisted, so each path is written out.
 vi.mock("lucide-react/dist/esm/icons/x", () => ({
   default: () => <svg aria-hidden="true" />,
@@ -97,6 +103,29 @@ describe("PerformanceModal", () => {
 
     expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("blurs the page behind it, but on Safari only dims it", () => {
+    // Linux WebKit drew 5 frames in 15 s with the page blurred behind it,
+    // on 4 CPUs (2026-10-21), where a browser test waited for 12. The
+    // site's other dialogs dim the page without the blur on Safari
+    // (details-dialog.tsx), as this one does now.
+    const backdrop = () =>
+      document.querySelector('[aria-hidden="true"].inset-0');
+    try {
+      const { unmount } = render(
+        <PerformanceModal isOpen={true} onClose={vi.fn()} />,
+      );
+      expect(backdrop()).toHaveClass("bg-black/80", "backdrop-blur-xs");
+      unmount();
+
+      safari.reduce = true;
+      render(<PerformanceModal isOpen={true} onClose={vi.fn()} />);
+      expect(backdrop()).toHaveClass("bg-black/90");
+      expect(backdrop()).not.toHaveClass("backdrop-blur-xs");
+    } finally {
+      safari.reduce = false;
+    }
   });
 
   it("opens at the end of the page's body, above a dialog already open", () => {

@@ -65,22 +65,42 @@ describe("Medium Posts API Route", () => {
   const mockMediumPost = {
     title: "Test Medium Post",
     link: "https://medium.com/@testuser/test-post",
-    thumbnail: "",
     content: `<p>Test content</p><img src="${PICTURE}">`,
-    pubDate: "2024-08-18T12:00:00.000Z",
+    pubDate: "Sun, 18 Aug 2024 12:00:00 GMT",
     author: "Test Author",
     guid: "post-guid-123",
     categories: ["programming", "testing"],
   };
 
-  const mockRss2JsonResponse = {
-    status: "ok",
-    feed: {
-      title: "Test User - Medium",
-      description: "Test user's Medium posts",
+  /** Medium's RSS for these posts, as medium.com serves it. */
+  const feed = (posts: (typeof mockMediumPost)[]) =>
+    `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title><![CDATA[Stories by Test User on Medium]]></title>${posts
+      .map(
+        (post) =>
+          `<item><title><![CDATA[${post.title}]]></title><link>${post.link}</link><guid isPermaLink="false">${post.guid}</guid>${post.categories
+            .map((category) => `<category><![CDATA[${category}]]></category>`)
+            .join(
+              "",
+            )}<dc:creator><![CDATA[${post.author}]]></dc:creator><pubDate>${post.pubDate}</pubDate><content:encoded><![CDATA[${post.content}]]></content:encoded></item>`,
+      )
+      .join("")}</channel></rss>`;
+
+  /** An answer from medium.com with this body. */
+  const answer = (body: string) => ({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(body),
+  });
+
+  /** What the route answers while the feed cannot be had. */
+  const UNAVAILABLE = [
+    { status: "unavailable", items: [], cachedColors: {} },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
+      },
     },
-    items: [mockMediumPost],
-  };
+  ];
 
   const mockEnrichedData = {
     image: "https://medium.com/better-image.jpg",
@@ -122,10 +142,7 @@ describe("Medium Posts API Route", () => {
 
     it("fetches and enriches Medium posts successfully", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
@@ -136,9 +153,9 @@ describe("Medium Posts API Route", () => {
       // Verify cache cleaning was called
       expect(mockCleanMediumCache).toHaveBeenCalled();
 
-      // Verify RSS2JSON API was called with correct URL
+      // Medium's own feed, for the configured account
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@testuser",
+        "https://medium.com/feed/@testuser",
         {
           next: { revalidate: 3600 },
           signal: expect.any(AbortSignal),
@@ -156,27 +173,47 @@ describe("Medium Posts API Route", () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toEqual({
         ...mockMediumPost,
+        thumbnail: PICTURE,
         image: PICTURE_PATH,
         enrichedColor: mockEnrichedData.color,
       });
       expect(result.cachedColors).toEqual(mockCachedColors);
     });
 
+    it("serves the feed to a request that says ?playwright=true", async () => {
+      // That flag got two made-up posts ("Test Article 1"), meant for the
+      // browser tests; the page asks with no query string, so no page or
+      // test ever had them (2026-10-21).
+      mockCleanMediumCache.mockResolvedValueOnce(undefined);
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
+      mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
+      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
+
+      const response = await GET(
+        new NextRequest(
+          "http://localhost:3000/api/medium-posts?playwright=true",
+        ),
+      );
+
+      const result = await response.json();
+      expect(mockFetch).toHaveBeenCalled();
+      expect(result.items.map((item: { title: string }) => item.title)).toEqual(
+        [mockMediumPost.title],
+      );
+    });
+
     it("uses default Medium username when env variable is not set", async () => {
       delete process.env.NEXT_PUBLIC_MEDIUM_USERNAME;
 
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce({});
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@romainclaret",
+        "https://medium.com/feed/@romainclaret",
         expect.any(Object),
       );
     });
@@ -187,76 +224,58 @@ describe("Medium Posts API Route", () => {
       process.env.NEXT_PUBLIC_MEDIUM_USERNAME = "@testuser";
 
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce({});
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@testuser",
+        "https://medium.com/feed/@testuser",
         expect.any(Object),
       );
     });
 
-    it("handles RSS2JSON API errors gracefully", async () => {
+    // A 500 put "Failed to load resource" in every visitor's console while
+    // the feed was away; the blog shows the Kudos story alone either way.
+    it("answers no posts, with a 200 cached briefly, when Medium refuses", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
+      // A refusal, whatever its body.
       mockFetch.mockResolvedValueOnce({
+        ...answer(feed([mockMediumPost])),
         ok: false,
-        status: 404,
+        status: 403,
       });
 
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({
-          status: "error",
-          message: "Failed to fetch Medium posts",
-          items: [],
-          cachedColors: {},
-        }),
-        status: 500,
-      });
-
-      await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        {
-          status: "error",
-          message: "Failed to fetch Medium posts",
-          items: [],
-          cachedColors: {},
-        },
-        { status: 500 },
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/medium-posts"),
       );
+
+      expect(mockNextResponse.json).toHaveBeenCalledWith(...UNAVAILABLE);
+      expect(response.status).toBe(200);
     });
 
-    it("handles network errors gracefully", async () => {
+    it("answers no posts when the network fails", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({
-          status: "error",
-          message: "Failed to fetch Medium posts",
-          items: [],
-          cachedColors: {},
-        }),
-        status: 500,
-      });
+      await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
+
+      expect(mockNextResponse.json).toHaveBeenCalledWith(...UNAVAILABLE);
+    });
+
+    it("answers no posts when a challenge page comes instead of the feed", async () => {
+      // What rss2json answered servers with from 2026-10.
+      mockCleanMediumCache.mockResolvedValueOnce(undefined);
+      mockFetch.mockResolvedValueOnce(
+        answer(
+          '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title></head></html>',
+        ),
+      );
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        {
-          status: "error",
-          message: "Failed to fetch Medium posts",
-          items: [],
-          cachedColors: {},
-        },
-        { status: 500 },
-      );
+      expect(mockNextResponse.json).toHaveBeenCalledWith(...UNAVAILABLE);
     });
 
     it("continues processing even when individual article enrichment fails", async () => {
@@ -271,14 +290,7 @@ describe("Medium Posts API Route", () => {
       ];
 
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ...mockRss2JsonResponse,
-            items: multiplePosts,
-          }),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed(multiplePosts)));
 
       // First article enrichment succeeds
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
@@ -308,17 +320,14 @@ describe("Medium Posts API Route", () => {
 
     it("takes a post's picture from the feed, through the site's route", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ...mockRss2JsonResponse,
-            items: [
-              mockMediumPost,
-              { ...mockMediumPost, guid: "no-picture", content: "<p>Text</p>" },
-            ],
-          }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        answer(
+          feed([
+            mockMediumPost,
+            { ...mockMediumPost, guid: "no-picture", content: "<p>Text</p>" },
+          ]),
+        ),
+      );
       // The article page's own image is not what the card shows.
       mockFetchMediumArticle.mockResolvedValue(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
@@ -338,14 +347,7 @@ describe("Medium Posts API Route", () => {
 
     it("handles empty items array gracefully", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ...mockRss2JsonResponse,
-            items: [],
-          }),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([])));
       mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
@@ -357,34 +359,11 @@ describe("Medium Posts API Route", () => {
       expect(result.cachedColors).toEqual(mockCachedColors);
     });
 
-    it("handles malformed RSS2JSON response", async () => {
-      mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            status: "ok",
-            // Missing items array
-          }),
-      });
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
-
-      const response = await GET(
-        new NextRequest("http://localhost:3000/api/medium-posts"),
-      );
-
-      const result = await response.json();
-      expect(result.cachedColors).toEqual(mockCachedColors);
-    });
-
     it("handles cache operation errors gracefully", async () => {
       // Cache cleaning fails
       mockCleanMediumCache.mockRejectedValueOnce(new Error("Cache error"));
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
 
       // Getting cached colors fails
@@ -402,10 +381,7 @@ describe("Medium Posts API Route", () => {
 
     it("sets correct cache revalidation time", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRss2JsonResponse),
-      });
+      mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
       mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 

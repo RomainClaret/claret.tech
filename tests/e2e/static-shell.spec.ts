@@ -337,6 +337,81 @@ test.describe("Static shell", () => {
     await closeContext(context);
   });
 
+  // The hero's title keeps one line: in the hero's two columns, from 1024
+  // px, it broke after "Accuracy", and at 320 px too. Its size follows its
+  // box, in CSS alone.
+  test("keeps the hero's title on one line, at every width", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    await page.evaluate(() => document.fonts.ready);
+
+    for (const width of [320, 390, 768, 1024, 1280, 1536]) {
+      await page.setViewportSize({ width, height: 900 });
+      const lines = await page.locator("#home h1").evaluate(
+        (title) =>
+          new Promise<number>((resolve) =>
+            requestAnimationFrame(() => {
+              const range = document.createRange();
+              range.selectNodeContents(title);
+              const tops = [...range.getClientRects()].map((rect) =>
+                Math.round(rect.top),
+              );
+              resolve(new Set(tops).size);
+            }),
+          ),
+      );
+      expect(lines, `${width} px`).toBe(1);
+    }
+    await closeContext(context);
+  });
+
+  // The hero's buttons on a phone's first screen. 390 x 664 is the page
+  // area of Playwright's iPhone 12, Safari's bars taking the rest of its
+  // 844 px. View Resume ended at 766 px; below 640 px wide the hero is
+  // tighter since 2026-10-21 (645). One more line of its paragraph, 26 px,
+  // would take the button off the screen again.
+  test("shows the hero's buttons on a phone's first screen", async ({
+    browser,
+    browserName,
+  }) => {
+    test.skip(browserName === "firefox", "Firefox has no mobile emulation");
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 664 },
+      deviceScaleFactor: 3,
+      isMobile: true,
+    });
+    await context.route(/\/_next\/static\/chunks\//, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto("/?playwright=true");
+    await page.evaluate(() => document.fonts.ready);
+
+    const { bottom, lines } = await page.locator("#home").evaluate((home) => {
+      const box = home.querySelector("h1")!.closest(".rounded-2xl")!;
+      const paragraph = box.querySelector(":scope > p")!;
+      const resume = [...box.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes("View Resume"),
+      )!;
+      return {
+        bottom: Math.round(
+          resume.getBoundingClientRect().bottom + window.scrollY,
+        ),
+        lines: Math.round(
+          paragraph.getBoundingClientRect().height /
+            parseFloat(getComputedStyle(paragraph).lineHeight),
+        ),
+      };
+    });
+    expect(
+      bottom,
+      `View Resume ends at ${bottom} px, the paragraph in ${lines} lines`,
+    ).toBeLessThanOrEqual(664);
+    await closeContext(context);
+  });
+
   // High contrast is settled by the same script: the visitor's choice, or
   // else the system's preference. A stored choice used to wait for the
   // bundle (the toggle's effect), and the system's was never read.
@@ -971,10 +1046,11 @@ test.describe("A section whose chunk fails to load", () => {
     await closeContext(context);
   });
 
-  // The research section's long texts (research-details.ts), fetched when
-  // the browser is idle and again when a card opens without them. Without
-  // them, an opened card keeps its short text.
-  test("keeps the research cards' short texts without the long ones", async ({
+  // The research section's details dialog (ResearchDetailsDialog.tsx), a
+  // chunk of its own with the long texts (research-details.ts), fetched
+  // only when a card is wanted. Without it, the dialog's stand-in shows the
+  // card's own short text, and the page stays.
+  test("keeps a research card's short text when its details cannot load", async ({
     browser,
   }) => {
     const context = await browser.newContext();
@@ -987,24 +1063,95 @@ test.describe("A section whose chunk fails to load", () => {
     const splash = page.getByRole("progressbar", { name: "Loading portfolio" });
     await expect(splash).toBeVisible();
     await expect(splash).toHaveCount(0, { timeout: 15_000 });
-    // The idle fetch has run, and failed.
-    await expect.poll(requests).toBe(1);
+    await page.waitForLoadState("networkidle");
+    // Nothing fetched them at load: no card was wanted yet.
+    expect(requests()).toBe(0);
 
     const hero = page.locator("#geenns");
-    await hero.scrollIntoViewIfNeeded();
-    const closed = await hero.innerText();
+    const title = (await hero.locator("h3").first().innerText()).trim();
     await hero.getByRole("button", { name: "Read full description" }).click();
 
-    await expect(hero.getByRole("button", { name: "Show less" })).toBeVisible();
-    // Only the button's label changed: the short text stayed.
-    expect(await hero.innerText()).toBe(
-      closed.replace("Read full description", "Show less"),
-    );
+    const dialog = page.getByRole("dialog", { name: title });
+    await expect(dialog).toContainText("Could not load the details.");
+    await expect(dialog).toContainText("Intelligence is not one big network");
+    await expect(
+      dialog.getByRole("button", { name: "Reload page" }),
+    ).toBeVisible();
+    // Asked for on the way to the button, as the dialog opened, and by the
+    // stand-in's own try.
+    await expect.poll(requests).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    // Closed, the page is as before: shown and scrolling.
     await expectPageShown(page);
-    // Opening asked for them again.
-    await expect.poll(requests).toBe(2);
     await closeContext(context);
   });
+
+  // The other sections' details dialogs, the same way (round 27): a chunk of
+  // their own each, fetched only when a card is wanted, and the stand-in
+  // shows what the card already has.
+  for (const { section, marker, open, title, text } of [
+    {
+      section: "a paper's",
+      // Only the paper dialog says an abstract is on its way.
+      marker: "Loading the abstract",
+      open: "Read more about Blockchain, a techie overview",
+      title: "Blockchain, a techie overview",
+      text: "Demystifying blockchain when everyone thought it would change everything.",
+    },
+    {
+      section: "a skill card's",
+      // From a core activity's story (skills-details.ts).
+      marker: "question-answering system built from engineered parts",
+      open: "Read more about Current Focus",
+      title: "Current Focus",
+      text: "What I am working on now, and the problem sitting under it.",
+    },
+    {
+      section: "a blog post's",
+      marker: "blog-details",
+      open: /^Read more about Teaching AI to Evolve/,
+      title: /^Teaching AI to Evolve/,
+      // The start of the story: the stand-in does not scroll.
+      text: "We explored over 3 billion configuration possibilities",
+    },
+  ]) {
+    test(`keeps ${section} short text when its details cannot load`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext();
+      const requests = await routeChunk(context, marker, (route) =>
+        route.abort(),
+      );
+      const page = await context.newPage();
+      await page.goto("/?playwright=true");
+      const splash = page.getByRole("progressbar", {
+        name: "Loading portfolio",
+      });
+      await expect(splash).toBeVisible();
+      await expect(splash).toHaveCount(0, { timeout: 15_000 });
+      await page.waitForLoadState("networkidle");
+      // Nothing fetched them at load: no card was wanted yet.
+      expect(requests()).toBe(0);
+
+      const button = page.getByRole("button", { name: open });
+      await button.scrollIntoViewIfNeeded();
+      await button.click();
+
+      const dialog = page.getByRole("dialog", { name: title });
+      await expect(dialog).toContainText("Could not load the details.");
+      await expect(dialog).toContainText(text);
+      await expect(
+        dialog.getByRole("button", { name: "Reload page" }),
+      ).toBeVisible();
+      await expect.poll(requests).toBeGreaterThanOrEqual(2);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+      await expect(button).toBeFocused();
+      await expectPageShown(page);
+      await closeContext(context);
+    });
+  }
 });
 
 test.describe("A terminal tool whose chunk fails to load", () => {

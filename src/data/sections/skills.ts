@@ -33,15 +33,14 @@ export const skillsSection = {
   },
   // Core activities with their technologies. A technology's icon is a Font
   // Awesome name that src/components/icons/tech-icons.tsx draws as a Lucide
-  // icon (tech-icons.test.ts holds each to one).
+  // icon (tech-icons.test.ts holds each to one). `description` is the card's
+  // text; the story its dialog tells is in skills-details.ts, by title.
   coreActivities: [
     {
       icon: "🧬",
       title: "Evolutionary AI: Growing Intelligence Instead of Training It",
       description:
         "I evolve networks instead of training them. It takes longer and costs more compute. What comes back is behavior I did not write, and working out what that behavior is worth is most of the job.",
-      expandedDescription:
-        "My master's thesis was a question-answering system built from engineered parts. It worked, and it was brittle in places nobody had planned for. Symbolic reasoning, distributed agents and fuzzy logic went the same way. What kept failing was designing the whole thing by hand, so I stopped. Now evolution builds the networks and I study what it finds. In my GECCO'24 study, settings found on one image task carried over to a harder one, though not to simple logic tasks. A small result, but the kind I care about: something that still holds when the problem changes.",
       technologies: [
         { name: "NEAT/CPPNs/ES-HyperNEAT", icon: "fas fa-dna" },
         { name: "JAX/TensorNEAT", icon: "fas fa-bolt" },
@@ -52,8 +51,6 @@ export const skillsSection = {
       title: "Research Through Systematic Exploration",
       description:
         "Used more CPU hours than is sensible. The useful part was rarely the best score. It was learning which settings still held up when the task changed.",
-      expandedDescription:
-        "I breed populations rather than training single networks: mutate, select, repeat. Most of the work is finding settings under which that loop gets anywhere. My GECCO'24 study searched those settings with a guided method rather than at random. On MNIST it beat random search and earlier results for that algorithm, and the settings carried over to Fashion-MNIST, though not to simple logic tasks. The score was never the point. Making evolution fast enough to run at that scale took the rest of my PhD.",
       technologies: [
         { name: "Hyperparameter Optimization", icon: "fas fa-sliders" },
         { name: "Distributed Computing", icon: "fas fa-network-wired" },
@@ -64,8 +61,6 @@ export const skillsSection = {
       title: "Thinking in Parts: Specialists That Learn to Work Together",
       description:
         "The networks I grow solve problems in parts: specialists that evolve separately, then learn to work together. It is messier than one big network, and you can look at the parts one at a time.",
-      expandedDescription:
-        "The idea behind GEENNS is that a mind is a team of specialists rather than one big network. Evolution grows small specialist networks, freezes the ones that work, and then evolves coordinators that decide how to combine them for each new task. In the PhD prototype, the same frozen specialists carried over to new tasks without retraining. What they do along the way is often not what I would have designed, and a fair part of it is redundant. The mess is the point. The mess is intelligence.",
       technologies: [
         { name: "Compositional Architectures", icon: "fas fa-puzzle-piece" },
         { name: "Emergent Behaviors", icon: "fas fa-seedling" },
@@ -95,20 +90,18 @@ export const skillsSection = {
     subtitle: "Building AI that adapts instead of memorizing",
   },
   /**
-   * Each panel leads with a short framing line so the bullets underneath have
+   * A card shows its panel's first bullet, the key point, so that one has to
+   * stand alone. Read more opens the rest in a dialog, which leads with
+   * `description`, a one-sentence framing line, then the longer framing in
+   * skills-details.ts (by category), so the bullets underneath have
    * something to attach to. Read as a bare list they lose their referent: a
    * bullet starting "Measuring it honestly" under a heading that just says
    * "Current Focus" gives the reader no way to work out what "it" is.
-   *
-   * `description` has to read well in a narrow four-across card, so keep it to
-   * one sentence. `expandedDescription` is what Read more swaps in.
    */
   researchInterests: {
     "Current Focus": {
       description:
         "What I am working on now, and the problem sitting under it.",
-      expandedDescription:
-        "Everything here follows from one choice: grow the networks rather than train them. That buys adaptability, and it costs you every familiar way of checking your work, because the usual tests assume the system learned from us. So half this list is the research and half is building the instruments to judge it.",
       bullets: [
         "GEENNS: a mind as a team of evolved specialists that claim their own roles and learn to work together",
         "Composition as reasoning: assemble solutions from evolved specialists, then get the assembly itself to emerge",
@@ -120,8 +113,6 @@ export const skillsSection = {
     },
     "Why Evolution": {
       description: "Why I grow networks instead of training them.",
-      expandedDescription:
-        "Optimization gives you the best answer to the question you asked. Adaptation gives you something that still works once the question changes. Biology has been running the second experiment for a few billion years, and almost nothing it produced was designed.",
       bullets: [
         "Cockroaches outlived dinosaurs. Adaptation beats optimization every time the world moves",
         "Your brain runs on 20 watts of spaghetti code, and still outthinks every tidy system we design",
@@ -133,8 +124,6 @@ export const skillsSection = {
     },
     "My Approach": {
       description: "How I work, mostly learned by wasting time first.",
-      expandedDescription:
-        "Long runs, systematic sweeps, and a lot of dead ends. These are the rules I keep relearning: test it before you trust it, measure what you actually claim, and build the tool yourself when the tool does not exist. Most of the useful signal arrived through failures I had not planned for.",
       bullets: [
         "Test systematically, or watch a year of computing vanish proving nothing",
         "Grow behaviors, don't drill answers. One adapts to new problems, the other just recites the old ones",
@@ -146,8 +135,6 @@ export const skillsSection = {
     },
     Seeking: {
       description: "What I want from collaborators and from problems.",
-      expandedDescription:
-        "I would rather have a good argument than easy agreement, and rather spend three years on a question that matters than three months on one that scores well. If you think I am wrong about any of this, bring evidence and I will listen.",
       bullets: [
         "Collaborators who value adaptation over benchmarks, and a good argument over easy agreement",
         "Patience to let evolution surprise you, because the results worth having rarely arrive on schedule",

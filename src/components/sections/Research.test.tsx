@@ -5,7 +5,6 @@ import {
   fireEvent,
   waitFor,
   act,
-  cleanup,
   within,
 } from "@testing-library/react";
 import { Research } from "./Research";
@@ -95,6 +94,8 @@ vi.mock("framer-motion", () => {
 });
 
 describe("Research", () => {
+  // The cards under the hero, as the page shows them.
+  const grid = researchSection.projects.filter(isDisplayed).slice(1);
   beforeEach(() => {
     vi.clearAllMocks();
     window.scrollTo = vi.fn();
@@ -136,25 +137,26 @@ describe("Research", () => {
       expect(github).toBeDisabled();
     });
 
-    it("opens a thesis from a grid card and does not collapse it", async () => {
+    it("opens a thesis from a card's dialog, which stays open under it", async () => {
       render(<Research />);
 
-      // Expand the PhD thesis card.
+      // A click anywhere on the PhD thesis card opens its details.
       fireEvent.click(
         screen.getByText("Scaling Adaptive Substrate Neuroevolution"),
       );
-      const readThesis = await screen.findByText("Read Thesis");
+      const dialog = await screen.findByRole("dialog", {
+        name: "Scaling Adaptive Substrate Neuroevolution",
+      });
 
-      fireEvent.click(readThesis);
+      fireEvent.click(within(dialog).getByText("Read Thesis"));
 
       expect(mockOpenPDF).toHaveBeenCalledWith(
         "/pdfs/thesis_PHD.pdf",
         "Scaling Adaptive Substrate Neuroevolution",
         "thesis_PHD.pdf",
       );
-      // The whole card is a click target, so without stopPropagation the
-      // click that opened the PDF would also close the card behind it.
-      expect(screen.getByText("Read Thesis")).toBeInTheDocument();
+      // The reader opens above the dialog, which stays.
+      expect(dialog).toBeInTheDocument();
     });
 
     it("keeps non-PDF links as external anchors", async () => {
@@ -163,8 +165,11 @@ describe("Research", () => {
       fireEvent.click(
         screen.getByText("Scaling Adaptive Substrate Neuroevolution"),
       );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Scaling Adaptive Substrate Neuroevolution",
+      });
       // By role, not text: "EMR-HyperNEAT" is also one of the card's tags.
-      const anchor = await screen.findByRole("link", {
+      const anchor = within(dialog).getByRole("link", {
         name: "EMR-HyperNEAT",
       });
 
@@ -177,27 +182,33 @@ describe("Research", () => {
   });
 
   describe("Keyboard", () => {
-    it("opens and closes a grid card from a real button that says so", async () => {
-      // The card was a div with a click handler: no Tab stop, no role, no
-      // state, so its description, links and PDF buttons were out of a
-      // keyboard's reach.
+    it("opens each grid card's details in a dialog, from a real button", async () => {
+      // The card grew in place and pushed the grid around; its details open
+      // above the page now, outside the card, and closing gives the focus
+      // back to the button.
       render(<Research />);
-      const [toggle] = screen.getAllByRole("button", {
-        name: "Click to expand",
-      });
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-      fireEvent.click(toggle);
+      for (const project of grid) {
+        const button = screen.getByRole("button", {
+          name: `Read more about ${project.title}`,
+        });
+        expect(button).toHaveAttribute("aria-haspopup", "dialog");
+        expect(button).not.toHaveAttribute("aria-expanded");
 
-      expect(toggle).toHaveAttribute("aria-expanded", "true");
-      expect(toggle).toHaveTextContent("Click to collapse");
-      const details = document.getElementById(
-        toggle.getAttribute("aria-controls")!,
-      );
-      expect(details).not.toBeNull();
+        fireEvent.click(button);
+        const dialog = await screen.findByRole("dialog", {
+          name: project.title,
+        });
+        expect(document.getElementById(project.anchorId!)).not.toContainElement(
+          dialog,
+        );
 
-      fireEvent.click(toggle);
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
+        fireEvent.keyDown(document, { key: "Escape" });
+        await waitFor(() => {
+          expect(screen.queryByRole("dialog")).toBeNull();
+        });
+        expect(button).toHaveFocus();
+      }
     });
 
     it("lets each PhD highlight take focus, which shows its explanation", () => {
@@ -220,50 +231,65 @@ describe("Research", () => {
       }
     });
 
-    it("writes an open card's technologies through the contrast helper", () => {
+    it("writes a card's technologies through the contrast helper", async () => {
       // Raw, the tags read at 2.1 to 4.0:1 on the light theme.
       render(<Research />);
-      const [toggle] = screen.getAllByRole("button", {
-        name: "Click to expand",
-      });
-      fireEvent.click(toggle);
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Read more about ${grid[0].title}`,
+        }),
+      );
 
-      const details = document.getElementById(
-        toggle.getAttribute("aria-controls")!,
-      )!;
-      const tags = [...details.querySelectorAll("span.rounded-lg")];
-      expect(tags.length).toBeGreaterThan(0);
+      const dialog = await screen.findByRole("dialog", {
+        name: grid[0].title,
+      });
+      const heading = within(dialog).getByRole("heading", {
+        name: "Technologies & Methods",
+      });
+      const tags = within(heading.parentElement!).getAllByRole("listitem");
+      expect(tags).toHaveLength(grid[0].tags.length);
       for (const tag of tags) {
         expect(tag).toHaveClass("accent-text");
-        expect((tag as HTMLElement).style.getPropertyValue("--accent")).toMatch(
-          /^rgb\(/,
-        );
+        expect(tag.style.getPropertyValue("--accent")).toMatch(/^rgb\(/);
       }
     });
 
-    it("says whether the story and the PhD description are open", () => {
+    it("opens the PhD's and the journey's texts in a dialog, from real buttons", async () => {
+      // Both swapped their text in place; their buttons said whether they
+      // were open. They open a dialog now, and closing it gives the focus
+      // back.
       render(<Research />);
 
-      for (const name of ["Read full story", "Read full description"]) {
-        const toggle = screen.getByRole("button", { name });
-        expect(toggle).toHaveAttribute("aria-expanded", "false");
+      for (const [name, dialogName] of [
+        [
+          "Read full description",
+          researchSection.projects.filter(isDisplayed)[0].title,
+        ],
+        ["Read the full story", "My Research Journey"],
+      ]) {
+        const button = screen.getByRole("button", { name });
+        expect(button).toHaveAttribute("aria-haspopup", "dialog");
+        expect(button).not.toHaveAttribute("aria-expanded");
 
-        fireEvent.click(toggle);
+        fireEvent.click(button);
+        await screen.findByRole("dialog", { name: dialogName });
 
-        expect(toggle).toHaveTextContent("Show less");
-        expect(toggle).toHaveAttribute("aria-expanded", "true");
+        fireEvent.keyDown(document, { key: "Escape" });
+        await waitFor(() => {
+          expect(screen.queryByRole("dialog")).toBeNull();
+        });
+        expect(button).toHaveFocus();
       }
+      expect(screen.queryByText("Show less")).toBeNull();
     });
   });
 
   describe("Long texts", () => {
-    // research-details.ts, out of the page's first JavaScript: fetched when
-    // the browser is idle after load, or when something opens first.
-    afterEach(() => {
-      // Unmount first: the component cancels its idle callback as it goes.
-      cleanup();
-      vi.unstubAllGlobals();
-    });
+    // research-details.ts comes with the details dialog's code, out of the
+    // page's first JavaScript: none of it is on the page until a dialog
+    // opens.
+    const [featured, firstInGrid] =
+      researchSection.projects.filter(isDisplayed);
 
     it("has every project's full description, and the journey's", () => {
       expect(Object.keys(researchDetails.descriptions).sort()).toEqual(
@@ -274,83 +300,61 @@ describe("Research", () => {
       );
     });
 
-    // Not idle yet: nothing has asked for them, so only an opening does.
-    function renderBeforeIdle() {
-      vi.stubGlobal("requestIdleCallback", () => 1);
-      vi.stubGlobal("cancelIdleCallback", () => {});
+    it("shows the PhD's full description in its dialog, not on the page", async () => {
       render(<Research />);
-    }
-    const [featured, firstInGrid] =
-      researchSection.projects.filter(isDisplayed);
-
-    it("fetches them when the browser is idle, before anything opens", async () => {
-      let idle = () => {};
-      vi.stubGlobal("requestIdleCallback", (callback: () => void) => {
-        idle = callback;
-        return 1;
-      });
-      vi.stubGlobal("cancelIdleCallback", () => {});
-      render(<Research />);
-
-      await act(async () => {
-        idle();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-      fireEvent.click(
-        screen.getByRole("button", { name: "Read full description" }),
-      );
-
-      // Already there: no short text in between.
-      expect(
-        screen.getByText(researchDetails.descriptions[featured.title]),
-      ).toBeInTheDocument();
-    });
-
-    it("opens the PhD on its short text, then shows the full one", async () => {
-      renderBeforeIdle();
-
-      fireEvent.click(
-        screen.getByRole("button", { name: "Read full description" }),
-      );
-
+      const full = researchDetails.descriptions[featured.title];
       expect(screen.getByText(featured.shortDescription!)).toBeInTheDocument();
+      expect(screen.queryByText(full)).toBeNull();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read full description" }),
+      );
+
+      const dialog = await screen.findByRole("dialog", {
+        name: featured.title,
+      });
+      expect(within(dialog).getByText(full)).toBeInTheDocument();
+      // The page shows the hero's highlights, technologies and links: its
+      // dialog does not repeat them.
       expect(
-        await screen.findByText(researchDetails.descriptions[featured.title]),
-      ).toBeInTheDocument();
+        within(dialog).queryByRole("heading", { name: "Key Contributions" }),
+      ).toBeNull();
     });
 
-    it("opens the story on its short text, then shows the full one", async () => {
-      renderBeforeIdle();
-
-      fireEvent.click(screen.getByRole("button", { name: "Read full story" }));
-
+    it("tells the journey's story in its dialog; the card has its teaser", async () => {
+      render(<Research />);
       expect(
         screen.getByText(researchSection.journeyShortDescription),
       ).toBeInTheDocument();
+      expect(screen.queryByText(researchDetails.journeyDescription)).toBeNull();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Read the full story" }),
+      );
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "My Research Journey",
+      });
       expect(
-        await screen.findByText(researchDetails.journeyDescription),
+        within(dialog).getByText(researchDetails.journeyDescription),
       ).toBeInTheDocument();
     });
 
-    it("opens a grid card on its short text, then shows the full one", async () => {
-      renderBeforeIdle();
-      const [toggle] = screen.getAllByRole("button", {
-        name: "Click to expand",
-      });
+    it("shows a grid card's full description in its dialog, not on the card", async () => {
+      render(<Research />);
+      const full = researchDetails.descriptions[firstInGrid.title];
+      expect(screen.queryByText(full)).toBeNull();
 
-      fireEvent.click(toggle);
-
-      const opened = within(
-        document.getElementById(toggle.getAttribute("aria-controls")!)!,
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Read more about ${firstInGrid.title}`,
+        }),
       );
-      expect(
-        opened.getByText(firstInGrid.shortDescription!),
-      ).toBeInTheDocument();
-      expect(
-        await opened.findByText(
-          researchDetails.descriptions[firstInGrid.title],
-        ),
-      ).toBeInTheDocument();
+
+      const dialog = await screen.findByRole("dialog", {
+        name: firstInGrid.title,
+      });
+      expect(within(dialog).getByText(full)).toBeInTheDocument();
     });
   });
 
@@ -395,34 +399,57 @@ describe("Research", () => {
 
       render(<Research />);
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(/Grid-based Emergent Evolution/),
-        ).toBeInTheDocument();
+      const dialog = await screen.findByRole("dialog", {
+        name: researchSection.projects.filter(isDisplayed)[0].title,
       });
+      expect(
+        within(dialog).getByText(/Grid-based Emergent Evolution/),
+      ).toBeInTheDocument();
       await waitFor(() => {
         expect(window.scrollTo).toHaveBeenCalled();
       });
     });
 
-    it("gives the -full variant an element to scroll to", () => {
-      // useCardDeepLink resolves its target with getElementById, so the
-      // variant needs a real node or the scroll silently does nothing.
+    it("points the -full link at the hero itself", async () => {
+      // It pointed at an empty span of its own at the top of the hero, which
+      // also held the link: any click on the hero itself released it.
+      window.location.hash = "#geenns-full";
+
       render(<Research />);
 
-      expect(document.getElementById("geenns-full")).toBeTruthy();
+      await waitFor(() => {
+        expect(document.getElementById("geenns")).toHaveClass(
+          "deep-link-highlight",
+        );
+      });
+      expect(document.getElementById("geenns-full")).toBeNull();
     });
 
-    it("expands the targeted grid card and leaves the others shut", async () => {
+    it("points at a grid card for #graphqa, without opening it", async () => {
       window.location.hash = "#graphqa";
 
       render(<Research />);
 
       await waitFor(() => {
-        expect(screen.getByText("Code Repository")).toBeInTheDocument();
+        expect(document.getElementById("graphqa")).toHaveClass(
+          "deep-link-highlight",
+        );
       });
-      // The PhD thesis card shares the same activeIndex and must stay closed,
-      // so its resource links are not rendered at all.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("opens the targeted grid card's details for #graphqa-full, and no other", async () => {
+      window.location.hash = "#graphqa-full";
+
+      render(<Research />);
+
+      const dialog = await screen.findByRole("dialog", {
+        name: /^GraphQA/,
+      });
+      expect(within(dialog).getByText("Code Repository")).toBeInTheDocument();
+      // An index off by one opened the card next to it: the PhD thesis,
+      // whose resources include this link.
       expect(
         screen.queryByRole("link", { name: "EMR-HyperNEAT" }),
       ).not.toBeInTheDocument();
@@ -437,6 +464,45 @@ describe("Research", () => {
       await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
       expect(window.scrollTo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("A card's details whose code cannot load", () => {
+    afterEach(() => {
+      vi.doUnmock("./ResearchDetailsDialog");
+      vi.resetModules();
+    });
+
+    it("says so with the card's own text, and gives the focus back", async () => {
+      const imports = { count: 0 };
+      vi.resetModules();
+      vi.doMock("./ResearchDetailsDialog", () => {
+        imports.count++;
+        throw new Error("chunk failed");
+      });
+      const { Research: Fresh } = await import("./Research");
+      render(<Fresh />);
+      const card = document.getElementById(grid[0].anchorId!)!;
+
+      // Pointing at a card starts fetching its details' code.
+      fireEvent.pointerEnter(card);
+      await waitFor(() => expect(imports.count).toBe(1));
+
+      const button = screen.getByRole("button", {
+        name: `Read more about ${grid[0].title}`,
+      });
+      fireEvent.click(button);
+      const dialog = await screen.findByRole("dialog", {
+        name: grid[0].title,
+      });
+      expect(dialog).toHaveTextContent(grid[0].shortDescription!);
+      expect(dialog).toHaveTextContent("Could not load the details.");
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).toBeNull();
+      });
+      expect(button).toHaveFocus();
     });
   });
 

@@ -37,19 +37,28 @@ test.describe("Keyboard paths", () => {
     await waitForSplashToEnd(page);
   });
 
-  test("opens a research card with Enter", async ({ page }) => {
-    // Held by what it controls: its name turns to "Click to collapse".
-    const controls = await page
-      .getByRole("button", { name: "Click to expand" })
-      .first()
-      .getAttribute("aria-controls");
-    const toggle = page.locator(`[aria-controls="${controls}"]`);
-    await toggle.focus();
+  test("opens a research card's details with Enter, and comes back", async ({
+    page,
+  }) => {
+    // The cards grew in place; their details open above the page now.
+    const button = page
+      .locator("#research")
+      .getByRole("button", { name: /^Read more about / })
+      .first();
+    const title = (await button.getAttribute("aria-label"))!.replace(
+      "Read more about ",
+      "",
+    );
+    await button.focus();
     await page.keyboard.press("Enter");
 
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(toggle).toHaveAccessibleName("Click to collapse");
-    await expect(byId(page, controls)).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: title });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(button).toBeFocused();
   });
 
   test("opens a thesis with Enter", async ({ page }) => {
@@ -126,7 +135,12 @@ test.describe("Keyboard paths", () => {
   test("shows the floating navigation's labels on keyboard focus", async ({
     page,
     browserName,
+    isMobile,
   }) => {
+    test.skip(
+      isMobile,
+      "Phones have no section rail (mobile-navigation.spec.ts)",
+    );
     await page.evaluate(() => window.scrollTo(0, innerHeight * 2));
     const home = page.getByRole("button", { name: /^Home/ });
     await expect(home).toBeEnabled();

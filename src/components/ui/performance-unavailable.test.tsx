@@ -4,6 +4,7 @@ import {
   PerformanceDashboardUnavailable,
   PerformanceMonitorUnavailable,
   PerformanceReportUnavailable,
+  ToolUnavailableDialog,
 } from "./performance-unavailable";
 
 const mocks = vi.hoisted(() => ({
@@ -191,5 +192,56 @@ describe("PerformanceReportUnavailable", () => {
     expect(
       screen.getByRole("dialog", { name: "Performance report" }),
     ).toHaveTextContent("Could not load the performance report.");
+  });
+});
+
+describe("ToolUnavailableDialog for a card's details", () => {
+  it("is named after the card, keeps its text, and gives the focus back", () => {
+    // In place of a card's details dialog whose chunk failed: the card's
+    // own short text still reads, and the page stays locked as under the
+    // details dialog.
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    let open = true;
+    const onClose = vi.fn(() => {
+      open = false;
+    });
+    const { rerender } = render(
+      <ToolUnavailableDialog
+        name="details"
+        title="GraphQA"
+        isOpen={open}
+        onClose={onClose}
+        retry={vi.fn()}
+        retrying={false}
+        lockScroll
+        returnFocus={() => trigger}
+      >
+        <p>Built zero-shot conversational AI.</p>
+      </ToolUnavailableDialog>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "GraphQA" });
+    expect(dialog).toHaveTextContent("Built zero-shot conversational AI.");
+    expect(dialog).toHaveTextContent("Could not load the details.");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(
+      <ToolUnavailableDialog
+        name="details"
+        title="GraphQA"
+        isOpen={open}
+        onClose={onClose}
+        retry={vi.fn()}
+        retrying={false}
+        lockScroll
+        returnFocus={() => trigger}
+      />,
+    );
+    expect(document.activeElement).toBe(trigger);
+    expect(document.body.style.overflow).toBe("");
+    trigger.remove();
   });
 });

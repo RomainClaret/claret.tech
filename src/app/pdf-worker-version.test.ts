@@ -26,6 +26,24 @@ describe("the pdf.js worker postinstall copies", () => {
     expect(installed).toBe(wanted);
   });
 
+  // next dev wraps each module in a strict eval, where a top-level
+  // `var __webpack_exports__` gets a binding of its own and hides the
+  // module's exports: pdf.js's plain build declares one (unused), and the
+  // reader's chunk failed to load in dev only, where no e2e test looks.
+  it("is a pdf.js file that leaves next dev's module exports alone", () => {
+    const config = readFileSync(join(process.cwd(), "next.config.mjs"), "utf8");
+    const target = /"pdfjs-dist\$":\s*"([^"]+)"/.exec(config)?.[1];
+    if (!target)
+      throw new Error("next.config.mjs no longer aliases pdfjs-dist");
+    const source = readFileSync(
+      join(process.cwd(), "node_modules", target),
+      "utf8",
+    );
+
+    expect(target).toMatch(/^pdfjs-dist\/legacy\/build\//);
+    expect(source).not.toMatch(/\b__webpack_exports__\b/);
+  });
+
   // The reader runs pdf.js's legacy build (next.config.mjs aliases
   // pdfjs-dist to it), for the oldest browsers in the browserslist, and so
   // must its worker: the default build's calls URL.parse and

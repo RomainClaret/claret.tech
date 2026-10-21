@@ -79,6 +79,28 @@ export function scrollToSection(
 }
 
 /**
+ * Puts a card right under the nav at once, if it is more than a few pixels
+ * off: after a dialog a link opened closes, the card it was about, which
+ * content arriving above it may have pushed down meanwhile. Clamped to the
+ * page's last scrollable pixel, as the deep links' settle loop is.
+ */
+export function alignToSection(id: string) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  const currentY = window.pageYOffset;
+  const top = element.getBoundingClientRect().top + currentY - NAV_OFFSET;
+  const maxTop = Math.max(
+    0,
+    document.documentElement.scrollHeight - window.innerHeight,
+  );
+  const target = Math.min(Math.max(top, 0), maxTop);
+  if (Math.abs(currentY - target) > 4) {
+    // "instant", not "auto": globals.css's smooth scrolling would animate it.
+    window.scrollTo({ top: target, behavior: "instant" });
+  }
+}
+
+/**
  * Focuses `element` without scrolling to it. A section is a container, not a
  * control: it takes focus through a temporary tabindex, with no outline (an
  * inline style, as src/lib is outside Tailwind's content), and both go when

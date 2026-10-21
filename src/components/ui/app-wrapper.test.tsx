@@ -8,6 +8,7 @@
 
 import { render, screen, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { usePageShown } from "@/contexts/page-shown-context";
 import { AppWrapper } from "./app-wrapper";
 import { SplashUnavailable } from "./splash-unavailable";
 import {
@@ -553,6 +554,53 @@ describe("AppWrapper", () => {
         expect(splashSkips()).toBe("true");
       } finally {
         computedStyle.mockRestore();
+      }
+    });
+  });
+
+  describe("What the page is told", () => {
+    // Whether the visitor can see it: a deep link's highlight waits for it
+    // (useCardDeepLink), as it pulsed under the splash.
+    function ShownProbe() {
+      return <div data-testid="page-shown">{String(usePageShown())}</div>;
+    }
+    const shown = () => screen.getByTestId("page-shown").textContent;
+
+    it("is covered while the splash plays, and shown once it has", async () => {
+      render(
+        <AppWrapper>
+          <ShownProbe />
+        </AppWrapper>,
+      );
+      expect(shown()).toBe("false");
+
+      await act(async () => {
+        screen.getByTestId("splash-show").click();
+      });
+      expect(shown()).toBe("false");
+
+      await act(async () => {
+        screen.getByTestId("splash-complete").click();
+      });
+      expect(shown()).toBe("true");
+    });
+
+    it("is shown when the page goes on screen without the splash", () => {
+      vi.useFakeTimers();
+      try {
+        render(
+          <AppWrapper>
+            <ShownProbe />
+          </AppWrapper>,
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(4000);
+        });
+
+        expect(shown()).toBe("true");
+      } finally {
+        vi.useRealTimers();
       }
     });
   });

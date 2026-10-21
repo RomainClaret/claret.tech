@@ -46,7 +46,7 @@ export const greeting = {
     700,
   ],
   subTitle:
-    "Evolution spent billions of years creating intelligence. I borrow its method to grow artificial minds instead of programming them: many small candidates compete, the best ones have offspring with small random changes, and over generations they become specialists that learn to work together. Nobody shows them how a person would solve a problem, only whether their attempt worked, so they get to think outside the box. Whether what they come up with is genuinely new, or only looks new to us, is what I am still working out.",
+    "Evolution spent billions of years creating intelligence. I borrow its method to grow artificial minds instead of programming them: many candidates compete, the best have offspring with small random changes, and over generations they become specialists that learn to work together. Nobody shows them how a person would solve a problem, so they can think outside the box.",
   resumeLink: "/pdfs/CV_RomainClaret.pdf",
   interests: [
     {

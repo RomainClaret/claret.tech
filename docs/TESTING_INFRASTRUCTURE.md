@@ -7,12 +7,16 @@ How the tests run, and what to know before writing one.
 - **Unit tests:** Vitest in jsdom, `src/**/*.test.ts(x)`.
 - **End to end:** Playwright against a built site, `tests/e2e/*.spec.ts`, in
   Chromium, Firefox and WebKit, desktop and phone.
+- **A push, before it is made:** act runs `ci.yml` and `playwright.yml` as
+  GitHub would for the local commits (`.github/workflows/README.md`,
+  "Rehearse a push"). Read each job's test step: artifact uploads fail
+  under act.
 
 CI runs the unit tests in ten jobs, one npm script each: `test:api`,
 `test:utils`, the four component batches (`test:components:batch1` to
 `batch4`, hand-kept lists of files), `test:contexts`, `test:hooks`,
-`test:lib-dom` and `test:unit`; each test runs in one job (2,640 on
-2026-10-20). Two tests keep the lists honest:
+`test:lib-dom` and `test:unit`; each test runs in one job (2,693 on
+2026-10-21). Two tests keep the lists honest:
 
 - `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
   that no CI script runs or that two run, and on a listed file that no
@@ -76,6 +80,18 @@ The e2e checks that measure, and can fail (2026-10-18):
   plus 15% (1,321 KB, 157 KB and 0.934, 31, 2, 2 and 46 on 2026-10-20).
   Web vitals are Lighthouse's (above): the FID and vitals tests recorded
   nothing measurable.
+- **Compactness** (`card-details.spec.ts`, the accessibility job): at
+  1280 px the four philosophy cards in one row, the row at most 260 px,
+  the core activities 407 and the research journey 354; at 390 px the
+  philosophy cards at most 888. Each is the height measured on 2026-10-21,
+  when the cards stopped growing in place, plus 15%. The deploy waits for
+  this workflow (`deploy.yml`'s browser-tests job), so these fail a deploy
+  too.
+- **The hero on a phone** (`static-shell.spec.ts`, Chromium, the
+  performance job): at 390 x 664, an iPhone 12's page area in Safari, View
+  Resume ends on the first screen (645 px on 2026-10-21, in Chromium and
+  WebKit, on macOS and in Linux). One more line of the hero's paragraph,
+  26 px, puts it at 671: shorten the text or the spacing, not the test.
 - **The console** (`static-shell.spec.ts`, Chromium, the performance job):
   the homepage loads with no console error and no page error, once its
   requests settle. Production reports only the errors that reach an error
@@ -228,6 +244,27 @@ proved each replacement with a mutation:
   ("EMR-HyperNEATPaper"), as they would in a browser without our CSS: put
   the space in the markup (`{" "}` between them renders nothing between
   blocks).
+- **A `vi.doMock` outlives its test.** After `vi.resetModules()`, a fresh
+  import gets the last factory any test of the file registered for that
+  module: `Skills.test.tsx`'s tests of missing data left the section with
+  no cards for a later test that imported it afresh. Hoist the file's data
+  (`vi.hoisted`) and register it again with `vi.doMock` in that test.
+- **A file-wide `next/dynamic` mock stands in for every dynamic component.**
+  `Papers.test.tsx`'s returned the PDF reader for each call, so the paper
+  dialog (round 27) would have rendered as the reader. Branch on the props,
+  and render the others through their own loader (`React.lazy`), which
+  keeps the stand-in for a chunk that fails.
+- **WebKit keeps a hover under a backdrop.** When a dialog's backdrop
+  appears under a pointer that has not moved, WebKit keeps the card's hover
+  (Chromium drops it), and `getBoundingClientRect()` includes the card's 2%
+  hover zoom: a card that kept its size measured up to 7 px taller. Compare
+  layout sizes (`offsetHeight`), as `card-details.spec.ts` does.
+- **A locator read in several calls can read several elements.**
+  `locator.nth(i)` resolves again on each call: reading a button's label,
+  text and title in three calls, while sections mounted, read three
+  different buttons, and a named page failed the name scan once in four
+  runs. Read what one check needs in one `evaluate` or `evaluateAll`
+  (`accessibility.spec.ts`'s name scan).
 - **A library mock encodes one version of the library.** The PDF reader's
   Document mock kept the pages mounted through a reload, as react-pdf 10.0
   did; 10.5 unmounts them, and the tests stayed green on the wrong
@@ -235,6 +272,39 @@ proved each replacement with a mutation:
   mocks of a library you upgrade. And let the test release what the mock
   delivers later: a `setTimeout(0)` delivery ran inside React's async `act`
   around the click, so no test saw the pages away.
+- **The page's `?playwright=true` stops at the page.** The blog asks
+  `/api/medium-posts` with no query string, so the API's own test posts
+  (for `?playwright=true` on the API's address, removed since) reached no
+  browser test,
+  and a spec that did not answer the route showed whatever the server
+  fetched from Medium. The dialog tests' posts were one sentence each, and
+  a bug that cut every real post at its photo's credit passed them all.
+  Answer the route in the spec with data shaped like the real thing
+  (`card-details.spec.ts`, `privacy.spec.ts`), and check a fix against the
+  live data too.
+- **A test that walks every case runs out of time under load.** The
+  dialogs' accessibility scan, eight dialogs in one test, ran out of its
+  60 s at the fourth in WebKit in the Linux container, where CI is about
+  3.7 times slower still. One test per case, as `card-details.spec.ts`
+  does now.
+- **Assigning `location.hash` before `renderHook` is a second arrival.** jsdom
+  queues a `hashchange` for it and delivers it inside a later `act`, so a
+  hook that restarts a timer on arrival restarts it late. A page opened at
+  a link fires none: model it with `history.replaceState`
+  (`useCardDeepLink.test.tsx`).
+- **act from the working copy passes CI by skipping it.** paths-filter
+  turns `main` into `origin/main` first, which here was the push's `before`:
+  no change, every job skipped, a green summary. Rehearse from a fresh clone,
+  whose `origin/main` is HEAD as on GitHub, and check that the filter's log
+  lists files.
+- **A container job's `run:` is sh.** In the Playwright image that is dash,
+  which leaves `{1..30}` as it is: the five waits for the server ran once
+  (GitHub printed "attempt {1..30}/30"). `ci-workflows.test.ts` refuses
+  brace ranges; count with `seq`.
+- **Linux WebKit draws few frames.** With the terminal open it drew 4.7 to
+  7.9 frames a second alone on 4 CPUs and 0.5 beside another browser (13
+  with every blur off): a test that counts frames, or that wants to see an
+  animation, cannot work there. Check such things in Chromium and Firefox.
 
 ## Patched dependencies
 

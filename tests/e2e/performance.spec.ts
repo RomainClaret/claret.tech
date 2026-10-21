@@ -194,7 +194,12 @@ test.describe("Performance", () => {
     // constellation's chunk). Round 25 fetched 23 scripts: this round moved
     // code the page needs only after hydration into chunks of their own,
     // fetched then, for 31 KB less JavaScript before it. Highest measured
-    // plus 15%; the limits were 30, 15, 15 and 100.
+    // plus 15%; the limits were 30, 15, 15 and 100. On 2026-10-21 (round
+    // 27): 29 scripts and 46 requests on a desktop, 28 and 42 on a phone.
+    // The research section's long texts come with its details dialog now,
+    // not from an idle fetch, and two Experience logos load at once: the
+    // Skills section above them is 610 px shorter, which brings them within
+    // the browser's lazy-loading distance.
     expect(requestsByType.script || 0).toBeLessThan(36);
     expect(requestsByType.stylesheet || 0).toBeLessThanOrEqual(3);
     expect(requestsByType.font || 0).toBeLessThanOrEqual(3);

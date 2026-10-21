@@ -18,7 +18,8 @@ export const maxDuration = 60;
 interface MediumPost {
   title: string;
   link: string;
-  thumbnail: string;
+  /** The post's first image, when it has one. */
+  thumbnail?: string;
   content: string;
   pubDate: string;
   author: string;
@@ -31,72 +32,8 @@ interface MediumPost {
   enrichedColor?: string | null;
 }
 
-async function handler(request: NextRequest) {
+async function handler() {
   const username = mediumUsername();
-
-  // Check if this is a test environment (playwright only, not unit tests)
-  const url = new URL(request.url);
-  // Deliberately NOT keyed on User-Agent. It used to also match a UA containing
-  // "Playwright", which made mock mode reachable on the bare URL: the response
-  // is cacheable and nothing sets Vary, so the edge stored it under the same
-  // key a real visitor uses. One request turned the public blog section and
-  // /rss.xml into "Test Article 1" for everyone until the entry expired. The
-  // query param is safe because it is part of the cache key.
-  const isTestMode =
-    url.searchParams.get("playwright") === "true" ||
-    (process.env.NODE_ENV === "test" && !process.env.VITEST);
-
-  // Return mock data in test environment to avoid API failures
-  if (isTestMode) {
-    return NextResponse.json(
-      {
-        status: "ok",
-        feed: {
-          title: "Medium - @romainclaret",
-          description: "Stories from Test Environment",
-          link: "https://medium.com/@romainclaret",
-        },
-        items: [
-          {
-            title: "Test Article 1",
-            link: "https://medium.com/@romainclaret/test-article-1",
-            thumbnail: "",
-            content: "<p>This is a test article for automated testing.</p>",
-            pubDate: new Date().toISOString(),
-            author: "Romain Claret",
-            guid: "test-1",
-            categories: ["Testing", "Development"],
-            // The site's own pictures: a test contacts no other host.
-            image: "/images/paper_geenns_2024.webp",
-            enrichedColor: "#007ACC",
-          },
-          {
-            title: "Test Article 2",
-            link: "https://medium.com/@romainclaret/test-article-2",
-            thumbnail: "",
-            content: "<p>Another test article for automated testing.</p>",
-            pubDate: new Date(Date.now() - 86400000).toISOString(),
-            author: "Romain Claret",
-            guid: "test-2",
-            categories: ["Testing", "Automation"],
-            image: "/images/jax_es_hyperneat.webp",
-            enrichedColor: "#28A745",
-          },
-        ],
-        cachedColors: {
-          "#007ACC": "blue",
-          "#28A745": "green",
-        },
-      },
-      {
-        headers: {
-          // Never shared: mock output must not be able to occupy a cache entry
-          // that a real visitor could be served from.
-          "Cache-Control": "private, no-store",
-        },
-      },
-    );
-  }
 
   try {
     // Clean expired cache entries periodically (non-fatal if it fails)
@@ -107,7 +44,7 @@ async function handler(request: NextRequest) {
       // Continue processing even if cache cleaning fails
     }
 
-    // Medium's RSS as JSON (rss2json), cached for an hour
+    // Medium's own RSS feed, cached for an hour
     const data = await fetchMediumFeed<{
       items?: MediumPost[];
       cachedColors?: unknown;
@@ -148,15 +85,18 @@ async function handler(request: NextRequest) {
       },
     });
   } catch (error) {
+    // No posts, said with a 200: the blog shows the Kudos story alone, and
+    // a 500 put "Failed to load resource" in every visitor's console while
+    // the feed was away (rss2json's Cloudflare challenge, 2026-10). Cached
+    // five minutes, so the posts come back soon after the feed does.
     logError(error, "Error fetching Medium posts");
     return NextResponse.json(
+      { status: "unavailable", items: [], cachedColors: {} },
       {
-        status: "error",
-        message: "Failed to fetch Medium posts",
-        items: [],
-        cachedColors: {},
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
+        },
       },
-      { status: 500 },
     );
   }
 }

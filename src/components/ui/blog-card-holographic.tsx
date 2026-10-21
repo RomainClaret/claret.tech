@@ -9,19 +9,18 @@ import {
   User,
   Share2,
   Eye,
-  ChevronDown,
+  ArrowRight,
 } from "lucide-react";
 import Image from "next/image";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { m } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
 import { latestEntry } from "@/lib/utils/intersection";
 import { accentStyle } from "@/components/ui/accent-text";
-import { useOpenOnDeepLink } from "@/lib/hooks/useOpenOnDeepLink";
-import { showToast } from "@/components/ui/toast";
+import { DETAILS_TRIGGER } from "@/lib/hooks/useDetailsDialog";
+import { shareArticle } from "@/lib/utils/share-article";
 import { mediumUsername } from "@/lib/utils/medium-username";
 
 interface BlogCardHolographicProps {
@@ -36,7 +35,11 @@ interface BlogCardHolographicProps {
   views?: number;
   author?: string;
   anchorId?: string; // deep-link hash for this post (enables the copy button)
-  isDeepLinked?: boolean; // arrived via a deep link: hold the glow + expand
+  isDeepLinked?: boolean; // arrived via a deep link: hold the glow
+  /** Opens the post's whole text in a dialog, in the card's colour. */
+  onOpenDetails: (trigger: HTMLElement, accent: string) => void;
+  /** Fetches the dialog's code when Read more is pointed at or focused. */
+  detailsIntent?: { onPointerEnter: () => void; onFocus: () => void };
 }
 
 // Blog category colors - optimized for better contrast
@@ -123,35 +126,6 @@ function detectArticleStatus(date?: string): {
   return { status: "archive", label: "Archive", color: "107, 114, 128" }; // Gray
 }
 
-/**
- * The system's share sheet where there is one. Elsewhere (Firefox on a
- * computer has none) the link goes to the clipboard, with a toast to say so;
- * the button did nothing there. A sheet closed without sharing rejects: the
- * visitor's choice, so nothing follows.
- */
-async function shareArticle(data: {
-  title: string;
-  text: string;
-  url: string;
-}) {
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share(data);
-      return;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      // Refused by the browser: copy the link instead.
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(data.url);
-  } catch {
-    // Clipboard denied or unavailable (plain http): nothing happened to say.
-    return;
-  }
-  showToast("Link copied to the clipboard", "success", 2500);
-}
-
 export function BlogCardHolographic({
   title,
   description,
@@ -165,9 +139,9 @@ export function BlogCardHolographic({
   author = "Romain Claret",
   anchorId,
   isDeepLinked = false,
+  onOpenDetails,
+  detailsIntent,
 }: BlogCardHolographicProps) {
-  // Arriving via a deep link opens it.
-  const [isExpanded, setIsExpanded] = useOpenOnDeepLink(isDeepLinked);
   const [imageError, setImageError] = useState(false);
 
   // Determine color based on category or use provided color
@@ -369,47 +343,26 @@ export function BlogCardHolographic({
             </div>
           </div>
 
-          {/* Description with expand/collapse */}
+          {/* The start of the text; the whole post opens in the details
+              dialog, above the page (the card grew in place before) */}
           <div className="flex-1 mb-4">
-            <div
-              className={cn(
-                "relative transition-all duration-300",
-                isExpanded && "bg-muted/5 p-3 rounded-lg",
-                isExpanded && `border-l-2`,
-              )}
-              style={{
-                borderColor: isExpanded ? `rgb(${nodeColor})` : "transparent",
-              }}
-            >
-              <p
-                className={cn(
-                  "text-sm text-muted-foreground transition-all duration-300",
-                  isExpanded ? "" : "line-clamp-3",
-                )}
-              >
-                {description}
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground line-clamp-3">
+              {description}
+            </p>
             {description.length > 150 && (
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsExpanded(!isExpanded);
-                }}
-                className="text-xs text-primary hover:underline mt-2 flex items-center gap-1 transition-all duration-300 hover:gap-2"
-                aria-label={
-                  isExpanded ? "Show less description" : "Read more description"
+                type="button"
+                {...{ [DETAILS_TRIGGER]: "" }}
+                aria-haspopup="dialog"
+                aria-label={`Read more about ${title}`}
+                {...detailsIntent}
+                onClick={(event) =>
+                  onOpenDetails(event.currentTarget, nodeColor)
                 }
-                aria-expanded={isExpanded}
+                className="text-xs text-primary hover:underline mt-2 flex items-center gap-1 transition-all duration-300 hover:gap-2"
               >
-                {isExpanded ? "Show less" : "Read more"}
-                <ChevronDown
-                  className={cn(
-                    "w-3 h-3 transition-transform duration-300",
-                    isExpanded && "rotate-180",
-                  )}
-                  aria-hidden="true"
-                />
+                Read more
+                <ArrowRight className="w-3 h-3" aria-hidden="true" />
               </button>
             )}
           </div>

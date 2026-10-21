@@ -174,10 +174,13 @@ export function Introduction() {
     }
   };
 
+  // 16 px above the hero on phones, not 64: with the paragraph's size and
+  // the buttons' gap (IntroductionContent), View Resume is on the first
+  // screen of a 390 x 664 page area (static-shell.spec.ts).
   return (
     <section
       ref={sectionRef}
-      className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 md:px-16 py-16 relative overflow-hidden"
+      className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 md:px-16 pt-4 pb-16 sm:pt-16 relative overflow-hidden"
     >
       {/* Background animations - only render when animations are enabled */}
       <ConditionalMotion>

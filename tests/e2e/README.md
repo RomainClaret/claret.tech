@@ -42,6 +42,7 @@ npx playwright test tests/e2e/navigation.spec.ts --project=webkit
 | `accessibility.spec.ts`        | axe scans in both themes and high contrast, headings, labels, keyboard      |
 | `keyboard-paths.spec.ts`       | What opened on a click or showed on hover, reached from the keyboard        |
 | `project-details.spec.ts`      | A repository's details dialog, with the GitHub APIs answered by fixtures    |
+| `card-details.spec.ts`         | The research, skills, paper and blog dialogs, their links, the skills' size |
 | `static-shell.spec.ts`         | The prerendered page before and without the bundle; group-variant styles    |
 | `performance.spec.ts`          | Core Web Vitals, bundle and image budgets, caching                          |
 | `motion-fallback.spec.ts`      | Content behind entrance animations, when their chunk or the bundle fails    |

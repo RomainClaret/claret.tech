@@ -1,9 +1,9 @@
 /**
  * The research section's long texts: the journey's and each project's full
  * description, by project title. None is in the page's HTML (a card shows its
- * short text until it is expanded), so they are a chunk of their own, which
- * Research.tsx loads when the browser is idle after load, or as soon as a
- * card opens.
+ * short text; these open in its details dialog), so they come with the
+ * dialog's code (ResearchDetailsDialog.tsx), out of the page's first
+ * JavaScript.
  *
  * A project added to research.ts needs its description here, by its title
  * (Research.test.tsx, "Long texts", holds the two together).

@@ -1,8 +1,13 @@
 # ACT Configuration for local GitHub Actions testing
 # https://github.com/nektos/act
 
-# The Node major CI and the production build run (package.json engines)
---platform ubuntu-latest=node:24-bookworm
+# The image act runs ubuntu-latest jobs in: Node 24 (package.json engines)
+# with jq, gh and docker, as GitHub's runners have them. Build it first:
+#   docker build --platform linux/amd64 -t claret-act:24 .github/act
+--platform ubuntu-latest=claret-act:24
+
+# A local image, which no registry has: act pulls images by default.
+--pull=false
 
 # Container architecture for Apple Silicon compatibility
 --container-architecture linux/amd64

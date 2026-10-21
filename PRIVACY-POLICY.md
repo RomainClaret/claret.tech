@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-10-20**
+**Last Updated: 2026-10-21**
 
 ## Our Commitment to Privacy
 
@@ -48,11 +48,11 @@ This website fetches public data from these services to display content:
 - **Semantic Scholar API** - For academic publications
 - **Crossref** - For publication details, looked up by DOI
 - **ORCID** - For research publications
-- **Medium** - For blog post previews, its feed read through rss2json.com
+- **Medium** - For blog post previews, its feed read directly from medium.com
 - **Hugging Face CDN** - For downloading AI language models used in the terminal assistant
 - **Vercel** - For hosting and privacy-preserving analytics
 
-This site's server makes the GitHub, Semantic Scholar, ORCID, Crossref, Medium and rss2json requests, and fetches and resizes the GitHub avatar and Medium's images; your browser never contacts them. Your browser contacts other sites only if you start the terminal's AI assistant: it downloads the model from Hugging Face and the model's WebGPU library from GitHub (raw.githubusercontent.com). Like any server, they see your IP address and browser; this site sends them nothing else. The models then run entirely in your browser using WebGPU: no data is sent to external servers for AI processing.
+This site's server makes the GitHub, Semantic Scholar, ORCID, Crossref and Medium requests, and fetches and resizes the GitHub avatar and Medium's images; your browser never contacts them. Your browser contacts other sites only if you start the terminal's AI assistant: it downloads the model from Hugging Face and the model's WebGPU library from GitHub (raw.githubusercontent.com). Like any server, they see your IP address and browser; this site sends them nothing else. The models then run entirely in your browser using WebGPU: no data is sent to external servers for AI processing.
 
 ## AI Assistant Privacy
 

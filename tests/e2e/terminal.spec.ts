@@ -1027,7 +1027,18 @@ test.describe("Terminal", () => {
 
   test("opens the dashboard without its spring, as motion is reduced", async ({
     page,
+    browserName,
   }) => {
+    // Linux WebKit draws this page with the terminal open at 4.7 to 7.9
+    // frames a second alone on 4 CPUs, and at 0.5 beside another browser
+    // (2026-10-21): it failed to collect 12 frames in 15 s 4 runs in 5 under
+    // CI's 4 workers, and at that rate a 300 to 500 ms spring fits between
+    // two frames, so WebKit could not see the bug anyway. framer's setting
+    // is the same code in every browser; Chromium and Firefox check it.
+    test.skip(
+      browserName === "webkit",
+      "Linux WebKit draws too few frames to see a spring",
+    );
     // framer ignored the setting (its default reducedMotion is "never"): the
     // dashboard sprang in from 0.9 for visitors who asked for less motion.
     await expectTerminalVisible(page);

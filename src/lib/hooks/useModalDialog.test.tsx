@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useLayoutEffect, useState } from "react";
-import { useModalDialog } from "./useModalDialog";
+import { useModalDialog, type ReturnFocus } from "./useModalDialog";
 
 /**
  * The focus and keyboard contract every modal dialog of the site shares:
@@ -11,13 +11,19 @@ import { useModalDialog } from "./useModalDialog";
 function Dialog({
   onClose,
   lockScroll,
+  restoreScroll,
   returnFocus,
 }: {
   onClose: () => void;
   lockScroll?: boolean;
-  returnFocus?: HTMLElement | null;
+  restoreScroll?: boolean;
+  returnFocus?: ReturnFocus;
 }) {
-  const ref = useModalDialog(true, onClose, { lockScroll, returnFocus });
+  const ref = useModalDialog(true, onClose, {
+    lockScroll,
+    restoreScroll,
+    returnFocus,
+  });
   return (
     <div ref={ref} role="dialog" aria-label="Details" tabIndex={-1}>
       <button type="button">Close</button>
@@ -256,6 +262,25 @@ describe("useModalDialog", () => {
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
   });
 
+  it("leaves the page where it is when asked, still unlocking it", () => {
+    // A dialog a link opened took its place before the page had scrolled
+    // to the link's card: putting that place back left the card.
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      value: 640,
+    });
+
+    const { unmount } = render(
+      <Dialog onClose={() => {}} lockScroll restoreScroll={false} />,
+    );
+    unmount();
+
+    expect(document.body.style.overflow).toBe("");
+    expect(scrollTo).not.toHaveBeenCalled();
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  });
+
   it("keeps the page locked while another dialog still is", () => {
     // Each dialog wrote "" as it closed: one closing over another
     // unlocked the page under the one still open.
@@ -331,5 +356,25 @@ describe("useModalDialog", () => {
     expect(document.activeElement).toBe(opener);
     opener.remove();
     elsewhere.remove();
+  });
+
+  it("asks a function for the way back when it closes", () => {
+    // A dialog a link opened has no opener: its card's button, the way
+    // back, is looked up as it closes.
+    let opener: HTMLButtonElement | null = null;
+    function Opener() {
+      const [open, setOpen] = useState(true);
+      return open ? (
+        <Dialog onClose={() => setOpen(false)} returnFocus={() => opener} />
+      ) : null;
+    }
+    render(<Opener />);
+    opener = document.createElement("button");
+    document.body.append(opener);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });

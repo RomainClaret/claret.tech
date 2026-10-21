@@ -128,7 +128,12 @@ const nextConfig = {
       // legacy build targets Chrome 110, Firefox ESR and Safari 16.4 (+19
       // KB gzipped, loaded only with the reader); scripts/setup-assets.js
       // copies its worker. react-pdf imports the bare package everywhere.
-      "pdfjs-dist$": "pdfjs-dist/legacy/build/pdf.mjs",
+      // The minified file: the plain one declares an unused
+      // `var __webpack_exports__` that webpack before 5.103 leaves named so,
+      // and inside next dev's eval source maps it hides the module's own
+      // exports, so the reader's chunk failed to load in dev, never in a
+      // build (pdf.js 5.4; webpack/webpack#20097, vercel/next.js#89177).
+      "pdfjs-dist$": "pdfjs-dist/legacy/build/pdf.min.mjs",
     };
 
     // Configure to prevent source map 404 errors

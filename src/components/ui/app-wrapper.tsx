@@ -21,6 +21,7 @@ import {
 import { ServiceWorkerCleanup } from "./service-worker-cleanup";
 import { ResearchMapRenderer } from "@/components/research-map/research-map-renderer";
 import { ProjectsProvider } from "@/contexts/projects-context";
+import { PageShownContext } from "@/contexts/page-shown-context";
 import {
   PerformanceMonitorProvider,
   usePerformanceMonitorContext,
@@ -215,6 +216,11 @@ export function AppWrapper({ children }: AppWrapperProps) {
   // already finished, which is also what gates the terminal.
   const isDirectDocument = pathname?.startsWith("/pdf/") ?? false;
 
+  // The page is on screen once the splash has played, has skipped itself, or
+  // never plays. What is there only to be seen waits for it (a deep link's
+  // highlight pulsed under the splash).
+  const pageShown = isDirectDocument || splashScreenComplete || skipSplash;
+
   const handleSplashComplete = useCallback(() => {
     setSplashScreenComplete(true);
   }, []);
@@ -268,7 +274,9 @@ export function AppWrapper({ children }: AppWrapperProps) {
               skip={skipSplash}
             />
           )}
-          <div className="relative z-10">{children}</div>
+          <PageShownContext.Provider value={pageShown}>
+            <div className="relative z-10">{children}</div>
+          </PageShownContext.Provider>
           {/* Terminal Component - Only render after splash screen completes,
                 and once it has been opened */}
           {terminalConfig.enabled &&

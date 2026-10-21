@@ -1,9 +1,10 @@
 "use client";
 
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePerformanceMonitorContext } from "@/contexts/performance-monitor-context";
 import { reloadPage } from "@/lib/utils/reload-page";
-import { useModalDialog } from "@/lib/hooks/useModalDialog";
+import { useModalDialog, type ReturnFocus } from "@/lib/hooks/useModalDialog";
 
 // Stand-ins for the terminal's performance tools while their code cannot be
 // fetched (withLoadFallback in app-wrapper.tsx). The monitor (`fps`), the
@@ -83,15 +84,37 @@ interface DialogProps extends Fallback {
   onClose: () => void;
 }
 
-/** A terminal tool's stand-in dialog, named; the research map's too. */
+/**
+ * A terminal tool's stand-in dialog, named; the research map's too. And a
+ * card's, while its details dialog cannot load: then it is named after the
+ * card (`title`), shows the card's own short text (`children`), and keeps
+ * the details dialog's scroll and focus behaviour.
+ */
 export function ToolUnavailableDialog({
   name,
   isOpen,
   onClose,
   retry,
   retrying,
-}: DialogProps & { name: string }) {
-  const dialogRef = useModalDialog<HTMLDivElement>(isOpen, onClose);
+  title,
+  children,
+  lockScroll,
+  restoreScroll,
+  returnFocus,
+}: DialogProps & {
+  name: string;
+  title?: string;
+  children?: ReactNode;
+  lockScroll?: boolean;
+  restoreScroll?: boolean;
+  returnFocus?: ReturnFocus;
+}) {
+  const dialogRef = useModalDialog<HTMLDivElement>(isOpen, onClose, {
+    lockScroll,
+    restoreScroll,
+    returnFocus,
+  });
+  const titleId = useId();
 
   if (!isOpen) return null;
 
@@ -111,9 +134,18 @@ export function ToolUnavailableDialog({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label={name.charAt(0).toUpperCase() + name.slice(1)}
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={
+          title ? undefined : name.charAt(0).toUpperCase() + name.slice(1)
+        }
         className="relative m-4 max-w-md space-y-4 rounded-lg bg-background p-6 shadow-2xl outline-hidden"
       >
+        {title && (
+          <h2 id={titleId} className="text-lg font-bold">
+            {title}
+          </h2>
+        )}
+        {children}
         <p className="text-muted-foreground">
           Could not load the {name}. Check your connection and try again.
         </p>
