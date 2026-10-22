@@ -4,6 +4,7 @@ import {
   dismissToasts,
   ensureElementNotBlockedByToast,
 } from "./utils/toast-utils";
+import { waitForSplashToEnd } from "./utils/splash";
 // Shared with python-terminal.spec.ts. Every keyboard-driven test below was
 // disabled because it typed into an element xterm does not read from and then
 // asserted against a container whose textContent is mostly injected CSS; these
@@ -160,7 +161,12 @@ test.describe("Terminal", () => {
     // Firefox needs significantly more time to load and be interactive
     const loadTimeout = browserName === "firefox" ? 12000 : 8000;
     await page.waitForSelector("nav", { timeout: loadTimeout });
-    await page.waitForLoadState("networkidle", { timeout: loadTimeout });
+    // The terminal renders once the splash has played or skipped itself, so
+    // that is what to wait for. This waited for the network to go quiet
+    // within 8 s instead: in Linux WebKit at a GitHub runner's 4 CPUs,
+    // hydration held the main thread until about 15 s, the sections'
+    // fetches followed it, and the wait failed 9 tests in 44 (2026-10-22).
+    await waitForSplashToEnd(page);
 
     // Additional wait for Firefox to stabilize
     if (browserName === "firefox") {
@@ -425,14 +431,21 @@ test.describe("Terminal", () => {
     await expectTerminalVisible(page);
     await waitForTerminalReady(page);
 
-    // terminalConfig.welcomeMessages (src/data/sections/misc.ts).
+    // terminalConfig.welcomeMessages (src/data/sections/misc.ts). Waited for,
+    // not read once: the terminal counts as ready at its first row, and
+    // xterm draws over its next frames, so at a runner's 4 CPUs the second
+    // line was not there yet (2026-10-22).
     for (const line of [
       "You found the terminal. Of course you did.",
       "Type 'help' to see what it can do.",
     ]) {
-      expect(await hasOutputRow(page, line), line).toBe(true);
+      await expect
+        .poll(() => hasOutputRow(page, line), { message: line })
+        .toBe(true);
     }
-    expect((await currentLine(page)).trim()).toBe("guest@Claret.Tech %");
+    await expect
+      .poll(async () => (await currentLine(page)).trim())
+      .toBe("guest@Claret.Tech %");
   });
 
   test("should execute help command", async ({ page }) => {
@@ -802,8 +815,10 @@ test.describe("Terminal", () => {
       return;
     }
 
-    // Increase test timeout for resize operations
-    test.setTimeout(60000);
+    // It set its own timeout to 60 s, written as an increase: the hook at the
+    // top of this describe gives WebKit 240 s in CI, so it cut that to a
+    // quarter, setup included, and ran out mid-resize at a runner's 4 CPUs
+    // (2026-10-22). The hook's budget stands.
 
     // Ensure page is fully loaded first
     await page.waitForLoadState("networkidle", { timeout: 20000 });
@@ -1457,6 +1472,10 @@ test.describe("Terminal", () => {
     await expect(terminal).toHaveAttribute("role", "application");
     await expect(terminal).toHaveAccessibleName("Terminal console");
 
+    // The terminal gives xterm's input the focus 50 ms after xterm opens
+    // (Terminal.tsx), which can come after a visible terminal: at a runner's
+    // 4 CPUs it came after the focus below and took it away (2026-10-22).
+    await expect(page.locator(".xterm-helper-textarea").first()).toBeFocused();
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await terminal.focus();
     await expect(terminal).toBeFocused();

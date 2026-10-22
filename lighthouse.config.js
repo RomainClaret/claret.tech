@@ -6,6 +6,19 @@
  * command line; the spec launches Chromium with its flags itself.
  */
 
+// CI's runners are the slow machine, so CI audits with no CPU slowdown. A
+// projection of CI's score on a faster machine sets this
+// (docs/TESTING_INFRASTRUCTURE.md, "Lighthouse before a push"). A value that
+// is not a positive number fails here: a decimal comma would otherwise audit
+// unthrottled under a projection's name.
+const multiplier = process.env.LIGHTHOUSE_CPU_MULTIPLIER;
+const cpuSlowdownMultiplier = multiplier === undefined ? 1 : Number(multiplier);
+if (!(cpuSlowdownMultiplier > 0)) {
+  throw new Error(
+    `LIGHTHOUSE_CPU_MULTIPLIER must be a positive number, not "${multiplier}"`,
+  );
+}
+
 module.exports = {
   extends: "lighthouse:default",
 
@@ -14,7 +27,7 @@ module.exports = {
     throttling: {
       rttMs: 40,
       throughputKbps: 10240,
-      cpuSlowdownMultiplier: 1,
+      cpuSlowdownMultiplier,
     },
 
     // The e2e server speaks HTTP/1.1 on localhost, while production serves

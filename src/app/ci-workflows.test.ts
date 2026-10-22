@@ -98,6 +98,21 @@ function jobBlock(text: string, job: string): string {
   return lines.slice(start, end === -1 ? undefined : end).join("\n");
 }
 
+/** Every step: the line it starts on, and its lines up to the next step. */
+function stepsOf(text: string): { line: number; step: string }[] {
+  const lines = text.split("\n");
+  return lines.flatMap((line, index) => {
+    const indent = line.match(/^(\s+)- (?:name|uses|run|id|if):/)?.[1].length;
+    if (indent === undefined) return [];
+    const end = lines.findIndex(
+      (next, at) =>
+        at > index && next.trim() !== "" && next.search(/\S/) <= indent,
+    );
+    const step = lines.slice(index, end === -1 ? undefined : end).join("\n");
+    return [{ line: index + 1, step }];
+  });
+}
+
 describe("the GitHub workflows", () => {
   it("check the format without rewriting the files", () => {
     // `npm run format -- --check` ran `prettier --write ... --check`, and
@@ -153,7 +168,10 @@ describe("the GitHub workflows", () => {
     // npm ci and the tests took, with 103 GB still free after it and
     // node_modules at 0.9 GB. Ten jobs cached two folders Vitest 5 never
     // writes (it keeps node_modules/.vite/vitest/<hash>/results.json), and
-    // the build job saved a .next that nothing restored.
+    // the build job saved a .next that nothing restored. Two browser-test
+    // jobs cached test-results/ and playwright-report/, which each run
+    // clears or rewrites, and .playwright-cache/, which nothing reads: "to
+    // avoid re-running unchanged tests", they skipped none.
     for (const { name, text } of workflows) {
       expect(text, name).not.toMatch(
         /rm -rf \/usr\/(?:local\/lib\/android|share\/dotnet)/,
@@ -161,6 +179,12 @@ describe("the GitHub workflows", () => {
       expect(text, name).not.toMatch(
         /\.vitest-cache|node_modules\/\.cache\/vitest/,
       );
+      for (const { line, step } of stepsOf(text)) {
+        if (!/uses: actions\/cache@/.test(step)) continue;
+        expect(step, `${name}:${line}`).not.toMatch(
+          /\b(?:test-results|playwright-report)\/|\.playwright-cache/,
+        );
+      }
     }
     expect(workflow("ci.yml")).not.toMatch(/^\s*path: \.next\s*$/m);
   });
@@ -251,6 +275,25 @@ describe("the GitHub workflows", () => {
     }
   });
 
+  it("let no report upload fail its job", () => {
+    // Three of the six upload-artifact steps could fail their job: an
+    // artifact outage would fail the run, and the deploy refuses a failed
+    // run. Under act 0.2.89, whose artifact server upload-artifact@v7
+    // cannot use, three jobs ended red after their tests passed
+    // (2026-10-21), and the summary job with them.
+    const uploads = workflows.flatMap(({ name, text }) =>
+      stepsOf(text)
+        .filter(({ step }) => /uses: actions\/upload-artifact@/.test(step))
+        .map(
+          ({ line, step }) =>
+            `${name}:${line} ${/^\s+continue-on-error: true\b/m.test(step)}`,
+        ),
+    );
+
+    expect(uploads.length).toBeGreaterThanOrEqual(6);
+    expect(uploads.filter((upload) => upload.endsWith(" false"))).toEqual([]);
+  });
+
   it("let the deploy's check skip only what the browser tests skip", () => {
     // browser-tests-passed.sh takes an older commit's run when nothing
     // after it is a file playwright.yml skips: a file in its list that the
@@ -301,6 +344,28 @@ describe("the GitHub workflows", () => {
 
     expect(specs.length).toBeGreaterThan(10);
     expect(specs.filter((spec) => !run.has(spec))).toEqual([]);
+  });
+
+  it("give Firefox's and WebKit's terminal shards tests to run", () => {
+    // Sorted first, python-terminal.spec.ts's 22 "Terminal: python" tests
+    // made the whole of shard 1 of 3, and they skip outside Chromium:
+    // Firefox's and WebKit's shard 1 ran nothing (2 to 3 s in run
+    // 37233882557) while shards 2 and 3 took the 44 others. Filtered out
+    // there, the three shards hold 15, 15 and 14.
+    const command = jobBlock(
+      workflow("playwright.yml"),
+      "terminal-tests",
+    ).match(/npx playwright test .*/)?.[0];
+
+    expect(command).toContain("tests/e2e/python-terminal.spec.ts");
+    expect(command).toContain(
+      `\${{ matrix.browser != 'chromium' && '--grep-invert "Terminal: python"' || '' }}`,
+    );
+    // The title the filter names, on the tests that skip outside Chromium:
+    // renamed, the filter would match nothing and shard 1 would empty again.
+    expect(read("tests/e2e/python-terminal.spec.ts")).toMatch(
+      /test\.describe\("Terminal: python", \(\) => \{\n\s+test\.skip\(\(\{ browserName \}\) => browserName !== "chromium"/,
+    );
   });
 
   it("leave the act copy of CI to act", () => {

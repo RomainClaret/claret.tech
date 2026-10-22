@@ -88,8 +88,8 @@ function medianAudit(audits: Audit[]): Audit {
 const describeAudit = ({ scores, metrics, benchmarkIndex }: Audit) =>
   `performance ${scores.performance}, FCP ${Math.round(metrics.fcp)} ms, ` +
   `LCP ${Math.round(metrics.lcp)} ms, TBT ${Math.round(metrics.tbt)} ms, ` +
-  `TTI ${Math.round(metrics.tti)} ms, CLS ${metrics.cls.toFixed(3)}, ` +
-  `CPU benchmark ${Math.round(benchmarkIndex)}`;
+  `SI ${Math.round(metrics.si)} ms, TTI ${Math.round(metrics.tti)} ms, ` +
+  `CLS ${metrics.cls.toFixed(3)}, CPU benchmark ${Math.round(benchmarkIndex)}`;
 
 // Performance thresholds for different browsers
 const PERFORMANCE_THRESHOLDS = {
@@ -381,6 +381,12 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
 
         // Run Lighthouse audit (only works with Chromium)
         const config = await import("../../lighthouse.config.js");
+        // A projection of CI's score sets a CPU multiplier; its log says so,
+        // so that it cannot pass for CI's (lighthouse.config.js).
+        const multiplier =
+          config.default.settings.throttling.cpuSlowdownMultiplier;
+        const projected =
+          multiplier === 1 ? "" : `, CPU multiplier ${multiplier}`;
         const audits: Audit[] = [];
         for (let run = 1; run <= AUDITS; run++) {
           const lighthouseReport = await playAudit({
@@ -412,12 +418,12 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
           // The job log keeps every run's numbers: CI recorded only the
           // four scores, so a passing run could not calibrate anything.
           console.log(
-            `Lighthouse run ${run}/${AUDITS}: ${describeAudit(audit)}`,
+            `Lighthouse run ${run}/${AUDITS}: ${describeAudit(audit)}${projected}`,
           );
         }
         const { scores, metrics, benchmarkIndex } = medianAudit(audits);
         console.log(
-          `Lighthouse median: ${describeAudit({ scores, metrics, benchmarkIndex })}`,
+          `Lighthouse median: ${describeAudit({ scores, metrics, benchmarkIndex })}${projected}`,
         );
         await testInfo.attach("lighthouse-audits.json", {
           body: JSON.stringify(

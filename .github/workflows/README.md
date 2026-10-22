@@ -47,6 +47,12 @@ on pushes, or on a pull request labelled `performance`). Each job names its
 spec files, and `src/app/ci-workflows.test.ts` fails on a spec that no job
 names.
 
+The terminal job runs three shards a browser. Outside Chromium it leaves
+out "Terminal: python", tests that run in Chromium only: sorted first,
+they were the whole of Firefox's and WebKit's shard 1, which then ran
+nothing. A failed report upload never fails its job (`continue-on-error`),
+so an outage of GitHub's artifact storage cannot block a deploy.
+
 ### 4. Deploy Workflow (`deploy.yml`) - MANUAL ONLY
 
 **Trigger**: Manual dispatch only (no automatic deployments)
@@ -198,11 +204,9 @@ cat > ../push.json <<EOF
   "deleted": false, "repository": { "default_branch": "main" } }
 EOF
 act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
-  --network bridge --secret-file /dev/null \
-  --artifact-server-path ../act-artifacts --concurrent-jobs 3
+  --network bridge --secret-file /dev/null --concurrent-jobs 3
 act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
-  --network bridge --secret-file /dev/null \
-  --artifact-server-path ../act-artifacts --concurrent-jobs 1
+  --network bridge --secret-file /dev/null --concurrent-jobs 1
 ```
 
 - `before` is the full 40-character commit (paths-filter takes nothing
@@ -217,9 +221,16 @@ act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
   and give the browser jobs' image (`mcr.microsoft.com/playwright:v1.64.0-jammy`)
   its arm64 variant for the run, the amd64 one back after.
-- Read each job's test step: under act 0.2.89 `actions/upload-artifact@v7`
-  fails (its artifact server answers with an empty body), so navigation,
-  accessibility and performance end red after their tests passed.
+- `actions/upload-artifact@v7` fails under act, and no job fails on it.
+  Without an artifact server it fails at once (no runtime token). With
+  `--artifact-server-path`, act 0.2.89 (the latest release, 2026-06)
+  answers it with an empty body, five times: about 80 s a job.
+- What a rehearsal cannot show: Linux WebKit's timing failures, which need
+  GitHub's slower machines. Each of GitHub's last five runs had a WebKit
+  terminal test pass only on its retry, where four rehearsals had none. For
+  those, `scripts/e2e-container.sh` runs a job's specs in CI's image on amd64
+  at 4 CPUs (`docs/TESTING_INFRASTRUCTURE.md`, "GitHub's WebKit, before a
+  push").
 - The deploy cannot be rehearsed before the push: its gate refuses a commit
   GitHub has not tested.
 

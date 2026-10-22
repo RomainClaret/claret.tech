@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import { SkillManifesto } from "./skill-manifesto";
 
+// The visitor's reduced-motion setting (useReducedMotion).
+const motion = vi.hoisted(() => ({ reduce: false }));
+vi.mock("@/lib/hooks/useReducedMotion", () => ({
+  useReducedMotion: () => motion.reduce,
+}));
+
 const skills = ["🧠 Evolving networks", "🐧 Penguin colonies", "Plain skill"];
 // The sentence button is named by its text (and its emoji).
 const SENTENCE = /Evolving networks/;
@@ -106,6 +112,31 @@ describe("SkillManifesto", () => {
         act(() => vi.advanceTimersByTime(1000));
         expect(screen.getByText("Skill 3 of 3")).toBeInTheDocument();
       } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  // framer keeps opacity animations under reduced motion, so for a visitor
+  // who asked for less motion the sentence still faded out and in every few
+  // seconds. It waits for them now (Romain, 2026-10-22).
+  describe("Reduced motion", () => {
+    it("holds the first sentence until the visitor presses Play", () => {
+      vi.useFakeTimers();
+      motion.reduce = true;
+      try {
+        render(<SkillManifesto skills={skills} autoPlayDelay={1000} />);
+        act(() => vi.advanceTimersByTime(3000));
+        expect(screen.getByText("Skill 1 of 3")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "Play" }));
+        act(() => vi.advanceTimersByTime(1000));
+        expect(screen.getByText("Skill 2 of 3")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Pause" }),
+        ).toBeInTheDocument();
+      } finally {
+        motion.reduce = false;
         vi.useRealTimers();
       }
     });

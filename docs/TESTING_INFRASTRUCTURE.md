@@ -9,14 +9,15 @@ How the tests run, and what to know before writing one.
   Chromium, Firefox and WebKit, desktop and phone.
 - **A push, before it is made:** act runs `ci.yml` and `playwright.yml` as
   GitHub would for the local commits (`.github/workflows/README.md`,
-  "Rehearse a push"). Read each job's test step: artifact uploads fail
-  under act.
+  "Rehearse a push"). Artifact uploads fail under act, without failing
+  their job. The Mac is too fast to show WebKit's timing failures: for
+  those, see "GitHub's WebKit, before a push" below.
 
 CI runs the unit tests in ten jobs, one npm script each: `test:api`,
 `test:utils`, the four component batches (`test:components:batch1` to
 `batch4`, hand-kept lists of files), `test:contexts`, `test:hooks`,
-`test:lib-dom` and `test:unit`; each test runs in one job (2,693 on
-2026-10-21). Two tests keep the lists honest:
+`test:lib-dom` and `test:unit`; each test runs in one job (2,696 on
+2026-10-22). Two tests keep the lists honest:
 
 - `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
   that no CI script runs or that two run, and on a listed file that no
@@ -305,6 +306,201 @@ proved each replacement with a mutation:
   7.9 frames a second alone on 4 CPUs and 0.5 beside another browser (13
   with every blur off): a test that counts frames, or that wants to see an
   animation, cannot work there. Check such things in Chromium and Firefox.
+- **A spec that skips itself still fills a shard.** `--shard` splits the
+  tests Playwright lists, skipped ones too. `python-terminal.spec.ts` sorts
+  first, and its 22 Chromium-only tests were the whole of Firefox's and
+  WebKit's terminal shard 1 of 3, which ran nothing (2 to 3 s on GitHub)
+  while shards 2 and 3 took the rest. `playwright.yml` leaves them out
+  there by their describe's title. `--list --shard=1/3` shows what a shard
+  holds.
+- **`networkidle` waits for WebKit's hydration.** At a GitHub runner's 4
+  CPUs (amd64, CI's image), the homepage loaded at 9 to 10 s, hydration
+  held WebKit's main thread until about 15 s, and the network went quiet
+  only after the sections' fetches that follow it: 8.3 to 10.1 s after the
+  load, 12 loads in 12. The terminal spec's 8 s wait for it failed 9 tests
+  in 44. On the Mac, and at d8da49f, the quiet came at the load, which hid
+  this. Wait for what the test needs instead: `waitForSplashToEnd`, a
+  control that is visible.
+- **A test's own timeout can be less than CI's.** `test.setTimeout(60000)`,
+  "to increase" it when the default was lower, cuts the config's 300 s in
+  CI, setup included. The accessibility describe gave every test 60 s in
+  WebKit (30 in Chromium), and the terminal's resize test 60 s under its
+  describe's 240: at a runner's 4 CPUs they ran out. Set a timeout only
+  above the config's.
+- **axe counts opacity.** An element mid-fade reads at a fraction of its
+  contrast: the skills manifesto's sentence, which fades every 6 s, read
+  1.04:1 to a whole-page scan. `showWholePage` pauses it first.
+- **A focus scroll aims at the page of the moment.** Projects and Blog fill
+  in when their data comes, after the splash; in WebKit at a runner's 4
+  CPUs, 1 to 3 s after it, growing the page by 134 and 820 px. A footer
+  link focused before that scrolled to the old end of the page and stayed
+  under the cookie notice. Let the page reach its height first (the footer
+  test waits for Projects to load and the height to hold for 2 s).
+
+## GitHub's WebKit, before a push
+
+act runs the browser jobs in CI's image on amd64 too (`.actrc`), but on all
+of Docker's 16 CPUs, too fast for Linux WebKit's timing failures to show.
+Each of GitHub's last five runs (2026-08 to 2026-10-04) had a WebKit
+terminal test pass only on its retry: `help` in all five, tab completion in
+the three August ones, `about` and a drag once each. Four act rehearsals had
+none. The same image at a runner's 4 CPUs comes close (Docker Desktop runs
+amd64 under Rosetta, a setting), and `scripts/e2e-container.sh` sets it up:
+a commit built and served as `playwright.yml` does, in the image it names,
+then a job's specs run there with CI's environment. It refuses a second run
+in a container that is running one, and Ctrl-C stops a run's tests in the
+container too.
+
+```bash
+bash scripts/e2e-container.sh start webkit-ci        # HEAD; or a commit
+bash scripts/e2e-container.sh run webkit-ci tests/e2e/terminal.spec.ts \
+  --project=webkit --retries=0 --repeat-each=10 --reporter=line,json
+bash scripts/e2e-container.sh stop webkit-ci
+```
+
+Logs, the JSON report and each run's `test-results/` land in the folder
+`start` prints (`OUT` to choose it). `PLATFORM` and `CPUS` change the
+machine: `PLATFORM=linux/arm64` is native and about twice as fast.
+
+Calibrated on d8da49f, whose GitHub run is known, in its own image there:
+
+- WebKit: its terminal shards took 3.2 and 3.7 min against GitHub's 2.3
+  and 2.9, and 4 tests passed on retry where GitHub had 3. About 1.3 times
+  slower than GitHub, and as flaky.
+- Chromium: navigation and performance took 1.5 min and 41 s against
+  GitHub's 1.0 min and 21 s at 4 CPUs, and 54 s and 19 s at `CPUS=8`,
+  GitHub's speed. Run a Chromium job at 8, or its timing-bound tests fail
+  for the container: 24 of the performance job's 76 did at 4, 1 at 8.
+  Even at 8, a Chromium failure that comes down to a slow main thread (a
+  timeout on the splash's loading bar, or on hydration) may be the
+  container's: Rosetta slows that thread more than its CPU benchmark says
+  (below). Find its cause before calling it GitHub's; 18 of the 24 at 4
+  CPUs waited on the loading bar.
+- Lighthouse scores about 20 points low here at any CPU count: d8da49f
+  scored 63 against GitHub's 83. First and largest paint and layout shift
+  earn all their 60 points; Total Blocking Time and Speed Index, Chromium's
+  main thread, earn 3 to 5 of their 40 (at `fa5a1e9`, 2.9 to 4.1 s and 6.7
+  to 7.5 s), and 8 CPUs cut the first by 29% without lifting its score off
+  the floor. So a score here says nothing of GitHub's, which can lie
+  anywhere from about 65 to 95 for the same reading: "Lighthouse before a
+  push" projects it.
+
+Why Chromium needs 8 CPUs where WebKit does with 4 is measured in part:
+Chromium's page work runs slower here than Lighthouse's CPU benchmark says.
+At the same benchmark slowdown, about 4, its Total Blocking Time is
+2,930 ms in this container and 280 ms natively on arm64, and its Speed
+Index 6.7 s against 1.7 s ("Lighthouse before a push"). Whether WebKit's
+engine loses less under Rosetta, as its 1.3 times against Chromium's 1.5
+to 1.9 suggests, is not measured. Docker Desktop also starts every `node` in an
+amd64 container with V8's optimizing compiler off (`--no-opt`, hidden from
+`process.execArgv` by a preload at `/proc/.reset`), so the server and
+Playwright's runner run unoptimized for both browsers; Chromium's own
+processes carry no such flag, and first paint at 0.4 s says the server is
+not what Lighthouse marks down.
+
+A busy Mac voids all of it: research jobs on 12 of its 16 CPUs took a pass
+that had failed once at GitHub's speed to 21 failures. The script warns
+when the host's load is over half its CPUs.
+
+The sweep of 2026-10-22 ran the terminal job's 44 WebKit tests some 590
+times. Found, each fixed in its own commit:
+
+- The setup's 8 s wait for a quiet network failed 9 tests in 44 (above,
+  "`networkidle` waits for WebKit's hydration").
+- The resize test's own 60 s timeout, written as an increase, cut the
+  describe's 240 s for WebKit: it took 52 to 64 s and failed 3 runs of 9.
+- In the focus test, xterm's own focus call, from a 50 ms timer, came after
+  the test's and took the focus back (1 run of 9). The welcome test read
+  xterm's rows before the second line was drawn (1 of 9).
+- `waitForSplashToEnd` allowed 15 s for the hydrated app to remove the
+  backdrop; it once took longer under the full suite's load (40 loads
+  alone: 3.9 to 11.8 s after the load). It allows 30.
+
+One context took 300 s to create, inside WebKit before any page code ran;
+GitHub's five runs show none, so it is put down to the container. With the
+fixes: the four tests 40 runs of 40, a full pass 43 passed and 1 skipped.
+GitHub's flaky ones passed throughout: `help`, `about` and tab completion
+11 of 11, the drag 41 of 41.
+
+The accessibility job's 84 WebKit tests, run once there after the act
+rehearsal had shown one of them flaky, failed 6:
+
+- Four ran out of the describe's own 60 s (above, "A test's own timeout
+  can be less than CI's"), at 61 to 66 s.
+- A whole-page contrast scan met the skills manifesto mid-fade (above,
+  "axe counts opacity").
+- The cookie notice's footer test focused a legal link while Projects and
+  Blog were still filling in (above, "A focus scroll aims at the page of
+  the moment"), and the link ended under the notice. A first reading, that
+  the notice published its height too late, did not survive a probe: the
+  height and the scroll padding were in place in 8 runs of 8. That change
+  was reverted.
+
+With the fixes, three passes: 83 passed and 1 skipped each, the slowest test
+108 s against CI's 300.
+
+Then every other job once there (2026-10-22, at `fa5a1e9`). Navigation in
+Chromium, Firefox and WebKit, the terminal in Chromium and Firefox and the
+accessibility job in Chromium passed. Found:
+
+- The phones' rail test waited 15 s for the floating rail, which mounts
+  after hydration: Mobile Safari loaded at 15 s and the rail came 8 to
+  11 s later, once past the wait. It waits for the splash to go first now.
+- At GitHub's Chromium speed (`CPUS=8`), the splash stand-in test failed 1
+  run in 2: it told the stand-in from the 4 s timer by a clock that starts
+  at the page, while the timer starts at the app's mount. It opens the
+  terminal instead, which only a completed splash allows; a mutant whose
+  stand-in never completes fails it. With the fix, the whole job passed
+  twice there on a quiet Mac (load under 5 on 16 CPUs): 75 tests and one
+  skipped, 1.8 min each; in the second, the slowest test took 14 s of
+  its 300.
+- Lighthouse scored 63 to 65, as d8da49f does here (83 on GitHub).
+
+## Lighthouse before a push
+
+The deploy waits for the Lighthouse job (`tests/e2e/lighthouse.spec.ts`,
+the median of three audits: performance 80, FCP 1.5 s, LCP 2 s, CLS 0.1,
+Total Blocking Time 1,000 ms, TTI 3 s). It audits with no CPU slowdown,
+since GitHub's runner is the slow machine. Round 20's method projects its
+result on the Mac: Chromium native on arm64, with Lighthouse's CPU
+slowdown set to what GitHub's runners take, about 3.7 times the idle arm64
+container's CPU time (`docs/performance.md`, round 20). The spec's own
+assertions are then the gate's.
+
+```bash
+PLATFORM=linux/arm64 CPUS= bash scripts/e2e-container.sh start lh
+LIGHTHOUSE_CPU_MULTIPLIER=3.7 bash scripts/e2e-container.sh run lh \
+  tests/e2e/lighthouse.spec.ts --project=chromium --retries=0 --reporter=line
+bash scripts/e2e-container.sh stop lh
+```
+
+At `90d7c32` (2026-10-22, an idle benchmark of 3,934), three runs at
+GitHub's slowdown (3.7 to 3.8) scored 92 to 96: TBT 236 to 347 ms, SI 1.6
+to 1.7 s, TTI 1.7 to 1.9 s, LCP 0.86 to 0.92 s, CLS 0. Three at 1.55 to
+1.85 times it scored 83 to 86 (TBT 543 to 711 ms, TTI 2.0 to 2.3 s), and
+all six passed. Round 20's HEAD scored 89 to 91 at GitHub's slowdown (TBT
+367 to 443 ms): nothing has regressed since. Lighthouse simulates the
+slowdown from a trace, so a run takes about 45 s at any multiplier.
+
+- A run's slowdown is its multiplier times 3,982, the idle container's CPU
+  benchmark, over the run's own, which each log line names with the
+  multiplier. Run 1.5 times the multiplier as well for the margin (round
+  20's HEAD passed at 1.7 to 1.8 times GitHub's slowdown).
+- Wait for a quiet Mac rather than scale the multiplier down: under
+  research jobs on 14 of its 16 CPUs, a run at an effective 6.5 scored 76
+  and failed, where a quiet Mac gave 83 to 86 at 5.7 to 6.8.
+- On arm64, `start` keeps the image under a local tag of its own
+  (`claret-e2e/playwright:<version>-arm64`), made on first use: Docker's
+  image store here keeps one architecture per tag, and an arm64 pull under
+  the shared tag would replace the amd64 image.
+- 3.7 dates from 2026-10-18: GitHub's runners worked as a CPU benchmark
+  near 1,100 would. The job's log names its runner's benchmark for each
+  audit since round 20, and no GitHub run has logged one yet: recalibrate
+  from the first.
+- The script's build and server are the Lighthouse job's in effect: GitHub
+  data needs `USE_GITHUB_DATA=true` and `GH_USERNAME`, which neither sets,
+  and the script's `SKIP_EXTERNAL_APIS` only skips Medium's article images
+  in `/api/medium-posts`.
 
 ## Patched dependencies
 

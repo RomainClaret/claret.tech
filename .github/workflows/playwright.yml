@@ -235,19 +235,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Cache Playwright test results to avoid re-running unchanged tests
-      - name: Cache Navigation test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            playwright-report/
-            test-results/
-            .playwright-cache/
-          key: playwright-navigation-${{ matrix.browser }}-${{ hashFiles('tests/e2e/navigation.spec.ts', 'src/**/nav*.{ts,tsx}', 'src/**/header*.{ts,tsx}', 'src/**/menu*.{ts,tsx}', 'package-lock.json') }}
-          restore-keys: |
-            playwright-navigation-${{ matrix.browser }}-${{ github.ref_name }}-
-            playwright-navigation-${{ matrix.browser }}-
-
       - name: Install Playwright Browser
         run: npx playwright install ${{ matrix.browser }}
 
@@ -312,6 +299,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
         with:
           name: navigation-tests-${{ matrix.browser }}-report
           path: playwright-report/
@@ -422,6 +410,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
         with:
           name: accessibility-tests-${{ matrix.browser }}-report
           path: playwright-report/
@@ -530,12 +519,13 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
+        continue-on-error: true  # Don't fail job if artifact upload fails
         with:
           name: performance-tests-report
           path: playwright-report/
           retention-days: 30
 
-  # Terminal tests (heavy - 38 tests) split into multiple shards
+  # Terminal tests, 3 shards a browser (66 tests in Chromium, 44 elsewhere)
   terminal-tests:
     needs: detect-changes
     # Only run if terminal-related files or core src changed
@@ -571,19 +561,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # Cache Terminal test results to avoid re-running unchanged tests
-      - name: Cache Terminal test results
-        uses: actions/cache@v5
-        with:
-          path: |
-            playwright-report/
-            test-results/
-            .playwright-cache/
-          key: playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ hashFiles('tests/e2e/terminal.spec.ts', 'tests/e2e/research-map.spec.ts', 'src/**/terminal/**', 'src/**/*terminal*.{ts,tsx}', 'src/**/*command*.{ts,tsx}', 'src/components/research-map/**', 'package-lock.json') }}
-          restore-keys: |
-            playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.ref_name }}-
-            playwright-terminal-${{ matrix.browser }}-${{ matrix.shard }}-
 
       - name: Install Playwright Browser
         run: npx playwright install ${{ matrix.browser }}
@@ -635,12 +612,16 @@ jobs:
         run: |
           # Convert shard format for Playwright (e.g., 1-of-3 -> 1/3)
           SHARD_PLAYWRIGHT=$(echo "${{ matrix.shard }}" | sed 's/-of-/\//g')
-          # python-terminal.spec.ts skips itself on non-chromium projects, so
-          # the webkit and firefox shards cost nothing here. It is the only
-          # place the sandbox is exercised for real rather than against mocks.
+          # python-terminal.spec.ts is the only place the sandbox is
+          # exercised for real rather than against mocks. Its "Terminal:
+          # python" tests run in Chromium only, so they are left out
+          # elsewhere: sorted first, those 22 skipped tests were the whole of
+          # Firefox's and WebKit's shard 1, which ran nothing (2 to 3 s on
+          # 2026-10-04). Without them, those shards hold 15, 15 and 14. Its
+          # older-bundle tests run in every browser.
           # research-map.spec.ts: the map `research` opens (14 tests, about
           # 4 to 10 s each).
-          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts tests/e2e/research-map.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2
+          npx playwright test tests/e2e/terminal.spec.ts tests/e2e/python-terminal.spec.ts tests/e2e/research-map.spec.ts --project=${{ matrix.browser }} --shard="$SHARD_PLAYWRIGHT" --max-failures=2 ${{ matrix.browser != 'chromium' && '--grep-invert "Terminal: python"' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_EXTERNAL_APIS: true

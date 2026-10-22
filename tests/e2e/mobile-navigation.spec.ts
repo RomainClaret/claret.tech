@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
+import { waitForSplashToEnd } from "./utils/splash";
 
 /**
  * Open the mobile menu and verify it is actually open.
@@ -110,7 +111,11 @@ test.describe("Mobile Navigation", () => {
       .filter({ has: page.locator('[aria-label="Scroll to next section"]') });
 
     // It mounts half a second after hydration: attached first, so that
-    // hidden means hidden, not not there yet.
+    // hidden means hidden, not not there yet. Hydration first: in Mobile
+    // Safari at a GitHub runner's 4 CPUs the page loaded at 15 s, the rail
+    // came 8 to 11 s later, and under the whole phone job once more than
+    // this wait's 15 s after the hook's 2 s (2026-10-22).
+    await waitForSplashToEnd(page);
     await expect(rail).toBeAttached();
     await expect(rail).toBeHidden();
 

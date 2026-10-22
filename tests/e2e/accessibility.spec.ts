@@ -13,7 +13,8 @@ import {
 
 /**
  * The whole page, as a visitor sees it: the splash gone and every section
- * mounted, by scrolling through once, then back at the top.
+ * mounted, by scrolling through once, then back at the top, with the skills
+ * manifesto held still.
  */
 async function showWholePage(page: Page): Promise<void> {
   await waitForSplashToEnd(page);
@@ -28,6 +29,31 @@ async function showWholePage(page: Page): Promise<void> {
     await page.waitForTimeout(150);
   }
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await holdManifestoStill(page);
+}
+
+/**
+ * The skills manifesto changes its sentence every 6 s with a fade, and a scan
+ * that met it mid-fade read the sentence at 1.04 to 1.38:1 (WebKit,
+ * 2026-10-22). Paused with its own button, which a visitor could press, and
+ * then fully opaque. Under reduced motion it does not play, so there may be
+ * no Pause to press.
+ */
+async function holdManifestoStill(page: Page): Promise<void> {
+  const pause = page.getByRole("button", { name: "Pause", exact: true });
+  if ((await pause.count()) > 0) await pause.dispatchEvent("click");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        // The sentence: the one button there that a hint describes, and in
+        // it the text, not the hidden hint.
+        const sentence = document.querySelector(
+          "#skills button[aria-describedby] > span:not([hidden])",
+        );
+        return sentence ? getComputedStyle(sentence).opacity : "none";
+      }),
+    )
+    .toBe("1");
 }
 
 /**
@@ -137,19 +163,10 @@ async function openMobileMenuForAccessibility(page: Page): Promise<void> {
 }
 
 test.describe("Accessibility", () => {
-  test.beforeEach(async ({ browserName }, testInfo) => {
-    // Firefox and WebKit need longer timeouts in CI for DOM operations
-    if (
-      (browserName === "webkit" || browserName === "firefox") &&
-      process.env.CI
-    ) {
-      testInfo.setTimeout(60000); // 60s for Firefox/WebKit in CI
-    } else if (process.env.CI) {
-      testInfo.setTimeout(30000); // 30s for Chrome in CI
-    } else {
-      testInfo.setTimeout(20000); // 20s locally
-    }
-  });
+  // These take the config's timeout, 300 s in CI. A hook here gave them 60 s
+  // in WebKit and Firefox, 30 s in Chromium and 20 s locally, written as
+  // more time: in WebKit at a GitHub runner's 4 CPUs, 4 tests of 19 ran out
+  // at 61 to 66 s, and 4 more took 55 to 60 s (2026-10-22).
 
   test("should pass accessibility checks on light theme", async ({ page }) => {
     await page.goto("/");
@@ -234,8 +251,6 @@ test.describe("Accessibility", () => {
     // under CI=1 (see the run recorded in the hardening notes). If Firefox
     // starts timing out here again, the fix is a Firefox-specific timeout, not
     // a skip - the axe scan is the only dark-theme coverage that exists.
-    test.setTimeout(60000); // Increase timeout to 60s for CI
-
     await page.goto("/");
     await page.waitForLoadState("networkidle"); // Wait for network to be idle
     await page.waitForSelector("h1", { timeout: 15000 });
@@ -700,17 +715,16 @@ test.describe("Accessibility", () => {
    * claim does not hold any more: run on 2026-08-03 against Mobile Chrome and
    * Mobile Safari, ten consecutive runs of each passed, the slowest project
    * pair finishing in 13.8s against a 60s budget. The most likely explanation
-   * is that it was written before `test.setTimeout(60000)` on the next line
-   * and before ensurePlaywrightParam/dismissToasts existed, and nobody went
-   * back to check. Left running on every project; if it does start flaking,
-   * the fix is to record the failure, not to hide the platform again.
+   * is that it was written before the test had 60 s (it takes the config's
+   * 300 s in CI now) and before ensurePlaywrightParam/dismissToasts existed,
+   * and nobody went back to check. Left running on every project; if it does
+   * start flaking, the fix is to record the failure, not to hide the platform
+   * again.
    */
   test("should announce dynamic content changes", async ({
     page,
     browserName: _browserName,
   }) => {
-    test.setTimeout(60000); // Increase timeout to 60s for CI
-
     await page.goto("/");
     await page.waitForLoadState("networkidle"); // Wait for network to be idle
     await page.waitForTimeout(1000); // Wait for animations
@@ -1257,6 +1271,28 @@ test.describe("The cookie notice", () => {
       await expect(
         page.getByRole("button", { name: /Dismiss privacy notice/ }),
       ).toBeVisible();
+      // Projects and Blog fill in when their data comes, after the splash:
+      // in WebKit at a GitHub runner's 4 CPUs, 1 to 3 s after it, the page
+      // growing by 134 and 820 px above the footer. A focus scroll aimed
+      // before that ended with the link under the notice (2026-10-22), so
+      // the page is let reach its height first.
+      await expect(
+        page.locator("#projects").getByText("Loading projects..."),
+      ).toHaveCount(0, { timeout: 20_000 });
+      let height = -1;
+      let since = Date.now();
+      await expect
+        .poll(
+          async () => {
+            const now = await page.evaluate(
+              () => document.documentElement.scrollHeight,
+            );
+            if (now !== height) [height, since] = [now, Date.now()];
+            return Date.now() - since >= 2_000;
+          },
+          { message: "the page's height, unchanged for 2 s", timeout: 30_000 },
+        )
+        .toBe(true);
 
       const legal = ["View Privacy Policy", "View Terms of Service"].map(
         (name) => page.getByRole("button", { name }),

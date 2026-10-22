@@ -3,6 +3,7 @@
 import { useState, useEffect, useId, useRef } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/hooks/useReducedMotion";
 import {
   ChevronDown,
   ChevronLeft,
@@ -35,7 +36,13 @@ export function SkillManifesto({
   autoPlayDelay = 10000,
 }: SkillManifestoProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  // It plays on its own unless the visitor asks for reduced motion: framer
+  // keeps opacity animations under that setting, so the sentence still
+  // faded out and in every 6 s on the page (Romain, 2026-10-22). Play and
+  // Pause are the visitor's choice either way.
+  const prefersReducedMotion = useReducedMotion();
+  const [playChoice, setPlayChoice] = useState<boolean | null>(null);
+  const isPlaying = playChoice ?? !prefersReducedMotion;
   // Each mode renders its own controls, so the button just pressed leaves the
   // page and focus would fall back to <body>: a switch also names the control
   // that takes focus in the next mode (autoFocus, applied as it mounts). Each
@@ -91,7 +98,7 @@ export function SkillManifesto({
   };
 
   const togglePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    setPlayChoice(!isPlaying);
   };
 
   const currentSkill = skills[currentIndex];

@@ -657,9 +657,13 @@ test.describe("Static shell", () => {
     await expect.poll(requests).toBe(2);
     const seen = await splashWatch(page);
     expect(seen.splashSeen).toBe(false);
-    // The stand-in removed the backdrop once the second try failed, as a
-    // finished splash does; the timer cannot fire before 4 s.
-    expect(seen.backdropGone).toBeLessThan(4_000);
+    // The stand-in completed the splash once its try failed, as a finished
+    // splash does: the terminal waits for a completed splash, and the 4 s
+    // timer only uncovers the page. This read the backdrop gone within 4 s
+    // of the page's start instead, which failed whenever hydration was slow
+    // (at GitHub's speed, 4.7 s, 1 run in 2; 2026-10-22).
+    await page.getByRole("button", { name: "Toggle terminal" }).first().click();
+    await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 30_000 });
     await closeContext(context);
   });
 
