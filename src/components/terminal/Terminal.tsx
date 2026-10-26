@@ -4,7 +4,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence } from "@/components/ui/animate-presence";
 import { executeCommand, getCompletions } from "@/lib/terminal/commands";
 import { useTerminal, MIN_SIZE } from "@/lib/terminal/terminal-context";
-import { attachTouchScroll } from "@/lib/terminal/touch-scroll";
+import {
+  attachTouchScroll,
+  lineScroller,
+  rowHeightIn,
+} from "@/lib/terminal/touch-scroll";
 import { useResizableWithHandles } from "@/lib/hooks/useResizableWithHandles";
 import { ResizeHandles } from "./ResizeHandles";
 import { terminalConfig } from "@/data/portfolio";
@@ -1640,20 +1644,35 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
   // xterm takes a wheel only while it has lines to scroll: with no
   // scrollback yet, at either end of it, or over the title bar, the wheel
   // went on to the page. Cancelling it here, after xterm has scrolled its
-  // lines, leaves the page still. React's onWheel cannot cancel (its
-  // listener is passive). Ctrl and a wheel, which is also how a trackpad
-  // pinch arrives, stays the browser's zoom; minimized, the window is a
-  // title bar with nothing to scroll.
+  // lines, leaves the page still; a wheel off those lines (the title bar,
+  // the window's edges) scrolls them from here, as a finger there does.
+  // React's onWheel cannot cancel (its listener is passive). Ctrl and a
+  // wheel, which is also how a trackpad pinch arrives, stays the browser's
+  // zoom; minimized, the window is a title bar with nothing to scroll.
   useEffect(() => {
     const container = containerRef.current;
     if (!isOpen || !container || windowState === "minimized") return;
+    const term = isTerminalReady ? xtermRef.current : null;
+    const rowHeight = () => rowHeightIn(container, term?.rows ?? 0);
+    const lines = term ? lineScroller(term, rowHeight) : null;
 
     const keepWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey) event.preventDefault();
+      if (event.ctrlKey) return;
+      event.preventDefault();
+      const onXterm = terminalRef.current?.contains(event.target as Node);
+      if (!term || !lines || onXterm) return;
+      // deltaMode: 0 counts pixels, 1 lines, 2 pages.
+      const unit =
+        event.deltaMode === 1
+          ? rowHeight()
+          : event.deltaMode === 2
+            ? rowHeight() * term.rows
+            : 1;
+      lines.scrollBy(event.deltaY * unit);
     };
     container.addEventListener("wheel", keepWheel, { passive: false });
     return () => container.removeEventListener("wheel", keepWheel);
-  }, [isOpen, windowState]);
+  }, [isOpen, windowState, isTerminalReady]);
 
   // A finger on the window scrolls the terminal, never the page behind it:
   // xterm 6 has no touch scrolling of its own (lib/terminal/touch-scroll.ts).
@@ -1663,10 +1682,9 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     if (!isOpen || !isTerminalReady || !container || !term) return;
     if (windowState === "minimized") return;
 
-    return attachTouchScroll(container, term, () => {
-      const screen = container.querySelector<HTMLElement>(".xterm-screen");
-      return screen && term.rows ? screen.clientHeight / term.rows : 0;
-    });
+    return attachTouchScroll(container, term, () =>
+      rowHeightIn(container, term.rows),
+    );
   }, [isOpen, isTerminalReady, windowState]);
 
   // Handle window button clicks

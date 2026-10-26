@@ -20,6 +20,7 @@ const xterm = vi.hoisted(() => {
     keyHandler: KeyHandler | null;
     dataHandler: DataHandler | null;
     writes: string[];
+    scrolled: number[];
   }[] = [];
   class FakeTerminal {
     cols = 80;
@@ -29,6 +30,8 @@ const xterm = vi.hoisted(() => {
     keyHandler: KeyHandler | null = null;
     dataHandler: DataHandler | null = null;
     writes: string[] = [];
+    scrolled: number[] = [];
+    buffer = { active: { viewportY: 0, baseY: 0 } };
     constructor() {
       instances.push(this);
     }
@@ -47,6 +50,9 @@ const xterm = vi.hoisted(() => {
     }
     clear() {}
     focus() {}
+    scrollLines(amount: number) {
+      this.scrolled.push(amount);
+    }
     onData(handler: DataHandler) {
       this.dataHandler = handler;
       return { dispose() {} };
@@ -251,6 +257,29 @@ describe("Terminal wheel", () => {
     render(<Terminal isOpen onClose={() => {}} />);
 
     expect(wheel(screen.getByTestId("terminal-header"))).toBe(false);
+  });
+
+  it("scrolls the lines from a wheel on the title bar, as a finger does", async () => {
+    xterm.release();
+    render(<Terminal isOpen onClose={() => {}} />);
+    advance(200);
+    await settle();
+    const term = xterm.instances.at(-1)!;
+    const header = screen.getByTestId("terminal-header");
+
+    // 100 px at a row of 17 (jsdom draws nothing to measure): 5 lines, and
+    // the 15 px left over wait for the next wheel.
+    expect(wheel(header)).toBe(true);
+    expect(term.scrolled).toEqual([5]);
+    // On xterm's own lines xterm scrolls them; the window holds the page.
+    expect(wheel(screen.getByLabelText("Terminal output"))).toBe(true);
+    expect(term.scrolled).toEqual([5]);
+    // A wheel counted in lines (deltaMode 1): three lines, the 15 px kept.
+    wheel(header, { deltaY: 3, deltaMode: 1 });
+    expect(term.scrolled).toEqual([5, 3]);
+    // Ctrl and a wheel zooms, and scrolls nothing.
+    wheel(header, { ctrlKey: true });
+    expect(term.scrolled).toEqual([5, 3]);
   });
 });
 

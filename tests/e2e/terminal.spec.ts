@@ -930,6 +930,11 @@ test.describe("Terminal", () => {
     const atBottom = await topRow();
     await wheelOver(output, -300);
     await expect.poll(topRow).not.toBe(atBottom);
+    // On the title bar too, as a finger there does: down, since a wheel up
+    // can have reached the top already (it had, in Firefox and WebKit).
+    const beforeTitleBar = await topRow();
+    await wheelOver(header, 300);
+    await expect.poll(topRow).not.toBe(beforeTitleBar);
     const pastTheEnd = async (deltaY: number) => {
       for (let wheels = 0; wheels < 30; wheels++) {
         const row = await topRow();

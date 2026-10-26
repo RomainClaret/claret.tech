@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { attachTouchScroll, type TouchScrollTarget } from "./touch-scroll";
+import {
+  attachTouchScroll,
+  lineScroller,
+  rowHeightIn,
+  type TouchScrollTarget,
+} from "./touch-scroll";
 
 const ROW = 20;
 
@@ -135,5 +140,37 @@ describe("attachTouchScroll", () => {
     const move = fire("touchmove", [200], 20);
     expect(move.defaultPrevented).toBe(false);
     expect(terminal.scrolled).toEqual([]);
+  });
+});
+
+describe("lineScroller", () => {
+  it("turns pixels into whole lines and keeps the rest for the next call", () => {
+    const scrolled: number[] = [];
+    const lines = lineScroller(
+      { scrollLines: (amount) => scrolled.push(amount) },
+      () => ROW,
+    );
+
+    lines.scrollBy(30); // a line, 10 px kept
+    lines.scrollBy(15); // 25 px: a line, 5 kept
+    lines.scrollBy(-30); // -25 px: a line back, -5 kept
+    expect(scrolled).toEqual([1, 1, -1]);
+    lines.reset();
+    lines.scrollBy(19); // under a row: nothing yet
+    expect(scrolled).toEqual([1, 1, -1]);
+  });
+});
+
+describe("rowHeightIn", () => {
+  it("is xterm's screen over its rows, or a guess before it is drawn", () => {
+    const container = document.createElement("div");
+    expect(rowHeightIn(container, 24)).toBe(17);
+
+    const screen = document.createElement("div");
+    screen.className = "xterm-screen";
+    Object.defineProperty(screen, "clientHeight", { value: 480 });
+    container.append(screen);
+    expect(rowHeightIn(container, 24)).toBe(20);
+    expect(rowHeightIn(container, 0)).toBe(17);
   });
 });

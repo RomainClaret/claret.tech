@@ -27,14 +27,47 @@ const SPEED_WINDOW = 100;
 /** A row's height when the terminal has not been measured. */
 const FALLBACK_ROW = 17;
 
+/** A row's height on screen: xterm's screen over its rows, or a guess before it is drawn. */
+export function rowHeightIn(container: HTMLElement, rows: number): number {
+  const screen = container.querySelector<HTMLElement>(".xterm-screen");
+  const height = screen && rows ? screen.clientHeight / rows : 0;
+  return height || FALLBACK_ROW;
+}
+
+/**
+ * Scrolls the terminal by pixels, a whole line at a time; what is left of a
+ * line waits for the next call. A finger, and a wheel off xterm's own lines
+ * (the title bar), scroll through this.
+ */
+export function lineScroller(
+  term: Pick<TouchScrollTarget, "scrollLines">,
+  rowHeight: () => number,
+) {
+  // Travel not yet a whole line, in px; above 0 is toward newer lines.
+  let pending = 0;
+  return {
+    scrollBy(pixels: number) {
+      const height = rowHeight() || FALLBACK_ROW;
+      pending += pixels;
+      const lines = Math.trunc(pending / height);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        pending -= lines * height;
+      }
+    },
+    reset() {
+      pending = 0;
+    },
+  };
+}
+
 export function attachTouchScroll(
   element: HTMLElement,
   term: TouchScrollTarget,
   rowHeight: () => number,
 ): () => void {
   let lastY: number | null = null;
-  // Finger travel not yet a whole line, in px; above 0 is toward newer lines.
-  let pending = 0;
+  const lines = lineScroller(term, rowHeight);
   let moves: { y: number; at: number }[] = [];
   let frame = 0;
 
@@ -43,15 +76,7 @@ export function attachTouchScroll(
     frame = 0;
   };
 
-  const scrollBy = (pixels: number) => {
-    const height = rowHeight() || FALLBACK_ROW;
-    pending += pixels;
-    const lines = Math.trunc(pending / height);
-    if (lines !== 0) {
-      term.scrollLines(lines);
-      pending -= lines * height;
-    }
-  };
+  const scrollBy = lines.scrollBy;
 
   const atEnd = (forward: boolean) => {
     const { viewportY, baseY } = term.buffer.active;
@@ -65,7 +90,7 @@ export function attachTouchScroll(
       return;
     }
     lastY = event.touches[0].clientY;
-    pending = 0;
+    lines.reset();
     moves = [{ y: lastY, at: event.timeStamp }];
   };
 
