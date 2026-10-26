@@ -1477,6 +1477,39 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
   under it and a flick glides on (`src/lib/terminal/touch-scroll.ts`); two
   fingers stay the browser's pinch zoom.
 
+### Round 28, part 2: the review (2026-10-26)
+
+- **The dev server on 127.0.0.1.** `next dev` listens on every interface by
+  default, and on UCD's network the Mac has a public address, with its
+  firewall off: the dev server was open to whatever UCD lets in.
+  `npm run dev` and `dev:https` now bind 127.0.0.1 (`localhost` binds
+  `::1` alone, which a client of `127.0.0.1` then misses). A dev server for
+  a phone listens on the Tailscale address (testing guide, "On a phone or a
+  tablet").
+- **A wheel on the terminal's title bar scrolls its lines**, as a finger
+  there already did.
+- **Each badge drawn once.** The training and memberships grids drew a
+  desktop, a tablet and a phone copy of every badge, two hidden by CSS: 524
+  elements where 200 showed (11% of the page's 4,820), each copy with its
+  own framer-motion entrance. One responsive grid now holds 228, 198 shown,
+  with the same look at each width in light and dark (high contrast boxes
+  every element, so its heights moved by a few rows of borders). Projected
+  at GitHub's slowdown, A/B on a quiet Mac, it scored 95 and 95 (TBT 252
+  and 251 ms, LCP 0.87 s) against `cc786ded`'s 94 and 95 (TBT 282 and 266
+  ms, LCP 0.87 to 0.90 s): what the memberships cost is back. A badge
+  lights for a mouse alone: a phone fires mouse events on a tap, which
+  would have left the tapped badge lit.
+- **act's Node cache.** The rehearsals' cleanup removed act's shared
+  `act-toolcache` volume, so three jobs unpacked Node at once and one or
+  two found npm half unpacked (6 of 10 rehearsals). The workflows README's
+  recipe keeps the volume and warms a new one with a single job.
+- **The old React site's history**, 586 commits that only a local folder
+  held (GitHub's repository keeps `main` alone), is in the git bundle
+  `claret.tech-2022-history.bundle` beside the repository.
+- **Kept as they are:** touch scrolling, which works on Romain's iPhone and
+  iPad; the memberships; Playwright 1.64.0 (1.64.1 fixes nothing used here,
+  and 1.65 brings the Firefox fix two skips wait for).
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
