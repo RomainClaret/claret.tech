@@ -210,6 +210,9 @@ cat > ../push.json <<EOF
 { "ref": "refs/heads/main", "before": "$before", "after": "$(git rev-parse HEAD)",
   "deleted": false, "repository": { "default_branch": "main" } }
 EOF
+# One job alone first, while act's Node cache is new (see below)
+act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
+  --network bridge --secret-file /dev/null -j quick-checks --matrix check:format
 act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
   --network bridge --secret-file /dev/null --concurrent-jobs 3
 act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
@@ -228,12 +231,16 @@ act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
   and give the browser jobs' image (`mcr.microsoft.com/playwright:v1.64.0-jammy`)
   its arm64 variant for the run, the amd64 one back after.
-- Jobs that run at once share act's tool cache, and one can find npm half
-  unpacked by another: `Cannot find module '../lib/cli.js'` (or
-  `'../../package.json'`) at setup-node or `npm ci`, or an `npm ci` that
-  stops at once, printing only where its log is. Rerun that job alone:
-  `-j <job>`, plus `--matrix check:<name>` for one quick check. In the
-  rehearsals of 2026-10-25 every such job passed alone.
+- act keeps the Node that setup-node unpacks in one volume,
+  `act-toolcache`, which every job shares. On a new one, three jobs each
+  unpacked Node into it at once, and one or two found npm half unpacked:
+  `Cannot find module '../lib/cli.js'` (or `'../../package.json'`,
+  `'ci-info'`) at setup-node or `npm ci`, or an `npm ci` that stops at once,
+  printing only where its log is. That was 6 of 10 rehearsals on 2026-10-25
+  and 26, each run after a cleanup that removed the volume. Keep it between
+  rehearsals (remove the other `act-` containers and volumes only), and warm
+  a new one with the single job above. A job that still fails that way
+  passes alone: `-j <job>`, plus `--matrix check:<name>` for one quick check.
 - `actions/upload-artifact@v7` fails under act, and no job fails on it.
   Without an artifact server it fails at once (no runtime token). With
   `--artifact-server-path`, act 0.2.89 (the latest release, 2026-06)
