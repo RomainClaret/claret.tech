@@ -158,11 +158,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: HEAD_BOOT_SCRIPT }} />
         {/* The splash's backdrop is in the HTML (app-wrapper.tsx); with
             scripts off nothing would ever remove it. Nor would anything
-            animate in the content framer starts at opacity 0 (globals.css). */}
+            animate in the content framer starts at opacity 0 (globals.css),
+            or unfold the badges a phone folds behind "Show all"
+            (certification-timeline.tsx): they show, and the button goes. */}
         <noscript>
           <style>
             {
-              '[data-splash-backdrop]{display:none}[style*="opacity:0;transform:"],[style="opacity:0"],[style="transform:scale(0)"],[data-reveal="pending"]{opacity:1!important;transform:none!important}'
+              '[data-splash-backdrop]{display:none}[style*="opacity:0;transform:"],[style="opacity:0"],[style="transform:scale(0)"],[data-reveal="pending"]{opacity:1!important;transform:none!important}[data-fold]{display:revert!important}[data-fold-toggle]{display:none!important}'
             }
           </style>
         </noscript>

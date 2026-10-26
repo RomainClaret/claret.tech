@@ -399,6 +399,8 @@ export function Education() {
             </SlideInUp>
             <CertificationTimeline
               certifications={educationInfo.certifications}
+              phoneCount={3}
+              itemsLabel="certifications"
               className="max-w-6xl mx-auto"
             />
           </div>
@@ -418,6 +420,8 @@ export function Education() {
           <CertificationTimeline
             certifications={educationInfo.memberships}
             icon={Users}
+            phoneCount={4}
+            itemsLabel="memberships"
             className="max-w-6xl mx-auto"
           />
         </div>

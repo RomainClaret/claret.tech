@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
 import { waitForSplashToEnd } from "./utils/splash";
 import { runCommand, waitForTerminalReady } from "./utils/terminal-utils";
+import { gotoWithoutScripts } from "./utils/no-script";
 
 /**
  * Open the mobile menu and verify it is actually open.
@@ -229,5 +230,63 @@ test.describe("Mobile Navigation", () => {
     const below = Math.min(viewport.height - 10, box.y + box.height + 30);
     await drag(viewport.width / 2, below, -250);
     await expect.poll(pageY).toBeGreaterThan(start);
+  });
+});
+
+// The training and memberships badges stacked 15 cards on a phone, 1,350 px
+// (2026-10-26): a phone shows the newest few of each, then "Show all".
+test.describe("The badges on a phone", () => {
+  test.skip(({ isMobile }) => !isMobile, "These tests are mobile-only");
+
+  const badgesOf = async (page: Page, button: Locator) =>
+    page.locator(`[id="${await button.getAttribute("aria-controls")}"] > div`);
+
+  test("shows the newest few, and all of them on a tap", async ({ page }) => {
+    test.slow();
+    await page.goto("/?playwright=true");
+    await waitForSplashToEnd(page);
+    await dismissToasts(page, { timeout: 3000 });
+    const education = page.locator("#education");
+    const training = education.getByRole("button", {
+      name: "Show all 7 certifications",
+    });
+    const memberships = education.getByRole("button", {
+      name: "Show all 8 memberships",
+    });
+    const trainingBadges = await badgesOf(page, training);
+    await expect(trainingBadges.filter({ visible: true })).toHaveCount(3);
+    await expect(
+      (await badgesOf(page, memberships)).filter({ visible: true }),
+    ).toHaveCount(4);
+    // Newest first, though the HTML lists them oldest first.
+    const top = async (name: string) =>
+      (await trainingBadges.filter({ hasText: name }).boundingBox())!.y;
+    expect(await top("Summer/Winter Schools")).toBeLessThan(
+      await top("Surviving a Ph.D."),
+    );
+
+    // Centred first: scrolled just into view, the fixed header covers it.
+    await training.evaluate((button) =>
+      button.scrollIntoView({ block: "center" }),
+    );
+    await training.click();
+    await expect(trainingBadges.filter({ visible: true })).toHaveCount(7);
+    await expect(training).toHaveAttribute("aria-expanded", "true");
+    await expect(training).toHaveAccessibleName("Show fewer certifications");
+  });
+
+  test.describe("without scripts", () => {
+    test.use({ javaScriptEnabled: false });
+
+    test("shows every badge, and no button", async ({ page }) => {
+      // layout.tsx's <noscript> style shows what a phone folds.
+      await gotoWithoutScripts(page, "/?playwright=true");
+      const badges = page.locator("#education [style*='--rank']");
+      await expect(badges).toHaveCount(15);
+      await expect(badges.filter({ visible: true })).toHaveCount(15);
+      await expect(
+        page.locator("#education").getByRole("button", { name: /^Show all/ }),
+      ).toHaveCount(0);
+    });
   });
 });

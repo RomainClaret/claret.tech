@@ -55,4 +55,30 @@ describe("Education", () => {
       educationInfo.memberships.length,
     );
   });
+
+  it("folds both badge grids on a phone behind a Show all of its own", () => {
+    render(
+      <AnimationStateProvider>
+        <Education />
+      </AnimationStateProvider>,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: `Show all ${educationInfo.certifications.length} certifications`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: `Show all ${educationInfo.memberships.length} memberships`,
+      }),
+    ).toBeInTheDocument();
+    // 3 and 4 of them show on a phone, the newest.
+    expect(document.querySelectorAll("[data-fold]")).toHaveLength(
+      educationInfo.certifications.length -
+        3 +
+        educationInfo.memberships.length -
+        4,
+    );
+  });
 });

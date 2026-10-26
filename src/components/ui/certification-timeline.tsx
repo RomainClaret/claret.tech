@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import { m } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
@@ -9,6 +9,7 @@ import {
   Sparkles,
   ShieldCheck,
   Calendar,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { accentStyle } from "@/components/ui/accent-text";
@@ -23,6 +24,13 @@ interface CertificationTimelineProps {
   certifications: Certification[];
   /** One icon for every badge, in place of the one picked from its name. */
   icon?: LucideIcon;
+  /**
+   * On phones, how many badges show, newest first, before "Show all": the
+   * rest are a tap away. Wider screens show every badge, oldest first.
+   */
+  phoneCount?: number;
+  /** What the badges are, for the button's name: "Show all 8 memberships". */
+  itemsLabel?: string;
   className?: string;
 }
 
@@ -33,6 +41,12 @@ interface CertificationTimelineProps {
 // body ("Association Suisse Alémanique & Friends") is wider than a badge.
 // A badge fills its grid cell, so a row of them stays even, and a year
 // range on the issuer line wraps whole, never after "2015-".
+
+// On a phone the two grids stacked 15 badges, 1,350 px, so a phone shows the
+// newest few and "Show all" (2026-10-26, Romain's choice). CSS `order` puts
+// the newest first there; the folded badges stay in the HTML, hidden by
+// `max-sm:hidden`, and layout.tsx's <noscript> style shows them, and hides
+// the button, when scripts are off.
 
 // The badges have no backdrop blur: their 3% tint lies over the section's
 // plain background, where blurring changed 45 of 132,804 pixels in Chromium
@@ -90,9 +104,13 @@ const getCertColor = (cert: Certification) => {
 export function CertificationTimeline({
   certifications,
   icon,
+  phoneCount,
+  itemsLabel = "badges",
   className,
 }: CertificationTimelineProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
 
   // Sort certifications by year
   const sortedCerts = [...certifications].sort((a, b) => {
@@ -102,6 +120,8 @@ export function CertificationTimeline({
     };
     return getYear(a.year) - getYear(b.year);
   });
+  const total = sortedCerts.length;
+  const folds = phoneCount !== undefined && phoneCount < total;
 
   return (
     <m.div
@@ -112,16 +132,27 @@ export function CertificationTimeline({
     >
       {/* One grid for every width: a column on phones, two from tablets, up
           to four on wide screens. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+      <div
+        id={listId}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3"
+      >
         {sortedCerts.map((cert, index) => {
           const isHovered = hoveredIndex === index;
           const color = getCertColor(cert);
           const Icon = icon ?? getCertIcon(cert.name);
+          // 0 for the newest: its place on a phone.
+          const rank = total - 1 - index;
+          const folded = folds && !expanded && rank >= phoneCount;
 
           return (
             <m.div
               key={index}
-              className="relative"
+              className={cn(
+                "relative max-sm:order-(--rank)",
+                folded && "max-sm:hidden",
+              )}
+              style={{ "--rank": rank } as CSSProperties}
+              data-fold={folded ? "" : undefined}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 + index * 0.05 }}
@@ -223,6 +254,31 @@ export function CertificationTimeline({
           );
         })}
       </div>
+      {folds && (
+        <div data-fold-toggle className="mt-3 flex justify-center sm:hidden">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={listId}
+            aria-label={
+              expanded
+                ? `Show fewer ${itemsLabel}`
+                : `Show all ${total} ${itemsLabel}`
+            }
+            onClick={() => setExpanded((open) => !open)}
+            className="inline-flex min-h-10 items-center gap-1 px-3 text-sm font-medium text-primary hover:underline"
+          >
+            {expanded ? "Show fewer" : `Show all ${total}`}
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-4 transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
+          </button>
+        </div>
+      )}
     </m.div>
   );
 }

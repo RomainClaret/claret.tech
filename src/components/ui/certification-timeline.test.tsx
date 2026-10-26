@@ -42,4 +42,64 @@ describe("CertificationTimeline", () => {
     fireEvent.pointerLeave(wrapper, { pointerType: "mouse" });
     expect(lit()).toBe(unlit);
   });
+
+  it("folds a phone's list to the newest, the rest a tap away", () => {
+    // 15 badges stacked 1,350 px on a phone (2026-10-26). The folded ones
+    // stay in the HTML, hidden below sm, for layout.tsx's <noscript> style
+    // to show when scripts are off.
+    const three = [
+      { name: "Oldest", issuer: "A", year: "2015" },
+      { name: "Newest", issuer: "C", year: "2022" },
+      { name: "Middle", issuer: "B", year: "2020" },
+    ];
+    const { container } = render(
+      <CertificationTimeline
+        certifications={three}
+        phoneCount={1}
+        itemsLabel="badges"
+      />,
+    );
+    const item = (name: string) =>
+      screen.getByText(name).closest("[style*='--rank']") as HTMLElement;
+    const folded = () =>
+      ["Oldest", "Middle", "Newest"].filter((name) =>
+        item(name).classList.contains("max-sm:hidden"),
+      );
+
+    // Oldest first in the HTML, newest first on a phone (CSS order).
+    expect(
+      ["Oldest", "Middle", "Newest"].map((n) =>
+        item(n).style.getPropertyValue("--rank"),
+      ),
+    ).toEqual(["2", "1", "0"]);
+    expect(folded()).toEqual(["Oldest", "Middle"]);
+    expect(item("Oldest").hasAttribute("data-fold")).toBe(true);
+    expect(item("Newest").hasAttribute("data-fold")).toBe(false);
+
+    const button = screen.getByRole("button", { name: "Show all 3 badges" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(button.getAttribute("aria-controls")).toBe(
+      container.querySelector(".grid")!.id,
+    );
+    // Phones alone: from sm the button's row is hidden.
+    expect(button.closest("[data-fold-toggle]")).toHaveClass("sm:hidden");
+
+    fireEvent.click(button);
+    expect(button).toHaveAccessibleName("Show fewer badges");
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(folded()).toEqual([]);
+
+    fireEvent.click(button);
+    expect(folded()).toEqual(["Oldest", "Middle"]);
+  });
+
+  it("folds nothing without a phone count, or when it covers every badge", () => {
+    const { rerender } = render(
+      <CertificationTimeline certifications={badges} />,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    rerender(<CertificationTimeline certifications={badges} phoneCount={2} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(document.querySelector("[data-fold]")).toBeNull();
+  });
 });
