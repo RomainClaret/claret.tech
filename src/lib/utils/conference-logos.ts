@@ -129,7 +129,7 @@ export function getConferenceLogo(
  * Logos whose file changed under the same name, with a version for the URL.
  * /images is cached for a year as immutable, so a changed file under an old
  * URL never reaches a returning visitor: these six were resized to 384 px
- * tall (5958da5), and anyone who had the originals cached kept decoding
+ * tall (183b3d9), and anyone who had the originals cached kept decoding
  * them, 21 MB across the six. Bump an entry, or add one, whenever a logo's
  * content changes.
  */

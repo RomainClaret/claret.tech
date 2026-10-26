@@ -9,6 +9,7 @@ import {
   Sparkles,
   ShieldCheck,
   Calendar,
+  type LucideIcon,
 } from "lucide-react";
 import { accentStyle } from "@/components/ui/accent-text";
 
@@ -20,8 +21,15 @@ interface Certification {
 
 interface CertificationTimelineProps {
   certifications: Certification[];
+  /** One icon for every badge, in place of the one picked from its name. */
+  icon?: LucideIcon;
   className?: string;
 }
+
+// The issuer line wraps rather than ending in an ellipsis: a membership's
+// body ("Association Suisse Alémanique & Friends") is wider than a badge.
+// The desktop badge fills its grid cell, so a row of them stays even, and
+// on tablets and phones a year range wraps whole, never after "2015-".
 
 // The badges have no backdrop blur: their 3% tint lies over the section's
 // plain background, where blurring changed 45 of 132,804 pixels in Chromium
@@ -78,6 +86,7 @@ const getCertColor = (cert: Certification) => {
 
 export function CertificationTimeline({
   certifications,
+  icon,
   className,
 }: CertificationTimelineProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -104,7 +113,7 @@ export function CertificationTimeline({
           {sortedCerts.map((cert, index) => {
             const isHovered = hoveredIndex === index;
             const color = getCertColor(cert);
-            const Icon = getCertIcon(cert.name);
+            const Icon = icon ?? getCertIcon(cert.name);
 
             return (
               <m.div
@@ -119,7 +128,7 @@ export function CertificationTimeline({
                 {/* Badge */}
                 <m.div
                   className={cn(
-                    "relative px-3 py-2.5 rounded-lg border transition-all duration-300",
+                    "relative h-full px-3 py-2.5 rounded-lg border transition-all duration-300",
                     "cursor-default overflow-hidden",
                     "flex items-center gap-2",
                   )}
@@ -166,7 +175,7 @@ export function CertificationTimeline({
                     >
                       {cert.name}
                     </div>
-                    <div className="text-[10px] text-muted-foreground truncate">
+                    <div className="text-[10px] text-muted-foreground break-words">
                       {cert.issuer}
                     </div>
                     <div
@@ -206,7 +215,7 @@ export function CertificationTimeline({
         <div className="grid grid-cols-2 gap-3">
           {sortedCerts.map((cert, index) => {
             const color = getCertColor(cert);
-            const Icon = getCertIcon(cert.name);
+            const Icon = icon ?? getCertIcon(cert.name);
 
             return (
               <m.div
@@ -240,8 +249,9 @@ export function CertificationTimeline({
                   <div className="text-xs font-medium text-foreground/80 truncate">
                     {cert.name}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {cert.issuer} • {cert.year}
+                  <div className="text-[10px] text-muted-foreground break-words">
+                    {cert.issuer}{" "}
+                    <span className="whitespace-nowrap">• {cert.year}</span>
                   </div>
                 </div>
               </m.div>
@@ -255,7 +265,7 @@ export function CertificationTimeline({
         <div className="space-y-2">
           {sortedCerts.map((cert, index) => {
             const color = getCertColor(cert);
-            const Icon = getCertIcon(cert.name);
+            const Icon = icon ?? getCertIcon(cert.name);
 
             return (
               <m.div
@@ -290,7 +300,8 @@ export function CertificationTimeline({
                     {cert.name}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {cert.issuer} • {cert.year}
+                    {cert.issuer}{" "}
+                    <span className="whitespace-nowrap">• {cert.year}</span>
                   </div>
                 </div>
               </m.div>

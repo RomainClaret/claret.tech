@@ -73,10 +73,14 @@ vi.mock("@xterm/addon-fit", () => ({
 vi.mock("@xterm/addon-web-links", () => ({ WebLinksAddon: class {} }));
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
+// A test can minimize the window; every other test sees it normal.
+const terminalWindow = vi.hoisted(() => ({
+  state: "normal" as "normal" | "minimized" | "maximized",
+}));
 vi.mock("@/lib/terminal/terminal-context", () => ({
   MIN_SIZE: { width: 400, height: 300 },
   useTerminal: () => ({
-    windowState: "normal",
+    windowState: terminalWindow.state,
     position: { x: 0, y: 0 },
     size: { width: 800, height: 500 },
     currentUser: "guest",
@@ -209,6 +213,44 @@ describe("Terminal keys", () => {
     ]) {
       expect(press(init)).toBe(true);
     }
+  });
+});
+
+describe("Terminal wheel", () => {
+  afterEach(() => {
+    terminalWindow.state = "normal";
+  });
+
+  /** Whether the window cancelled a wheel at `target`, as the page sees it. */
+  const wheel = (target: Element, init: WheelEventInit = {}) => {
+    const event = new WheelEvent("wheel", {
+      deltaY: 100,
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+
+  it("keeps a wheel over the window from the page, all but a zoom", () => {
+    // The page behind scrolled on any wheel xterm had no lines for: before
+    // any scrollback, past either end of it, and over the title bar.
+    render(<Terminal isOpen onClose={() => {}} />);
+
+    expect(wheel(screen.getByLabelText("Terminal output"))).toBe(true);
+    expect(wheel(screen.getByTestId("terminal-header"))).toBe(true);
+    // Ctrl and a wheel, or a trackpad pinch, zooms the page.
+    expect(wheel(screen.getByTestId("terminal"), { ctrlKey: true })).toBe(
+      false,
+    );
+  });
+
+  it("leaves the wheel to the page while minimized to its title bar", () => {
+    terminalWindow.state = "minimized";
+    render(<Terminal isOpen onClose={() => {}} />);
+
+    expect(wheel(screen.getByTestId("terminal-header"))).toBe(false);
   });
 });
 

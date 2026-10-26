@@ -259,7 +259,9 @@ jobs:
 
       - name: Start Next.js Application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
@@ -276,6 +278,7 @@ jobs:
           # Final health check
           if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
             echo "❌ Server failed to start after 60 seconds"
+            cat server.log
             exit 1
           fi
         env:
@@ -295,6 +298,11 @@ jobs:
           if [ ! -z "$SERVER_PID" ]; then
             kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
           fi
 
       - uses: actions/upload-artifact@v7
@@ -363,7 +371,9 @@ jobs:
 
       - name: Start Next.js Application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
@@ -380,6 +390,7 @@ jobs:
           # Final health check
           if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
             echo "❌ Server failed to start after 60 seconds"
+            cat server.log
             exit 1
           fi
         env:
@@ -406,6 +417,11 @@ jobs:
           if [ ! -z "$SERVER_PID" ]; then
             kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
           fi
 
       - uses: actions/upload-artifact@v7
@@ -471,7 +487,9 @@ jobs:
 
       - name: Start Next.js Application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
@@ -488,6 +506,7 @@ jobs:
           # Final health check
           if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
             echo "❌ Server failed to start after 60 seconds"
+            cat server.log
             exit 1
           fi
         env:
@@ -515,6 +534,11 @@ jobs:
           if [ ! -z "$SERVER_PID" ]; then
             kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
           fi
 
       - uses: actions/upload-artifact@v7
@@ -586,7 +610,9 @@ jobs:
 
       - name: Start Next.js Application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
@@ -603,6 +629,7 @@ jobs:
           # Final health check
           if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
             echo "❌ Server failed to start after 60 seconds"
+            cat server.log
             exit 1
           fi
         env:
@@ -634,6 +661,11 @@ jobs:
           if [ ! -z "$SERVER_PID" ]; then
             kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
           fi
 
       - uses: actions/upload-artifact@v7
@@ -702,7 +734,9 @@ jobs:
 
       - name: Start Next.js Application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           
@@ -719,6 +753,7 @@ jobs:
           # Final health check
           if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
             echo "❌ Server failed to start after 60 seconds"
+            cat server.log
             exit 1
           fi
         env:
@@ -743,6 +778,11 @@ jobs:
           if [ ! -z "$SERVER_PID" ]; then
             kill "$SERVER_PID" || true
             echo "🛑 Server stopped (PID: $SERVER_PID)"
+          fi
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
           fi
 
       - uses: actions/upload-artifact@v7
@@ -809,10 +849,12 @@ jobs:
 
       - name: Start application
         run: |
-          npm start &
+          # Into a file, printed at the job's end: under act, a server that
+          # wrote to this step's output after the step ended stopped serving.
+          npm start > server.log 2>&1 &
           sleep 30
           # Fixed: Discard HTML output to avoid curl buffer overflow (23) error
-          curl --retry 10 --retry-delay 5 --retry-connrefused -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"
+          curl --retry 10 --retry-delay 5 --retry-connrefused -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200" || { cat server.log; exit 1; }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -822,6 +864,15 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOME: /root  # Fix potential browser launch issues
+
+      - name: Print the server log
+        if: always()
+        run: |
+          if [ -f server.log ]; then
+            echo "::group::Server log"
+            cat server.log
+            echo "::endgroup::"
+          fi
 
       # Safari-Specific Performance Tests removed - no matching tests exist
       # Regular performance tests already run on webkit project

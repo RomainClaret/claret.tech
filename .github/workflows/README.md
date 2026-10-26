@@ -53,6 +53,13 @@ they were the whole of Firefox's and WebKit's shard 1, which then ran
 nothing. A failed report upload never fails its job (`continue-on-error`),
 so an outage of GitHub's artifact storage cannot block a deploy.
 
+Each job starts the server with its output in `server.log` and prints that
+file at its end, or at once when the server does not start. Under act, a
+server that wrote to its start step's output after the step had ended
+stopped serving (2026-10-25): snapshots whose server logged an error on
+every test failed most of their browser jobs, and one such job passed 21 of
+21 with its output in a file. The log also survives for a failed run now.
+
 ### 4. Deploy Workflow (`deploy.yml`) - MANUAL ONLY
 
 **Trigger**: Manual dispatch only (no automatic deployments)
@@ -221,6 +228,12 @@ act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
   and give the browser jobs' image (`mcr.microsoft.com/playwright:v1.64.0-jammy`)
   its arm64 variant for the run, the amd64 one back after.
+- Jobs that run at once share act's tool cache, and one can find npm half
+  unpacked by another: `Cannot find module '../lib/cli.js'` (or
+  `'../../package.json'`) at setup-node or `npm ci`, or an `npm ci` that
+  stops at once, printing only where its log is. Rerun that job alone:
+  `-j <job>`, plus `--matrix check:<name>` for one quick check. In the
+  rehearsals of 2026-10-25 every such job passed alone.
 - `actions/upload-artifact@v7` fails under act, and no job fails on it.
   Without an artifact server it fails at once (no runtime token). With
   `--artifact-server-path`, act 0.2.89 (the latest release, 2026-06)

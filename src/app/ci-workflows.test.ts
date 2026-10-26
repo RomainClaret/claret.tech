@@ -234,6 +234,35 @@ describe("the GitHub workflows", () => {
     expect(ranges).toEqual([]);
   });
 
+  it("keep the server's output out of its start step", () => {
+    // Under act, a server started with `npm start &` stopped serving once it
+    // wrote to its start step's output after that step had ended: the
+    // squashed history's snapshots, which logged a failed Medium fetch on
+    // every test, failed 14 or 15 of their 17 browser jobs, and one of those
+    // jobs passed 21 of 21 with the output in a file (2026-10-25). A file
+    // also keeps the log, which the job prints at its end.
+    const text = workflow("playwright.yml");
+    const jobs = [...text.matchAll(/^ {2}([a-z-]+):$/gm)].map(
+      (match) => match[1],
+    );
+    const serving = jobs.filter((job) =>
+      /^\s*npm start\b/m.test(jobBlock(text, job)),
+    );
+
+    expect(serving.length).toBeGreaterThan(0);
+    for (const job of serving) {
+      const block = jobBlock(text, job);
+      expect(block.match(/^\s*npm start\b.*$/m)?.[0].trim(), job).toBe(
+        "npm start > server.log 2>&1 &",
+      );
+      const printed = stepsOf(block).some(
+        ({ step }) =>
+          /if: always\(\)/.test(step) && /cat server\.log/.test(step),
+      );
+      expect(printed, job).toBe(true);
+    }
+  });
+
   it("write nothing to Vercel or GitHub under act", () => {
     // .actrc hands act .env.act.local, which holds the real Vercel token:
     // given --input environment=production, an act run reached the

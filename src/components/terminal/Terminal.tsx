@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence } from "@/components/ui/animate-presence";
 import { executeCommand, getCompletions } from "@/lib/terminal/commands";
 import { useTerminal, MIN_SIZE } from "@/lib/terminal/terminal-context";
+import { attachTouchScroll } from "@/lib/terminal/touch-scroll";
 import { useResizableWithHandles } from "@/lib/hooks/useResizableWithHandles";
 import { ResizeHandles } from "./ResizeHandles";
 import { terminalConfig } from "@/data/portfolio";
@@ -1634,6 +1635,39 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [isOpen, windowState, size, aside]);
+
+  // A wheel over the window scrolls the terminal, never the page behind it.
+  // xterm takes a wheel only while it has lines to scroll: with no
+  // scrollback yet, at either end of it, or over the title bar, the wheel
+  // went on to the page. Cancelling it here, after xterm has scrolled its
+  // lines, leaves the page still. React's onWheel cannot cancel (its
+  // listener is passive). Ctrl and a wheel, which is also how a trackpad
+  // pinch arrives, stays the browser's zoom; minimized, the window is a
+  // title bar with nothing to scroll.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!isOpen || !container || windowState === "minimized") return;
+
+    const keepWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) event.preventDefault();
+    };
+    container.addEventListener("wheel", keepWheel, { passive: false });
+    return () => container.removeEventListener("wheel", keepWheel);
+  }, [isOpen, windowState]);
+
+  // A finger on the window scrolls the terminal, never the page behind it:
+  // xterm 6 has no touch scrolling of its own (lib/terminal/touch-scroll.ts).
+  useEffect(() => {
+    const container = containerRef.current;
+    const term = xtermRef.current;
+    if (!isOpen || !isTerminalReady || !container || !term) return;
+    if (windowState === "minimized") return;
+
+    return attachTouchScroll(container, term, () => {
+      const screen = container.querySelector<HTMLElement>(".xterm-screen");
+      return screen && term.rows ? screen.clientHeight / term.rows : 0;
+    });
+  }, [isOpen, isTerminalReady, windowState]);
 
   // Handle window button clicks
   const handleMinimize = useCallback(() => {

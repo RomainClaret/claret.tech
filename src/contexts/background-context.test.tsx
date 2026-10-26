@@ -307,7 +307,7 @@ describe("generateBackgroundData", () => {
     expect(background.current.backgroundData?.nodes.length).toBeGreaterThan(0);
   });
 
-  // Recorded before the node count was capped by the cells (4f0f120): where
+  // Recorded before the node count was capped by the cells (183b3d9): where
   // generation finished then, the same draws still give the same backgrounds,
   // field for field. The hash covers fifty seeds per size: every background
   // and how many draws it took.

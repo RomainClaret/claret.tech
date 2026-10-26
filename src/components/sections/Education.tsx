@@ -13,6 +13,7 @@ import {
   Calendar,
   Sparkles,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/lib/utils/blur-placeholder";
 import { useColorExtraction } from "@/lib/hooks/useColorExtraction";
@@ -402,6 +403,25 @@ export function Education() {
             />
           </div>
         )}
+
+      {/* Memberships & Service */}
+      {educationInfo.memberships.length > 0 && (
+        <div className="mt-20">
+          <SlideInUp className="text-center mb-8">
+            <h3 className="section-subtitle-gradient text-2xl md:text-3xl mb-2">
+              {educationInfo.membershipSection.title}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+              {educationInfo.membershipSection.subtitle}
+            </p>
+          </SlideInUp>
+          <CertificationTimeline
+            certifications={educationInfo.memberships}
+            icon={Users}
+            className="max-w-6xl mx-auto"
+          />
+        </div>
+      )}
     </div>
   );
 }

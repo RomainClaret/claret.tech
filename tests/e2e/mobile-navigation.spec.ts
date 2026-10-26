@@ -1,6 +1,7 @@
-import { test, expect, type Page } from "./utils/fixtures";
+import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import { dismissToasts } from "./utils/toast-utils";
 import { waitForSplashToEnd } from "./utils/splash";
+import { runCommand, waitForTerminalReady } from "./utils/terminal-utils";
 
 /**
  * Open the mobile menu and verify it is actually open.
@@ -142,5 +143,91 @@ test.describe("Mobile Navigation", () => {
     expect(controls).toBeTruthy();
     await openMobileMenu(page);
     await expect(page.locator(`[id="${controls}"]`)).toBeVisible();
+  });
+
+  // The terminal opens on a phone too, over most of the screen. xterm 6 has
+  // no touch scrolling of its own: a swipe over it scrolled the page behind
+  // it, 200 to 1,500 px, and the scrollback was out of reach (2026-10-26).
+  test("scrolls the terminal under a finger, never the page behind it", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "a test can swipe a finger (CDP's synthesized gesture) in Chromium only",
+    );
+    test.slow();
+    await waitForSplashToEnd(page);
+    await dismissToasts(page, { timeout: 3000 });
+    await page.getByRole("button", { name: "Toggle terminal" }).first().tap();
+    const terminal = page.getByTestId("terminal");
+    await expect(terminal).toBeVisible();
+    await waitForTerminalReady(page);
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight / 2),
+    );
+    const pageY = () => page.evaluate(() => Math.round(window.scrollY));
+    const start = await pageY();
+    expect(start, "the page can scroll either way").toBeGreaterThan(0);
+
+    const output = terminal.locator('[aria-label="Terminal output"]');
+    const topRow = () =>
+      output.locator(".xterm-rows > div").first().textContent();
+    // A finger put down, moved in ten steps, lifted: raw touch points.
+    // CDP's synthesized scroll gesture moved nothing in CI's Linux Chromium,
+    // not even the page, where these do. A finger moving down (yDistance
+    // above 0) shows what is above.
+    const cdp = await page.context().newCDPSession(page);
+    const drag = async (x: number, y: number, yDistance: number) => {
+      const at = (dy: number) => [
+        { x: Math.round(x), y: Math.round(y + dy), id: 1 },
+      ];
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: at(0),
+      });
+      for (let step = 1; step <= 10; step++) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: at((yDistance * step) / 10),
+        });
+        await page.waitForTimeout(16);
+      }
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    };
+    const swipe = async (target: Locator, yDistance: number) => {
+      const box = (await target.boundingBox())!;
+      await drag(box.x + box.width / 2, box.y + box.height / 2, yDistance);
+      // The page would have moved with the finger, which has lifted.
+      await page.waitForTimeout(300);
+      expect(await pageY(), `the page moved on a swipe of ${yDistance}`).toBe(
+        start,
+      );
+    };
+
+    // No scrollback yet, then the title bar.
+    await swipe(output, -250);
+    await swipe(output, 250);
+    await swipe(terminal.getByTestId("terminal-header"), 200);
+
+    // With scrollback (help prints 37 lines into the window), the finger
+    // moves the lines, and past both ends the page still stays put.
+    await runCommand(page, "help", /Use Ctrl\+C to cancel current input/);
+    const atEnd = await topRow();
+    await swipe(output, 250);
+    await expect.poll(topRow).not.toBe(atEnd);
+    for (let swipes = 0; swipes < 6; swipes++) await swipe(output, 250);
+    for (let swipes = 0; swipes < 6; swipes++) await swipe(output, -250);
+    await expect.poll(topRow).toBe(atEnd);
+
+    // Below the window, a finger still scrolls the page.
+    const box = (await terminal.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    const below = Math.min(viewport.height - 10, box.y + box.height + 30);
+    await drag(viewport.width / 2, below, -250);
+    await expect.poll(pageY).toBeGreaterThan(start);
   });
 });

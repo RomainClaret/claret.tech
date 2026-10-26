@@ -99,7 +99,7 @@ export function SplashScreen({
   // Fetch the themed splash Lottie at runtime instead of bundling both
   // multi-MB JSONs into the splash chunk; /animations/* is immutable-cached
   // so repeat visits read it from disk cache. Which also means a file whose
-  // content changes needs a new name: v2 is the minified data (8eaebe0),
+  // content changes needs a new name: v2 is the minified data (183b3d9),
   // which the old names kept from every visitor who had the 1.6 MB
   // originals cached, for up to a year.
   useEffect(() => {

@@ -228,7 +228,7 @@ export function PDFViewer({
     // loads the same document again and mounts new page boxes for it, which
     // get the same sizes, so the sizes stay, and so do the pages near the
     // view. The column held its size meanwhile, so the reader is where
-    // they were, and it lets go now that the boxes are back. 632715b reset
+    // they were, and it lets go now that the boxes are back. 183b3d9 reset
     // the sizes here, which dropped every box past the first screen until
     // they were measured again, and WebKit then clamped a reader on page
     // 200 to page 1. A different document starts over.

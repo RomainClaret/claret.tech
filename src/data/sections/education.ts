@@ -29,6 +29,10 @@ export const educationInfo = {
     subtitle:
       "Side Quests That Mattered. Short courses and schools, each of which changed how I work.",
   },
+  membershipSection: {
+    title: "Memberships & Service",
+    subtitle: "Societies I belong to and the groups I help run.",
+  },
   schools: [
     {
       schoolName: "University of Neuchâtel, Switzerland",
@@ -105,6 +109,41 @@ export const educationInfo = {
       name: "Surviving a Ph.D.",
       issuer: "Sheer Stubbornness",
       year: "2020-2026",
+    },
+  ] as Certification[],
+  // Shown as badges like the certifications: the body, then the role.
+  memberships: [
+    {
+      name: "HES-SO Participatory Council",
+      issuer: "Member, engineering domain",
+      year: "2015-2017",
+    },
+    { name: "IEEE", issuer: "Member", year: "2022-present" },
+    { name: "ACM", issuer: "Member", year: "2022-present" },
+    {
+      name: "ISAL",
+      issuer: "Member, International Society for Artificial Life",
+      year: "2022-present",
+    },
+    {
+      name: "Algorithmia",
+      issuer: "President, Computational Thinking Association",
+      year: "2023-present",
+    },
+    {
+      name: "ASA&F",
+      issuer: "Treasurer, Association Suisse Alémanique & Friends",
+      year: "2023-present",
+    },
+    {
+      name: "ACINE",
+      issuer: "Committee member, University of Neuchâtel",
+      year: "2023-present",
+    },
+    {
+      name: "University Assembly",
+      issuer: "Member, University of Neuchâtel",
+      year: "2025-present",
     },
   ] as Certification[],
 };

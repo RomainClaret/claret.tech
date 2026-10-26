@@ -32,4 +32,27 @@ describe("Education", () => {
 
     expect(details.open).toBe(true);
   });
+
+  it("lists the memberships under their own heading, as group badges", () => {
+    const { container } = render(
+      <AnimationStateProvider>
+        <Education />
+      </AnimationStateProvider>,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: educationInfo.membershipSection.title,
+      }),
+    ).toBeInTheDocument();
+    // The timeline draws every badge three times, for computers, tablets and
+    // phones, and CSS shows one of them.
+    for (const membership of educationInfo.memberships) {
+      expect(screen.getAllByText(membership.name)).toHaveLength(3);
+    }
+    expect(container.querySelectorAll("svg.lucide-users")).toHaveLength(
+      educationInfo.memberships.length * 3,
+    );
+  });
 });

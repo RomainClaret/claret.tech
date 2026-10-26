@@ -16,8 +16,8 @@ How the tests run, and what to know before writing one.
 CI runs the unit tests in ten jobs, one npm script each: `test:api`,
 `test:utils`, the four component batches (`test:components:batch1` to
 `batch4`, hand-kept lists of files), `test:contexts`, `test:hooks`,
-`test:lib-dom` and `test:unit`; each test runs in one job (2,696 on
-2026-10-22). Two tests keep the lists honest:
+`test:lib-dom` and `test:unit`; each test runs in one job (2,713 on
+2026-10-26). Two tests keep the lists honest:
 
 - `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
   that no CI script runs or that two run, and on a listed file that no
@@ -302,6 +302,25 @@ proved each replacement with a mutation:
   which leaves `{1..30}` as it is: the five waits for the server ran once
   (GitHub printed "attempt {1..30}/30"). `ci-workflows.test.ts` refuses
   brace ranges; count with `seq`.
+- **Under act, a server that writes after its start step stops serving.**
+  The browser jobs start `npm start` in one step and test in the next. The
+  squashed history's first six snapshots fetch Medium through rss2json,
+  which now answers act's containers with a Cloudflare page; their server
+  logged that error on every test and stopped answering, and 14 or 15 of
+  their 17 browser jobs failed. One of those jobs passed 21 of 21 with the
+  output in a file and failed again without it (2026-10-25). The jobs write
+  to `server.log` now and print it at their end; `ci-workflows.test.ts`
+  checks both.
+- **A synthesized swipe moves nothing in CI's Chromium.** CDP's
+  `Input.synthesizeScrollGesture` with touch scrolled the page on the Mac,
+  but in CI's Linux image only touchstart and touchend arrived, so a check
+  that the page did not move passed whatever the code did (2026-10-26).
+  Raw points through `Input.dispatchTouchEvent` scroll there; keep a swipe
+  that must move something in the test, as the phone terminal test does.
+  No browser but Chromium takes a swipe from a test.
+- **Wheel checks go after each wheel.** Down then up cancels out in a check
+  at the end: the terminal's wheel test passed without its fix in Chromium
+  until each wheel had its own check.
 - **Linux WebKit draws few frames.** With the terminal open it drew 4.7 to
   7.9 frames a second alone on 4 CPUs and 0.5 beside another browser (13
   with every blur off): a test that counts frames, or that wants to see an
@@ -362,7 +381,10 @@ Logs, the JSON report and each run's `test-results/` land in the folder
 `start` prints (`OUT` to choose it). `PLATFORM` and `CPUS` change the
 machine: `PLATFORM=linux/arm64` is native and about twice as fast.
 
-Calibrated on d8da49f, whose GitHub run is known, in its own image there:
+Calibrated on d8da49f, whose GitHub run is known, in its own image there.
+A hash marked pre-squash below names a state of the history from before
+it was squashed, kept as the local tag `archive/pre-squash-2026-10-23`
+(`docs/performance.md`, "Results").
 
 - WebKit: its terminal shards took 3.2 and 3.7 min against GitHub's 2.3
   and 2.9, and 4 tests passed on retry where GitHub had 3. About 1.3 times
@@ -379,7 +401,7 @@ Calibrated on d8da49f, whose GitHub run is known, in its own image there:
 - Lighthouse scores about 20 points low here at any CPU count: d8da49f
   scored 63 against GitHub's 83. First and largest paint and layout shift
   earn all their 60 points; Total Blocking Time and Speed Index, Chromium's
-  main thread, earn 3 to 5 of their 40 (at `fa5a1e9`, 2.9 to 4.1 s and 6.7
+  main thread, earn 3 to 5 of their 40 (at `fa5a1e9`, pre-squash, 2.9 to 4.1 s and 6.7
   to 7.5 s), and 8 CPUs cut the first by 29% without lifting its score off
   the floor. So a score here says nothing of GitHub's, which can lie
   anywhere from about 65 to 95 for the same reading: "Lighthouse before a
@@ -439,7 +461,7 @@ rehearsal had shown one of them flaky, failed 6:
 With the fixes, three passes: 83 passed and 1 skipped each, the slowest test
 108 s against CI's 300.
 
-Then every other job once there (2026-10-22, at `fa5a1e9`). Navigation in
+Then every other job once there (2026-10-22, at `fa5a1e9`, pre-squash). Navigation in
 Chromium, Firefox and WebKit, the terminal in Chromium and Firefox and the
 accessibility job in Chromium passed. Found:
 
@@ -474,7 +496,7 @@ LIGHTHOUSE_CPU_MULTIPLIER=3.7 bash scripts/e2e-container.sh run lh \
 bash scripts/e2e-container.sh stop lh
 ```
 
-At `90d7c32` (2026-10-22, an idle benchmark of 3,934), three runs at
+At `90d7c32` (pre-squash, 2026-10-22, an idle benchmark of 3,934), three runs at
 GitHub's slowdown (3.7 to 3.8) scored 92 to 96: TBT 236 to 347 ms, SI 1.6
 to 1.7 s, TTI 1.7 to 1.9 s, LCP 0.86 to 0.92 s, CLS 0. Three at 1.55 to
 1.85 times it scored 83 to 86 (TBT 543 to 711 ms, TTI 2.0 to 2.3 s), and
@@ -501,6 +523,34 @@ slowdown from a trace, so a run takes about 45 s at any multiplier.
   data needs `USE_GITHUB_DATA=true` and `GH_USERNAME`, which neither sets,
   and the script's `SKIP_EXTERNAL_APIS` only skips Medium's article images
   in `/api/medium-posts`.
+
+## On a phone or a tablet
+
+Over Tailscale a phone reaches the Mac at the Mac's Tailscale address. Test
+a production build there: the dev server's page weighs about 30 MB
+(unminified, with its live-update code), the production page 2.8 MB
+(2026-10-26), and a phone whose network blocks direct connections goes
+through one of Tailscale's relays (from UCD's network, London's: 40 to 125
+ms a round trip). Build in another checkout, or with the dev server
+stopped, since both write `.next`:
+
+```bash
+SERVE_HTTP=true npm run build
+npx next start -p 3001 -H <the Mac's Tailscale address>
+```
+
+`-H` keeps the server off the Mac's other addresses (on UCD's network, a
+public one). Plain http stays private inside the tailnet, and `SERVE_HTTP`
+drops the headers that would send the browser to https.
+
+The dev server opens from a phone too, slowly, once its host is allowed.
+Next 16 refuses its dev resources to any host but localhost; the page then
+never hydrates: its live-update connection (`/_next/hmr`) is refused, and
+its buttons, data and terminal stay dead.
+
+```bash
+DEV_ALLOWED_ORIGINS=<the Mac's Tailscale address>,<machine>.<tailnet>.ts.net npm run dev:https
+```
 
 ## Patched dependencies
 

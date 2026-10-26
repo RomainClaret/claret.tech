@@ -97,6 +97,17 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
 
+  // Hosts besides localhost that may open the dev server, such as the Mac's
+  // Tailscale address for a phone: DEV_ALLOWED_ORIGINS, hostnames separated
+  // by commas, with no scheme or port (100.101.102.103,my-mac.example.ts.net).
+  // Next 16 refuses its dev resources to other hosts, and a page opened from
+  // one never hydrated: its live-update connection (/_next/hmr) was refused,
+  // and its buttons, data and terminal stayed dead (2026-10-26). Dev only.
+  allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean),
+
   // Enable experimental features for better performance
   experimental: {
     // optimizeCss: true, // Disabled due to critters dependency issue

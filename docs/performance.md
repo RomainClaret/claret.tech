@@ -50,8 +50,8 @@ with the Firefox Profiler's idle view before and after a change.
 | P1  | `/pdf/phd-thesis` at DPR 2: canvas memory                       | n/a                                        |
 
 The forced tiers are a manual pick (`quality-auto=false`), which runs no
-frame sampler since `b020d8d`, and an automatic tier runs none while
-animations are off since `ce9565a` (Safari's default): the sampler only
+frame sampler, and an automatic tier runs none while animations are off
+(Safari's default; both since `60bea03`): the sampler only
 feeds the automatic loop and, at battery saver, auto-disable. With
 animations playing its share is within noise ("Frame sampler", below), so
 S1 to S6 still stand for an automatic visit at their tier.
@@ -72,7 +72,15 @@ S1 to S6 still stand for an automatic visit at their tier.
 
 ## Results
 
-### Baseline: `ce75bc9`, before the 2026-10 performance pass
+The local history was squashed into phases on 2026-10-23, and round 28
+into one commit on 2026-10-26. A hash marked pre-squash, and every other
+hash in its paragraph, list item or table, names a measured state in the
+history from before that, kept as the local tag
+`archive/pre-squash-2026-10-23` (rounds 1 to 27) or
+`archive/pre-squash-2026-10-26` (round 28); any other hash is a commit of
+this history.
+
+### Baseline: `ce75bc9` (pre-squash), before the 2026-10 performance pass
 
 Median of 3 runs (W1 and P1: 1 run).
 
@@ -98,7 +106,7 @@ Median of 3 runs (W1 and P1: 1 run).
 - **Layout shifts at load.** CLS comes from the splash box resizing (`div.max-w-md.w-full.px-8`) and the hero phrase's half-typed words wrapping.
 - **PDF reader.** The PhD thesis asks for 7.8 GB of canvas.
 
-### After Phases 1-4: `b87c925` against `ce75bc9` (2026-10-08)
+### After Phases 1-4: `b87c925` against `ce75bc9` (pre-squash, 2026-10-08)
 
 Median of 2 runs per scenario, alternating between the two builds (baseline,
 candidate, baseline, ...), both serving the same content. S5 did not run on the
@@ -128,7 +136,7 @@ no longer load until someone reaches for them.
 | CLS (S1 / S7 / S8)                                         | 0.127 / 0.321 / 0.120 | 0 / 0.0003 / 0 |
 | Window resize listeners after 4 terminal open-close cycles | 9 → 17                | 10 → 10        |
 
-### Final: `acd4ead` against `ce75bc9` (2026-10-08)
+### Final: `acd4ead` against `ce75bc9` (pre-squash, 2026-10-08)
 
 Phases 0-6 and 8. Median of 2 runs per scenario, alternating between the two
 builds, both with the same content and assets.
@@ -157,10 +165,10 @@ builds, both with the same content and assets.
   whose share halved.
 - S7 and S8 run at LOW: the startup check classes a software GPU as weak.
 
-### After the review fixes: `e5320b1` against `acd4ead` (2026-10-08)
+### After the review fixes: `e5320b1` against `acd4ead` (pre-squash, 2026-10-08)
 
 The 65 commits of review fixes after the pass, measured the same way.
-Absolute numbers drift between sessions (S7 measured 50.4% on `acd4ead` in
+Absolute numbers drift between sessions (S7 measured 50.4% on `acd4ead`, pre-squash, in
 the table above and 68-78% here), so compare within a table, not across.
 
 | id  | main%       | fps          | >20ms      | heapMB      | scroll>20   |
@@ -176,7 +184,7 @@ the table above and 68-78% here), so compare within a table, not across.
 | S7  | 76.4 → 95.5 | 119.3 → 110  | 0 → 0.5    | 22.3 → 20.7 | 23.5 → 28.5 |
 | S8  | 82.7 → 80.0 | 60.0 → 81.1  | 23.5 → 15  | 14.9 → 15.7 |             |
 
-- **S7 regressed, and is fixed.** Since `ae53e80` the hero's cover was judged
+- **S7 regressed, and is fixed.** Since `ae53e80` (pre-squash) the hero's cover was judged
   against the site grid's own box, measured once while a phone's layout
   viewport was briefly 394 px wide during load: the whole site grid
   animated under the hero, with twice the running animations. With
@@ -184,11 +192,11 @@ the table above and 68-78% here), so compare within a table, not across.
   Research tooltip made every page under 600 px wide pan sideways by up to
   31 px), S7 is 70.6-71.3% against 67.8-75.2% for `acd4ead`, and its
   scroll jank 17-20 against 26 frames over 20 ms.
-- **S5**: the brain canvas now stops under the PDF reader (`fa842a8`).
+- **S5**: the brain canvas now stops under the PDF reader (`183b3d9`).
 - **S1M** (MAXIMUM, where the automatic loop takes a capable machine) costs
   5-10 points more than S1 on the same build. Its SMIL count is no measure
   of a change: it is a snapshot of whatever signals are in flight, and the
-  same `acd4ead` build read 168, 192 and 312 in three runs.
+  same `acd4ead` (pre-squash) build read 168, 192 and 312 in three runs.
 - First-load JS for `/`: 242 → 245 kB (the fallbacks and the quality loop's
   backoff).
 
@@ -252,7 +260,7 @@ How it holds together:
 - **Content that framer starts at opacity 0 shows without framer.**
   framer-motion puts each `m` element's initial state in the HTML, which
   for most of the text in `<main>` is opacity 0, and only its features
-  chunk, loaded after hydration since `acd4ead`, animates it in. When that
+  chunk, loaded after hydration since `183b3d9`, animates it in. When that
   chunk fails, the bundle never runs or scripts are off, `globals.css` shows
   that content instead: at once when the chunk failed twice (MotionProvider
   asks once more a second after a first failure, so a transient one still
@@ -305,32 +313,32 @@ match, and text and cards screenshot byte-identical. **Still to check on
 Vercel** (needs a deploy): `x-vercel-cache: PRERENDER` then `HIT` on `/`,
 and the first byte at edge speed.
 
-### End to end: `40ec705` against `acd4ead` (2026-10-08)
+### End to end: `40ec705` against `acd4ead` (pre-squash, 2026-10-08)
 
 Part 2 and the static homepage together, against the end of the first pass:
 S1 six times and S1M three times per build, interleaved, at a load average
 of 7.6 to 12.4. Medians, with the range in brackets. The last column is the
 target the part 2 plan set.
 
-| Measure                                  | `acd4ead`          | `40ec705`           | Target |
-| ---------------------------------------- | ------------------ | ------------------- | ------ |
-| Fetched with no interaction (S1)         | 705.5 KB           | 621.5 KB            | 600 KB |
-| Font                                     | 78.5 KB            | 41.2 KB             | 32 KB  |
-| Images                                   | 53.9 KB            | 10.0 KB             |        |
-| JS the HTML loads before hydrating, gzip | 314.2 KB           | 295.8 KB            |        |
-| First-load JS in Next's build table      | 242 kB             | 245 kB              | 225 kB |
-| S1 main thread, BALANCED                 | 27.9% [26.2-28.8]  | 29.1% [28.6-30.1]   | 23%    |
-| S1M main thread, MAXIMUM                 | 34.3% [31.9-38.0]  | 35.2% [33.7-35.3]   | S1 + 5 |
-| S1 frames over 20 ms in a full scroll    | 48 [35-63]         | 27 [14-46]          | 25     |
-| S1M frames over 20 ms in a full scroll   | 54 [53-57]         | 27 [26-31]          |        |
-| S1 heap                                  | 21.4 MB            | 18.4 MB             |        |
-| `/` from `next start`                    | rendered, 17-23 ms | prerendered, 3-8 ms |        |
+| Measure                                  | `acd4ead` (pre-squash) | `40ec705`           | Target |
+| ---------------------------------------- | ---------------------- | ------------------- | ------ |
+| Fetched with no interaction (S1)         | 705.5 KB               | 621.5 KB            | 600 KB |
+| Font                                     | 78.5 KB                | 41.2 KB             | 32 KB  |
+| Images                                   | 53.9 KB                | 10.0 KB             |        |
+| JS the HTML loads before hydrating, gzip | 314.2 KB               | 295.8 KB            |        |
+| First-load JS in Next's build table      | 242 kB                 | 245 kB              | 225 kB |
+| S1 main thread, BALANCED                 | 27.9% [26.2-28.8]      | 29.1% [28.6-30.1]   | 23%    |
+| S1M main thread, MAXIMUM                 | 34.3% [31.9-38.0]      | 35.2% [33.7-35.3]   | S1 + 5 |
+| S1 frames over 20 ms in a full scroll    | 48 [35-63]             | 27 [14-46]          | 25     |
+| S1M frames over 20 ms in a full scroll   | 54 [53-57]             | 27 [26-31]          |        |
+| S1 heap                                  | 21.4 MB                | 18.4 MB             |        |
+| `/` from `next start`                    | rendered, 17-23 ms     | prerendered, 3-8 ms |        |
 
 - **No numeric target is met.** Bytes, scroll jank and heap went down;
   S1's main thread, S1M's and Next's first-load figure did not, for the
   reasons below.
 - **Bytes:** 84 KB less per first visit. Next's build table reads 245 kB
-  before and after framer's features left the critical path (`c389e86`), so
+  before and after framer's features left the critical path (`183b3d9`), so
   it does not see that change; the build manifests and the served HTML's
   script tags do (18.4 KB gzip less).
 - **Font:** the 32 KB estimate assumed pyftsubset's default OpenType
@@ -345,7 +353,7 @@ target the part 2 plan set.
   changes between two loads of the same build, compared per text element
   (58 of 58).
 - **S1 main thread, +1.2 points.** Bisected with S1 three times on each of
-  four builds, order rotated: `acd4ead` 28.3%, `7dd7216` 27.9%, `c83df26`
+  four builds, order rotated: `acd4ead` (pre-squash) 28.3%, `7dd7216` 27.9%, `c83df26`
   27.7%, `40ec705` 29.3%, so it arrives with the static homepage. Traces of
   the same window find no new work there: the same `requestAnimationFrame`
   call sites at the same rates, the same timers, the same layout time (101
@@ -365,7 +373,7 @@ target the part 2 plan set.
   now move (before, they sat frozen at the end of their paths). Moving
   particles add style recalculations (96 to 1,463 per second at MAXIMUM) at
   no measurable main-thread cost.
-- **Scroll** jank fell 44% in the median, from the card layers (`2646253`).
+- **Scroll** jank fell 44% in the median, from the card layers (`183b3d9`).
   The spread is wide: the same build read 14 to 18 in one set of runs and
   36 to 46 in the next, an hour later.
 
@@ -375,7 +383,7 @@ The frame sampler (`useFpsOnly`) requested a frame on every display refresh
 for the whole visit, whether or not the quality loop or auto-disable read
 it. On an otherwise still page each callback is a full rendering update
 (style, layout, IntersectionObserver checks, a commit) that draws nothing.
-Since `b020d8d` it samples only while the automatic loop runs or
+Since `60bea03` it samples only while the automatic loop runs or
 auto-disable can count (battery tier, animations on), and since the fix
 after it, no longer once auto-disable has switched animations off: it
 kept sampling there for the rest of the session, on exactly the slowest
@@ -402,7 +410,7 @@ callbacks/s but no measurable main-thread time (275.8 against 275.1 ms/s).
 An automatic visit with animations off, Safari's default, kept sampling
 all visit after that: 105 to 114 ms/s of CPU in WebKit over two series
 (166 against 61, 171 against 57). A still page always measures as fast,
-so its tier also climbed, LOW to BALANCED within 20 s. Since `ce9565a` the
+so its tier also climbed, LOW to BALANCED within 20 s. Since `60bea03` the
 automatic loop, and its sampling, hold while animations are off and start
 over when they play again. WebKit, automatic tier, animations off, 3 runs
 per side:
@@ -443,9 +451,9 @@ React 18, which only the unit tests ran (the site runs Next's own React
 build, 19.3.0-canary in 16.4.1), is 19.3 now; the og-image route runs on
 Node.js and is built once (`dynamic = "force-static"`; on Edge it was drawn
 on every request). Homepage bytes did not move with either (Linux build of
-`193ece7` against `bcc716a`: JS 326.5 KB gzipped, CSS 19.1, HTML 511.7).
+`193ece7` against `bcc716a`, both pre-squash: JS 326.5 KB gzipped, CSS 19.1, HTML 511.7).
 
-### Round 14: the React Compiler fixes, `eb2e966` against `92e347d` (2026-10-16)
+### Round 14: the React Compiler fixes, `eb2e966` against `92e347d` (pre-squash, 2026-10-16)
 
 ESLint 9 brought the React Compiler's rules, and fixing their 84 findings
 touched canvas and animation code: browser values through
@@ -453,19 +461,19 @@ touched canvas and animation code: browser values through
 in render. Both builds served side by side (`:3002`, `:3003`), alternated,
 two runs per scenario per round.
 
-| Scenario | Measure                | `92e347d` | `eb2e966` | Runs per side |
-| -------- | ---------------------- | --------- | --------- | ------------- |
-| S1       | main thread            | 18.06%    | 17.50%    | 10            |
-| S1       | layout                 | 1.34%     | 1.12%     | 10            |
-| S1M      | main thread            | 23.60%    | 22.01%    | 4             |
-| S1M      | style recalcs          | 1537/s    | 835/s     | 4             |
-| S6       | main thread            | 32.13%    | 31.62%    | 4             |
-| S7       | blocking time          | 177.5 ms  | 181 ms    | 10            |
-| S7       | long tasks             | 5.5       | 5.0       | 10            |
-| S7       | main thread            | 37.79%    | 35.55%    | 10            |
-| S8       | blocking time          | 151.5 ms  | 149 ms    | 4             |
-| S8       | main thread            | 57.07%    | 56.48%    | 4             |
-| W1       | fps, frames over 20 ms | 59.6, 2   | 59.8, 2   | 4             |
+| Scenario | Measure                | `92e347d` (pre-squash) | `eb2e966` | Runs per side |
+| -------- | ---------------------- | ---------------------- | --------- | ------------- |
+| S1       | main thread            | 18.06%                 | 17.50%    | 10            |
+| S1       | layout                 | 1.34%                  | 1.12%     | 10            |
+| S1M      | main thread            | 23.60%                 | 22.01%    | 4             |
+| S1M      | style recalcs          | 1537/s                 | 835/s     | 4             |
+| S6       | main thread            | 32.13%                 | 31.62%    | 4             |
+| S7       | blocking time          | 177.5 ms               | 181 ms    | 10            |
+| S7       | long tasks             | 5.5                    | 5.0       | 10            |
+| S7       | main thread            | 37.79%                 | 35.55%    | 10            |
+| S8       | blocking time          | 151.5 ms               | 149 ms    | 4             |
+| S8       | main thread            | 57.07%                 | 56.48%    | 4             |
+| W1       | fps, frames over 20 ms | 59.6, 2                | 59.8, 2   | 4             |
 
 No regression; S1M's style recalcs halved. The first round ran under a load
 average of about 70 and is left out. At four runs per side, S1's layout
@@ -523,7 +531,7 @@ skill carousel's 15 dot buttons, 6 by 6 px (the current one 12 by 6),
 under WCAG 2.2's 24 by 24: Lighthouse 13's axe-core (4.14, from its `^4.13`)
 catches them, 12's and the e2e scans' (4.10) do not.
 
-After this round's fixes, at `2a935ac` (three runs, Lighthouse 13):
+After this round's fixes, at `2a935ac` (pre-squash, three runs, Lighthouse 13):
 performance 100, accessibility 100 (the carousel's 24 px controls, the
 underlined footer links), best practices 96 (the same console errors), SEO
 100 (the cards' "Medium" links). LCP 859 to 870 ms, from 686 to 849 ms
@@ -617,7 +625,7 @@ own tab, apparently outside that page's browser context). The spec now
 passes `disableStorageReset: false`: three cold audits (FCP 454, 551 and
 461 ms).
 
-Vite 8 (`d347892`): all 10 CI unit scripts pass with round 19's counts
+Vite 8 (`5096ede`): all 10 CI unit scripts pass with round 19's counts
 (2,552 tests) on vite 8.3.4, and esbuild leaves the tree (npm audit 8 to 7).
 Vite 8 raised the shared postcss from 8.5.25 to 8.5.30; built in one
 directory with each lockfile, all 71 CSS and JavaScript files of the site
@@ -626,7 +634,7 @@ are byte-identical. New since vite 8: one warning per Vitest run that
 loader, planned as a future default, will refuse (rename it `.mts` and
 replace `__dirname`).
 
-Final HEAD (`bf7d638`) in the Playwright 1.64 container, against CI's e2e
+Final HEAD (`bf7d638`, pre-squash) in the Playwright 1.64 container, against CI's e2e
 build. Lighthouse, three spec runs of three audits each, all passing:
 medians performance 100, FCP 444 to 450 ms, LCP 647 to 924 ms, TBT 2 to
 68 ms, TTI 0.94 to 1.50 s, CLS 0.016 (CPU benchmark 2,017 to 2,728 under
@@ -689,15 +697,15 @@ test fails on any console error.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped        | `5033cb0`          | `7c740ff`          |
-| --------------------- | ------------------ | ------------------ |
-| Homepage JS           | 337,147 (15 files) | 348,035 (16 files) |
-| All CSS               | 25,927             | 26,174             |
-| Terminal chunk (lazy) | 67,835             | 82,428             |
-| PDF chunk (lazy)      | 106,870            | 106,870            |
-| web-llm chunk (lazy)  | 1,964,686          | 2,171,956          |
+| Bytes, gzipped        | `5033cb0` (pre-squash) | `7c740ff`          |
+| --------------------- | ---------------------- | ------------------ |
+| Homepage JS           | 337,147 (15 files)     | 348,035 (16 files) |
+| All CSS               | 25,927                 | 26,174             |
+| Terminal chunk (lazy) | 67,835                 | 82,428             |
+| PDF chunk (lazy)      | 106,870                | 106,870            |
+| web-llm chunk (lazy)  | 1,964,686              | 2,171,956          |
 
-Final HEAD (`7c740ff`) in the container: Lighthouse, three spec runs of
+Final HEAD (`7c740ff`, pre-squash) in the container: Lighthouse, three spec runs of
 three audits, all passing, medians performance 100, FCP 446 to 450 ms, LCP
 692 to 856 ms, TBT 21 to 25 ms, TTI 1.19 to 1.20 s; every audit scored
 accessibility, best practices and SEO 100 (best practices was 96: the
@@ -774,16 +782,16 @@ block; the markup has the space now.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped         | `647a81f`          | `456e8a7`          |
-| ---------------------- | ------------------ | ------------------ |
-| Homepage JS            | 348,021 (16 files) | 338,521 (16 files) |
-| Motion features (lazy) | 19,417             | 28,343             |
-| All CSS                | 26,174             | 26,419             |
-| Terminal chunk (lazy)  | 82,428             | 82,428             |
-| PDF chunk (lazy)       | 106,870            | 120,529            |
-| pdf.js worker (lazy)   | 283,837            | 287,697            |
+| Bytes, gzipped         | `647a81f` (pre-squash) | `456e8a7`          |
+| ---------------------- | ---------------------- | ------------------ |
+| Homepage JS            | 348,021 (16 files)     | 338,521 (16 files) |
+| Motion features (lazy) | 19,417                 | 28,343             |
+| All CSS                | 26,174                 | 26,419             |
+| Terminal chunk (lazy)  | 82,428                 | 82,428             |
+| PDF chunk (lazy)       | 106,870                | 120,529            |
+| pdf.js worker (lazy)   | 283,837                | 287,697            |
 
-Final HEAD (`456e8a7`) in the container: `npm ci` applied the patch
+Final HEAD (`456e8a7`, pre-squash) in the container: `npm ci` applied the patch
 (`motion-dom@14.3.1 ✔`); lint, type-check, knip, format, CI's build and the
 static-home check passed. Lighthouse, three spec runs of three audits, all
 passing: medians performance 100, FCP 443 ms, LCP 688 to 871 ms, TBT 0 ms, TTI
@@ -849,16 +857,16 @@ package.json.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped         | `b4a33e8`          | `54f2379`          |
-| ---------------------- | ------------------ | ------------------ |
-| Homepage JS            | 338,513 (16 files) | 338,522 (16 files) |
-| All CSS                | 26,419             | 26,419             |
-| Motion features (lazy) | 28,343             | 28,343             |
-| Terminal chunk (lazy)  | 82,428             | 82,428             |
-| PDF chunk (lazy)       | 120,529            | 139,564            |
-| pdf.js worker (lazy)   | 287,697            | 305,155            |
+| Bytes, gzipped         | `b4a33e8` (pre-squash) | `54f2379`          |
+| ---------------------- | ---------------------- | ------------------ |
+| Homepage JS            | 338,513 (16 files)     | 338,522 (16 files) |
+| All CSS                | 26,419                 | 26,419             |
+| Motion features (lazy) | 28,343                 | 28,343             |
+| Terminal chunk (lazy)  | 82,428                 | 82,428             |
+| PDF chunk (lazy)       | 120,529                | 139,564            |
+| pdf.js worker (lazy)   | 287,697                | 305,155            |
 
-Final code HEAD (`54f2379`) in the container: `npm ci` ran the new script
+Final code HEAD (`54f2379`, pre-squash) in the container: `npm ci` ran the new script
 ("motion-dom@14.3.1 patched (3 files)"); lint, type-check, knip, format, CI's
 build and the static-home check passed. Lighthouse, three spec runs of three
 audits, all passing: medians performance 100, FCP 442 to 443 ms, LCP 859 to
@@ -910,16 +918,16 @@ time, each in one job. npm audit: 7.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped         | `04447db`          | `2b6c3dd`          |
-| ---------------------- | ------------------ | ------------------ |
-| Homepage JS            | 338,513 (16 files) | 339,890 (16 files) |
-| All CSS                | 26,419             | 26,397             |
-| Motion features (lazy) | 28,343             | 28,343             |
-| Terminal chunk (lazy)  | 82,428             | 82,428             |
-| PDF chunk (lazy)       | 139,563            | 139,564            |
-| pdf.js worker (lazy)   | 305,155            | 305,155            |
+| Bytes, gzipped         | `04447db` (pre-squash) | `2b6c3dd`          |
+| ---------------------- | ---------------------- | ------------------ |
+| Homepage JS            | 338,513 (16 files)     | 339,890 (16 files) |
+| All CSS                | 26,419                 | 26,397             |
+| Motion features (lazy) | 28,343                 | 28,343             |
+| Terminal chunk (lazy)  | 82,428                 | 82,428             |
+| PDF chunk (lazy)       | 139,563                | 139,564            |
+| pdf.js worker (lazy)   | 305,155                | 305,155            |
 
-Final code (`2b6c3dd`; `432ad4d` after it changed only a test) in the
+Final code (`2b6c3dd`, pre-squash; `432ad4d` after it changed only a test) in the
 container: `npm ci` (the patch script, and 314.0.7 alone in
 `public/pyodide`), lint, type-check, knip, format, CI's build and the
 static-home check passed. Lighthouse, three spec runs: performance 100,
@@ -968,16 +976,16 @@ each time. npm audit: 7.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped         | `becc3db`          | `21caf49`          |
-| ---------------------- | ------------------ | ------------------ |
-| Homepage JS            | 339,875 (16 files) | 340,027 (16 files) |
-| All CSS                | 26,420             | 26,426             |
-| Motion features (lazy) | 28,343             | 28,343             |
-| Terminal chunk (lazy)  | 82,428             | 82,428             |
-| PDF chunk (lazy)       | 139,563            | 139,564            |
-| pdf.js worker (lazy)   | 305,155            | 305,155            |
+| Bytes, gzipped         | `becc3db` (pre-squash) | `21caf49`          |
+| ---------------------- | ---------------------- | ------------------ |
+| Homepage JS            | 339,875 (16 files)     | 340,027 (16 files) |
+| All CSS                | 26,420                 | 26,426             |
+| Motion features (lazy) | 28,343                 | 28,343             |
+| Terminal chunk (lazy)  | 82,428                 | 82,428             |
+| PDF chunk (lazy)       | 139,563                | 139,564            |
+| pdf.js worker (lazy)   | 305,155                | 305,155            |
 
-Final HEAD (`21caf49`) in the container: `npm ci`, lint, type-check, knip,
+Final HEAD (`21caf49`, pre-squash) in the container: `npm ci`, lint, type-check, knip,
 format, CI's build and the static-home check passed. Lighthouse, three spec
 runs: performance 100, FCP 442 to 443 ms, LCP 858 to 868 ms, TBT 0 ms, CLS
 0.014 (CPU benchmark 3,845 to 3,952); accessibility, best practices and
@@ -1038,25 +1046,25 @@ three engines. Unit: act's 8 jobs and two macOS runs of the 10 scripts,
 Each change against the commit before it, on the Mac (CI's e2e build,
 homepage scripts without the polyfills, gzip -9):
 
-| Commit    | Change                                     | Bytes   | Files |
-| --------- | ------------------------------------------ | ------- | ----- |
-| `b010632` | before the eager-JS commits                | 300,006 | 15    |
-| `d8bd363` | 27 dead icon entries                       | 298,768 | 15    |
-| `6c85a90` | styled-jsx out                             | 295,910 | 15    |
-| `e9d0391` | animated favicon, lazy                     | 294,882 | 15    |
-| `5c562ab` | project cards, with the repositories       | 288,228 | 15    |
-| `d186880` | article cards, with the articles           | 285,704 | 15    |
-| `92da77f` | hero layers, after hydration               | 277,413 | 16    |
-| `0feda8d` | constellation, wide screens only           | 274,965 | 16    |
-| `a30e392` | abstracts left to the API                  | 271,421 | 16    |
-| `4f6b0c5` | research texts, when idle                  | 268,540 | 16    |
-| `90b1deb` | papers filed by title (a fix of the above) | 268,550 | 16    |
-| `925cc94` | the conflict report                        | 268,620 | 16    |
-| `0d09a11` | conflicts settled                          | 268,576 | 16    |
-| `b75aa2a` | `cn()` with clsx                           | 260,427 | 15    |
-| `ce9dceb` | an icon per technology, 9 icons fewer      | 260,024 | 15    |
+| Commit (pre-squash) | Change                                     | Bytes   | Files |
+| ------------------- | ------------------------------------------ | ------- | ----- |
+| `b010632`           | before the eager-JS commits                | 300,006 | 15    |
+| `d8bd363`           | 27 dead icon entries                       | 298,768 | 15    |
+| `6c85a90`           | styled-jsx out                             | 295,910 | 15    |
+| `e9d0391`           | animated favicon, lazy                     | 294,882 | 15    |
+| `5c562ab`           | project cards, with the repositories       | 288,228 | 15    |
+| `d186880`           | article cards, with the articles           | 285,704 | 15    |
+| `92da77f`           | hero layers, after hydration               | 277,413 | 16    |
+| `0feda8d`           | constellation, wide screens only           | 274,965 | 16    |
+| `a30e392`           | abstracts left to the API                  | 271,421 | 16    |
+| `4f6b0c5`           | research texts, when idle                  | 268,540 | 16    |
+| `90b1deb`           | papers filed by title (a fix of the above) | 268,550 | 16    |
+| `925cc94`           | the conflict report                        | 268,620 | 16    |
+| `0d09a11`           | conflicts settled                          | 268,576 | 16    |
+| `b75aa2a`           | `cn()` with clsx                           | 260,427 | 15    |
+| `ce9dceb`           | an icon per technology, 9 icons fewer      | 260,024 | 15    |
 
-`39eb6da` (between `6c85a90` and `e9d0391`) adds the CI check only.
+`39eb6da` (pre-squash, between `6c85a90` and `e9d0391`) adds the CI check only.
 `ce9dceb` and `9b1b0cc` (the ring labels' line height, no change in size)
 came last, both chosen by Romain from before/after screenshots. Not kept:
 a split-chunks group for the root boundaries' shared helpers saved 1,162 B
@@ -1065,21 +1073,21 @@ for 8 more requests.
 The round's start and end, built the same way in the Playwright container
 (CI's e2e build, gzip -9):
 
-| Bytes, gzipped                       | `bca23f5`          | `f082507`          |
-| ------------------------------------ | ------------------ | ------------------ |
-| Homepage JS, without the polyfills   | 300,625 (15 files) | 260,808 (15 files) |
-| Polyfills (`noModule`, never loaded) | 39,405             | 39,405             |
-| All CSS                              | 26,426             | 26,454             |
-| Terminal chunk (lazy)                | 82,428             | 82,428             |
-| PDF chunk (lazy)                     | 139,563            | 139,564            |
+| Bytes, gzipped                       | `bca23f5` (pre-squash) | `f082507`          |
+| ------------------------------------ | ---------------------- | ------------------ |
+| Homepage JS, without the polyfills   | 300,625 (15 files)     | 260,808 (15 files) |
+| Polyfills (`noModule`, never loaded) | 39,405                 | 39,405             |
+| All CSS                              | 26,426                 | 26,454             |
+| Terminal chunk (lazy)                | 82,428                 | 82,428             |
+| PDF chunk (lazy)                     | 139,563                | 139,564            |
 
-The new chunks at `f082507`: project cards 8,833 B; hero layers 6,478
+The new chunks at `f082507` (pre-squash): project cards 8,833 B; hero layers 6,478
 (never fetched on Safari); abstracts 4,450 (only when /api/publications
 fails); research texts 4,253; article cards 3,842; constellation 3,314
 (wide screens only); animated favicon 1,386. The homepage asks for 31
 scripts on a desktop (23 at `bca23f5`), the extra ones after hydration.
 
-Final HEAD (`f082507`) in the container: `npm ci`, lint, type-check, knip,
+Final HEAD (`f082507`, pre-squash) in the container: `npm ci`, lint, type-check, knip,
 format, CI's build, the static-home check and the client-bundle deny list
 passed. e2e, every spec: Chromium 196 passed and 13 skipped. WebKit 166
 passed, 39 skipped and 4 failed: the two splash-timer tests in
@@ -1126,7 +1134,7 @@ before.
   and come with their dialogs now. A Medium post's text keeps its
   paragraphs, and its extraction moved into the blog cards' chunk.
 
-The sections' heights, before (`6499311`) and after (`d68b534`):
+The sections' heights, before (`6499311`, pre-squash) and after (`d68b534`):
 
 | Section  | 1280 px        | 390 px         |
 | -------- | -------------- | -------------- |
@@ -1138,18 +1146,18 @@ The sections' heights, before (`6499311`) and after (`d68b534`):
 Eager JavaScript, each change against the commit before it, on the Mac
 (CI's e2e build, homepage scripts without the polyfills, gzip -9):
 
-| Commit    | Change                                  | Bytes   | Files |
-| --------- | --------------------------------------- | ------- | ----- |
-| `6499311` | before the round                        | 260,024 | 15    |
-| `6d76b2b` | the shared dialog pieces (five commits) | 260,289 | 15    |
-| `c598c87` | research cards open a dialog            | 260,590 | 15    |
-| `2a4c087` | the PhD and the journey; no idle fetch  | 260,149 | 15    |
-| `3730a17` | the paper cards' shared parts           | 260,167 | 15    |
-| `6252afa` | papers open a dialog                    | 261,190 | 15    |
-| `903689c` | one lazy loader and stand-in            | 261,101 | 15    |
-| `dab6eab` | skills open a dialog, compact cards     | 261,160 | 15    |
-| `2ac093e` | the skills' long texts come with it     | 260,100 | 15    |
-| `b62bd7c` | blog posts open a dialog                | 260,012 | 15    |
+| Commit (pre-squash) | Change                                  | Bytes   | Files |
+| ------------------- | --------------------------------------- | ------- | ----- |
+| `6499311`           | before the round                        | 260,024 | 15    |
+| `6d76b2b`           | the shared dialog pieces (five commits) | 260,289 | 15    |
+| `c598c87`           | research cards open a dialog            | 260,590 | 15    |
+| `2a4c087`           | the PhD and the journey; no idle fetch  | 260,149 | 15    |
+| `3730a17`           | the paper cards' shared parts           | 260,167 | 15    |
+| `6252afa`           | papers open a dialog                    | 261,190 | 15    |
+| `903689c`           | one lazy loader and stand-in            | 261,101 | 15    |
+| `dab6eab`           | skills open a dialog, compact cards     | 261,160 | 15    |
+| `2ac093e`           | the skills' long texts come with it     | 260,100 | 15    |
+| `b62bd7c`           | blog posts open a dialog                | 260,012 | 15    |
 
 The dialogs' chunks: research 6,532 B (with its long texts), skills 3,316
 (with theirs), papers 2,421 and blog 1,921; the blog cards' chunk went from
@@ -1164,7 +1172,7 @@ papers commit on, all killed). One choice differs from the plan: the blog's
 dialog has a chunk of its own, where the plan put it in the blog cards'
 chunk, which every visit fetches.
 
-Final HEAD (`d68b534`) in the Playwright container (Node 24.21): `npm ci`,
+Final HEAD (`d68b534`, pre-squash) in the Playwright container (Node 24.21): `npm ci`,
 lint, type-check, knip, format, CI's build, the static-home check and the
 client-bundle deny list passed (56 client chunks). e2e, every spec: Chromium
 216 passed, 13 skipped and 3 failed; WebKit 189 passed, 41 skipped and 2
@@ -1252,7 +1260,7 @@ And from rehearsing the next push with act (Romain's choices):
   arm64 containers (`.github/workflows/README.md`, "Rehearse a push"). CI
   passed whole, twice: the five quick checks (knip and actionlint for the
   first time in a CI shape) and 2,693 unit tests on the final HEAD
-  (`07e72e8`). The browser tests failed one WebKit test (below), and with it
+  (`07e72e8`, pre-squash). The browser tests failed one WebKit test (below), and with it
   fixed passed in every job: navigation 7 a browser, accessibility 84 and
   83, performance 75, the terminal's nine shards, the phones 26, Lighthouse 2. Artifact uploads fail under act 0.2.89 and do not count.
 - **The server waits ran once.** A job in a container runs its steps under
@@ -1312,7 +1320,7 @@ Romain's choices):
   15 s for the hydrated app to remove the splash's backdrop. All five are
   fixed; a full pass then gave 43 passed and 1 skipped, and the drag test
   that failed on GitHub passed 41 runs of 41.
-- **The accessibility job too.** The act rehearsal of `c415aea` passed
+- **The accessibility job too.** The act rehearsal of `c415aea` (pre-squash) passed
   every job, with one WebKit test flaky (the dark theme's scan). The
   accessibility job's 84 WebKit tests, once in the same container, failed
   6: four ran out of a 60 s timeout the describe set (CI's is 300 s), the
@@ -1332,7 +1340,7 @@ Romain's choices):
   faded every 6 s; Play and Pause stay theirs.
 - **With every fix.** Three accessibility passes in the container: 83
   passed and 1 skipped each, the slowest test 108 s. The act rehearsal of
-  the push at `8b9f0e2`, both workflows: CI's 18 jobs (2,696 unit tests)
+  the push at `8b9f0e2` (pre-squash), both workflows: CI's 18 jobs (2,696 unit tests)
   and the browser tests' 19 jobs passed, none flaky, Firefox's and
   WebKit's terminal shards holding 15, 15 and 14 tests (one skipped).
 
@@ -1383,7 +1391,7 @@ hidden `--no-opt` left documented):
   "about 83 on GitHub" read from it was unsound. Round 20's method,
   Chromium native on arm64 with Lighthouse's CPU slowdown at GitHub's, is
   now a setting (`LIGHTHOUSE_CPU_MULTIPLIER`, 1 unless set, an error for a
-  value it cannot read) and a recipe in the testing guide. At `90d7c32`:
+  value it cannot read) and a recipe in the testing guide. At `90d7c32` (pre-squash):
   92 to 96 at GitHub's slowdown (TBT 236 to 347 ms, TTI 1.7 to 1.9 s) and
   83 to 86 at 1.55 to 1.85 times it, where round 20's HEAD scored 89 to 91
   (TBT 367 to 443 ms). No regression, and 12 to 16 points over the gate.
@@ -1423,6 +1431,51 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
   benchmark does not make up for a loaded host.
 - **Chromium failures in the container need a cause first.** The testing
   guide says so where it sets Chromium at 8 CPUs.
+
+### Round 28: the squashed history rehearsed, the old copies reviewed (2026-10-25)
+
+- **Every squashed commit under act.** Each of the nine commits ran CI and
+  the browser tests as the workflows README rehearses a push. The unit tests
+  passed in all nine (2,149 to 2,699 tests). Every browser job passed in
+  phases 7 and 8 and the references commit (`110ea35`, pre-squash); phases 1
+  to 6 failed 14 or 15 of their 17. Lint and the type check ran from phase 5
+  on (until round 23, `ci.yml`'s jobs began with a sudo step that act cannot
+  run) and passed, except actionlint in phases 5 and 6, whose act image had
+  no docker CLI. The browser jobs built the site in every phase.
+- **Why phases 1 to 6 failed: act, not their code.** They fetch Medium
+  through rss2json, which now answers act's containers with a Cloudflare
+  page. Their server logged that error on every test, and under act a
+  server that writes after its start step stops serving. Phase 5's terminal
+  shard 2 passed 21 of 21 with the server's output in a file, and 4 failed
+  with 12 not run without it. Phase 7 reads Medium's feed directly and
+  passed. The browser jobs write to `server.log` now.
+- **act's own failures.** One or two jobs a phase found npm half unpacked
+  in act's shared tool cache; each passed alone (workflows README).
+- **The old copies.** `claret.tech copy`, the site of 2025-09-03, held
+  nothing the site lacks but two items, both taken back: the memberships,
+  data no section ever rendered (now "Memberships & Service" under
+  Education, eight entries from 2015 on), and a unit test of
+  `WebLLMClient.isSupported()` deleted in 2025 (`src/lib/webllm/client.test.ts`).
+  Its history, 725 commits with two found nowhere else, is kept in the git
+  bundle `claret.tech-copy-2025-history.bundle` beside the repository.
+- **What the memberships cost.** Projected at GitHub's slowdown on a quiet
+  Mac (two containers, runs alternating), `2877e8b4` (pre-squash) scored 93
+  and 94 (TBT 301 and 277 ms, LCP 0.90 s) where `110ea35` scored 95 and 94
+  (TBT 263 and 286 ms, LCP 0.86 s). Under act both sit at the gate, back to
+  back on a quiet Mac: 80 to 81 against 78 to 82. The rehearsal's one
+  Lighthouse failure (73 to 74, TBT 1.2 s) ran with 4 to 6 cores busy
+  outside Docker.
+- **The terminal keeps the wheel, and the finger.** xterm takes a wheel
+  only while it has lines to scroll. Before any scrollback, past either end
+  of it, and over the title bar, the wheel scrolled the page behind the
+  window, 300 px a notch in Chromium, Firefox and WebKit. The window now
+  cancels every wheel after xterm has used it, except Ctrl and a wheel (the
+  browser's zoom, and a trackpad pinch) and while minimized to its title
+  bar. On a phone, where the terminal covers most of the screen, xterm 6
+  has no touch scrolling at all: a swipe scrolled the page, 200 to 1,500
+  px, and the scrollback was out of reach. A finger now moves the lines
+  under it and a flick glides on (`src/lib/terminal/touch-scroll.ts`); two
+  fingers stay the browser's pinch zoom.
 
 ## Measuring well
 
@@ -1596,7 +1649,7 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
   `netstat -s`). Tests that waited 30 s on a request failed there and
   nowhere else. Round 10's set of 354 tests failed 6 through the
   forwarder, 4 of which passed 5 of 5 alone; served in the container, it
-  failed none (on `5d36b46`, which had also fixed one of the 6).
+  failed none (on `5d36b46`, pre-squash, which had also fixed one of the 6).
 
   For CI itself, rehearse with `act`: a scratch workflow with CI's steps
   (CI's x64 image, Node 20, `npm ci`, the build and the server inside the

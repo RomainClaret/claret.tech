@@ -126,7 +126,9 @@ test.describe("Terminal", () => {
     });
 
   test.beforeEach(async ({ page, browserName, isMobile }) => {
-    // Skip all terminal tests on mobile - terminal is desktop-only feature
+    // These drive the window as a computer does: a mouse, a keyboard,
+    // dragging and resizing. The terminal opens on phones too; its phone
+    // test (a finger's scrolling) is in mobile-navigation.spec.ts.
     if (isMobile) {
       test.skip();
       return;
@@ -880,6 +882,70 @@ test.describe("Terminal", () => {
     await expect(output).toBeVisible();
     await expect.poll(height).toBe(normal);
     await runCommand(page, "ls", /README\.md/);
+  });
+
+  test("keeps a wheel over it to itself, never the page behind it", async ({
+    page,
+  }) => {
+    // xterm takes a wheel only while it has lines to scroll. With no
+    // scrollback yet, at either end of it, or over the title bar, the wheel
+    // went on to the page under the window and scrolled the site (2026-10-26).
+    const terminal = await expectTerminalVisible(page);
+    await waitForTerminalReady(page);
+    await page.evaluate(() =>
+      window.scrollTo(0, document.documentElement.scrollHeight / 2),
+    );
+    const pageY = () => page.evaluate(() => Math.round(window.scrollY));
+    const start = await pageY();
+    expect(start, "the page can scroll either way").toBeGreaterThan(0);
+    const pointAt = async (target: Locator) => {
+      const box = (await target.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    // Checked after each wheel: down and up again would cancel out in a
+    // check at the end (they did, in Chromium).
+    const wheelOver = async (target: Locator, deltaY: number) => {
+      await pointAt(target);
+      await page.mouse.wheel(0, deltaY);
+      // A scroll can land a little after its wheel event.
+      await page.waitForTimeout(500);
+      expect(await pageY(), `the page moved on a wheel of ${deltaY}`).toBe(
+        start,
+      );
+    };
+    const output = terminal.locator('[aria-label="Terminal output"]');
+    const header = terminal.getByTestId("terminal-header");
+
+    // No scrollback yet, then the title bar.
+    await wheelOver(output, 400);
+    await wheelOver(output, -400);
+    await wheelOver(header, 400);
+
+    // With scrollback (help prints 37 lines into 24 rows) the wheel still
+    // scrolls the terminal. xterm moves a few lines a wheel, so each end is
+    // where the top row stops changing, and one more wheel goes past it.
+    await runCommand(page, "help", /Use Ctrl\+C to cancel current input/);
+    const topRow = () =>
+      output.locator(".xterm-rows > div").first().textContent();
+    const atBottom = await topRow();
+    await wheelOver(output, -300);
+    await expect.poll(topRow).not.toBe(atBottom);
+    const pastTheEnd = async (deltaY: number) => {
+      for (let wheels = 0; wheels < 30; wheels++) {
+        const row = await topRow();
+        await wheelOver(output, deltaY);
+        if ((await topRow()) === row) return;
+      }
+      throw new Error(`a wheel of ${deltaY} never reached the end`);
+    };
+    await pastTheEnd(-400);
+    await pastTheEnd(400);
+
+    // Minimized to its title bar, the window leaves the wheel to the page.
+    await terminal.getByRole("button", { name: "Minimize terminal" }).click();
+    await pointAt(header);
+    await page.mouse.wheel(0, 400);
+    await expect.poll(pageY).toBeGreaterThan(start);
   });
 
   test("should handle special characters", async ({ page }) => {
