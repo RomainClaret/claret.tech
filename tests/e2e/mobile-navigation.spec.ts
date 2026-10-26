@@ -233,13 +233,20 @@ test.describe("Mobile Navigation", () => {
   });
 });
 
-// The training and memberships badges stacked 15 cards on a phone, 1,350 px
-// (2026-10-26): a phone shows the newest few of each, then "Show all".
+// The training and memberships badges stacked 15 cards, 1,038 px on a 390 px
+// wide phone (2026-10-26): a phone shows the newest few of each, then
+// "Show all".
 test.describe("The badges on a phone", () => {
   test.skip(({ isMobile }) => !isMobile, "These tests are mobile-only");
 
   const badgesOf = async (page: Page, button: Locator) =>
     page.locator(`[id="${await button.getAttribute("aria-controls")}"] > div`);
+  // The button by the list it opens: its name changes on a tap, and a
+  // locator by the old name then finds nothing.
+  const byList = async (page: Page, button: Locator) =>
+    page.locator(
+      `button[aria-controls="${await button.getAttribute("aria-controls")}"]`,
+    );
 
   test("shows the newest few, and all of them on a tap", async ({ page }) => {
     test.slow();
@@ -265,14 +272,16 @@ test.describe("The badges on a phone", () => {
       await top("Surviving a Ph.D."),
     );
 
-    // Centred first: scrolled just into view, the fixed header covers it.
-    await training.evaluate((button) =>
+    const toggle = await byList(page, training);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Centered first: scrolled just into view, the fixed header covers it.
+    await toggle.evaluate((button) =>
       button.scrollIntoView({ block: "center" }),
     );
-    await training.click();
+    await toggle.click();
     await expect(trainingBadges.filter({ visible: true })).toHaveCount(7);
-    await expect(training).toHaveAttribute("aria-expanded", "true");
-    await expect(training).toHaveAccessibleName("Show fewer certifications");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(toggle).toHaveAccessibleName("Show fewer certifications");
   });
 
   test.describe("without scripts", () => {
