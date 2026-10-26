@@ -24,14 +24,18 @@ export const educationInfo = {
     normalText:
       "Spent a decade in universities learning how to engineer things. I had to learn building before I could see the case for growing.",
   },
+  // phoneCount: on a phone, how many of the newest badges show before
+  // "Show all"; wider screens show them all.
   certificationSection: {
     title: "Professional Certifications & Training",
     subtitle:
       "Side Quests That Mattered. Short courses and schools, each of which changed how I work.",
+    phoneCount: 3,
   },
   membershipSection: {
     title: "Memberships & Service",
     subtitle: "Societies I belong to and the groups I help run.",
+    phoneCount: 4,
   },
   schools: [
     {

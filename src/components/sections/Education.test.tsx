@@ -73,12 +73,12 @@ describe("Education", () => {
         name: `Show all ${educationInfo.memberships.length} memberships`,
       }),
     ).toBeInTheDocument();
-    // 3 and 4 of them show on a phone, the newest.
+    // The newest few of each show on a phone.
     expect(document.querySelectorAll("[data-fold]")).toHaveLength(
       educationInfo.certifications.length -
-        3 +
+        educationInfo.certificationSection.phoneCount +
         educationInfo.memberships.length -
-        4,
+        educationInfo.membershipSection.phoneCount,
     );
   });
 });

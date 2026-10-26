@@ -399,7 +399,7 @@ export function Education() {
             </SlideInUp>
             <CertificationTimeline
               certifications={educationInfo.certifications}
-              phoneCount={3}
+              phoneCount={educationInfo.certificationSection.phoneCount}
               itemsLabel="certifications"
               className="max-w-6xl mx-auto"
             />
@@ -420,7 +420,7 @@ export function Education() {
           <CertificationTimeline
             certifications={educationInfo.memberships}
             icon={Users}
-            phoneCount={4}
+            phoneCount={educationInfo.membershipSection.phoneCount}
             itemsLabel="memberships"
             className="max-w-6xl mx-auto"
           />

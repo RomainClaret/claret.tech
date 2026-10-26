@@ -3,6 +3,7 @@ import { dismissToasts } from "./utils/toast-utils";
 import { waitForSplashToEnd } from "./utils/splash";
 import { runCommand, waitForTerminalReady } from "./utils/terminal-utils";
 import { gotoWithoutScripts } from "./utils/no-script";
+import { educationInfo } from "../../src/data/sections/education";
 
 /**
  * Open the mobile menu and verify it is actually open.
@@ -235,9 +236,15 @@ test.describe("Mobile Navigation", () => {
 
 // The training and memberships badges stacked 15 cards, 1,038 px on a 390 px
 // wide phone (2026-10-26): a phone shows the newest few of each, then
-// "Show all".
+// "Show all". The counts come from the data, so a new badge changes no test.
 test.describe("The badges on a phone", () => {
   test.skip(({ isMobile }) => !isMobile, "These tests are mobile-only");
+  const {
+    certifications,
+    memberships,
+    certificationSection,
+    membershipSection,
+  } = educationInfo;
 
   const badgesOf = async (page: Page, button: Locator) =>
     page.locator(`[id="${await button.getAttribute("aria-controls")}"] > div`);
@@ -255,22 +262,36 @@ test.describe("The badges on a phone", () => {
     await dismissToasts(page, { timeout: 3000 });
     const education = page.locator("#education");
     const training = education.getByRole("button", {
-      name: "Show all 7 certifications",
+      name: `Show all ${certifications.length} certifications`,
     });
-    const memberships = education.getByRole("button", {
-      name: "Show all 8 memberships",
+    const membershipsButton = education.getByRole("button", {
+      name: `Show all ${memberships.length} memberships`,
     });
     const trainingBadges = await badgesOf(page, training);
-    await expect(trainingBadges.filter({ visible: true })).toHaveCount(3);
-    await expect(
-      (await badgesOf(page, memberships)).filter({ visible: true }),
-    ).toHaveCount(4);
-    // Newest first, though the HTML lists them oldest first.
-    const top = async (name: string) =>
-      (await trainingBadges.filter({ hasText: name }).boundingBox())!.y;
-    expect(await top("Summer/Winter Schools")).toBeLessThan(
-      await top("Surviving a Ph.D."),
+    await expect(trainingBadges.filter({ visible: true })).toHaveCount(
+      certificationSection.phoneCount,
     );
+    await expect(
+      (await badgesOf(page, membershipsButton)).filter({ visible: true }),
+    ).toHaveCount(membershipSection.phoneCount);
+    // The shown badges are the newest, last in the HTML (oldest first), and
+    // on a phone the newest is on top: each sits above the one before it in
+    // the HTML.
+    const shown = await trainingBadges.evaluateAll((badges) =>
+      badges.flatMap((badge, index) =>
+        badge.getClientRects().length > 0
+          ? [{ index, top: badge.getBoundingClientRect().top }]
+          : [],
+      ),
+    );
+    expect(shown.map((badge) => badge.index)).toEqual(
+      [...certifications.keys()].slice(-certificationSection.phoneCount),
+    );
+    for (let i = 1; i < shown.length; i++) {
+      expect(shown[i].top, "above the one before it").toBeLessThan(
+        shown[i - 1].top,
+      );
+    }
 
     const toggle = await byList(page, training);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -279,7 +300,9 @@ test.describe("The badges on a phone", () => {
       button.scrollIntoView({ block: "center" }),
     );
     await toggle.click();
-    await expect(trainingBadges.filter({ visible: true })).toHaveCount(7);
+    await expect(trainingBadges.filter({ visible: true })).toHaveCount(
+      certifications.length,
+    );
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(toggle).toHaveAccessibleName("Show fewer certifications");
   });
@@ -290,9 +313,10 @@ test.describe("The badges on a phone", () => {
     test("shows every badge, and no button", async ({ page }) => {
       // layout.tsx's <noscript> style shows what a phone folds.
       await gotoWithoutScripts(page, "/?playwright=true");
+      const total = certifications.length + memberships.length;
       const badges = page.locator("#education [style*='--rank']");
-      await expect(badges).toHaveCount(15);
-      await expect(badges.filter({ visible: true })).toHaveCount(15);
+      await expect(badges).toHaveCount(total);
+      await expect(badges.filter({ visible: true })).toHaveCount(total);
       await expect(
         page.locator("#education").getByRole("button", { name: /^Show all/ }),
       ).toHaveCount(0);
