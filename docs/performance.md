@@ -1524,6 +1524,10 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
 - **Hidden, not removed.** The folded badges stay in the HTML (the DOM size
   is unchanged), hidden below `sm`. Without scripts, layout.tsx's
   `<noscript>` style shows them and hides the buttons.
+- **The counts are data.** How many a phone shows is `phoneCount` beside
+  each section's title in `src/data/sections/education.ts`. The tests take
+  it and the totals from there: the first phone tests named them, so a new
+  membership would have failed them.
 
 ## Measuring well
 
