@@ -42,11 +42,11 @@ interface CertificationTimelineProps {
 // A badge fills its grid cell, so a row of them stays even, and a year
 // range on the issuer line wraps whole, never after "2015-".
 
-// On a phone the two grids stacked 15 badges, 1,350 px, so a phone shows the
-// newest few and "Show all" (2026-10-26, Romain's choice). CSS `order` puts
-// the newest first there; the folded badges stay in the HTML, hidden by
-// `max-sm:hidden`, and layout.tsx's <noscript> style shows them, and hides
-// the button, when scripts are off.
+// On a phone the two grids stacked 15 badges, 1,038 px at 390 px wide, so a
+// phone shows the newest few and "Show all", 440 px less (2026-10-26,
+// Romain's choice). CSS `order` puts the newest first there; the folded
+// badges stay in the HTML, hidden by `max-sm:hidden`, and layout.tsx's
+// <noscript> style shows them, and hides the button, when scripts are off.
 
 // The badges have no backdrop blur: their 3% tint lies over the section's
 // plain background, where blurring changed 45 of 132,804 pixels in Chromium
@@ -205,7 +205,7 @@ export function CertificationTimeline({
                 </div>
 
                 {/* Content: below tablets' md the year follows the issuer;
-                    from md it has a line of its own, in the badge's colour. */}
+                    from md it has a line of its own, in the badge's color. */}
                 <div className="relative z-10 flex-1 min-w-0">
                   <div
                     className={cn(

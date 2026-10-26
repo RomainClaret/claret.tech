@@ -44,9 +44,9 @@ describe("CertificationTimeline", () => {
   });
 
   it("folds a phone's list to the newest, the rest a tap away", () => {
-    // 15 badges stacked 1,350 px on a phone (2026-10-26). The folded ones
-    // stay in the HTML, hidden below sm, for layout.tsx's <noscript> style
-    // to show when scripts are off.
+    // 15 badges stacked 1,038 px on a 390 px phone (2026-10-26). The folded
+    // ones stay in the HTML, hidden below sm, for layout.tsx's <noscript>
+    // style to show when scripts are off.
     const three = [
       { name: "Oldest", issuer: "A", year: "2015" },
       { name: "Newest", issuer: "C", year: "2022" },

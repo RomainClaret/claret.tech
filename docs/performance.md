@@ -1510,6 +1510,21 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
   iPad; the memberships; Playwright 1.64.0 (1.64.1 fixes nothing used here,
   and 1.65 brings the Firefox fix two skips wait for).
 
+### Round 28, part 3: the badges on a phone (2026-10-26)
+
+- **A phone shows the newest few.** On a 390 px wide phone the training and
+  memberships grids stacked their 15 badges one per row, 1,038 px (the two
+  blocks 1,274 px with their headings, 1.5 screens of an 844 px phone). A
+  phone now shows the 3 newest training badges and the 4 newest memberships,
+  newest first (CSS `order`), each grid followed by a Show all button: the
+  blocks take 834 px, 440 px less, as at 360 and 412 px wide. Show all
+  brings every badge back, plus the button's 52 px row. Tablets and desktops
+  show every badge, oldest first, as before: their screenshots are
+  pixel-identical.
+- **Hidden, not removed.** The folded badges stay in the HTML (the DOM size
+  is unchanged), hidden below `sm`. Without scripts, layout.tsx's
+  `<noscript>` style shows them and hides the buttons.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another

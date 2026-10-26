@@ -16,7 +16,7 @@ How the tests run, and what to know before writing one.
 CI runs the unit tests in ten jobs, one npm script each: `test:api`,
 `test:utils`, the four component batches (`test:components:batch1` to
 `batch4`, hand-kept lists of files), `test:contexts`, `test:hooks`,
-`test:lib-dom` and `test:unit`; each test runs in one job (2,719 on
+`test:lib-dom` and `test:unit`; each test runs in one job (2,722 on
 2026-10-26). Two tests keep the lists honest:
 
 - `src/app/ci-test-lists.test.ts` reads the workflow and fails on a test file
