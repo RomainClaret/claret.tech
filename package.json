@@ -15,8 +15,8 @@
     "ios_saf 16.4"
   ],
   "scripts": {
-    "dev": "next dev --webpack",
-    "dev:https": "next dev --webpack --experimental-https",
+    "dev": "next dev --webpack -H 127.0.0.1",
+    "dev:https": "next dev --webpack --experimental-https -H 127.0.0.1",
     "//postinstall": "scripts/apply-patches.mjs applies patches/, each listed in patches/patches.json with the exact package version and every file's SHA-256 before and after. motion-dom's puts its feature registry in a module of its own, which keeps framer-motion's animation engine out of the homepage's eager JS (-9,579 B gzipped; docs/performance.md, round 22). Any other motion-dom version or content fails the install: when framer-motion moves, redo the patch (docs/TESTING_INFRASTRUCTURE.md) or drop it once upstream splits the module. npm install <package> skips this script: run npm run postinstall after one that reinstalls motion-dom.",
     "postinstall": "node scripts/apply-patches.mjs && node scripts/setup-assets.js && node scripts/mirror-legacy-pdfs.js",
     "prebuild": "node scripts/extract-colors-simple.js && node scripts/extract-medium-colors.js && node scripts/mirror-legacy-pdfs.js",

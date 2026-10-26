@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** next.config.mjs as the dev server loads it, under this DEV_ALLOWED_ORIGINS. */
@@ -25,5 +27,21 @@ describe("allowedDevOrigins", () => {
   it("adds no host when it is unset or empty", async () => {
     expect(await allowedDevOrigins(undefined)).toEqual([]);
     expect(await allowedDevOrigins("")).toEqual([]);
+  });
+});
+
+describe("the dev scripts", () => {
+  // next dev listens on every interface by default: on a Mac with a public
+  // address (UCD's) and its firewall off, any network could reach the dev
+  // server (2026-10-26). `localhost` would bind ::1 alone, which a client of
+  // 127.0.0.1 then misses; a client of localhost falls back to 127.0.0.1.
+  it("listen on the loopback address alone", () => {
+    const scripts: Record<string, string> = JSON.parse(
+      readFileSync(join(process.cwd(), "package.json"), "utf8"),
+    ).scripts;
+
+    for (const name of ["dev", "dev:https"]) {
+      expect(scripts[name], name).toMatch(/\s-H 127\.0\.0\.1(\s|$)/);
+    }
   });
 });
