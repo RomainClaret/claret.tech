@@ -26,10 +26,13 @@ interface CertificationTimelineProps {
   className?: string;
 }
 
+// Each badge is drawn once, for every width. There were three copies, a
+// desktop, a tablet and a phone one, two hidden by CSS: 524 elements in the
+// two grids where 200 showed, each copy with its own entrance (2026-10-26).
 // The issuer line wraps rather than ending in an ellipsis: a membership's
 // body ("Association Suisse Alémanique & Friends") is wider than a badge.
-// The desktop badge fills its grid cell, so a row of them stays even, and
-// on tablets and phones a year range wraps whole, never after "2015-".
+// A badge fills its grid cell, so a row of them stays even, and a year
+// range on the issuer line wraps whole, never after "2015-".
 
 // The badges have no backdrop blur: their 3% tint lies over the section's
 // plain background, where blurring changed 45 of 132,804 pixels in Chromium
@@ -107,207 +110,118 @@ export function CertificationTimeline({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6, delay: 0.2 }}
     >
-      {/* Desktop: Badge Grid */}
-      <div className="hidden md:block">
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {sortedCerts.map((cert, index) => {
-            const isHovered = hoveredIndex === index;
-            const color = getCertColor(cert);
-            const Icon = icon ?? getCertIcon(cert.name);
+      {/* One grid for every width: a column on phones, two from tablets, up
+          to four on wide screens. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+        {sortedCerts.map((cert, index) => {
+          const isHovered = hoveredIndex === index;
+          const color = getCertColor(cert);
+          const Icon = icon ?? getCertIcon(cert.name);
 
-            return (
+          return (
+            <m.div
+              key={index}
+              className="relative"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 + index * 0.05 }}
+              // A mouse alone lights a badge: phones fire mouse events on a
+              // tap, which left the tapped badge lit until the next tap.
+              onPointerEnter={(event) => {
+                if (event.pointerType === "mouse") setHoveredIndex(index);
+              }}
+              onPointerLeave={() => setHoveredIndex(null)}
+            >
+              {/* Badge */}
               <m.div
-                key={index}
-                className="relative"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + index * 0.05 }}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
+                className={cn(
+                  "relative h-full px-3 py-2.5 rounded-lg border transition-all duration-300",
+                  "cursor-default overflow-hidden",
+                  "flex items-center gap-3 sm:gap-2",
+                )}
+                style={{
+                  backgroundColor: `rgba(${color}, ${isHovered ? 0.08 : 0.03})`,
+                  borderColor: `rgba(${color}, ${isHovered ? 0.4 : 0.2})`,
+                }}
+                whileHover={{ scale: 1.02 }}
               >
-                {/* Badge */}
+                {/* Background gradient effect */}
                 <m.div
-                  className={cn(
-                    "relative h-full px-3 py-2.5 rounded-lg border transition-all duration-300",
-                    "cursor-default overflow-hidden",
-                    "flex items-center gap-2",
-                  )}
+                  className="absolute inset-0 opacity-0"
                   style={{
-                    backgroundColor: `rgba(${color}, ${isHovered ? 0.08 : 0.03})`,
-                    borderColor: `rgba(${color}, ${isHovered ? 0.4 : 0.2})`,
+                    background: `linear-gradient(135deg, transparent, rgba(${color}, 0.1))`,
                   }}
-                  whileHover={{ scale: 1.02 }}
-                >
-                  {/* Background gradient effect */}
-                  <m.div
-                    className="absolute inset-0 opacity-0"
-                    style={{
-                      background: `linear-gradient(135deg, transparent, rgba(${color}, 0.1))`,
-                    }}
-                    animate={{
-                      opacity: isHovered ? 1 : 0,
-                    }}
-                    transition={{ duration: 0.3 }}
-                  />
-
-                  {/* Icon */}
-                  <div
-                    className="relative z-10 shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{
-                      backgroundColor: `rgba(${color}, 0.1)`,
-                    }}
-                  >
-                    <Icon
-                      size={14}
-                      style={{
-                        color: `rgb(${color})`,
-                      }}
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <div className="relative z-10 flex-1 min-w-0">
-                    <div
-                      className={cn(
-                        "text-xs font-medium truncate transition-colors",
-                        isHovered ? "text-foreground" : "text-foreground/70",
-                      )}
-                    >
-                      {cert.name}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground break-words">
-                      {cert.issuer}
-                    </div>
-                    <div
-                      className="text-[9px] font-medium mt-0.5 accent-text"
-                      style={accentStyle(`rgb(${color})`)}
-                    >
-                      {cert.year}
-                    </div>
-                  </div>
-
-                  {/* Hover glow effect */}
-                  {isHovered && (
-                    <m.div
-                      className="absolute inset-0 pointer-events-none"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div
-                        className="absolute inset-0 blur-xl"
-                        style={{
-                          background: `radial-gradient(circle at center, rgba(${color}, 0.15), transparent)`,
-                        }}
-                      />
-                    </m.div>
-                  )}
-                </m.div>
-              </m.div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Tablet: 2-Column Grid */}
-      <div className="hidden sm:block md:hidden">
-        <div className="grid grid-cols-2 gap-3">
-          {sortedCerts.map((cert, index) => {
-            const color = getCertColor(cert);
-            const Icon = icon ?? getCertIcon(cert.name);
-
-            return (
-              <m.div
-                key={index}
-                className={cn(
-                  "relative px-3 py-2.5 rounded-lg border",
-                  "flex items-center gap-2",
-                )}
-                style={{
-                  backgroundColor: `rgba(${color}, 0.03)`,
-                  borderColor: `rgba(${color}, 0.2)`,
-                }}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + index * 0.05 }}
-              >
-                <div
-                  className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{
-                    backgroundColor: `rgba(${color}, 0.1)`,
+                  animate={{
+                    opacity: isHovered ? 1 : 0,
                   }}
-                >
-                  <Icon
-                    size={12}
-                    style={{
-                      color: `rgb(${color})`,
-                    }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-foreground/80 truncate">
-                    {cert.name}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground break-words">
-                    {cert.issuer}{" "}
-                    <span className="whitespace-nowrap">• {cert.year}</span>
-                  </div>
-                </div>
-              </m.div>
-            );
-          })}
-        </div>
-      </div>
+                  transition={{ duration: 0.3 }}
+                />
 
-      {/* Mobile: Vertical List */}
-      <div className="sm:hidden">
-        <div className="space-y-2">
-          {sortedCerts.map((cert, index) => {
-            const color = getCertColor(cert);
-            const Icon = icon ?? getCertIcon(cert.name);
-
-            return (
-              <m.div
-                key={index}
-                className={cn(
-                  "relative px-3 py-2.5 rounded-lg border",
-                  "flex items-center gap-3",
-                )}
-                style={{
-                  backgroundColor: `rgba(${color}, 0.03)`,
-                  borderColor: `rgba(${color}, 0.2)`,
-                }}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + index * 0.05 }}
-              >
+                {/* Icon: a size smaller on tablets */}
                 <div
-                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                  className="relative z-10 shrink-0 w-8 h-8 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center"
                   style={{
                     backgroundColor: `rgba(${color}, 0.1)`,
                   }}
                 >
                   <Icon
                     size={14}
+                    className="sm:size-3 md:size-3.5"
                     style={{
                       color: `rgb(${color})`,
                     }}
                   />
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground/80">
+
+                {/* Content: below tablets' md the year follows the issuer;
+                    from md it has a line of its own, in the badge's colour. */}
+                <div className="relative z-10 flex-1 min-w-0">
+                  <div
+                    className={cn(
+                      "text-sm sm:text-xs font-medium sm:truncate transition-colors",
+                      isHovered
+                        ? "text-foreground"
+                        : "text-foreground/80 md:text-foreground/70",
+                    )}
+                  >
                     {cert.name}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {cert.issuer}{" "}
-                    <span className="whitespace-nowrap">• {cert.year}</span>
+                  <div className="text-xs sm:text-[10px] sm:leading-normal text-muted-foreground break-words">
+                    {cert.issuer}
+                    <span className="md:hidden">
+                      {" "}
+                      <span className="whitespace-nowrap">• {cert.year}</span>
+                    </span>
+                  </div>
+                  <div
+                    className="hidden md:block text-[9px] font-medium mt-0.5 accent-text"
+                    style={accentStyle(`rgb(${color})`)}
+                  >
+                    {cert.year}
                   </div>
                 </div>
+
+                {/* Hover glow effect */}
+                {isHovered && (
+                  <m.div
+                    className="absolute inset-0 pointer-events-none"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div
+                      className="absolute inset-0 blur-xl"
+                      style={{
+                        background: `radial-gradient(circle at center, rgba(${color}, 0.15), transparent)`,
+                      }}
+                    />
+                  </m.div>
+                )}
               </m.div>
-            );
-          })}
-        </div>
+            </m.div>
+          );
+        })}
       </div>
     </m.div>
   );

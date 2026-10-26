@@ -46,13 +46,13 @@ describe("Education", () => {
         name: educationInfo.membershipSection.title,
       }),
     ).toBeInTheDocument();
-    // The timeline draws every badge three times, for computers, tablets and
-    // phones, and CSS shows one of them.
+    // Once each: the timeline drew three copies of every badge, for
+    // computers, tablets and phones, two of them hidden by CSS.
     for (const membership of educationInfo.memberships) {
-      expect(screen.getAllByText(membership.name)).toHaveLength(3);
+      expect(screen.getAllByText(membership.name)).toHaveLength(1);
     }
     expect(container.querySelectorAll("svg.lucide-users")).toHaveLength(
-      educationInfo.memberships.length * 3,
+      educationInfo.memberships.length,
     );
   });
 });
