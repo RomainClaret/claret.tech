@@ -27,6 +27,64 @@ const CACHED = "public, max-age=2678400, s-maxage=2678400, immutable";
 const refuse = (status: number) =>
   new NextResponse(null, { status, headers: { "Cache-Control": "no-store" } });
 
+/**
+ * Resized pictures by id and width, kept while the instance lives. The CDN
+ * keys on the URL a client sends, and Next hands this route a normalized
+ * query, so spellings it cannot see (empty pairs, escapes, nxtP parameters)
+ * each arrived as ?w=480 with a fetch and a resize of their own: here the
+ * work is once per (id, width). Two widths of the feed's few pictures; a
+ * failure is not kept.
+ */
+const resizedPictures = new Map<string, Promise<Buffer | number>>();
+const MAX_KEPT = 64;
+
+function resizedOnce(
+  id: string,
+  width: string,
+  source: string,
+): Promise<Buffer | number> {
+  const key = `${id}:${width}`;
+  const kept = resizedPictures.get(key);
+  if (kept) return kept;
+  if (resizedPictures.size >= MAX_KEPT) resizedPictures.clear();
+  const work = resize(source, Number(width));
+  resizedPictures.set(key, work);
+  void work.then((result) => {
+    if (typeof result === "number") resizedPictures.delete(key);
+  });
+  return work;
+}
+
+/** The picture as WebP at this width, or the status to refuse with. */
+async function resize(source: string, width: number): Promise<Buffer | number> {
+  let upstream: Response;
+  try {
+    upstream = await fetchMediumImage(source, 8_000);
+  } catch (error) {
+    // By name: a DOMException is not an Error in every realm.
+    const timedOut =
+      (error as { name?: unknown } | null)?.name === "TimeoutError";
+    return timedOut ? 504 : 502;
+  }
+  const type = upstream.headers.get("content-type") ?? "";
+  if (!upstream.ok || !type.startsWith("image/") || type.includes("svg")) {
+    return 502;
+  }
+
+  const original = await readCapped(upstream);
+  if (!original) return 502;
+
+  try {
+    return await sharp(original, { limitInputPixels: MAX_IMAGE_PIXELS })
+      .rotate()
+      .resize({ width, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .toBuffer();
+  } catch {
+    return 502;
+  }
+}
+
 async function handler(request: NextRequest): Promise<NextResponse> {
   // withRateLimit hands over the request only, so the id comes off the path.
   const id = request.nextUrl.pathname.split("/").pop() ?? "";
@@ -41,33 +99,9 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const source = (await blogImageSources()).get(id);
   if (!source) return refuse(404);
 
-  let upstream: Response;
-  try {
-    upstream = await fetchMediumImage(source, 8_000);
-  } catch (error) {
-    // By name: a DOMException is not an Error in every realm.
-    const timedOut =
-      (error as { name?: unknown } | null)?.name === "TimeoutError";
-    return refuse(timedOut ? 504 : 502);
-  }
-  const type = upstream.headers.get("content-type") ?? "";
-  if (!upstream.ok || !type.startsWith("image/") || type.includes("svg")) {
-    return refuse(502);
-  }
-
-  const original = await readCapped(upstream);
-  if (!original) return refuse(502);
-
-  let resized: Buffer;
-  try {
-    resized = await sharp(original, { limitInputPixels: MAX_IMAGE_PIXELS })
-      .rotate()
-      .resize({ width: Number(width), fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 75 })
-      .toBuffer();
-  } catch {
-    return refuse(502);
-  }
+  const result = await resizedOnce(id, width, source);
+  if (typeof result === "number") return refuse(result);
+  const resized = result;
 
   return new NextResponse(new Uint8Array(resized), {
     headers: {

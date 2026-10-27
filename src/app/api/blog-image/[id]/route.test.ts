@@ -94,6 +94,31 @@ describe("GET /api/blog-image/[id]", () => {
     );
   });
 
+  it("fetches and resizes a picture once per width, however often it is asked", async () => {
+    // The CDN keys on the URL a client sends, and Next hands the route a
+    // normalized query, so spellings the route cannot see (empty pairs,
+    // escapes, nxtP parameters) each reached it as ?w=480: the work is
+    // bounded per (id, width) here (security audit run 1, lead 15).
+    for (const ip of ["10.2.1.1", "10.2.1.2", "10.2.1.3"]) {
+      const response = await GET(get(`/api/blog-image/${ID}?w=480`, ip));
+      expect(response.status).toBe(200);
+    }
+    expect(upstream).toHaveBeenCalledTimes(1);
+
+    expect((await GET(get(`/api/blog-image/${ID}?w=960`))).status).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
+
+  it("tries again after a failure, which it does not keep", async () => {
+    upstream.mockResolvedValueOnce(new Response(null, { status: 500 }));
+    expect((await GET(get(`/api/blog-image/${ID}?w=480`))).status).toBe(502);
+
+    expect(
+      (await GET(get(`/api/blog-image/${ID}?w=480`, "10.2.1.4"))).status,
+    ).toBe(200);
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
+
   it("refuses an id that is not one, without reading the feed", async () => {
     const response = await GET(get("/api/blog-image/not-an-id?w=480"));
 
