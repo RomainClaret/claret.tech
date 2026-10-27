@@ -175,15 +175,8 @@ the API routes read `GH_USERNAME` from it at run time.
    docker build --platform linux/amd64 -t claret-act:24 .github/act
    ```
 
-3. Copy the example secrets file:
-
-   ```bash
-   cp .env.act.local.example .env.act.local
-   ```
-
-4. Fill in your values in `.env.act.local`
-
-5. Run the unit jobs as CI does (`.actrc` sets the image and the secrets):
+3. Run the unit jobs as CI does (`.actrc` sets the image; they need no
+   secret):
 
    ```bash
    act workflow_dispatch -W .github/workflows/ci-act.yml
@@ -192,8 +185,16 @@ the API routes read `GH_USERNAME` from it at run time.
    act workflow_dispatch -W .github/workflows/ci-act.yml --action-offline-mode
    ```
 
-act never deploys or opens a pull request: those steps skip when `ACT` is
-set, which act does, since `.env.act.local` holds real tokens.
+`.actrc` keeps act runs away from real credentials: no secret file, an
+empty `GITHUB_TOKEN` (without the key, act takes your `gh auth token`, a
+repo-scoped login, and hands it to every job), and no host Docker socket in
+the job containers (act binds it by default, and a job could then mount
+any folder Docker Desktop shares). actionlint, the one step that needs
+Docker, runs on the host under act: `npm run lint:workflows`. A run that
+does need the tokens in `.env.act.local` (copied from
+`.env.act.local.example`) passes `--secret-file .env.act.local`; even
+then, act never deploys or opens a pull request: those steps skip when
+`ACT` is set, which act does.
 
 #### Rehearse a push
 
@@ -211,12 +212,12 @@ cat > ../push.json <<EOF
   "deleted": false, "repository": { "default_branch": "main" } }
 EOF
 # One job alone first, while act's Node cache is new (see below)
-act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
-  --network bridge --secret-file /dev/null -j quick-checks --matrix check:format
-act push -W .github/workflows/ci.yml -e ../push.json --reuse=false \
-  --network bridge --secret-file /dev/null --concurrent-jobs 3
-act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
-  --network bridge --secret-file /dev/null --concurrent-jobs 1
+act push -W .github/workflows/ci.yml -e ../push.json \
+  --network bridge -j quick-checks --matrix check:format
+act push -W .github/workflows/ci.yml -e ../push.json \
+  --network bridge --concurrent-jobs 3
+act push -W .github/workflows/playwright.yml -e ../push.json \
+  --network bridge --concurrent-jobs 1
 ```
 
 - `before` is the full 40-character commit (paths-filter takes nothing
@@ -224,8 +225,8 @@ act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
 - `--network bridge`: on the host network every browser-test job starts its
   server on the same port 3000. `--concurrent-jobs` counts jobs, not a
   job's matrix entries, which run 4 at a time.
-- `--secret-file /dev/null`: no real token in a rehearsal. `--reuse=false`:
-  otherwise every job's copy (about 3 GB) stays.
+- `.actrc` gives a rehearsal no real token and no host Docker socket
+  (above), and keeps no container, so no job's copy (about 3 GB) stays.
 - On Apple Silicon, native containers are about twice as fast: build the
   image with `--platform linux/arm64 -t claret-act:24-arm64`, add
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
@@ -288,4 +289,5 @@ act push -W .github/workflows/playwright.yml -e ../push.json --reuse=false \
 1. Make sure Docker is running
 2. Use `--verbose` flag for detailed output
 3. Check `.actrc` configuration
-4. Ensure `.env.act.local` has all required values
+4. A run that needs tokens: `--secret-file .env.act.local`, with the values
+   from `.env.act.local.example` filled in

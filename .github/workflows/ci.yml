@@ -178,7 +178,12 @@ jobs:
       # actionlint runs from its Docker image and needs no dependencies.
       - if: matrix.check != 'actionlint'
         run: npm ci
+      # actionlint runs from its image through the host's Docker, which act
+      # gives jobs no access to (.actrc): under act it runs on the host.
+      - if: matrix.check == 'actionlint' && env.ACT
+        run: echo "Under act, run actionlint on the host - npm run lint:workflows"
       - name: Run ${{ matrix.check }}
+        if: matrix.check != 'actionlint' || !env.ACT
         run: |
           case "${{ matrix.check }}" in
             lint)

@@ -263,8 +263,33 @@ describe("the GitHub workflows", () => {
     }
   });
 
+  it("give act no host Docker socket and no host GitHub token", () => {
+    // act binds the host's Docker socket into every job container unless
+    // told "-", and code there could then mount any folder Docker Desktop
+    // shares, the home directory included. Without a GITHUB_TOKEN key, act
+    // fills secrets.GITHUB_TOKEN from `gh auth token`, a repo-scoped login
+    // (security audit run 1, leads 4 and 5).
+    const flags = read(".actrc")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("--"));
+    expect(flags).toContain("--container-daemon-socket -");
+    expect(flags).toContain("--secret GITHUB_TOKEN=");
+    // No default reach for the real tokens: a run that needs them says so.
+    expect(flags.filter((flag) => flag.startsWith("--secret-file"))).toEqual(
+      [],
+    );
+    expect(flags).not.toContain("--reuse");
+
+    // The one job step that needs Docker skips under act.
+    const ci = read(".github/workflows/ci.yml");
+    expect(ci).toMatch(
+      /- if: matrix\.check == 'actionlint' && env\.ACT\n\s+run: echo/,
+    );
+  });
+
   it("write nothing to Vercel or GitHub under act", () => {
-    // .actrc hands act .env.act.local, which holds the real Vercel token:
+    // .env.act.local holds the real Vercel token, and a run handed it:
     // given --input environment=production, an act run reached the
     // production deploy (act -n, 2026-10-21), and given a GitHub token it
     // would open a pull request. act sets ACT; GitHub leaves it unset.

@@ -15,11 +15,19 @@
 # Enable verbose output for debugging
 # --verbose
 
-# Reuse containers between runs for faster execution
---reuse
+# No host Docker socket in the job containers: act binds it by default,
+# and code in a job could then mount any folder Docker Desktop shares, the
+# home directory included. The one job step that needs Docker, actionlint,
+# runs on the host under act (npm run lint:workflows).
+--container-daemon-socket -
 
-# Default secrets file location (create .env.act.local for testing)
---secret-file .env.act.local
+# An empty GITHUB_TOKEN: without the key, act fills it from `gh auth token`,
+# your repo-scoped login, and hands it to every job. A run that needs a token
+# passes -s GITHUB_TOKEN=... itself.
+--secret GITHUB_TOKEN=
+
+# No secret file by default: .env.act.local holds real tokens, and no
+# rehearsal needs them. A run that does passes --secret-file .env.act.local.
 
 # Custom event file location (optional)
 # --eventpath .github/workflows/events/
