@@ -121,7 +121,9 @@ start)
   if [ -z "${IMAGE:-}" ] && [ "$platform" != linux/amd64 ]; then
     arch=${platform#*/}
     arch=${arch%%/*}
-    tag="claret-e2e/${image##*/}-$arch"
+    # The name without its digest: a tag holds no "@".
+    base=${image%@*}
+    tag="claret-e2e/${base##*/}-$arch"
     if [ "$(docker image inspect -f '{{.Architecture}}' "$tag" 2>/dev/null)" != "$arch" ]; then
       echo "$name: making $tag, once per Playwright version"
       docker pull --quiet --platform "$platform" "$image" >/dev/null

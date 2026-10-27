@@ -227,11 +227,16 @@ act push -W .github/workflows/playwright.yml -e ../push.json \
   job's matrix entries, which run 4 at a time.
 - `.actrc` gives a rehearsal no real token and no host Docker socket
   (above), and keeps no container, so no job's copy (about 3 GB) stays.
+- The browser jobs' image is named by digest (playwright.yml's `image:`,
+  pinned by `src/app/ci-workflows.test.ts`), and `.actrc` pulls nothing:
+  pull it once by that name for the run's platform, `docker pull --platform
+linux/amd64 <image@sha256:...>` (a tag pulled earlier does not match a
+  digest).
 - On Apple Silicon, native containers are about twice as fast: build the
   image with `--platform linux/arm64 -t claret-act:24-arm64`, add
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
-  and give the browser jobs' image (`mcr.microsoft.com/playwright:v1.64.0-jammy`)
-  its arm64 variant for the run, the amd64 one back after.
+  and pull the browser jobs' image with `--platform linux/arm64`, the amd64
+  one back after.
 - act keeps the Node that setup-node unpacks in one volume,
   `act-toolcache`, which every job shares. On a new one, three jobs each
   unpacked Node into it at once, and one or two found npm half unpacked:

@@ -74,7 +74,7 @@ jobs:
       dependencies: ${{ steps.filter.outputs.dependencies }}
       workflows: ${{ steps.filter.outputs.workflows }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # The commit history, for the diff base below, but not the old
           # contents of files: the diff compares trees.
@@ -215,7 +215,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
     strategy:
       fail-fast: false
@@ -223,11 +223,11 @@ jobs:
         browser: [chromium, firefox, webkit]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -305,7 +305,7 @@ jobs:
             echo "::endgroup::"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -327,7 +327,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
     strategy:
       fail-fast: false
@@ -335,11 +335,11 @@ jobs:
         browser: [chromium, webkit]  # Skip firefox for accessibility due to timeouts
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -424,7 +424,7 @@ jobs:
             echo "::endgroup::"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -447,15 +447,15 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -541,7 +541,7 @@ jobs:
             echo "::endgroup::"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -565,7 +565,7 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
     strategy:
       fail-fast: false
@@ -574,11 +574,11 @@ jobs:
         shard: [1-of-3, 2-of-3, 3-of-3]  # Split terminal tests across 3 shards
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -668,7 +668,7 @@ jobs:
             echo "::endgroup::"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -694,15 +694,15 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -785,7 +785,7 @@ jobs:
             echo "::endgroup::"
           fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:
@@ -798,7 +798,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-jammy
+      image: mcr.microsoft.com/playwright:v1.64.0-jammy@sha256:c064e7f355d2dda32f669801a1b09e86a1e9252395c844d2cfbbe5c44acb9b79
       options: --user root
     needs: detect-changes  # Simplified dependencies to avoid cycles
     # On main always: the deploy takes a green run there as everything
@@ -815,11 +815,11 @@ jobs:
         needs.detect-changes.outputs.workflows == 'true'))
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: 'npm'
@@ -877,7 +877,7 @@ jobs:
       # Safari-Specific Performance Tests removed - no matching tests exist
       # Regular performance tests already run on webkit project
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         continue-on-error: true  # Don't fail job if artifact upload fails
         with:

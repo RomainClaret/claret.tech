@@ -596,6 +596,38 @@ describe("the GitHub workflows", () => {
     );
   });
 
+  it("name every action by commit and every image by digest", () => {
+    // A tag moves: whoever can move actions/checkout@v6, or the Playwright
+    // image's tag, chose code that ran beside the deploy token or as root
+    // in the browser jobs (security audit run 1, hardening). A new version
+    // is a reviewed change; the comment keeps the tag it came from.
+    const unpinned = workflows.flatMap(({ name, text }) =>
+      [...text.matchAll(/^\s*(?:- )?uses: ([^\s#]+)/gm)]
+        .map((match) => match[1])
+        .filter((ref) => !ref.startsWith("./"))
+        .filter((ref) => !/@[0-9a-f]{40}$/.test(ref))
+        .map((ref) => `${name}: ${ref}`),
+    );
+    expect(unpinned).toEqual([]);
+
+    const images = workflows.flatMap(({ text }) =>
+      [...text.matchAll(/^\s+image: (\S+)/gm)].map((match) => match[1]),
+    );
+    expect(images.length).toBeGreaterThan(0);
+    for (const image of images) expect(image).toMatch(/@sha256:[0-9a-f]{64}$/);
+    for (const line of read(".github/act/Dockerfile").match(/^FROM .*/gm)!) {
+      expect(line).toMatch(/@sha256:[0-9a-f]{64}\b/);
+    }
+
+    // The browser jobs' image is the Playwright the tests use.
+    const playwright = JSON.parse(read("package.json")).devDependencies[
+      "@playwright/test"
+    ].replace(/^\D*/, "");
+    for (const image of images.filter((i) => i.includes("/playwright:"))) {
+      expect(image).toContain(`/playwright:v${playwright}-`);
+    }
+  });
+
   it("deploy with the token in the environment, never on a command line", () => {
     // A `--token=${{ secrets.VERCEL_TOKEN }}` in run: text is an argument,
     // which any process on the runner can read from /proc/<pid>/cmdline

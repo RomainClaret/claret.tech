@@ -49,7 +49,7 @@ jobs:
       docs-only: ${{ steps.filter.outputs.docs-only }}
       has-code-changes: ${{ steps.filter.outputs.has-code-changes }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0  # Fetch full history for path filtering
           
@@ -170,8 +170,8 @@ jobs:
         check: [lint, format, type-check, knip, actionlint]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -215,8 +215,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -236,8 +236,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -255,8 +255,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -276,8 +276,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -297,8 +297,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -318,8 +318,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -340,8 +340,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -359,8 +359,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -378,8 +378,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -397,8 +397,8 @@ jobs:
        needs.detect-changes.outputs.test-setup == 'true' ||
        github.event_name == 'pull_request')
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -422,8 +422,8 @@ jobs:
       GITHUB_TOKEN: mock_token
       USE_GITHUB_DATA: false
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
