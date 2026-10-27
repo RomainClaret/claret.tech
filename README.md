@@ -79,7 +79,7 @@ npm run test:ci
 npm run test:e2e
 
 # or against a production build, as CI does
-SERVE_HTTP=true npm run build && SERVE_HTTP=true npx next start -p 3001
+SERVE_HTTP=true npm run build && SERVE_HTTP=true npx next start -p 3001 -H 127.0.0.1
 PLAYWRIGHT_BASE_URL=http://localhost:3001 npm run test:e2e
 ```
 

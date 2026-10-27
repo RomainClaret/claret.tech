@@ -9,7 +9,7 @@ Measure a production build. `next dev` is much slower and not representative.
 
 ```
 SERVE_HTTP=true npx next build --webpack
-SERVE_HTTP=true npx next start -p 3000
+SERVE_HTTP=true npx next start -p 3000 -H 127.0.0.1
 node scripts/perf/measure.mjs --label <name> --runs 3
 ```
 

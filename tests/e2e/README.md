@@ -17,7 +17,7 @@ also what to measure against locally:
 
 ```bash
 SERVE_HTTP=true npm run build
-SERVE_HTTP=true npx next start -p 3001
+SERVE_HTTP=true npx next start -p 3001 -H 127.0.0.1
 PLAYWRIGHT_BASE_URL=http://localhost:3001 npx playwright test
 ```
 

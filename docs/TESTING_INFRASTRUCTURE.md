@@ -545,9 +545,9 @@ npx next start -p 3001 -H <the Mac's Tailscale address>
 public one). Plain http stays private inside the tailnet, and `SERVE_HTTP`
 drops the headers that would send the browser to https.
 
-`npm run dev` and `dev:https` listen on 127.0.0.1 alone: Next's default,
-every interface, put the dev server on UCD's public address with the Mac's
-firewall off (`localhost` would bind `::1` alone, which `127.0.0.1` then
+`npm run dev`, `dev:https` and `npm start` listen on 127.0.0.1 alone: Next's
+default, every interface, put the dev server on UCD's public address with the
+Mac's firewall off, and `npm start` serves the build with `.env.local` loaded (`localhost` would bind `::1` alone, which `127.0.0.1` then
 misses). A dev server for a phone listens on the Tailscale address instead,
 and its host must be allowed: Next 16 refuses its dev resources to any host
 but localhost, and the page then never hydrates (its live-update connection,

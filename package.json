@@ -22,7 +22,7 @@
     "prebuild": "node scripts/extract-colors-simple.js && node scripts/extract-medium-colors.js && node scripts/mirror-legacy-pdfs.js",
     "build": "next build --webpack",
     "build:analyze": "ANALYZE=true next build --webpack",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1",
     "lint": "eslint src tests scripts .github/scripts public \"*.config.{js,mjs,mts,ts}\" --max-warnings 0",
     "knip": "knip",
     "lint:workflows": "docker run --rm -v \"$PWD\":/repo --workdir /repo rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color",
