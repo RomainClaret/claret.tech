@@ -34,7 +34,7 @@ The site runs on Vercel's free Hobby plan. Like any web host, Vercel records eac
 
 ## Error Reports
 
-If a page fails with an error, your browser sends this site the error's type and message, where it happened in the site's code, the page's path (without any query) and the version of the site it ran, with no cookie and no page address. The site publishes the type, the first 300 characters of the message, the code location and the kind of page (such as the homepage or a PDF page) as an issue in its public GitHub repository, so I can fix the error. Nothing about you is published with a report.
+If a page fails with an error, your browser sends this site the error's type and message (with any quoted value in it blanked), where it happened in the site's code, the page's path (without any query) and the version of the site it ran, with no cookie and no page address. The site publishes the type, the first 300 characters of the message, the code location and the kind of page (such as the homepage or a PDF page) as an issue in its public GitHub repository, so I can fix the error. Nothing about you is published with a report.
 
 ## Performance Reports
 

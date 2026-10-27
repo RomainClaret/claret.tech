@@ -77,6 +77,36 @@ describe("reportPayload", () => {
   });
 });
 
+// The message goes into a public GitHub issue, and the privacy policy says
+// nothing about the visitor is published with a report. Engines quote the
+// values they choke on, so every quoted literal is blanked in the browser,
+// before anything is sent (security audit run 1, hardening).
+describe("the values a message quotes", () => {
+  it.each([
+    [
+      "Cannot create property 'x' on string 'a visitor value'",
+      "Cannot create property '…' on string '…'",
+    ],
+    [
+      `Unexpected token 'h', "hello world" is not valid JSON`,
+      `Unexpected token '…', "…" is not valid JSON`,
+    ],
+    ["Failed to load `secret.txt`", "Failed to load `…`"],
+    ["x is not a function", "x is not a function"],
+  ])("never leave the browser: %s", (message, sent) => {
+    expect(report.reportPayload(new TypeError(message), "/").message).toBe(
+      sent,
+    );
+  });
+
+  it("are blanked before the cut, so a cut cannot reopen one", () => {
+    // The cut at 300 falls inside the literal, after "visitor".
+    const message = "m".repeat(285) + " 'a visitor value'";
+    const sent = report.reportPayload(new Error(message), "/").message;
+    expect(sent).not.toContain("visitor");
+  });
+});
+
 describe("what was thrown, when it is not an Error", () => {
   it("is reported by what it is", () => {
     // Next passes the boundaries whatever was thrown.
@@ -86,7 +116,7 @@ describe("what was thrown, when it is not an Error", () => {
       frame: null,
     });
     expect(report.reportPayload("a string", "/").message).toBe(
-      "Thrown, not an Error: a string",
+      "Thrown, not an Error: string",
     );
     expect(report.reportPayload(42, "/").message).toBe(
       "Thrown, not an Error: number",

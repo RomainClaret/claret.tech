@@ -51,9 +51,22 @@ function errorFields(thrown: unknown): {
     thrown === null
       ? "null"
       : typeof thrown === "string"
-        ? thrown
+        ? "string"
         : typeof thrown;
   return { name: "Error", message: `Thrown, not an Error: ${what}` };
+}
+
+/**
+ * The message with every quoted literal blanked. It is published in a
+ * public GitHub issue, and engines quote the values they choke on ("on
+ * string 'a visitor value'", "\"hello\" is not valid JSON"): only the
+ * shape leaves the browser, as the privacy policy says (security audit
+ * run 1, hardening).
+ */
+function withoutQuotedValues(message: string): string {
+  return message.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, (quoted) =>
+    quoted.length > 2 ? `${quoted[0]}…${quoted[0]}` : quoted,
+  );
 }
 
 export function reportPayload(error: unknown, path: string): ReportPayload {
@@ -61,7 +74,7 @@ export function reportPayload(error: unknown, path: string): ReportPayload {
   const frame = stack?.match(CHUNK_FRAME);
   return {
     name: String(name),
-    message: String(message).slice(0, 300),
+    message: withoutQuotedValues(String(message)).slice(0, 300),
     frame: frame ? `${frame[1]}:${frame[2]}:${frame[3]}` : null,
     path,
     build: process.env.BUILD_COMMIT ?? "unknown",
