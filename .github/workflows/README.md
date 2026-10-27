@@ -98,6 +98,21 @@ count.
 **Note**: Vercel's automatic GitHub deployments are disabled in vercel.json,
 so this workflow is the only way to production.
 
+**Rolling back.** Prefer a revert pushed and deployed through this workflow
+over Vercel's Instant Rollback. A rollback serves an older build as it was,
+fixes and all undone: a build before the security audit's fixes
+(2026-10-27) brings back what they closed, such as the image optimizer
+fetching from seven hosts (before b66d8868). It also keeps the old build's
+BUILD_COMMIT and `VERCEL_ENV=production`, so its client error reports name
+that commit and can reopen fixed issues as regressions. If you roll back
+anyway, deploy a fix forward soon after.
+
+To map a reported frame from an older deployment, which Vercel's
+protection keeps private, set `VERCEL_AUTOMATION_BYPASS_SECRET` (the
+project's Protection Bypass for Automation) before
+`node scripts/map-frame.mjs`, or pass a `.next` folder built from that
+commit.
+
 ### 5. Update Publications (`update-publications.yml`)
 
 Manual dispatch only. Runs `scripts/fetch-publications.js` and opens a pull

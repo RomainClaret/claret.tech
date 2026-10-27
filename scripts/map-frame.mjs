@@ -11,6 +11,10 @@
  * which serves the current deployment. For a report from an older build
  * (its issue names the build), pass that deployment's URL, or a .next
  * folder built from the reported commit.
+ *
+ * Older deployments are behind Vercel's protection, which answers with a
+ * redirect to a login page. Set VERCEL_AUTOMATION_BYPASS_SECRET (the
+ * project's Protection Bypass for Automation) to pass it, or use .next.
  */
 
 import { readFile } from "node:fs/promises";
@@ -32,7 +36,17 @@ const mapPath = `${chunk}.map`;
 
 let raw;
 if (/^https?:\/\//.test(from)) {
-  const response = await fetch(new URL(mapPath, from));
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const response = await fetch(new URL(mapPath, from), {
+    redirect: "manual",
+    headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
+  });
+  if (response.status >= 300 && response.status < 400) {
+    process.stderr.write(
+      `${from} is protected (${response.status}): set VERCEL_AUTOMATION_BYPASS_SECRET, or pass a .next folder built from that commit\n`,
+    );
+    process.exit(1);
+  }
   if (!response.ok) {
     process.stderr.write(
       `${response.status} for ${mapPath} at ${from}: that build is not deployed there\n`,

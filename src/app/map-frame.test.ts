@@ -1,5 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import { createServer, type IncomingHttpHeaders } from "node:http";
+import type { AddressInfo } from "node:net";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,5 +66,65 @@ describe("map-frame.mjs", () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toMatch(/^usage:/);
+  });
+
+  // An older deployment sits behind Vercel's protection, which redirects to
+  // a login page: followed, the page came back as a map and JSON.parse
+  // failed with no word of why (security audit run 1, hardening).
+  describe("from a protected deployment", () => {
+    const seen: IncomingHttpHeaders[] = [];
+    const server = createServer((request, response) => {
+      seen.push(request.headers);
+      if (request.headers["x-vercel-protection-bypass"] === "dummy-secret") {
+        response.end(map.toString());
+      } else {
+        response.writeHead(302, { location: "https://vercel.com/sso" });
+        response.end();
+      }
+    });
+    const origin = new Promise<string>((resolve) =>
+      server.listen(0, "127.0.0.1", () =>
+        resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}`),
+      ),
+    );
+    afterAll(() => server.close());
+
+    const mapFrameAsync = async (env: Record<string, string>) => {
+      const from = await origin;
+      return new Promise<{ code: number; stdout: string; stderr: string }>(
+        (resolve) => {
+          execFile(
+            process.execPath,
+            [
+              script,
+              "/_next/static/chunks/app/page-0a1b2c3d4e5f6a7b.js:1:11",
+              from,
+            ],
+            {
+              env: { NODE_ENV: "test", PATH: process.env.PATH ?? "", ...env },
+              encoding: "utf8",
+            },
+            (error, stdout, stderr) =>
+              resolve({ code: error ? Number(error.code) : 0, stdout, stderr }),
+          );
+        },
+      );
+    };
+
+    it("says what to do, without following the redirect", async () => {
+      const result = await mapFrameAsync({});
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toMatch(/VERCEL_AUTOMATION_BYPASS_SECRET/);
+    });
+
+    it("passes the protection with the bypass secret", async () => {
+      const result = await mapFrameAsync({
+        VERCEL_AUTOMATION_BYPASS_SECRET: "dummy-secret",
+      });
+
+      expect(result.stdout).toMatch(/Blog\.tsx:291:7/);
+      expect(seen.at(-1)?.["x-vercel-protection-bypass"]).toBe("dummy-secret");
+    });
   });
 });
