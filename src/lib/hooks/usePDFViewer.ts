@@ -33,9 +33,14 @@ export function usePDFViewer() {
   const openPDF = useCallback(
     (url: string, title?: string, downloadFileName?: string) => {
       // Extract the actual PDF URL from Google Viewer URL if present
-      const cleanUrl = url.includes("docs.google.com/gview")
-        ? new URL(url).searchParams.get("url") || url
-        : url;
+      let cleanUrl = url;
+      if (url.includes("docs.google.com/gview")) {
+        try {
+          cleanUrl = new URL(url).searchParams.get("url") || url;
+        } catch {
+          // A relative URL that merely names the viewer: as it is.
+        }
+      }
 
       if (!isSafePdfUrl(cleanUrl)) {
         return;

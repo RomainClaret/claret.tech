@@ -95,6 +95,16 @@ describe("usePDFViewer", () => {
       expect(result.current.pdfUrl).toBe(malformedUrl);
     });
 
+    it("opens a relative URL that names the viewer as it is, without throwing", () => {
+      const { result } = renderHook(() => usePDFViewer());
+
+      act(() => {
+        result.current.openPDF("/pdfs/x.pdf?docs.google.com/gview");
+      });
+
+      expect(result.current.pdfUrl).toBe("/pdfs/x.pdf?docs.google.com/gview");
+    });
+
     it("handles regular URLs without modification", () => {
       const { result } = renderHook(() => usePDFViewer());
 
@@ -141,6 +151,10 @@ describe("usePDFViewer", () => {
       ["javascript:alert(1)", false],
       ["data:application/pdf;base64,AAAA", false],
       ["//evil.example/paper.pdf", false],
+      // The URL parser reads these as //evil.example (security audit run 1).
+      ["/\\evil.example/paper.pdf", false],
+      ["/\t/evil.example/paper.pdf", false],
+      ["/\n/evil.example/paper.pdf", false],
       ["", false],
     ])("isSafePdfUrl(%j) -> %s", (url, expected) => {
       expect(isSafePdfUrl(url as string)).toBe(expected);
