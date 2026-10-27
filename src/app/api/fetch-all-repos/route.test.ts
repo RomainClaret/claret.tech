@@ -516,5 +516,48 @@ describe("Fetch All Repositories API Route", () => {
       expect(requestBody.variables.username).toBe("testuser");
       expect(requestBody.variables.first).toBe(100);
     });
+
+    it("lists public repositories only, whatever the token can read", async () => {
+      // The token's scope decides what GitHub answers, and the answer is
+      // public and cached: the query and the handler both keep to public
+      // repositories (security audit run 1, lead 7).
+      const page = (nodes: object[]) => ({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                repositories: {
+                  totalCount: nodes.length,
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                  edges: nodes.map((node) => ({ node })),
+                },
+              },
+            },
+          }),
+      });
+      mockFetch.mockResolvedValueOnce(
+        page([
+          mockRepository,
+          { ...mockRepository, id: "p1", name: "private-1", isPrivate: true },
+          {
+            ...mockRepository,
+            id: "p2",
+            name: "unmarked",
+            isPrivate: undefined,
+          },
+        ]),
+      );
+      const request = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+      } as unknown as NextRequest;
+
+      const response = await GET(request);
+
+      const { query } = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(query).toMatch(/repositories\([^)]*privacy: PUBLIC/);
+      const data = (await response.json()).data as { name: string }[];
+      expect(data.map((repo) => repo.name)).toEqual(["test-repo"]);
+    });
   });
 });

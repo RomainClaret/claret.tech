@@ -44,14 +44,11 @@ describe("GET /profile.json", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, data: user });
     // The build's env, and no file written: the answer is the snapshot.
-    expect(mocks.fetchGitHubData).toHaveBeenCalledWith(
-      {
-        githubToken: "token",
-        githubUsername: "RomainClaret",
-        useGithubData: "true",
-      },
-      true,
-    );
+    expect(mocks.fetchGitHubData).toHaveBeenCalledWith({
+      githubToken: "token",
+      githubUsername: "RomainClaret",
+      useGithubData: "true",
+    });
   });
 
   // As /api/fetch-github with GitHub data off: no data, and no error status,

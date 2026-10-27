@@ -18,14 +18,11 @@ export const dynamic = "force-static";
 
 export async function GET() {
   try {
-    const data = await fetchGitHubData(
-      {
-        githubToken: process.env.GITHUB_TOKEN,
-        githubUsername: process.env.GH_USERNAME,
-        useGithubData: process.env.USE_GITHUB_DATA,
-      },
-      true, // no file write: this answer is the snapshot
-    );
+    const data = await fetchGitHubData({
+      githubToken: process.env.GITHUB_TOKEN,
+      githubUsername: process.env.GH_USERNAME,
+      useGithubData: process.env.USE_GITHUB_DATA,
+    });
     // fetchGitHubData answers null only with USE_GITHUB_DATA off.
     return NextResponse.json({ success: true, data });
   } catch (error) {

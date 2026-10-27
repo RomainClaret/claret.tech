@@ -67,6 +67,7 @@ async function fetchAllRepositories(
           after: $after
           orderBy: { field: UPDATED_AT, direction: DESC }
           ownerAffiliations: OWNER
+          privacy: PUBLIC
           isFork: false
           isArchived: false
         ) {
@@ -147,9 +148,12 @@ async function fetchAllRepositories(
     throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
   }
 
-  const repositories = data.data.user.repositories.edges.map(
-    (edge: { node: Repository }) => edge.node,
-  );
+  // Public repositories only, whatever the token can read: the answer is
+  // public and cached. The query asks for them; a repository not marked
+  // public is dropped anyway (security audit run 1, lead 7).
+  const repositories = data.data.user.repositories.edges
+    .map((edge: { node: Repository }) => edge.node)
+    .filter((repository: Repository) => repository.isPrivate === false);
 
   // If there are more pages, fetch them recursively
   if (data.data.user.repositories.pageInfo.hasNextPage) {

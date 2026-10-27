@@ -1,7 +1,6 @@
 // External data fetching utilities - Migrated from fetch.js
 // This file handles fetching data from GitHub and Medium APIs
 
-import fs from "fs/promises";
 import https from "https";
 import { logError } from "@/lib/utils/dev-logger";
 
@@ -22,6 +21,7 @@ interface GitHubUser {
         };
         url: string;
         id: string;
+        isPrivate?: boolean;
         diskUsage: number;
         primaryLanguage: {
           name: string;
@@ -101,7 +101,6 @@ function httpsRequest(
 // Fetch GitHub profile data
 export async function fetchGitHubData(
   config: FetchConfig,
-  skipFileWrite = false,
 ): Promise<GitHubUser | null> {
   if (!config.useGithubData || config.useGithubData !== "true") {
     return null;
@@ -112,8 +111,8 @@ export async function fetchGitHubData(
   }
 
   const query = `
-    query {
-      user(login: "${config.githubUsername}") {
+    query($username: String!) {
+      user(login: $username) {
         name
         bio
         avatarUrl
@@ -131,6 +130,7 @@ export async function fetchGitHubData(
                 }
                 url
                 id
+                isPrivate
                 diskUsage
                 primaryLanguage {
                   name
@@ -157,22 +157,27 @@ export async function fetchGitHubData(
   };
 
   try {
-    const response = await httpsRequest(options, JSON.stringify({ query }));
+    const response = await httpsRequest(
+      options,
+      JSON.stringify({ query, variables: { username: config.githubUsername } }),
+    );
     const data = JSON.parse(response);
 
     if (data.errors) {
       throw new Error(ERROR_MESSAGES.requestFailed);
     }
 
-    // Save to file for build-time usage (skip in API routes)
-    if (!skipFileWrite) {
-      await fs.writeFile(
-        "./public/profile.json",
-        JSON.stringify(data, null, 2),
-      );
-    }
-
-    return data.data.user;
+    // Public pins only, whatever the token can read: the answer is public
+    // and cached (security audit run 1, lead 9). A pin not marked public is
+    // dropped, and the count is what is kept.
+    const user = data.data.user as GitHubUser;
+    const edges = user.pinnedItems.edges.filter(
+      (edge) => edge.node.isPrivate === false,
+    );
+    return {
+      ...user,
+      pinnedItems: { ...user.pinnedItems, totalCount: edges.length, edges },
+    };
   } catch (error) {
     logError(error, "GitHub fetch error");
     throw error;

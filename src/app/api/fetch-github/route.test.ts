@@ -86,14 +86,11 @@ describe("GitHub API Route", () => {
 
       const response = await GET(new NextRequest("http://localhost"));
 
-      expect(mockFetchGitHubData).toHaveBeenCalledWith(
-        {
-          githubToken: "test-token",
-          githubUsername: "testuser",
-          useGithubData: "true",
-        },
-        true, // skipFileWrite
-      );
+      expect(mockFetchGitHubData).toHaveBeenCalledWith({
+        githubToken: "test-token",
+        githubUsername: "testuser",
+        useGithubData: "true",
+      });
 
       const result = await response.json();
       expect(result.success).toBe(true);
@@ -235,25 +232,11 @@ describe("GitHub API Route", () => {
         useGithubData: "true",
       });
 
-      expect(mockFetchGitHubData).toHaveBeenCalledWith(
-        {
-          githubToken: undefined,
-          githubUsername: undefined,
-          useGithubData: "true",
-        },
-        true,
-      );
-    });
-
-    it("passes skipFileWrite parameter correctly", async () => {
-      mockFetchGitHubData.mockResolvedValueOnce(mockGitHubData);
-
-      await GET(new NextRequest("http://localhost"));
-
-      expect(mockFetchGitHubData).toHaveBeenCalledWith(
-        expect.any(Object),
-        true, // skipFileWrite should be true for API routes
-      );
+      expect(mockFetchGitHubData).toHaveBeenCalledWith({
+        githubToken: undefined,
+        githubUsername: undefined,
+        useGithubData: "true",
+      });
     });
   });
 });

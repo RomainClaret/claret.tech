@@ -39,7 +39,7 @@ async function handler(_request: NextRequest) {
     };
 
     // Pass true for skipFileWrite to avoid writing to filesystem in API route
-    const data = await fetchGitHubData(config, true);
+    const data = await fetchGitHubData(config);
 
     // Update cache
     if (data) {
