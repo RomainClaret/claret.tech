@@ -166,3 +166,11 @@ describe("Terminal File System", () => {
     });
   });
 });
+
+describe("inherited names", () => {
+  // A plain object's lookup reached Object.prototype (security audit run 1).
+  it("are no file or folder", () => {
+    expect(getFileAtPath("/__proto__")).toBeNull();
+    expect(getFileAtPath("/constructor")).toBeNull();
+  });
+});

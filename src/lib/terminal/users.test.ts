@@ -164,3 +164,11 @@ describe("Terminal User System", () => {
     });
   });
 });
+
+describe("inherited names", () => {
+  // A plain object's lookup reached Object.prototype (security audit run 1).
+  it("are no user", () => {
+    expect(getUser("__proto__")).toBeNull();
+    expect(getUser("constructor")).toBeNull();
+  });
+});

@@ -379,7 +379,8 @@ ${formatCommands(aiCommands)}
       case "":
       case "open":
       default: {
-        // Generate access token for security
+        // A per-open nonce, not a security check: nothing verifies it, and
+        // any script on the page can send this event.
         const token = Math.random().toString(36).substring(2, 15);
         window.dispatchEvent(
           new CustomEvent("terminal-performance-dashboard", {
@@ -588,7 +589,7 @@ ${formatCommands(aiCommands)}
 
   linkedin: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.linkedin, "_blank");
+      window.open(socialMediaLinks.linkedin, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening LinkedIn profile: ${socialMediaLinks.linkedin}`,
@@ -598,7 +599,7 @@ ${formatCommands(aiCommands)}
 
   github: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.github, "_blank");
+      window.open(socialMediaLinks.github, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening GitHub profile: ${socialMediaLinks.github}`,
@@ -630,7 +631,7 @@ ${formatCommands(aiCommands)}
 
   orcid: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.orcid, "_blank");
+      window.open(socialMediaLinks.orcid, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening ORCID profile: ${socialMediaLinks.orcid}`,
@@ -640,7 +641,7 @@ ${formatCommands(aiCommands)}
 
   gitlab: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.gitlab, "_blank");
+      window.open(socialMediaLinks.gitlab, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening GitLab profile: ${socialMediaLinks.gitlab}`,
@@ -650,7 +651,7 @@ ${formatCommands(aiCommands)}
 
   medium: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.medium, "_blank");
+      window.open(socialMediaLinks.medium, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening Medium profile: ${socialMediaLinks.medium}`,
@@ -660,7 +661,11 @@ ${formatCommands(aiCommands)}
 
   stackoverflow: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.stackoverflow, "_blank");
+      window.open(
+        socialMediaLinks.stackoverflow,
+        "_blank",
+        "noopener,noreferrer",
+      );
     }, 100);
     return {
       output: `Opening Stack Overflow profile: ${socialMediaLinks.stackoverflow}`,
@@ -670,7 +675,7 @@ ${formatCommands(aiCommands)}
 
   instagram: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.instagram, "_blank");
+      window.open(socialMediaLinks.instagram, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening Instagram profile: ${socialMediaLinks.instagram}`,
@@ -680,7 +685,7 @@ ${formatCommands(aiCommands)}
 
   reddit: () => {
     setTimeout(() => {
-      window.open(socialMediaLinks.reddit, "_blank");
+      window.open(socialMediaLinks.reddit, "_blank", "noopener,noreferrer");
     }, 100);
     return {
       output: `Opening Reddit profile: ${socialMediaLinks.reddit}`,
@@ -1371,7 +1376,10 @@ ${formatCommands(aiCommands)}
     }
 
     const command = args[0].toLowerCase();
-    const manual = manuals[command];
+    // Own entries only: a plain object's lookup reached Object.prototype.
+    const manual = Object.hasOwn(manuals, command)
+      ? manuals[command]
+      : undefined;
 
     if (!manual) {
       return {
@@ -1656,7 +1664,10 @@ export async function executeCommand(
   }
 
   const [commandName, ...args] = trimmed.split(/\s+/);
-  const command = commands[commandName];
+  // Own entries only: a plain object's lookup ran "constructor".
+  const command = Object.hasOwn(commands, commandName)
+    ? commands[commandName]
+    : undefined;
 
   if (!command) {
     return {

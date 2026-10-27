@@ -56,7 +56,8 @@ export const users: Record<string, User> = {
 // Function to get user by username (case-insensitive)
 export function getUser(username: string): User | null {
   const lowerUsername = username.toLowerCase();
-  return users[lowerUsername] || null;
+  // Own entries only: a plain object's lookup reached Object.prototype.
+  return Object.hasOwn(users, lowerUsername) ? users[lowerUsername] : null;
 }
 
 // Function to list all available usernames

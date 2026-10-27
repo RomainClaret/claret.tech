@@ -203,7 +203,8 @@ export function getFileAtPath(path: string): VirtualFile | null {
     if (
       current.type !== "directory" ||
       !current.children ||
-      !current.children[part]
+      // Own entries only: a plain object's lookup reached Object.prototype.
+      !Object.hasOwn(current.children, part)
     ) {
       return null;
     }

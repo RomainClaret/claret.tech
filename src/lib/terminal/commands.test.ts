@@ -1123,6 +1123,7 @@ describe("Terminal Commands", () => {
       expect(mockWindow.open).toHaveBeenCalledWith(
         "https://linkedin.com/in/test",
         "_blank",
+        "noopener,noreferrer",
       );
 
       vi.useRealTimers();
@@ -1140,6 +1141,7 @@ describe("Terminal Commands", () => {
       expect(mockWindow.open).toHaveBeenCalledWith(
         "https://github.com/test",
         "_blank",
+        "noopener,noreferrer",
       );
 
       vi.useRealTimers();
@@ -1506,6 +1508,17 @@ describe("executeCommand", () => {
     const result = await executeCommand("", mockContext);
     expect(result.output).toBe("");
     expect(result.success).toBe(true);
+  });
+
+  it("runs no inherited member as a command, and has no manual for one", async () => {
+    // A plain object's lookup reached Object.prototype (security audit
+    // run 1, hardening).
+    for (const name of ["__proto__", "constructor", "toString"]) {
+      const result = await executeCommand(name, mockContext);
+      expect(result.output).toBe(`${name}: command not found`);
+    }
+    const manual = await executeCommand("man constructor", mockContext);
+    expect(manual.output).toBe("No manual entry for 'constructor'");
   });
 
   it("handles whitespace-only command", async () => {
