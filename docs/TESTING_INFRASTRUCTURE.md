@@ -548,8 +548,8 @@ drops the headers that would send the browser to https.
 
 `npm run dev`, `dev:https` and `npm start` listen on 127.0.0.1 alone: Next's
 default, every interface, put the dev server on UCD's public address with the
-Mac's firewall off, and `npm start` serves the build with `.env.local` loaded (`localhost` would bind `::1` alone, which `127.0.0.1` then
-misses). A dev server for a phone listens on the Tailscale address instead,
+Mac's firewall off, and `npm start` serves the build with `.env.local` loaded
+(`localhost` would bind `::1` alone, which `127.0.0.1` then misses). A dev server for a phone listens on the Tailscale address instead,
 and its host must be allowed: Next 16 refuses its dev resources to any host
 but localhost, and the page then never hydrates (its live-update connection,
 `/_next/hmr`, is refused; its buttons, data and terminal stay dead). It is
@@ -558,6 +558,21 @@ slow on a phone, and localhost does not reach it while it runs.
 ```bash
 DEV_ALLOWED_ORIGINS=<the Mac's Tailscale address>,<machine>.<tailnet>.ts.net \
   npx next dev --webpack --experimental-https -H <the Mac's Tailscale address>
+```
+
+That dev server takes its peers' requests to Next's dev endpoints, which
+check no Host header (security audit run 1, lead 8): run it only on a
+tailnet whose devices are yours, and prefer the production preview above.
+
+`dev:https` runs mkcert from Next's cache (`~/Library/Caches/mkcert`), and
+downloads it from GitHub with no checksum when the cache is empty, then runs
+it with `-install` (lead 17). With mkcert from Homebrew, make a certificate
+once and hand it to Next instead, which then runs no mkcert of its own:
+
+```bash
+mkcert -key-file certificates/dev-key.pem -cert-file certificates/dev.pem localhost 127.0.0.1
+npx next dev --webpack --experimental-https -H 127.0.0.1 \
+  --experimental-https-key certificates/dev-key.pem --experimental-https-cert certificates/dev.pem
 ```
 
 ## Patched dependencies

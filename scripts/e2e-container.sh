@@ -137,7 +137,11 @@ start)
   mkdir -p "$out"
   out=$(cd "$out" && pwd)
   echo "$name: ${sha:0:7} in $image ($platform, ${cpus:-all} CPUs), output in $out"
-  docker run -d --name "$name" --label "$label=yes" --ipc=host --init \
+  # A local tag (claret-e2e/...) is never pulled: missing, it would resolve
+  # to docker.io/claret-e2e, a namespace that is not ours.
+  pull=missing
+  case $image in claret-e2e/*) pull=never ;; esac
+  docker run -d --pull "$pull" --name "$name" --label "$label=yes" --ipc=host --init \
     --platform "$platform" ${cpus:+--cpus "$cpus"} -v "$out:/out" "$image" \
     sleep infinity >/dev/null
   # Streamed, not written to OUT: each start left a 45 MB archive there.

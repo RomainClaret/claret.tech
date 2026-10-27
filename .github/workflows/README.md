@@ -163,8 +163,6 @@ the API routes read `GH_USERNAME` from it at run time.
 
    ```bash
    brew install act
-   # or
-   curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
    ```
 
 2. Build the image act runs the jobs in (`.actrc` names it): Node 24 with

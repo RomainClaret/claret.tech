@@ -6,8 +6,14 @@ WebKit, on desktop and on phones (`playwright.config.ts`).
 ## Prerequisites
 
 ```bash
-npx playwright install
+npm ci
+npx --no-install playwright install
 ```
+
+`npm ci` first: without the locked Playwright in `node_modules`, `npx`
+fetched whatever `playwright` was latest. The browsers it installs are
+bound by no digest (security audit run 1, lead 16); `scripts/e2e-container.sh`
+runs the tests in CI's image, pinned by digest, instead.
 
 ## Running Tests
 
