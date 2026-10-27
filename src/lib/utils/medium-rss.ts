@@ -50,23 +50,41 @@ function decode(raw: string): string {
 }
 
 /**
+ * CDATA sections, set aside before any tag is matched: a section's text is
+ * the author's (a title, a post), and a "<link>" or "</item><item>" in it
+ * took over a card's link or added whole posts. Each becomes a NUL-quoted
+ * index, which XML text cannot contain.
+ */
+function maskCdata(xml: string): { masked: string; sections: string[] } {
+  const sections: string[] = [];
+  const masked = xml.replace(
+    /<!\[CDATA\[([\s\S]*?)\]\]>/g,
+    (_section, body: string) => `\u0000${sections.push(body) - 1}\u0000`,
+  );
+  return { masked, sections };
+}
+
+/**
  * An element's text: its CDATA sections as they are, the rest decoded. A
  * "]]>" inside the text arrives split across two sections.
  */
-function text(raw: string): string {
+function text(raw: string, sections: string[]): string {
   let out = "";
   let last = 0;
-  for (const section of raw.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)) {
-    out += decode(raw.slice(last, section.index)) + section[1];
-    last = section.index + section[0].length;
+  // NUL is the mark because XML text cannot contain it (maskCdata).
+  // eslint-disable-next-line no-control-regex
+  for (const mark of raw.matchAll(/\u0000(\d+)\u0000/g)) {
+    out +=
+      decode(raw.slice(last, mark.index)) + (sections[Number(mark[1])] ?? "");
+    last = mark.index + mark[0].length;
   }
   return (out + decode(raw.slice(last))).trim();
 }
 
-/** The text of each `tag` element in `xml`, in order. */
-function elements(xml: string, tag: string): string[] {
+/** The text of each `tag` element in `xml` (CDATA masked), in order. */
+function elements(xml: string, tag: string, sections: string[]): string[] {
   const pattern = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "g");
-  return Array.from(xml.matchAll(pattern), (match) => text(match[1]));
+  return Array.from(xml.matchAll(pattern), (match) => text(match[1], sections));
 }
 
 /** Medium's view counter: an image in every post, never its picture. */
@@ -81,22 +99,26 @@ export function parseMediumRss(xml: string): MediumRssItem[] {
   if (!/<rss[\s>]/.test(xml) || !xml.includes("<channel>")) {
     throw new Error("Not an RSS feed");
   }
-  return Array.from(xml.matchAll(/<item>([\s\S]*?)<\/item>/g), ([, item]) => {
-    const first = (tag: string) => elements(item, tag)[0] ?? "";
-    const content = first("content:encoded");
-    const images = Array.from(
-      content.matchAll(/<img[^>]+src="([^"]+)"/g),
-      (match) => match[1],
-    );
-    return {
-      title: first("title"),
-      link: first("link"),
-      guid: first("guid"),
-      pubDate: first("pubDate"),
-      author: first("dc:creator"),
-      categories: elements(item, "category"),
-      content,
-      thumbnail: images.find((src) => !src.startsWith(TRACKING_PIXEL)),
-    };
-  });
+  const { masked, sections } = maskCdata(xml);
+  return Array.from(
+    masked.matchAll(/<item>([\s\S]*?)<\/item>/g),
+    ([, item]) => {
+      const first = (tag: string) => elements(item, tag, sections)[0] ?? "";
+      const content = first("content:encoded");
+      const images = Array.from(
+        content.matchAll(/<img[^>]+src="([^"]+)"/g),
+        (match) => match[1],
+      );
+      return {
+        title: first("title"),
+        link: first("link"),
+        guid: first("guid"),
+        pubDate: first("pubDate"),
+        author: first("dc:creator"),
+        categories: elements(item, "category", sections),
+        content,
+        thumbnail: images.find((src) => !src.startsWith(TRACKING_PIXEL)),
+      };
+    },
+  );
 }

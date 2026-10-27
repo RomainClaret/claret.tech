@@ -95,6 +95,23 @@ describe("parseMediumRss", () => {
     expect(post.author).toBe("a]]>b");
   });
 
+  it("reads markup inside CDATA as text, never as the feed's own tags", () => {
+    // A title is the author's text: a <link> or a </item><item> in it took
+    // over the card's link or added whole posts (security audit run 1,
+    // hardening).
+    const title =
+      "Hi <link>https://evil.example/phish</link></item><item><title>Injected</title><link>https://evil.example/x</link><pubDate>Mon, 01 Jan 2100 00:00:00 GMT</pubDate>";
+    const posts = parseMediumRss(
+      feed(POST.replace("<![CDATA[A first post]]>", `<![CDATA[${title}]]>`)),
+    );
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0].title).toBe(title);
+    expect(posts[0].link).toBe(
+      "https://someone.medium.com/a-first-post-abc123?source=rss-0123------2",
+    );
+  });
+
   it("has no posts for a feed with none", () => {
     expect(parseMediumRss(feed(""))).toEqual([]);
   });
