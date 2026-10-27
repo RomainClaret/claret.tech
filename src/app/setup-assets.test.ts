@@ -122,4 +122,33 @@ describe("setup-assets.js", () => {
     ]);
     expect(existsSync(join(pyodide, "drafts/pyodide.mjs"))).toBe(true);
   });
+
+  it("downloads no wheel the lock gives no sha256 to check", () => {
+    // The check was skipped for an empty sha256, and the log still said
+    // "checksum ok" (security audit run 1, hardening). Refused before any
+    // request, so this test reaches no network.
+    const dir = rootWith("314.0.7");
+    write(
+      join(dir, "node_modules/pyodide/pyodide-lock.json"),
+      JSON.stringify({
+        packages: {
+          numpy: {
+            name: "numpy",
+            version: "2.4.6",
+            file_name: "numpy-probe.whl",
+            sha256: "",
+            depends: [],
+          },
+        },
+      }),
+    );
+
+    const result = run(dir);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout + result.stderr).toContain("no sha256 to check");
+    expect(
+      existsSync(join(dir, "public/pyodide/314.0.7/numpy-probe.whl")),
+    ).toBe(false);
+  });
 });

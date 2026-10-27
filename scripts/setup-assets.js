@@ -68,13 +68,18 @@ async function sha256(file) {
  * browsers. A mismatch fails loudly rather than shipping unknown bytes.
  */
 async function downloadVerified(url, dest, expectedSha256) {
+  // No sha256, no download: the comparison below was skipped for an empty
+  // one, and the log still said "checksum ok".
+  if (!/^[0-9a-f]{64}$/.test(expectedSha256 || "")) {
+    throw new Error("the lock gives no sha256 to check");
+  }
   for (let attempt = 1; attempt <= DOWNLOAD_RETRIES; attempt++) {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = Buffer.from(await res.arrayBuffer());
       const actual = crypto.createHash("sha256").update(buf).digest("hex");
-      if (expectedSha256 && actual !== expectedSha256) {
+      if (actual !== expectedSha256) {
         throw new Error(
           `checksum mismatch (expected ${expectedSha256.slice(0, 12)}..., got ${actual.slice(0, 12)}...)`,
         );
