@@ -127,10 +127,8 @@ describe("the build's Medium color map", () => {
 
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
       "https://medium.com/p/abc123": {
+        // The color alone: the file ships whole in the client bundle.
         color: "rgb(236, 72, 153)",
-        image: "https://cdn-images-1.medium.com/max/1024/0*picture",
-        title: "A story",
-        category: "story",
       },
     });
   });
