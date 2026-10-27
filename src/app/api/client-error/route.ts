@@ -33,6 +33,8 @@ const GITHUB = "https://api.github.com";
 interface KnownIssue {
   number: number;
   state: "open" | "closed";
+  /** Locked by the owner: closed for good, whatever build reports it. */
+  locked?: boolean;
   at: number;
 }
 const issues = new Map<string, KnownIssue>();
@@ -168,7 +170,12 @@ async function findIssue(
     `/search/issues?per_page=100&q=${encodeURIComponent(query)}`,
   )) as {
     incomplete_results?: boolean;
-    items?: { number: number; state?: string; body?: string | null }[];
+    items?: {
+      number: number;
+      state?: string;
+      locked?: boolean;
+      body?: string | null;
+    }[];
   };
   // The route writes an issue's signature line last, and a report's message
   // is published in the same body: a decoy could carry another error's line
@@ -181,6 +188,7 @@ async function findIssue(
   const issue: KnownIssue = {
     number: item.number,
     state: item.state === "closed" ? "closed" : "open",
+    locked: item.locked === true,
     at: now,
   };
   issues.set(signature, issue);
@@ -234,7 +242,14 @@ async function fileReport(
     // most, as for a comment.
     const last = lastComment.get(signature) ?? 0;
     const recent = now.getTime() - last < REPORT_LIMITS.commentEveryMs;
-    if (report.build !== deployment.commit || recent || !takeComment()) {
+    // The build a page reports is public, so anyone can claim the serving
+    // one: a closed issue the owner locked stays closed.
+    if (
+      found.locked ||
+      report.build !== deployment.commit ||
+      recent ||
+      !takeComment()
+    ) {
       return "known";
     }
     lastComment.set(signature, now.getTime());

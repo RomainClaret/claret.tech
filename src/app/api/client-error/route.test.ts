@@ -39,7 +39,12 @@ let calls: GitHubCall[];
 // Issues the search finds besides the route's own: another instance's.
 // Without a body of its own, an item's body ends with the line searched
 // for, as a report the route filed does.
-let searchItems: { number: number; state?: string; body?: string }[];
+let searchItems: {
+  number: number;
+  state?: string;
+  body?: string;
+  locked?: boolean;
+}[];
 let searchIncomplete: boolean;
 // The daily count's own incomplete_results.
 let countIncomplete: boolean;
@@ -421,6 +426,17 @@ describe("POST /api/client-error", () => {
     ]);
     expect(calls[1].body).toEqual({ state: "open" });
     expect(calls[2].body?.body).toMatch(/^Back on the build serving now/);
+  });
+
+  it("leaves a closed issue the owner locked alone, from any build", async () => {
+    // The build a page reports is public (it is in the page), so anyone can
+    // claim the serving one: locking a closed issue keeps it closed.
+    searchItems = [{ number: 12, state: "closed", locked: true }];
+
+    const response = await send({ ...report, build: "7c48428" });
+
+    expect(response.status).toBe(202);
+    expect(calls.map((call) => call.method)).toEqual(["GET"]);
   });
 
   it("opens nothing when GitHub's search came back incomplete", async () => {
