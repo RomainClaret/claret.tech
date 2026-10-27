@@ -41,6 +41,8 @@ let calls: GitHubCall[];
 // for, as a report the route filed does.
 let searchItems: { number: number; state?: string; body?: string }[];
 let searchIncomplete: boolean;
+// The daily count's own incomplete_results.
+let countIncomplete: boolean;
 // The issues the route opened, which the search finds by signature line,
 // as GitHub's does.
 let opened: { number: number; body: string; state: string; day: string }[];
@@ -97,7 +99,7 @@ async function fakeGitHub(
         total_count:
           opened.filter((issue) => issue.day >= since).length + othersToday,
         items: [],
-        incomplete_results: false,
+        incomplete_results: countIncomplete,
       });
     }
     const phrase = /"([^"]+)"/.exec(query)?.[1] ?? "";
@@ -172,6 +174,12 @@ const errorNumbered = (n: number) => ({
   message: `error ${[...n.toString(26)].map((d) => String.fromCharCode(97 + parseInt(d, 26))).join("")}`,
 });
 
+/**
+ * Reports a few seconds apart, as real ones arrive: the cap tests send more
+ * than a minute's GitHub searches (REPORT_LIMITS.searchesPerMinute).
+ */
+const later = () => vi.setSystemTime(Date.now() + 7_000);
+
 describe("POST /api/client-error", () => {
   let POST: typeof import("./route").POST;
   const send = async (
@@ -191,6 +199,7 @@ describe("POST /api/client-error", () => {
     calls = [];
     searchItems = [];
     searchIncomplete = false;
+    countIncomplete = false;
     opened = [];
     othersToday = 0;
     limitedFor = null;
@@ -226,6 +235,25 @@ describe("POST /api/client-error", () => {
 
     const raw = JSON.stringify({ ...report, message: "x".repeat(5000) });
     expect((await send(null, { raw })).status).toBe(413);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("stops reading a body past the limit, with no length declared", async () => {
+    // request.text() read a chunked body whole before measuring it.
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 64) controller.close();
+        else controller.enqueue(new Uint8Array(1024).fill(120));
+      },
+    });
+    const { request, text } = reportRequest(report);
+    Object.assign(request, { body });
+
+    expect((await POST(request)).status).toBe(413);
+    expect(text).not.toHaveBeenCalled();
+    expect(pulled).toBeLessThanOrEqual(7);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -476,16 +504,19 @@ describe("POST /api/client-error", () => {
     searchItems = [{ number: 12 }];
 
     for (let n = 0; n < REPORT_LIMITS.commentsPerDay; n++) {
+      later();
       expect((await send(error(n), { ip: `10.3.0.${n}` })).status).toBe(202);
     }
     expect(comments()).toBe(REPORT_LIMITS.commentsPerDay);
 
     // Still on record, so still a 202, but no comment.
+    later();
     expect((await send(error(50), { ip: "10.3.1.0" })).status).toBe(202);
     expect(comments()).toBe(REPORT_LIMITS.commentsPerDay);
 
     searchItems = [];
     for (let n = 0; n < REPORT_LIMITS.newIssuesPerDay; n++) {
+      later();
       await send(error(100 + n), { ip: `10.3.2.${n}` });
     }
     const asked = calls.length;
@@ -504,8 +535,13 @@ describe("POST /api/client-error", () => {
     const count = (match: (call: GitHubCall) => boolean) =>
       calls.filter(match).length;
 
-    beforeEach(() => {
+    // These test the daily caps, which a burst passes only by more than a
+    // minute's searches: the search budget has its own test.
+    // The route's own copy: each test imports it, and its modules, afresh.
+    beforeEach(async () => {
       latencyMs = 20;
+      const issue = await import("@/lib/client-error/issue");
+      issue.REPORT_LIMITS.searchesPerMinute = 1000;
     });
 
     it(`open at most ${REPORT_LIMITS.newIssuesPerDay} issues`, async () => {
@@ -546,15 +582,41 @@ describe("POST /api/client-error", () => {
     // Nothing was filed: ten failed counts must not use up the day.
     failing = (call) => call.url.includes("created%3A%3E%3D");
     for (let n = 0; n < REPORT_LIMITS.newIssuesPerDay; n++) {
+      later();
       expect((await send(errorNumbered(n), { ip: `10.8.0.${n}` })).status).toBe(
         204,
       );
     }
     failing = () => false;
+    later();
     expect((await send(errorNumbered(50), { ip: "10.8.1.0" })).status).toBe(
       202,
     );
     expect(calls.at(-1)?.url).toBe(`${REPO}/issues`);
+  });
+
+  it("opens nothing when GitHub's count came back incomplete", async () => {
+    // A count that timed out is not a count: the day may be full.
+    countIncomplete = true;
+
+    const response = await send(report);
+
+    expect(response.status).toBe(204);
+    expect(calls.filter((call) => call.method === "POST")).toEqual([]);
+  });
+
+  it("keeps its GitHub searches under GitHub's limit", async () => {
+    // GitHub allows 30 searches a minute; past them it refuses with 403 and
+    // the route goes quiet for everyone. Each report costs one or two.
+    searchItems = [{ number: 12 }];
+    for (let n = 0; n < 30; n++) {
+      await send(errorNumbered(n), { ip: `10.7.0.${n}` });
+    }
+    const searches = calls.filter((call) => call.url.includes("/search/"));
+    expect(searches.length).toBeLessThanOrEqual(
+      REPORT_LIMITS.searchesPerMinute,
+    );
+    expect(REPORT_LIMITS.searchesPerMinute).toBeLessThan(30);
   });
 
   it("counts the reports every instance opened today", async () => {

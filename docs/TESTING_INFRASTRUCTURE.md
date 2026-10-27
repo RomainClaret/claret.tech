@@ -117,7 +117,8 @@ The e2e checks that measure, and can fail (2026-10-18):
   an incomplete search opening nothing, 10 new issues a day counted on
   GitHub, 20 comments per instance, both caps holding for reports in flight
   together (a fake GitHub on a real-timer delay), a reopen at most once an
-  hour, a failed count giving its slot back, quiet after GitHub's 403 or 429,
+  hour, a failed count giving its slot back, an incomplete count opening
+  nothing, 20 GitHub searches a minute, a body counted as it arrives, quiet after GitHub's 403 or 429,
   and the rate limit. `.github/workflows/client-error-notify.yml` assigns new
   reports to the owner (GitHub tells nobody of their own activity), and
   `scripts/map-frame.mjs` maps a reported frame with the build's published,

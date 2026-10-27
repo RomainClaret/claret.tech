@@ -40,6 +40,16 @@ const lastComment = new Map<string, number>();
 let today = "";
 let openedToday = 0;
 let commentedToday = 0;
+// When this instance's recent GitHub searches ran, for its per-minute budget.
+let searchedAt: number[] = [];
+
+/** Takes one of the minute's searches, if one is left. */
+function takeSearch(now: number): boolean {
+  searchedAt = searchedAt.filter((at) => now - at < 60_000);
+  if (searchedAt.length >= REPORT_LIMITS.searchesPerMinute) return false;
+  searchedAt.push(now);
+  return true;
+}
 
 // After GitHub refuses for its rate limits, no call until it says.
 let quietUntil = 0;
@@ -114,14 +124,26 @@ async function writeToIssue(
   }
 }
 
-/** The reports opened today, by every instance: the daily cap's count. */
-async function openedOnGitHub(token: string, day: string): Promise<number> {
+/**
+ * The reports opened today, by every instance: the daily cap's count. null
+ * when there is none to trust (the minute's searches spent, or GitHub's
+ * count incomplete or missing), which must not open an issue.
+ */
+async function openedOnGitHub(
+  token: string,
+  day: string,
+  now: number,
+): Promise<number | null> {
+  if (!takeSearch(now)) return null;
   const query = `repo:${ISSUE_REPO} is:issue author:@me label:${ISSUE_LABEL} created:>=${day}`;
   const found = (await github(
     token,
     `/search/issues?per_page=1&q=${encodeURIComponent(query)}`,
-  )) as { total_count?: number };
-  return found.total_count ?? 0;
+  )) as { total_count?: number; incomplete_results?: boolean };
+  if (found.incomplete_results || typeof found.total_count !== "number") {
+    return null;
+  }
+  return found.total_count;
 }
 
 /**
@@ -138,6 +160,7 @@ async function findIssue(
 ): Promise<KnownIssue | null | "incomplete"> {
   const known = issues.get(signature);
   if (known && now - known.at < REPORT_LIMITS.commentEveryMs) return known;
+  if (!takeSearch(now)) return "incomplete";
   const line = signatureLine(signature);
   const query = `repo:${ISSUE_REPO} is:issue author:@me label:${ISSUE_LABEL} in:body "${line}"`;
   const found = (await github(
@@ -249,13 +272,17 @@ async function fileReport(
   // Each instance counts its own, and GitHub counts them all: an instance
   // starts at zero, and Vercel runs as many as the traffic calls for.
   if (!takeOpen()) return "capped";
-  let openedAll: number;
+  let openedAll: number | null;
   try {
-    openedAll = await openedOnGitHub(token, day);
+    openedAll = await openedOnGitHub(token, day, now.getTime());
   } catch (error) {
     // Nothing was filed: the slot goes back.
     openedToday--;
     throw error;
+  }
+  if (openedAll === null) {
+    openedToday--;
+    return "capped";
   }
   if (openedAll >= REPORT_LIMITS.newIssuesPerDay) {
     // Full on GitHub today: this instance stops asking.
@@ -279,6 +306,33 @@ async function fileReport(
   return "filed";
 }
 
+/**
+ * The body as text, or null past REPORT_LIMITS.bodyBytes, counted as it
+ * arrives: request.text() read a chunked body whole before measuring it.
+ */
+async function readBody(request: NextRequest): Promise<string | null> {
+  const reader = request.body?.getReader();
+  if (!reader) {
+    const text = await request.text();
+    return new TextEncoder().encode(text).length > REPORT_LIMITS.bodyBytes
+      ? null
+      : text;
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > REPORT_LIMITS.bodyBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
 async function postHandler(request: NextRequest): Promise<NextResponse> {
   // Only the site's own pages report. A cross-site page could make its
   // visitors' browsers post text/plain, which needs no preflight, from as
@@ -300,8 +354,8 @@ async function postHandler(request: NextRequest): Promise<NextResponse> {
   if (declared > REPORT_LIMITS.bodyBytes) {
     return NextResponse.json({ error: "Report too large" }, { status: 413 });
   }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > REPORT_LIMITS.bodyBytes) {
+  const text = await readBody(request);
+  if (text === null) {
     return NextResponse.json({ error: "Report too large" }, { status: 413 });
   }
   let report: ClientErrorReport | null;

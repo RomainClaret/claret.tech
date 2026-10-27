@@ -34,6 +34,12 @@ export const REPORT_LIMITS = {
   commentsPerDay: 20,
   /** One comment per error and instance in this time, at most. */
   commentEveryMs: 60 * 60 * 1000,
+  /**
+   * GitHub searches one instance makes in a minute. GitHub allows 30, and
+   * past them refuses with 403, after which the route goes quiet for
+   * everyone; a report costs one or two.
+   */
+  searchesPerMinute: 20,
 };
 
 /** A report, checked: what may be published. */
@@ -53,6 +59,11 @@ export interface ClientErrorReport {
 // C0 and C1 controls, and the two Unicode line and paragraph separators.
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g;
+// Invisible format characters (bidi overrides, zero-width ones) make the
+// published text read other than it is, and a lone surrogate can make
+// GitHub refuse the issue: dropped, not spaced.
+const INVISIBLE =
+  /\p{Cf}|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/gu;
 // A dynamic route's chunks sit under its encoded segment (pdf/%5Bslug%5D).
 const FRAME = /^\/_next\/static\/chunks\/[\w./%-]+\.js:\d{1,7}:\d{1,7}$/;
 
@@ -71,16 +82,22 @@ export function sanitizeReport(body: unknown): ClientErrorReport | null {
   const { name, message, frame, path, build } = body as Record<string, unknown>;
   const line =
     typeof message === "string"
-      ? message.replace(CONTROL, " ").replace(/\s+/g, " ").trim()
+      ? message
+          .replace(INVISIBLE, "")
+          .replace(CONTROL, " ")
+          .replace(/\s+/g, " ")
+          .trim()
       : "";
+  // Cut by character, not UTF-16 unit, so no character is cut in half.
+  const characters = Array.from(line);
   return {
     name:
       typeof name === "string" && /^[A-Za-z]{1,40}$/.test(name)
         ? name
         : "Error",
     message:
-      line.length > REPORT_LIMITS.message
-        ? `${line.slice(0, REPORT_LIMITS.message - 1)}…`
+      characters.length > REPORT_LIMITS.message
+        ? `${characters.slice(0, REPORT_LIMITS.message - 1).join("")}…`
         : line,
     frame:
       typeof frame === "string" && FRAME.test(frame) && !frame.includes("..")

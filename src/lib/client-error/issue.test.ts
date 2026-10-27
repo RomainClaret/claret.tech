@@ -67,6 +67,21 @@ describe("sanitizeReport", () => {
     expect(message).toBe("a b c d e f g h");
   });
 
+  it("drops invisible format characters and lone surrogates", () => {
+    // Bidi overrides and zero-width characters make published text read
+    // other than it is; a lone surrogate can make GitHub refuse the issue.
+    const { message } = sanitizeReport({
+      message: "a\u202Eb\u2066c\u200Bd\uFEFFe\uD800f",
+    })!;
+    expect(message).toBe("abcdef");
+  });
+
+  it("never cuts a character in half", () => {
+    const { message } = sanitizeReport({ message: "😀".repeat(400) })!;
+    expect(message.endsWith("😀…")).toBe(true);
+    expect(message.isWellFormed()).toBe(true);
+  });
+
   it(`cuts the message to ${REPORT_LIMITS.message} characters`, () => {
     const { message } = sanitizeReport({ message: "x".repeat(1000) })!;
     expect(message).toHaveLength(REPORT_LIMITS.message);
