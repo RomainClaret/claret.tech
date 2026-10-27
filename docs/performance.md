@@ -1529,6 +1529,61 @@ Then the script's polish (2026-10-22, Romain's choice of all four):
   it and the totals from there: the first phone tests named them, so a new
   membership would have failed them.
 
+### Round 29: the security audit's fixes (2026-10-27)
+
+Cloudflare's security-audit skill reviewed `0341d998` (run 1, kept outside
+the repository in `~/security-audit-skill/claret.tech/run-1/`): no critical,
+high or medium finding, 3 confirmed low ones and 19 leads that need a fact
+from outside the repository (Vercel, GitHub or the Mac). The fixes are on
+`main`, one commit each, each code change with its tests.
+
+- **The three low findings.** The client-error daily caps now hold for
+  reports in flight together (a slot is taken before the first await and
+  given back on failure). The Medium scraper's image fetch stays on Medium's
+  image hosts, with a byte and pixel cap. The AI chat loads only model
+  artifacts pinned by commit and checked by SRI
+  (`src/lib/webllm/model-pins.json`).
+- **Leads with a fix in the source.** `npm start` binds 127.0.0.1; act
+  rehearsals get no host Docker socket and no host GitHub token; the GitHub
+  routes list public repositories only, whatever the token reads;
+  `/pdf/[slug]` renders the registry's documents only; the image optimizer
+  takes no remote image (the GitHub avatar is vendored); `vercel.json`
+  turns Git deployments off by both keys, and the project's Git link is
+  gone; no MCP endpoint on the dev server; the Pyodide runtime, the PDFs and
+  the pdf.js worker are same-origin only; the deploy's Vercel CLI comes from
+  a lockfile with no install script; every action is pinned by commit and
+  every container image by digest.
+- **Hardening.** Capped and checked request bodies (client-error,
+  performance-report; POST `/api/publications` removed); fixed error
+  answers with redacted logs on both GitHub routes; one GitHub load at a
+  time with a minute's pause after a failure; a limiter on `/rss.xml`, whose
+  query now redirects to the one cached URL; a CDATA-aware RSS reader and a
+  well-formed feed without Medium's view counter; only colors leave the
+  Medium pipeline; escaped JSON-LD, server markdown and terminal output;
+  quoted values blanked from client error reports before they leave the
+  browser; HSTS on every build but a dev server's; `npm audit` of the
+  runtime tree in CI.
+- **The pdf.js worker** (1.1 MB) was revalidated on every visit by the
+  pages' no-cache rule. Its URL now names the pdf.js version, and that path
+  is immutable for a year.
+- **Not done, on purpose.** Route handlers do not pass `request.signal` to
+  their upstream loads: those loads are shared between callers now
+  (single-flight, the scraper's in-flight map, the blog-image memo), and
+  one caller's abort would cancel the others' answer. `?playwright=true`
+  still works in production builds: CI's browser tests depend on it, and
+  it only quiets toasts.
+- **Romain's part.** Rotate the tokens dated 2025-08-27 (Vercel's
+  `GITHUB_TOKEN`, the Actions secrets `GH_TOKEN` and `VERCEL_TOKEN`) for
+  fine-grained, read-only ones on the Production target, and revoke the
+  classic token in this repository's 2025 history, which is public.
+  Secret scanning with push protection and a `main`-only Production
+  environment were turned on the same day.
+- **Checked on `df1d06b6`:** lint, types and formatting; 2,814 unit tests;
+  the touched browser specs (privacy, PDF reader, error reports, terminal,
+  Python terminal, static shell, card details) in CI's image on Chromium,
+  153 passed (8 CPUs, the Mac under load, so no timings); act's API job
+  under the new `.actrc` (no Docker socket, empty token), 147 passed.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
