@@ -2,6 +2,10 @@
   "github": {
     "enabled": false
   },
+  "git": {
+    "deploymentEnabled": false
+  },
+  "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",

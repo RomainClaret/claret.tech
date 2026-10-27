@@ -87,7 +87,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:3001 npm run test:e2e
 
 ## 📦 Deployment
 
-Production deploys run from the **Deploy to Vercel** workflow (GitHub Actions, started by hand). It runs CI first, then builds on the runner with `vercel build --prod` and uploads the result. Vercel's Git integration is off (`vercel.json`), so a push deploys nothing by itself.
+Production deploys run from the **Deploy to Vercel** workflow (GitHub Actions, started by hand). It runs CI first, then builds on the runner with `vercel build --prod` and uploads the result. The Vercel project has no Git connection (removed 2026-10-27) and `vercel.json` turns Git deployments off by both of its keys, so a push or a pull request deploys nothing by itself.
 
 ## 📄 License
 
