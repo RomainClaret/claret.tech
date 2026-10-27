@@ -134,7 +134,10 @@ Object.defineProperty(global, "URL", {
 });
 
 Object.defineProperty(global, "Blob", {
-  value: vi.fn(() => ({})),
+  // A function, not an arrow: the download path calls `new Blob(...)`.
+  value: vi.fn(function () {
+    return {};
+  }),
 });
 
 describe("PerformanceReportModal", () => {
@@ -550,6 +553,29 @@ describe("PerformanceReportModal", () => {
         browserSpecificIssues: [],
       },
     };
+
+    it("exports HTML with the report's text escaped, not as markup", () => {
+      render(<PerformanceReportModal isOpen={true} onClose={mockOnClose} />);
+      act(() => {
+        storedCallback?.({
+          ...reportData,
+          browserOptimizations: {
+            ...reportData.browserOptimizations,
+            currentBrowser: '<img src=x onerror="alert(1)">',
+            optimizations: ["<script>x()</script>"],
+          },
+        });
+      });
+      vi.mocked(Blob).mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Download HTML" }));
+
+      const [parts] = vi.mocked(Blob).mock.calls[0] as unknown as [string[]];
+      const html = parts.join("");
+      expect(html).not.toContain("<script>x()");
+      expect(html).not.toContain("<img src=x");
+      expect(html).toContain("&lt;script&gt;x()&lt;/script&gt;");
+    });
 
     it("is a named dialog, not a modal one", () => {
       // Opened from the terminal, which stays usable above it.

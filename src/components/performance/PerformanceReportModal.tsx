@@ -315,6 +315,20 @@ export function PerformanceReportModal({
 }
 
 // Helper function to generate HTML report
+/**
+ * Text for the exported HTML report: its values come from the API and the
+ * page, so they are escaped rather than trusted as markup.
+ */
+function esc(value: unknown): string {
+  return String(value).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ] as string,
+  );
+}
+
 function generateHTMLReport(reportData: PerformanceReportData): string {
   return `
 <!DOCTYPE html>
@@ -347,8 +361,8 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
     <div class="container">
         <div class="header">
             <h1>Performance Report</h1>
-            <div class="score">${reportData.summary.overallScore}</div>
-            <div class="grade">${reportData.summary.grade}</div>
+            <div class="score">${esc(reportData.summary.overallScore)}</div>
+            <div class="grade">${esc(reportData.summary.grade)}</div>
             <p>Generated on ${new Date().toLocaleString()}</p>
         </div>
 
@@ -356,11 +370,11 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
             <h2>Performance Metrics</h2>
             <div class="metric">
                 <span>Frame Rate (FPS)</span>
-                <span class="status-${reportData.metrics.performance.fps.status.toLowerCase()}">${reportData.metrics.performance.fps.value} (${reportData.metrics.performance.fps.status})</span>
+                <span class="status-${esc(reportData.metrics.performance.fps.status.toLowerCase())}">${esc(reportData.metrics.performance.fps.value)} (${esc(reportData.metrics.performance.fps.status)})</span>
             </div>
             <div class="metric">
                 <span>Memory Usage</span>
-                <span class="status-${reportData.metrics.performance.memory.status.toLowerCase()}">${reportData.metrics.performance.memory.value.toFixed(1)}% (${reportData.metrics.performance.memory.status})</span>
+                <span class="status-${esc(reportData.metrics.performance.memory.status.toLowerCase())}">${esc(reportData.metrics.performance.memory.value.toFixed(1))}% (${esc(reportData.metrics.performance.memory.status)})</span>
             </div>
         </div>
 
@@ -370,7 +384,7 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
               reportData.metrics.vitals.lcp.value
                 ? `<div class="metric">
                 <span>Largest Contentful Paint (LCP)</span>
-                <span class="status-${reportData.metrics.vitals.lcp.status.toLowerCase().replace(" ", "-")}">${reportData.metrics.vitals.lcp.value}ms (${reportData.metrics.vitals.lcp.status})</span>
+                <span class="status-${esc(reportData.metrics.vitals.lcp.status.toLowerCase().replace(" ", "-"))}">${esc(reportData.metrics.vitals.lcp.value)}ms (${esc(reportData.metrics.vitals.lcp.status)})</span>
             </div>`
                 : ""
             }
@@ -378,7 +392,7 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
               reportData.metrics.vitals.fcp.value
                 ? `<div class="metric">
                 <span>First Contentful Paint (FCP)</span>
-                <span class="status-${reportData.metrics.vitals.fcp.status.toLowerCase().replace(" ", "-")}">${reportData.metrics.vitals.fcp.value}ms (${reportData.metrics.vitals.fcp.status})</span>
+                <span class="status-${esc(reportData.metrics.vitals.fcp.status.toLowerCase().replace(" ", "-"))}">${esc(reportData.metrics.vitals.fcp.value)}ms (${esc(reportData.metrics.vitals.fcp.status)})</span>
             </div>`
                 : ""
             }
@@ -386,7 +400,7 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
               reportData.metrics.vitals.cls.value
                 ? `<div class="metric">
                 <span>Cumulative Layout Shift (CLS)</span>
-                <span class="status-${reportData.metrics.vitals.cls.status.toLowerCase().replace(" ", "-")}">${reportData.metrics.vitals.cls.value.toFixed(3)} (${reportData.metrics.vitals.cls.status})</span>
+                <span class="status-${esc(reportData.metrics.vitals.cls.status.toLowerCase().replace(" ", "-"))}">${esc(reportData.metrics.vitals.cls.value.toFixed(3))} (${esc(reportData.metrics.vitals.cls.status)})</span>
             </div>`
                 : ""
             }
@@ -397,10 +411,10 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
             ${reportData.recommendations
               .map(
                 (rec: PerformanceReportData["recommendations"][0]) => `
-                <div class="recommendation priority-${rec.priority.toLowerCase()}">
-                    <strong>[${rec.priority}] ${rec.issue}</strong>
-                    <p>${rec.solution}</p>
-                    <p><em>Impact: ${rec.impact}</em></p>
+                <div class="recommendation priority-${esc(rec.priority.toLowerCase())}">
+                    <strong>[${esc(rec.priority)}] ${esc(rec.issue)}</strong>
+                    <p>${esc(rec.solution)}</p>
+                    <p><em>Impact: ${esc(rec.impact)}</em></p>
                 </div>
             `,
               )
@@ -408,8 +422,8 @@ function generateHTMLReport(reportData: PerformanceReportData): string {
         </div>
 
         <div class="section">
-            <h2>Browser Optimizations (${reportData.browserOptimizations.currentBrowser})</h2>
-            ${reportData.browserOptimizations.optimizations.map((opt: string) => `<p>• ${opt}</p>`).join("")}
+            <h2>Browser Optimizations (${esc(reportData.browserOptimizations.currentBrowser)})</h2>
+            ${reportData.browserOptimizations.optimizations.map((opt: string) => `<p>• ${esc(opt)}</p>`).join("")}
         </div>
     </div>
 </body>

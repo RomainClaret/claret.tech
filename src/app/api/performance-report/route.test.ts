@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
 import { NextResponse, NextRequest } from "next/server";
 
 // Dynamic import to avoid cache issues
-let GET: typeof import("./route").GET;
 let POST: typeof import("./route").POST;
 
 // Mock Next.js
@@ -59,22 +58,23 @@ interface PerformanceReportResponse {
     technicalDetails: {
       resourceBreakdown: Array<{ type: string; percentage: number }>;
     };
-    exportOptions: {
-      formats: string[];
-      downloadLinks: Record<string, string>;
-    };
   };
-  rawData?: {
-    browser: {
-      name: string;
-      version: string;
-      engine: string;
-    };
-    [key: string]: unknown;
-  };
-  service?: string;
-  status?: string;
   error?: string;
+}
+
+/** A POST as a browser sends it: JSON, with its length declared. */
+function post(
+  body: unknown,
+  headers: Record<string, string> = { "content-type": "application/json" },
+) {
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  return {
+    headers: new Headers({
+      "content-length": String(new TextEncoder().encode(text).length),
+      ...headers,
+    }),
+    text: () => Promise.resolve(text),
+  } as unknown as NextRequest;
 }
 
 describe("Performance Report API Route", () => {
@@ -135,34 +135,17 @@ describe("Performance Report API Route", () => {
     // Clear module cache and re-import to get fresh instance
     vi.resetModules();
     const routeModule = await import("./route");
-    GET = routeModule.GET;
     POST = routeModule.POST;
   });
 
-  describe("GET /api/performance-report", () => {
-    it("returns health check information", async () => {
-      vi.useRealTimers();
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-08-18T12:00:00.000Z"));
-
-      const response = await GET(new NextRequest("http://localhost"));
-
-      const result = (await (
-        response as APIResponse
-      ).json()) as PerformanceReportResponse;
-      expect(result.service).toBe("Performance Report Generator");
-      expect(result.status).toBe("operational");
-      expect(result.timestamp).toBe("2024-08-18T12:00:00.000Z");
-
-      vi.useRealTimers();
-    });
+  it("has no GET: nothing called its status answer", async () => {
+    const route = await import("./route");
+    expect("GET" in route).toBe(false);
   });
 
   describe("POST /api/performance-report", () => {
     it("generates comprehensive performance report", async () => {
-      const request = {
-        json: () => Promise.resolve(mockPerformanceData),
-      } as NextRequest;
+      const request = post(mockPerformanceData);
 
       const response = await POST(request);
 
@@ -172,7 +155,6 @@ describe("Performance Report API Route", () => {
       expect(result.success).toBe(true);
       expect(result.timestamp).toBe(mockPerformanceData.timestamp);
       expect(result.report).toBeDefined();
-      expect(result.rawData).toEqual(mockPerformanceData);
 
       // Verify report structure
       expect(result.report!.summary).toBeDefined();
@@ -180,22 +162,18 @@ describe("Performance Report API Route", () => {
       expect(result.report!.recommendations).toBeDefined();
       expect(result.report!.browserOptimizations).toBeDefined();
       expect(result.report!.technicalDetails).toBeDefined();
-      expect(result.report!.exportOptions).toBeDefined();
     });
 
     it("parses browser information correctly for Chrome", async () => {
-      const request = {
-        json: () => Promise.resolve(mockPerformanceData),
-      } as NextRequest;
+      const request = post(mockPerformanceData);
 
       const response = await POST(request);
 
       const result = (await (
         response as APIResponse
       ).json()) as PerformanceReportResponse;
-      expect(result.rawData!.browser.name).toBe("Chrome");
-      expect(result.rawData!.browser.version).toBe("91.0.4472.124");
-      expect(result.rawData!.browser.engine).toBe("Blink");
+      // The report names the browser it parsed from the user agent.
+      expect(result.report!.browserOptimizations.currentBrowser).toBe("Chrome");
     });
 
     it("parses browser information correctly for Safari", async () => {
@@ -205,18 +183,15 @@ describe("Performance Report API Route", () => {
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/14.1.1 Safari/537.36",
       };
 
-      const request = {
-        json: () => Promise.resolve(safariData),
-      } as NextRequest;
+      const request = post(safariData);
 
       const response = await POST(request);
 
       const result = (await (
         response as APIResponse
       ).json()) as PerformanceReportResponse;
-      expect(result.rawData!.browser.name).toBe("Safari");
-      expect(result.rawData!.browser.version).toBe("14.1.1");
-      expect(result.rawData!.browser.engine).toBe("WebKit");
+      // The report names the browser it parsed from the user agent.
+      expect(result.report!.browserOptimizations.currentBrowser).toBe("Safari");
     });
 
     it("parses browser information correctly for Firefox", async () => {
@@ -226,18 +201,17 @@ describe("Performance Report API Route", () => {
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
       };
 
-      const request = {
-        json: () => Promise.resolve(firefoxData),
-      } as NextRequest;
+      const request = post(firefoxData);
 
       const response = await POST(request);
 
       const result = (await (
         response as APIResponse
       ).json()) as PerformanceReportResponse;
-      expect(result.rawData!.browser.name).toBe("Firefox");
-      expect(result.rawData!.browser.version).toBe("89.0");
-      expect(result.rawData!.browser.engine).toBe("Gecko");
+      // The report names the browser it parsed from the user agent.
+      expect(result.report!.browserOptimizations.currentBrowser).toBe(
+        "Firefox",
+      );
     });
 
     it("calculates overall score correctly for excellent performance", async () => {
@@ -258,9 +232,7 @@ describe("Performance Report API Route", () => {
         },
       };
 
-      const request = {
-        json: () => Promise.resolve(excellentData),
-      } as NextRequest;
+      const request = post(excellentData);
 
       const response = await POST(request);
 
@@ -289,9 +261,7 @@ describe("Performance Report API Route", () => {
         },
       };
 
-      const request = {
-        json: () => Promise.resolve(poorData),
-      } as NextRequest;
+      const request = post(poorData);
 
       const response = await POST(request);
 
@@ -322,9 +292,7 @@ describe("Performance Report API Route", () => {
         },
       };
 
-      const request = {
-        json: () => Promise.resolve(problemData),
-      } as NextRequest;
+      const request = post(problemData);
 
       const response = await POST(request);
 
@@ -366,9 +334,7 @@ describe("Performance Report API Route", () => {
         },
       };
 
-      const request = {
-        json: () => Promise.resolve(safariData),
-      } as NextRequest;
+      const request = post(safariData);
 
       const response = await POST(request);
 
@@ -385,9 +351,7 @@ describe("Performance Report API Route", () => {
     });
 
     it("calculates resource breakdown correctly", async () => {
-      const request = {
-        json: () => Promise.resolve(mockPerformanceData),
-      } as NextRequest;
+      const request = post(mockPerformanceData);
 
       const response = await POST(request);
 
@@ -416,9 +380,7 @@ describe("Performance Report API Route", () => {
         },
       };
 
-      const request = {
-        json: () => Promise.resolve(dataWithoutMemory),
-      } as NextRequest;
+      const request = post(dataWithoutMemory);
 
       const response = await POST(request);
 
@@ -435,9 +397,7 @@ describe("Performance Report API Route", () => {
         // Missing timestamp and url
       };
 
-      const request = {
-        json: () => Promise.resolve(invalidData),
-      } as NextRequest;
+      const request = post(invalidData);
 
       mockNextResponse.json.mockReturnValueOnce({
         json: () => ({ error: "Missing required fields: timestamp, url" }),
@@ -453,27 +413,16 @@ describe("Performance Report API Route", () => {
     });
 
     it("handles JSON parsing errors", async () => {
-      const request = {
-        json: () => Promise.reject(new Error("Invalid JSON")),
-      } as NextRequest;
-
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({ error: "Failed to generate performance report" }),
-        status: 500,
-      });
-
-      await POST(request);
+      await POST(post("{not json"));
 
       expect(mockNextResponse.json).toHaveBeenCalledWith(
-        { error: "Failed to generate performance report" },
-        { status: 500 },
+        { error: "Not a report" },
+        { status: 400 },
       );
     });
 
     it("sets correct FPS targets for different browsers", async () => {
-      const chromeRequest = {
-        json: () => Promise.resolve(mockPerformanceData),
-      } as NextRequest;
+      const chromeRequest = post(mockPerformanceData);
 
       const chromeResponse = await POST(chromeRequest);
       const chromeResult = (await (
@@ -487,9 +436,7 @@ describe("Performance Report API Route", () => {
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/14.1.1 Safari/537.36",
       };
 
-      const safariRequest = {
-        json: () => Promise.resolve(safariData),
-      } as NextRequest;
+      const safariRequest = post(safariData);
 
       const safariResponse = await POST(safariRequest);
       const safariResult = (await (
@@ -498,24 +445,38 @@ describe("Performance Report API Route", () => {
       expect(safariResult.report!.metrics.performance.fps.target).toBe(55);
     });
 
-    it("includes export options with correct URLs", async () => {
-      const request = {
-        json: () => Promise.resolve(mockPerformanceData),
-      } as NextRequest;
+    it("echoes nothing it was sent beyond the report", async () => {
+      // It returned the whole body as rawData, and the timestamp four more
+      // times in links to an /export route that does not exist: 1 MiB in,
+      // 5 MiB out (security audit run 1, hardening).
+      const response = await POST(post(mockPerformanceData));
 
-      const response = await POST(request);
+      const result = (await (response as APIResponse).json()) as Record<
+        string,
+        unknown
+      >;
+      expect(result).not.toHaveProperty("rawData");
+      expect(result.report).not.toHaveProperty("exportOptions");
+    });
 
-      const result = (await (
-        response as APIResponse
-      ).json()) as PerformanceReportResponse;
-      const exportOptions = result.report!.exportOptions;
-
-      expect(exportOptions.formats).toEqual(["JSON", "HTML", "CSV"]);
-      expect(exportOptions.downloadLinks.json).toContain(
-        mockPerformanceData.timestamp,
+    it("takes JSON only, of at most 16 KiB, with a short timestamp and URL", async () => {
+      await POST(post(mockPerformanceData, { "content-type": "text/plain" }));
+      expect(mockNextResponse.json).toHaveBeenLastCalledWith(
+        { error: "A report is JSON" },
+        { status: 415 },
       );
-      expect(exportOptions.downloadLinks.html).toContain("format=html");
-      expect(exportOptions.downloadLinks.csv).toContain("format=csv");
+
+      await POST(post({ ...mockPerformanceData, pad: "x".repeat(17_000) }));
+      expect(mockNextResponse.json).toHaveBeenLastCalledWith(
+        { error: "Report too large" },
+        { status: 413 },
+      );
+
+      await POST(post({ ...mockPerformanceData, timestamp: "x".repeat(33) }));
+      expect(mockNextResponse.json).toHaveBeenLastCalledWith(
+        { error: "Missing required fields: timestamp, url" },
+        { status: 400 },
+      );
     });
 
     it("handles network connection type scoring", async () => {
@@ -524,9 +485,7 @@ describe("Performance Report API Route", () => {
         network: { connectionType: "slow-2g" },
       };
 
-      const request = {
-        json: () => Promise.resolve(slowNetworkData),
-      } as NextRequest;
+      const request = post(slowNetworkData);
 
       const response = await POST(request);
 

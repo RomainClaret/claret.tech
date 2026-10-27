@@ -56,15 +56,6 @@ interface TechnicalDetails {
   };
 }
 
-interface ExportOptions {
-  formats: string[];
-  downloadLinks: {
-    json: string;
-    html: string;
-    csv: string;
-  };
-}
-
 interface PerformanceReport {
   summary: {
     overallScore: number;
@@ -76,7 +67,6 @@ interface PerformanceReport {
   recommendations: PerformanceRecommendation[];
   browserOptimizations: BrowserOptimizations;
   technicalDetails: TechnicalDetails;
-  exportOptions: ExportOptions;
 }
 
 interface PerformanceReportGeneratorProps {

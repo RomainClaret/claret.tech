@@ -116,15 +116,6 @@ interface GeneratedReport {
       firstPaint?: number;
     };
   };
-
-  exportOptions: {
-    formats: string[];
-    downloadLinks: {
-      json: string;
-      html: string;
-      csv: string;
-    };
-  };
 }
 
 function getBrowserInfo(userAgent: string) {
@@ -364,12 +355,62 @@ function getGrade(score: number): "Excellent" | "Good" | "Fair" | "Poor" {
   return "Poor";
 }
 
+/** A report's body: a page's metrics, a few KiB. */
+const MAX_BODY_BYTES = 16 * 1024;
+
+/**
+ * The body as text, or null past MAX_BODY_BYTES, counted as it arrives.
+ * The route read any body whole, of any type (security audit run 1).
+ */
+async function readBody(request: NextRequest): Promise<string | null> {
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {
+    return null;
+  }
+  const reader = request.body?.getReader();
+  if (!reader) {
+    const text = await request.text();
+    return new TextEncoder().encode(text).length > MAX_BODY_BYTES ? null : text;
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
 async function postHandler(request: NextRequest) {
   try {
-    const data: PerformanceReportData = await request.json();
+    const type = request.headers.get("content-type") ?? "";
+    if (!/^application\/json\b/i.test(type)) {
+      return NextResponse.json({ error: "A report is JSON" }, { status: 415 });
+    }
+    const text = await readBody(request);
+    if (text === null) {
+      return NextResponse.json({ error: "Report too large" }, { status: 413 });
+    }
+    let data: PerformanceReportData;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ error: "Not a report" }, { status: 400 });
+    }
 
-    // Validate required fields
-    if (!data.timestamp || !data.url) {
+    // Validate required fields: a short ISO timestamp and URL, which the
+    // report repeats.
+    if (
+      typeof data?.timestamp !== "string" ||
+      data.timestamp.length > 32 ||
+      typeof data.url !== "string" ||
+      data.url.length > 2048
+    ) {
       return NextResponse.json(
         { error: "Missing required fields: timestamp, url" },
         { status: 400 },
@@ -575,22 +616,12 @@ async function postHandler(request: NextRequest) {
           firstPaint: data.vitals.fcp,
         },
       },
-
-      exportOptions: {
-        formats: ["JSON", "HTML", "CSV"],
-        downloadLinks: {
-          json: `/api/performance-report/export?format=json&timestamp=${data.timestamp}`,
-          html: `/api/performance-report/export?format=html&timestamp=${data.timestamp}`,
-          csv: `/api/performance-report/export?format=csv&timestamp=${data.timestamp}`,
-        },
-      },
     };
 
     return NextResponse.json({
       success: true,
       timestamp: data.timestamp,
       report,
-      rawData: data,
     });
   } catch (error) {
     logError(error, "Performance report generation error");
@@ -599,19 +630,6 @@ async function postHandler(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-async function getHandler(_request: NextRequest) {
-  return NextResponse.json({
-    service: "Performance Report Generator",
-    status: "operational",
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// API route handler
-export async function GET(request: NextRequest) {
-  return withRateLimit(getHandler)(request);
 }
 
 export const POST = withRateLimit(postHandler);
