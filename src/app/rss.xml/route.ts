@@ -1,7 +1,9 @@
 // RSS Feed Generator
+import { NextRequest, NextResponse } from "next/server";
 import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
 import { blogImagePath } from "@/lib/blog-images/sources";
+import { withRateLimit } from "@/lib/utils/rate-limiter";
 
 /**
  * Characters XML 1.0 forbids: one (decoded from Medium's &#11;, say) made
@@ -46,8 +48,14 @@ function cdata(value: unknown): string {
     .replace(/]]>/g, "]]]]><![CDATA[>");
 }
 
-export async function GET() {
+async function handler(request: NextRequest): Promise<NextResponse> {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://claret.tech";
+
+  // The CDN keeps the feed an hour per URL: each distinct query missed that
+  // copy and ran this function. One URL, then (security audit run 1).
+  if (request.nextUrl.search) {
+    return NextResponse.redirect(new URL("/rss.xml", request.url), 308);
+  }
 
   try {
     // Medium's own feed, read directly: through the site's API over HTTP it
@@ -133,7 +141,7 @@ export async function GET() {
   </channel>
 </rss>`;
 
-    return new Response(rss, {
+    return new NextResponse(rss, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
         "Cache-Control": "public, max-age=3600, s-maxage=3600",
@@ -153,7 +161,7 @@ export async function GET() {
   </channel>
 </rss>`;
 
-    return new Response(errorRss, {
+    return new NextResponse(errorRss, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
       },
@@ -161,3 +169,5 @@ export async function GET() {
     });
   }
 }
+
+export const GET = withRateLimit(handler);

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextRequest } from "next/server";
 import { GET, maxDuration } from "./route";
+import { RATE_LIMIT_CONFIG } from "@/lib/utils/rate-limiter";
+
+const feedRequest = (path = "/rss.xml", ip = "203.0.113.7") =>
+  new NextRequest(`https://claret.tech${path}`, {
+    headers: { "x-forwarded-for": ip },
+  });
 
 /**
  * The feed is built from Medium's own, as the blog section's API reads it,
@@ -60,6 +67,33 @@ describe("GET /rss.xml", () => {
     expect(maxDuration).toBe(30);
   });
 
+  // Each distinct query missed the CDN's cached feed and ran the function,
+  // and nothing counted the calls (security audit run 1, hardening).
+  it("sends a query to the one cached URL, without reading the feed", async () => {
+    const fetchMock = answering([]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(feedRequest("/rss.xml?nocache=1"));
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://claret.tech/rss.xml",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("counts each client's requests in the default limit", async () => {
+    vi.stubGlobal("fetch", answering([]));
+    const statuses: number[] = [];
+    for (let i = 0; i <= RATE_LIMIT_CONFIG.maxRequests; i++) {
+      statuses.push(
+        (await GET(feedRequest("/rss.xml?n=" + i, "198.51.100.9"))).status,
+      );
+    }
+
+    expect(statuses.at(-1)).toBe(429);
+  });
+
   it("reads Medium's feed, not the site's own API", async () => {
     const fetchMock = answering([
       {
@@ -71,7 +105,7 @@ describe("GET /rss.xml", () => {
     ]);
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await GET();
+    const response = await GET(feedRequest());
     const xml = await response.text();
 
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
@@ -94,7 +128,7 @@ describe("GET /rss.xml", () => {
       ]),
     );
 
-    const xml = await (await GET()).text();
+    const xml = await (await GET(feedRequest())).text();
 
     expect(xml).toContain("<title><![CDATA[a ]]]]><![CDATA[> b]]></title>");
     expect(xml).toContain(
@@ -120,7 +154,7 @@ describe("GET /rss.xml", () => {
       ]),
     );
 
-    const xml = await (await GET()).text();
+    const xml = await (await GET(feedRequest())).text();
 
     // The characters XML 1.0 forbids.
     // eslint-disable-next-line no-control-regex
