@@ -24,18 +24,27 @@ interface MediumCache {
 const CACHE_FILE = path.join(process.cwd(), "src/lib/utils/medium-cache.json");
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-// Load cache from file
+/**
+ * The cache, in memory first: on Vercel the app directory is read-only, so
+ * the file never saved, and every request that missed the CDN scraped every
+ * article again. One object for the instance, so concurrent requests add to
+ * the same entries. The file still carries the cache across local restarts.
+ */
+let memoryCache: MediumCache | null = null;
+
 async function loadCache(): Promise<MediumCache> {
+  if (memoryCache) return memoryCache;
   try {
     const data = await fs.readFile(CACHE_FILE, "utf-8");
-    return JSON.parse(data);
+    memoryCache = JSON.parse(data) as MediumCache;
   } catch {
-    return {};
+    memoryCache = {};
   }
+  return memoryCache;
 }
 
-// Save cache to file
 async function saveCache(cache: MediumCache): Promise<void> {
+  memoryCache = cache;
   try {
     await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
   } catch (error) {
@@ -388,7 +397,25 @@ export async function fetchMediumArticle(articleUrl: string): Promise<{
     return { image: null, color: null };
   }
 
-  // Load cache
+  // Requests in flight together share one scrape of the article.
+  const running = articleScrapes.get(articleUrl);
+  if (running) return running;
+  const work = scrapeArticle(articleUrl).finally(() =>
+    articleScrapes.delete(articleUrl),
+  );
+  articleScrapes.set(articleUrl, work);
+  return work;
+}
+
+const articleScrapes = new Map<
+  string,
+  Promise<{ image: string | null; color: string | null }>
+>();
+
+async function scrapeArticle(articleUrl: string): Promise<{
+  image: string | null;
+  color: string | null;
+}> {
   const cache = await loadCache();
 
   // Check if we have a valid cached entry

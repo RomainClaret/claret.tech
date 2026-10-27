@@ -212,3 +212,45 @@ describe("fetchMediumArticle image leg", () => {
     expect(pulled).toBeLessThanOrEqual(12);
   });
 });
+
+/**
+ * The 24-hour article cache was a file under the app directory, which is
+ * read-only on Vercel: it never saved, so every request that missed the CDN
+ * scraped every article again (security audit run 1, lead 14). The file
+ * mock above refuses reads, as a fresh deployment's missing file does.
+ */
+describe("fetchMediumArticle cache", () => {
+  const originalSkip = process.env.SKIP_EXTERNAL_APIS;
+  const page = () =>
+    new Response("<html><title>cached</title></html>", { status: 200 });
+
+  beforeEach(() => {
+    delete process.env.SKIP_EXTERNAL_APIS;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => page()),
+    );
+  });
+
+  afterEach(() => {
+    if (originalSkip === undefined) delete process.env.SKIP_EXTERNAL_APIS;
+    else process.env.SKIP_EXTERNAL_APIS = originalSkip;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("scrapes an article once, though its cache file cannot be saved", async () => {
+    const url = "https://medium.com/@romainclaret/cache-probe";
+    await fetchMediumArticle(url);
+    await fetchMediumArticle(url);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("scrapes an article once for requests in flight together", async () => {
+    const url = "https://medium.com/@romainclaret/in-flight-probe";
+    await Promise.all([fetchMediumArticle(url), fetchMediumArticle(url)]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
