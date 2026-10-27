@@ -98,6 +98,10 @@ const nextConfig = {
 
   // Enable experimental features for better performance
   experimental: {
+    // Next 16 mounts an MCP endpoint, /_next/mcp, in dev by default, behind
+    // a cross-site guard that never checks the Host header. Nothing here uses
+    // it.
+    mcpServer: false,
     // optimizeCss: true, // Disabled due to critters dependency issue
     // optimizePackageImports(lucide-react/framer-motion) was tried 2026-07-19
     // and REVERTED: its __barrel_optimize__ proxy modules broke lazy chunks

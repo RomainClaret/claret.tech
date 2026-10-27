@@ -46,3 +46,15 @@ describe("the server scripts", () => {
     }
   });
 });
+
+describe("the dev server's MCP endpoint", () => {
+  // Next 16 mounts /_next/mcp in dev by default, beside its devtools
+  // endpoints, behind a cross-site guard that never checks the Host header:
+  // a DNS-rebound page, or a peer when dev runs on the Tailscale address,
+  // could reach it (security audit run 1, lead 8). Nothing here uses it.
+  it("is off", async () => {
+    vi.resetModules();
+    const { default: config } = await import("../../next.config.mjs");
+    expect(config.experimental?.mcpServer).toBe(false);
+  });
+});
