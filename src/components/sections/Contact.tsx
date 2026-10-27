@@ -235,7 +235,11 @@ export function Contact() {
                   <div className="p-1 rounded-full">
                     <div className="relative overflow-hidden rounded-full">
                       <Image
-                        src={`https://github.com/${process.env.NEXT_PUBLIC_GH_USERNAME || "RomainClaret"}.png`}
+                        // The GitHub avatar, as a local file: the optimizer
+                        // takes no remote image (next.config.mjs). A new
+                        // avatar gets a new file name, as /images is cached
+                        // for a year.
+                        src="/images/github-avatar-2026-10.jpg"
                         alt="GitHub Profile"
                         width={300}
                         height={300}

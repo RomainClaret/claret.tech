@@ -244,7 +244,11 @@ describe("Contact Component", () => {
 
       const avatar = screen.getByTestId("next-image");
       expect(avatar).toBeInTheDocument();
-      expect(avatar).toHaveAttribute("src", "https://github.com/testuser.png");
+      // A local file: the image optimizer takes no remote image.
+      expect(avatar).toHaveAttribute(
+        "src",
+        "/images/github-avatar-2026-10.jpg",
+      );
       expect(avatar).toHaveAttribute("alt", "GitHub Profile");
       expect(avatar).toHaveAttribute("width", "300");
       expect(avatar).toHaveAttribute("height", "300");
@@ -273,21 +277,6 @@ describe("Contact Component", () => {
       expect(githubLink).toHaveAttribute("href", "https://github.com/username");
       expect(githubLink).toHaveAttribute("target", "_blank");
       expect(githubLink).toHaveAttribute("rel", "noopener noreferrer");
-    });
-
-    it("falls back to default username when env var not set", () => {
-      // Override the environment variable
-      Object.defineProperty(process, "env", {
-        value: {},
-      });
-
-      render(<Contact />);
-
-      const avatar = screen.getByTestId("next-image");
-      expect(avatar).toHaveAttribute(
-        "src",
-        "https://github.com/RomainClaret.png",
-      );
     });
   });
 

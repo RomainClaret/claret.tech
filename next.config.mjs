@@ -65,31 +65,19 @@ const nextConfig = {
     // A month. On Vercel's Hobby plan the optimizer has 5,000 transformations
     // a month, and each cache miss or stale refresh is one: at a day, every
     // remote image cost one a day it was seen. Local /images get a year from
-    // their headers below. A changed GitHub avatar shows within a month.
+    // their headers below.
     minimumCacheTTL: 2678400,
-    // The GitHub avatar alone, by exact path. With Medium, Unsplash and
-    // jsDelivr open, and any GitHub avatar, anyone could spend the month's
-    // transformations on their images, after which every image not yet
-    // cached failed until the month ended. The blog's pictures have their
-    // own route (src/app/api/blog-image), the Kudos photo is a local file,
-    // and no image came from raw.githubusercontent.com or jsDelivr.
-    remotePatterns: [
-      {
-        // github.com serves the avatar as /RomainClaret.png, a single
-        // segment with no trailing slash, so /RomainClaret/** does not match
-        // it; it is pinned to the exact file.
-        protocol: "https",
-        hostname: "github.com",
-        pathname: "/RomainClaret.png",
-      },
-      {
-        // Where that address redirects (GitHub user 8895475), in case the
-        // optimizer checks a redirect's target against these patterns.
-        protocol: "https",
-        hostname: "avatars.githubusercontent.com",
-        pathname: "/u/8895475",
-      },
-    ],
+    // No remote image. With Medium, Unsplash, jsDelivr and any GitHub avatar
+    // open, anyone could spend the month's transformations, after which
+    // every image not yet cached failed until the month ended; even the
+    // avatar alone left the query, fragment and userinfo of its URL open, a
+    // new transformation per spelling. The blog's pictures have their own
+    // route (src/app/api/blog-image), and the avatar is a local file.
+    remotePatterns: [],
+    // Local images from /images only, with no query: Next's default, every
+    // local path, made the optimizer fetch PDFs and API routes before
+    // refusing them.
+    localPatterns: [{ pathname: "/images/**", search: "" }],
     formats: ["image/avif", "image/webp"],
   },
 

@@ -158,11 +158,18 @@ test.describe("Privacy", () => {
   }) => {
     // It took any image on Medium, Unsplash or jsDelivr, or any GitHub
     // avatar, which anyone could use to spend Vercel's 5,000 monthly
-    // transformations. Only the site's own GitHub avatar is left.
+    // transformations; then the avatar alone, whose URL's query, fragment
+    // and userinfo were still open. It takes no remote image now.
     for (const source of [
       "https://images.unsplash.com/photo-1717501218385-55bc3a95be94",
       "https://miro.medium.com/v2/resize:fit:1024/0*foSWTIlQM-cdYK3S",
       "https://avatars.githubusercontent.com/u/1",
+      "https://github.com/RomainClaret.png",
+      "https://github.com/RomainClaret.png?x=1",
+      "https://github.com/RomainClaret.png#x",
+      "https://x@github.com/RomainClaret.png",
+      "/pdfs/thesis_PHD.pdf",
+      "/images/github-avatar-2026-10.jpg?x=1",
     ]) {
       const answer = await request.get(
         `/_next/image?url=${encodeURIComponent(source)}&w=640&q=75`,
@@ -170,10 +177,9 @@ test.describe("Privacy", () => {
       expect(answer.status(), source).toBe(400);
     }
 
-    // The control: the avatar the contact section shows still comes through
-    // (github.com redirects it to avatars.githubusercontent.com/u/8895475).
+    // The control: the avatar the contact section shows, a local file.
     const avatar = await request.get(
-      `/_next/image?url=${encodeURIComponent("https://github.com/RomainClaret.png")}&w=64&q=75`,
+      `/_next/image?url=${encodeURIComponent("/images/github-avatar-2026-10.jpg")}&w=64&q=75`,
     );
     expect(avatar.status()).toBe(200);
   });

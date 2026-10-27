@@ -10,19 +10,19 @@ import nextConfig from "../../next.config.mjs";
  * (src/app/api/blog-image); the optimizer keeps the GitHub avatar alone.
  */
 describe("the image optimizer's sources", () => {
-  it("fetches only the GitHub avatar", () => {
-    expect(nextConfig.images?.remotePatterns).toEqual([
-      {
-        protocol: "https",
-        hostname: "github.com",
-        pathname: "/RomainClaret.png",
-      },
-      {
-        // Where github.com/RomainClaret.png redirects (user 8895475).
-        protocol: "https",
-        hostname: "avatars.githubusercontent.com",
-        pathname: "/u/8895475",
-      },
+  it("fetches no remote image", () => {
+    // Even the avatar alone was too much: a pattern pins host and path, not
+    // the query, fragment or userinfo, so each spelling of its URL was a new
+    // transformation (security audit run 1, lead 11). The avatar is a local
+    // file now.
+    expect(nextConfig.images?.remotePatterns).toEqual([]);
+  });
+
+  it("takes local images from /images only, with no query", () => {
+    // Next's default, every local path, made the optimizer fetch PDFs and
+    // API routes before refusing them.
+    expect(nextConfig.images?.localPatterns).toEqual([
+      { pathname: "/images/**", search: "" },
     ]);
   });
 
