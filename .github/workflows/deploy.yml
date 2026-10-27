@@ -90,6 +90,9 @@ jobs:
         # takes from here (a YAML anchor), so a preview builds what
         # production would.
         env: &build-env
+          # Never the local http server's headers: SERVE_HTTP drops HSTS and
+          # the https-forcing CSP (next.config.mjs), whatever Vercel's env says.
+          SERVE_HTTP: "false"
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           USE_GITHUB_DATA: true
           # The account whose pinned repositories the build saves at

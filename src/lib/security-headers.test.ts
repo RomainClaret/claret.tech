@@ -99,6 +99,20 @@ describe("security headers (next.config)", () => {
     expect(hsts).toContain("preload");
   });
 
+  it("forces https on a build under any NODE_ENV but development", async () => {
+    // isProd read NODE_ENV === "production", so a build run under
+    // NODE_ENV=test silently dropped HSTS and both https directives
+    // (security audit run 1, hardening).
+    const headers = await withEnv(
+      { NODE_ENV: "test", SERVE_HTTP: undefined },
+      readHeaders,
+    );
+    expect(headers.get("Strict-Transport-Security")).toContain("max-age=");
+    expect(headers.get("Content-Security-Policy")).toContain(
+      "upgrade-insecure-requests",
+    );
+  });
+
   it("forces https on the deployed site", async () => {
     const csp =
       (await securityHeaderMap()).get("Content-Security-Policy") ?? "";

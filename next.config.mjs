@@ -349,9 +349,11 @@ const nextConfig = {
     // SERVE_HTTP is therefore opt-in and off by default: Vercel serves https
     // and never sets it, so production keeps all three headers. Only a local
     // or CI production server serving plain http turns them off, and
-    // src/app/security-headers.test.ts pins both states.
+    // src/lib/security-headers.test.ts pins both states. Anything but a dev
+    // server forces https: a build under NODE_ENV=test dropped the headers
+    // when only "production" counted.
     const servesOverHttp = process.env.SERVE_HTTP === "true";
-    const isProd = process.env.NODE_ENV === "production" && !servesOverHttp;
+    const isProd = process.env.NODE_ENV !== "development" && !servesOverHttp;
 
     // Content Security Policy: the browser reaches only what the site uses.
     // Beyond the site itself, that is the terminal's AI chat (`ai init`):
