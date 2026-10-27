@@ -22,6 +22,12 @@ env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+# One deploy per environment at a time, in order: two dispatches could
+# finish out of order and leave the older build serving.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
 jobs:
   # Run all CI checks first
   ci:
@@ -83,13 +89,18 @@ jobs:
           echo "$GITHUB_WORKSPACE/tools/vercel/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        # The token in the environment, which the CLI reads: on the command
+        # line any process on the runner could read it.
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=preview
 
       - name: Build Project Artifacts
         # The production build's env, which deploy-production's build step
         # takes from here (a YAML anchor), so a preview builds what
         # production would.
         env: &build-env
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           # Never the local http server's headers: SERVE_HTTP drops HSTS and
           # the https-forcing CSP (next.config.mjs), whatever Vercel's env says.
           SERVE_HTTP: "false"
@@ -104,23 +115,26 @@ jobs:
           # (src/lib/utils/medium-username.ts). Unset, romainclaret.
           NEXT_PUBLIC_MEDIUM_USERNAME: ${{ secrets.MEDIUM_USERNAME }}
           NEXT_PUBLIC_SITE_URL: https://claret.tech
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build
 
       - name: Deploy to Vercel Preview
         id: deploy
         # Never under act (which sets ACT): .actrc hands it .env.act.local,
         # which holds the real Vercel token.
         if: ${{ !env.ACT }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(vercel deploy --prebuilt)
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Preview URL: $url"
 
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
     needs: [ci, browser-tests]
-    if: github.event.inputs.environment == 'production'
+    # Production from main only, whatever branch the dispatch names (the
+    # Production environment allows main alone too).
+    if: github.event.inputs.environment == 'production' && github.ref == 'refs/heads/main'
     environment:
       name: Production
       url: https://claret.tech
@@ -143,14 +157,18 @@ jobs:
           echo "$GITHUB_WORKSPACE/tools/vercel/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production
 
       - name: Build Project Artifacts
         # The env block defined in deploy-preview's build step above.
         env: *build-env
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod
 
       - name: Deploy to Vercel Production
         # Never under act, as the preview's.
         if: ${{ !env.ACT }}
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod

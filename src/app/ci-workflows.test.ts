@@ -596,6 +596,28 @@ describe("the GitHub workflows", () => {
     );
   });
 
+  it("deploy with the token in the environment, never on a command line", () => {
+    // A `--token=${{ secrets.VERCEL_TOKEN }}` in run: text is an argument,
+    // which any process on the runner can read from /proc/<pid>/cmdline
+    // (security audit run 1, hardening). The CLI reads VERCEL_TOKEN itself.
+    const deploy = workflow("deploy.yml");
+    expect(deploy).not.toMatch(/--token/);
+    expect(deploy).toMatch(/VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/);
+  });
+
+  it("deploy one environment at a time, production from main only", () => {
+    // Two dispatches could finish out of order and leave the older build in
+    // production; a dispatch from another branch reached the production job
+    // (security audit run 1, hardening).
+    const deploy = workflow("deploy.yml");
+    expect(deploy).toMatch(
+      /concurrency:\n\s+group: deploy-\$\{\{ inputs\.environment \}\}\n\s+cancel-in-progress: false/,
+    );
+    expect(deploy).toMatch(
+      /if: github\.event\.inputs\.environment == 'production' && github\.ref == 'refs\/heads\/main'/,
+    );
+  });
+
   it("install the Vercel CLI from its lockfile, with no install script", () => {
     // Both jobs ran `npm install -g vercel@latest`, then vercel@64.7.0, with
     // the deploy token in their environment. The pin fixed vercel's own
@@ -651,6 +673,8 @@ describe("the GitHub workflows", () => {
       "NODE_OPTIONS",
       "VERCEL_ORG_ID",
       "VERCEL_PROJECT_ID",
+      // The Vercel CLI's token, from the environment, off its command line.
+      "VERCEL_TOKEN",
     ]);
     const files = [
       ...["src", "scripts", ".github/scripts", "tests"].flatMap(scriptsUnder),
