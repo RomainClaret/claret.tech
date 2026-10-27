@@ -5,6 +5,7 @@ import { join } from "node:path";
 // configuration Next.js serves. With ANALYZE unset, the @next/bundle-analyzer
 // wrapper returns the config object untouched, so `headers()` is intact.
 import nextConfig from "../../next.config.mjs";
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 
 type HeaderRule = {
   source: string;
@@ -56,6 +57,54 @@ async function readHeaders(): Promise<Map<string, string>> {
   expect(rule, "expected a header rule for source '/:path*'").toBeDefined();
   return new Map(rule!.headers.map((h) => [h.key, h.value]));
 }
+
+/**
+ * The headers a path gets, as Next resolves them: every matching rule, in
+ * order, a later value replacing an earlier one under the same key.
+ */
+async function headersFor(path: string): Promise<Map<string, string>> {
+  const rules = (await (
+    nextConfig as { headers: () => Promise<HeaderRule[]> }
+  ).headers()) as HeaderRule[];
+  const out = new Map<string, string>();
+  for (const rule of rules) {
+    if (!getPathMatch(rule.source)(path)) continue;
+    for (const { key, value } of rule.headers) out.set(key, value);
+  }
+  return out;
+}
+
+describe("the headers each path gets", () => {
+  // Read through Next's own matcher: the site policy's rule (/:path*) also
+  // matches /python-worker.js, which gets its own policy only because its
+  // rule comes later (security audit run 1, hardening).
+  it("gives the Python worker its own policy, nothing of the site's", async () => {
+    const worker = await withEnv(
+      { NODE_ENV: "production", SERVE_HTTP: undefined },
+      () => headersFor("/python-worker.js"),
+    );
+    expect(worker.get("Content-Security-Policy")).toMatch(
+      /^default-src 'none'/,
+    );
+  });
+
+  it.each([
+    "/",
+    "/pdf/geenns",
+    "/api/fetch-github",
+    "/images/x.png",
+    "/rss.xml",
+  ])("keeps every other page out of frames: %s", async (path) => {
+    const headers = await withEnv(
+      { NODE_ENV: "production", SERVE_HTTP: undefined },
+      () => headersFor(path),
+    );
+    expect(headers.get("Content-Security-Policy")).toContain(
+      "frame-ancestors 'none'",
+    );
+    expect(headers.get("X-Frame-Options")).toBe("DENY");
+  });
+});
 
 describe("the large static files", () => {
   // The Pyodide runtime (a 9.6 MB wasm) and the PDFs draw on the plan's
