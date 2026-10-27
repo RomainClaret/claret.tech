@@ -2,6 +2,9 @@ import { EventEmitter } from "node:events";
 import https from "node:https";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchGitHubData } from "./fetch-external-data";
+import { logError } from "@/lib/utils/dev-logger";
+
+vi.mock("@/lib/utils/dev-logger", () => ({ logError: vi.fn() }));
 
 /**
  * The pinned repositories reach anonymous callers of /api/fetch-github and
@@ -81,5 +84,20 @@ describe("fetchGitHubData", () => {
     expect(query).not.toContain('x")');
     expect(query).toContain("user(login: $username)");
     expect(variables.username).toBe('x") { id } #');
+  });
+
+  // undici and node:https put a header's value in their validation error,
+  // and a token stored with a stray CR would land in the logs whole
+  // (security audit run 1, hardening).
+  it("logs a failure with anything token-shaped cut off", async () => {
+    vi.spyOn(https, "request").mockImplementation(() => {
+      throw new Error('Invalid header value: "Bearer ghp_dummydummydummy\r"');
+    });
+
+    await expect(fetchGitHubData(config)).rejects.toThrow();
+
+    const logged = String(vi.mocked(logError).mock.calls.at(-1)?.[0]);
+    expect(logged).toContain("ghp_…");
+    expect(logged).not.toContain("dummydummy");
   });
 });

@@ -179,7 +179,14 @@ export async function fetchGitHubData(
       pinnedItems: { ...user.pinnedItems, totalCount: edges.length, edges },
     };
   } catch (error) {
-    logError(error, "GitHub fetch error");
+    // Anything token-shaped redacted, as /api/fetch-all-repos does.
+    const message = error instanceof Error ? error.message : String(error);
+    logError(
+      new Error(
+        message.replace(/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]+/g, "$1…"),
+      ),
+      "GitHub fetch error",
+    );
     throw error;
   }
 }

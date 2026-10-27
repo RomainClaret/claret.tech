@@ -164,50 +164,25 @@ describe("GitHub API Route", () => {
       expect(again.status).toBe(503);
     });
 
-    it("handles fetch errors gracefully", async () => {
-      const errorMessage = "GitHub API rate limit exceeded";
-      mockFetchGitHubData.mockRejectedValueOnce(new Error(errorMessage));
+    // A fixed answer, as /api/fetch-all-repos: undici puts a header's value
+    // in its validation error, so a token stored with a stray CR or NUL
+    // came back in the 500 body (security audit run 1, hardening).
+    it.each([
+      new Error("invalid header value: Bearer ghp_dummydummydummy\r"),
+      "String error",
+    ])(
+      "answers a fixed error, never the exception's text (%s)",
+      async (thrown) => {
+        mockFetchGitHubData.mockRejectedValueOnce(thrown);
 
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({
-          success: false,
-          error: errorMessage,
-        }),
-        status: 500,
-      });
+        await GET(new NextRequest("http://localhost"));
 
-      await GET(new NextRequest("http://localhost"));
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        {
-          success: false,
-          error: errorMessage,
-        },
-        { status: 500 },
-      );
-    });
-
-    it("handles non-Error exceptions", async () => {
-      mockFetchGitHubData.mockRejectedValueOnce("String error");
-
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({
-          success: false,
-          error: "Unknown error",
-        }),
-        status: 500,
-      });
-
-      await GET(new NextRequest("http://localhost"));
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        {
-          success: false,
-          error: "Unknown error",
-        },
-        { status: 500 },
-      );
-    });
+        expect(mockNextResponse.json).toHaveBeenCalledWith(
+          { success: false, error: "GitHub request failed" },
+          { status: 500 },
+        );
+      },
+    );
 
     it("does not update cache when fetch returns null/falsy data", async () => {
       mockFetchGitHubData.mockResolvedValueOnce(null);

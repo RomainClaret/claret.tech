@@ -77,12 +77,12 @@ async function handler(_request: NextRequest) {
         },
       },
     );
-  } catch (error) {
+  } catch {
+    // A fixed answer, as /api/fetch-all-repos: undici puts a header's value
+    // in its validation error, which would carry a malformed token. The
+    // message is logged, redacted, where it is thrown (fetch-external-data).
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { success: false, error: "GitHub request failed" },
       { status: 500 },
     );
   }
