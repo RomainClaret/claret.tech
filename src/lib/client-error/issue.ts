@@ -19,7 +19,12 @@ export const REPORT_LIMITS = {
   bodyBytes: 4096,
   /** The message is cut to this many characters. */
   message: 300,
-  /** New issues one server instance opens in a UTC day. */
+  /**
+   * New issues a UTC day: exact for one instance (its slot is taken before
+   * GitHub's count is read), and the threshold of GitHub's count of every
+   * instance's reports. That count reserves nothing, so reports whose count
+   * search runs before earlier creates are searchable can pass it.
+   */
   newIssuesPerDay: 10,
   /**
    * Comments one instance posts in a UTC day. Anyone can resend an open

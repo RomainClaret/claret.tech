@@ -50,6 +50,10 @@ let failing: (call: GitHubCall) => boolean;
 let limitedFor: number | null;
 // Calls on something GitHub no longer has (404).
 let gone: (call: GitHubCall) => boolean;
+// Milliseconds GitHub takes to answer, on a real timer: 0 answers at once.
+// A call's reads and writes take effect when it answers, so reports in
+// flight together all see GitHub as it was before any of them.
+let latencyMs: number;
 
 const json = (data: unknown, status = 200) =>
   Promise.resolve(
@@ -59,7 +63,13 @@ const json = (data: unknown, status = 200) =>
     }),
   );
 
-function fakeGitHub(input: string | URL | Request, init?: RequestInit) {
+async function fakeGitHub(
+  input: string | URL | Request,
+  init?: RequestInit,
+): Promise<Response> {
+  if (latencyMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, latencyMs));
+  }
   const call: GitHubCall = {
     url: String(input),
     method: init?.method ?? "GET",
@@ -178,6 +188,7 @@ describe("POST /api/client-error", () => {
     othersToday = 0;
     limitedFor = null;
     gone = () => false;
+    latencyMs = 0;
     nextIssue = 7;
     failing = () => false;
     ({ POST } = await import("./route"));
@@ -438,6 +449,70 @@ describe("POST /api/client-error", () => {
     const asked = calls.length;
     expect((await send(error(200), { ip: "10.3.3.0" })).status).toBe(204);
     expect(calls).toHaveLength(asked);
+  });
+
+  describe("reports in flight together", () => {
+    // A parallel burst from one machine, each report from its own client
+    // (the limiter keys on address and User-Agent), all within one GitHub
+    // round-trip: the caps must hold for any arrival order.
+    const burst = (bodies: unknown[], net: number) =>
+      Promise.all(
+        bodies.map((body, n) => send(body, { ip: `10.9.${net}.${n}` })),
+      );
+    const count = (match: (call: GitHubCall) => boolean) =>
+      calls.filter(match).length;
+
+    beforeEach(() => {
+      latencyMs = 20;
+    });
+
+    it(`open at most ${REPORT_LIMITS.newIssuesPerDay} issues`, async () => {
+      await burst(
+        Array.from({ length: 15 }, (_, n) => errorNumbered(n)),
+        1,
+      );
+      expect(
+        count(
+          (call) => call.url === `${REPO}/issues` && call.method === "POST",
+        ),
+      ).toBe(REPORT_LIMITS.newIssuesPerDay);
+    });
+
+    it(`post at most ${REPORT_LIMITS.commentsPerDay} comments`, async () => {
+      searchItems = [{ number: 12 }];
+      await burst(
+        Array.from({ length: 30 }, (_, n) => errorNumbered(n)),
+        2,
+      );
+      expect(count((call) => call.url.endsWith("/comments"))).toBe(
+        REPORT_LIMITS.commentsPerDay,
+      );
+    });
+
+    it("reopen a closed issue once, with one comment, within the hour", async () => {
+      searchItems = [{ number: 12, state: "closed" }];
+      await burst(
+        Array.from({ length: 10 }, () => ({ ...report, build: "7c48428" })),
+        3,
+      );
+      expect(count((call) => call.method === "PATCH")).toBe(1);
+      expect(count((call) => call.url.endsWith("/comments"))).toBe(1);
+    });
+  });
+
+  it("gives a new-issue slot back when GitHub's count fails", async () => {
+    // Nothing was filed: ten failed counts must not use up the day.
+    failing = (call) => call.url.includes("created%3A%3E%3D");
+    for (let n = 0; n < REPORT_LIMITS.newIssuesPerDay; n++) {
+      expect((await send(errorNumbered(n), { ip: `10.8.0.${n}` })).status).toBe(
+        204,
+      );
+    }
+    failing = () => false;
+    expect((await send(errorNumbered(50), { ip: "10.8.1.0" })).status).toBe(
+      202,
+    );
+    expect(calls.at(-1)?.url).toBe(`${REPO}/issues`);
   });
 
   it("counts the reports every instance opened today", async () => {

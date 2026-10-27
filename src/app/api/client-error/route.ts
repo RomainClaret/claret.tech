@@ -156,6 +156,24 @@ async function findIssue(
   return issue;
 }
 
+/**
+ * Takes one of the day's comments, if one is left. A slot is taken in the
+ * same step as its check, after the GitHub search: reports in flight
+ * together would otherwise all pass a check read before any of them filed.
+ */
+function takeComment(): boolean {
+  if (commentedToday >= REPORT_LIMITS.commentsPerDay) return false;
+  commentedToday++;
+  return true;
+}
+
+/** Takes one of the day's new issues, if one is left (as takeComment). */
+function takeOpen(): boolean {
+  if (openedToday >= REPORT_LIMITS.newIssuesPerDay) return false;
+  openedToday++;
+  return true;
+}
+
 /** "filed": a new issue or a comment; "known": on record, no comment; "capped": nothing filed. */
 async function fileReport(
   report: ClientErrorReport,
@@ -181,9 +199,13 @@ async function fileReport(
   if (found?.state === "closed") {
     // Fixed and closed. From an older build, it is that bug, in a tab
     // opened before the fix: on record. From the build serving now, it is
-    // back: reopened, and the workflow tells the owner.
-    if (report.build !== deployment.commit || !canComment) return "known";
-    commentedToday++;
+    // back: reopened, and the workflow tells the owner, once an hour at
+    // most, as for a comment.
+    const last = lastComment.get(signature) ?? 0;
+    const recent = now.getTime() - last < REPORT_LIMITS.commentEveryMs;
+    if (report.build !== deployment.commit || recent || !takeComment()) {
+      return "known";
+    }
     lastComment.set(signature, now.getTime());
     await writeToIssue(signature, () =>
       github(token, `/repos/${ISSUE_REPO}/issues/${found.number}`, {
@@ -205,8 +227,7 @@ async function fileReport(
     // day's comments last.
     const last = lastComment.get(signature) ?? 0;
     const recent = now.getTime() - last < REPORT_LIMITS.commentEveryMs;
-    if (recent || !canComment) return "known";
-    commentedToday++;
+    if (recent || !takeComment()) return "known";
     lastComment.set(signature, now.getTime());
     await writeToIssue(signature, () =>
       github(token, `/repos/${ISSUE_REPO}/issues/${found.number}/comments`, {
@@ -219,11 +240,20 @@ async function fileReport(
 
   // Each instance counts its own, and GitHub counts them all: an instance
   // starts at zero, and Vercel runs as many as the traffic calls for.
-  if (!canOpen) return "capped";
-  if ((await openedOnGitHub(token, day)) >= REPORT_LIMITS.newIssuesPerDay) {
+  if (!takeOpen()) return "capped";
+  let openedAll: number;
+  try {
+    openedAll = await openedOnGitHub(token, day);
+  } catch (error) {
+    // Nothing was filed: the slot goes back.
+    openedToday--;
+    throw error;
+  }
+  if (openedAll >= REPORT_LIMITS.newIssuesPerDay) {
+    // Full on GitHub today: this instance stops asking.
+    openedToday = REPORT_LIMITS.newIssuesPerDay;
     return "capped";
   }
-  openedToday++;
   const created = (await github(token, `/repos/${ISSUE_REPO}/issues`, {
     method: "POST",
     body: {
