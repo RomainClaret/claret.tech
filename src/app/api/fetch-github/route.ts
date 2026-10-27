@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchGitHubData } from "@/lib/api/fetch-external-data";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
+import { singleFlight } from "@/lib/utils/single-flight";
 
 // Simple in-memory cache
 let cache: {
@@ -9,6 +10,11 @@ let cache: {
 } | null = null;
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// One GitHub load at a time, and a minute's pause after one fails.
+const githubLoad = singleFlight<Awaited<ReturnType<typeof fetchGitHubData>>>(
+  60 * 1000,
+);
 
 async function handler(_request: NextRequest) {
   try {
@@ -38,8 +44,14 @@ async function handler(_request: NextRequest) {
       useGithubData: process.env.USE_GITHUB_DATA,
     };
 
-    // Pass true for skipFileWrite to avoid writing to filesystem in API route
-    const data = await fetchGitHubData(config);
+    if (githubLoad.recentlyFailed()) {
+      return NextResponse.json(
+        { success: false, error: "GitHub request failed" },
+        { status: 503 },
+      );
+    }
+
+    const data = await githubLoad.run(() => fetchGitHubData(config));
 
     // Update cache
     if (data) {

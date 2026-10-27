@@ -143,6 +143,27 @@ describe("GitHub API Route", () => {
       expect(result.cached).toBe(false);
     });
 
+    // As /api/fetch-all-repos (security audit run 1).
+    it("asks GitHub once for requests that arrive during one load", async () => {
+      mockFetchGitHubData.mockResolvedValue(mockGitHubData);
+
+      await Promise.all(
+        [1, 2, 3, 4, 5].map(() => GET(new NextRequest("http://localhost"))),
+      );
+
+      expect(mockFetchGitHubData).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers at once for a minute after GitHub failed, without asking it", async () => {
+      mockFetchGitHubData.mockRejectedValue(new Error("rate limited"));
+
+      await GET(new NextRequest("http://localhost"));
+      const again = await GET(new NextRequest("http://localhost"));
+
+      expect(mockFetchGitHubData).toHaveBeenCalledTimes(1);
+      expect(again.status).toBe(503);
+    });
+
     it("handles fetch errors gracefully", async () => {
       const errorMessage = "GitHub API rate limit exceeded";
       mockFetchGitHubData.mockRejectedValueOnce(new Error(errorMessage));

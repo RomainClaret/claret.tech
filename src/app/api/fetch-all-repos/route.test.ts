@@ -369,6 +369,48 @@ describe("Fetch All Repositories API Route", () => {
       );
     });
 
+    // Five cold requests at once made five GitHub calls, and a failing
+    // GitHub was asked again on every request (security audit run 1).
+    it("asks GitHub once for requests that arrive during one load", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockGraphQLResponse),
+      });
+      const request = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+      } as unknown as NextRequest;
+
+      const responses = await Promise.all(
+        [1, 2, 3, 4, 5].map(() => GET(request)),
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      for (const response of responses) {
+        expect((await response.json()).data).toEqual([mockRepository]);
+      }
+    });
+
+    it("answers at once for a minute after GitHub failed, without asking it", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 403 });
+      const request = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+      } as unknown as NextRequest;
+
+      await GET(request);
+      const again = await GET(request);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(again.status).toBe(503);
+      expect(await again.json()).toEqual({
+        success: false,
+        error: "GitHub request failed",
+      });
+
+      vi.advanceTimersByTime(60_000);
+      await GET(request);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
     it("handles GitHub API errors", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,

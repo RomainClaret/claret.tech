@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { logError } from "@/lib/utils/dev-logger";
 import { withRateLimit } from "@/lib/utils/rate-limiter";
 import { mayForceRefresh } from "@/lib/utils/refresh-key";
+import { singleFlight } from "@/lib/utils/single-flight";
 
 // Simple in-memory cache
 let cache: {
@@ -10,6 +11,10 @@ let cache: {
 } | null = null;
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// One GitHub load at a time, and a minute's pause after one fails.
+const repositoriesLoad = singleFlight<Repository[]>(60 * 1000);
+const UNAVAILABLE = { success: false, error: "GitHub request failed" };
 
 interface Repository {
   id: string;
@@ -209,8 +214,14 @@ async function handler(request: NextRequest) {
       );
     }
 
-    // Fetch all repositories
-    const repositories = await fetchAllRepositories(username, token);
+    // The keyed refresh is the owner's, and may try again at once.
+    if (!forceFresh && repositoriesLoad.recentlyFailed()) {
+      return NextResponse.json(UNAVAILABLE, { status: 503 });
+    }
+
+    const repositories = await repositoriesLoad.run(() =>
+      fetchAllRepositories(username, token),
+    );
 
     // Update cache
     cache = {
@@ -251,10 +262,7 @@ async function handler(request: NextRequest) {
       ),
       "Error fetching repositories",
     );
-    return NextResponse.json(
-      { success: false, error: "GitHub request failed" },
-      { status: 500 },
-    );
+    return NextResponse.json(UNAVAILABLE, { status: 500 });
   }
 }
 
