@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateStructuredData } from "./structured-data";
+import { generateStructuredData, jsonLd } from "./structured-data";
 import { socialMediaLinks } from "@/data/portfolio";
 
 /**
@@ -31,5 +31,22 @@ describe("Person schema sameAs", () => {
   it("points at the ORCID record that exists, not the dead one", () => {
     expect(person.sameAs).toContain("https://orcid.org/0000-0002-5612-8471");
     expect(person.sameAs.join(" ")).not.toContain("6872-7815");
+  });
+});
+
+describe("jsonLd", () => {
+  // The JSON is written into a <script> element: a "</script>" in any value
+  // would close it and start markup (security audit run 1, hardening).
+  it("writes no < at all, and reads back the same data", () => {
+    const value = { name: "</script><script>alert(1)</script>", n: "a<b" };
+
+    const script = jsonLd(value);
+
+    expect(script).not.toContain("<");
+    expect(JSON.parse(script)).toEqual(value);
+  });
+
+  it("holds no < for the site's own data either", () => {
+    expect(jsonLd(generateStructuredData())).not.toContain("<");
   });
 });

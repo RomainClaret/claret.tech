@@ -8,7 +8,7 @@ import { Navigation } from "@/components/ui/navigation";
 import { Footer } from "@/components/ui/footer";
 import { AppWrapper } from "@/components/ui/app-wrapper";
 import { FloatingNav } from "@/components/ui/floating-nav";
-import { generateStructuredData } from "@/lib/seo/structured-data";
+import { generateStructuredData, jsonLd } from "@/lib/seo/structured-data";
 import { BackgroundProvider } from "@/contexts/background-context";
 import { SafariProvider } from "@/contexts/safari-context";
 import { AnimationStateProvider } from "@/contexts/animation-state-context";
@@ -221,7 +221,7 @@ export default function RootLayout({
 
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(structuredData) }}
         />
         {/* A circle's radius, checked as it is set: every write to `r`, from
             React or framer-motion, goes through setAttribute, so a bad value

@@ -199,3 +199,12 @@ export function generateStructuredData() {
 
   return combinedSchema;
 }
+
+/**
+ * Structured data as the text of a JSON-LD <script> element: every "<" is
+ * written <, which JSON reads the same, so no value can close the
+ * element and start markup.
+ */
+export function jsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
