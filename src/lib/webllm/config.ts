@@ -1,3 +1,23 @@
+import modelPins from "./model-pins.json";
+
+/** Reviewed artifacts for one allowlisted model (see model-pins.json). */
+export interface ModelArtifactPin {
+  /** Commit of huggingface.co/mlc-ai/<id> whose files were reviewed. */
+  revision: string;
+  /** Commit of github.com/mlc-ai/binary-mlc-llm-libs holding the reviewed library. */
+  libCommit: string;
+  /** SRI hashes of the reviewed files at those commits (web-llm's ModelIntegrity). */
+  integrity: {
+    model_lib: string;
+    config: string;
+    tokenizer: Record<string, string>;
+  };
+}
+
+/** By model id; an allowlisted model without a pin cannot load. */
+export const WEBLLM_PINS: Partial<Record<string, ModelArtifactPin>> =
+  modelPins.models;
+
 export const WEBLLM_CONFIG = {
   // Available models for WebLLM
   models: [

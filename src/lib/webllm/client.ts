@@ -3,7 +3,7 @@ import {
   ChatCompletionMessageParam,
   MLCEngine,
 } from "@mlc-ai/web-llm";
-import { WEBLLM_CONFIG } from "./config";
+import { WEBLLM_CONFIG, WEBLLM_PINS } from "./config";
 import { logError } from "@/lib/utils/dev-logger";
 import { isPhilosophicalQuestion } from "./philosophy";
 
@@ -43,7 +43,28 @@ class WebLLMClient {
 
     try {
       // Dynamically import WebLLM to avoid SSR issues
-      const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
+      const { CreateMLCEngine, prebuiltAppConfig } =
+        await import("@mlc-ai/web-llm");
+
+      // Only reviewed artifacts: web-llm's prebuilt records load from
+      // mutable `main` refs with no integrity, so whoever writes those refs
+      // would decide what runs and prints. Commit URLs fix the files,
+      // weights included, and SRI re-checks the library, config and
+      // tokenizer on every load, cached copies too.
+      const pin = WEBLLM_PINS[modelId];
+      const prebuilt = prebuiltAppConfig.model_list.find(
+        (record) => record.model_id === modelId,
+      );
+      if (!pin || !prebuilt) {
+        throw new Error(`No reviewed artifacts are pinned for ${modelId}`);
+      }
+      const modelLib = prebuilt.model_lib.replace(
+        "/binary-mlc-llm-libs/main/",
+        `/binary-mlc-llm-libs/${pin.libCommit}/`,
+      );
+      if (modelLib === prebuilt.model_lib) {
+        throw new Error(`Unexpected model library URL for ${modelId}`);
+      }
 
       // Reset engine if switching models
       if (this.engine) {
@@ -53,6 +74,16 @@ class WebLLMClient {
 
       // Create new engine with progress callback
       this.engine = await CreateMLCEngine(modelId, {
+        appConfig: {
+          model_list: [
+            {
+              ...prebuilt,
+              model: `https://huggingface.co/mlc-ai/${modelId}/resolve/${pin.revision}/`,
+              model_lib: modelLib,
+              integrity: { ...pin.integrity, onFailure: "error" },
+            },
+          ],
+        },
         initProgressCallback: (report: InitProgressReport) => {
           if (onProgress) {
             onProgress({

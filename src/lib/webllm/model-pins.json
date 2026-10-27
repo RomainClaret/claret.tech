@@ -1,0 +1,85 @@
+{
+  "$comment": "Reviewed WebLLM artifacts per allowlisted model (security audit run 1, finding 4.2): the huggingface.co/mlc-ai/<id> commit, the github.com/mlc-ai/binary-mlc-llm-libs commit, and SRI hashes of the library, mlc-chat-config.json and the tokenizer web-llm 0.2.86 fetches. Taken 2026-10-27 from main; changing a pin is a reviewed change, like the lockfile.",
+  "models": {
+    "Llama-3.2-1B-Instruct-q4f16_1-MLC": {
+      "revision": "2a37b0a5ecb622d51ddc2fac74de0b95872affd7",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-SqGaO0UxzSI5Ma30Uj/0X2giUDggp9OUtX9oZK5gYCQ=",
+        "config": "sha256-DsUTtUtBmtRxAGQwaGvc/6rnECtB97Akb7/N4lF6zH8=",
+        "tokenizer": {
+          "tokenizer.json": "sha256-eePlImNfMXEwCRO7QhRkqH3mIiGCoFcLmyzLoqlksrQ="
+        }
+      }
+    },
+    "Llama-3.2-3B-Instruct-q4f16_1-MLC": {
+      "revision": "1e80abf71e3d17cd564e2d2b63caa15cb226018e",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-ZKr2fYPzuD0im+PoNw84M9nFiw5Z2Bt3ownRClB2BJw=",
+        "config": "sha256-ELIxjYcTIMpmyGt6RMtETOp2d+B4obFH1OBkaViofb4=",
+        "tokenizer": {
+          "tokenizer.json": "sha256-eePlImNfMXEwCRO7QhRkqH3mIiGCoFcLmyzLoqlksrQ="
+        }
+      }
+    },
+    "Phi-3.5-mini-instruct-q4f16_1-MLC": {
+      "revision": "206a7da25b5efbef7b50502993367fcb05183a1d",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-GqzXBxXEv2fOkysw7Jub5l+dXWWj91CzcGb0QJfCakk=",
+        "config": "sha256-kzcjPCZN4TBVviyuS+LjT2OHBkjB27op96BwjYvJxgs=",
+        "tokenizer": {
+          "tokenizer.model": "sha256-nlVq/UQhO2vRviuFDru9mPVIFDeoAhr69Y7n+xgY00c=",
+          "tokenizer.json": "sha256-nirj1mgZ8WPNz+26UHjzo6+BGMJxJJHtYJEvd4hr2m8="
+        }
+      }
+    },
+    "gemma-2-2b-it-q4f16_1-MLC": {
+      "revision": "de9cc76f0d4b3a49a0f718df424944054bf1eec1",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-2Y2kvZPggfA3bZwTLvG1uYPrMcOcZI6xC1ZPJRvdnnA=",
+        "config": "sha256-TSlU7CRZ/n08994e27p+wk3ySYzpdpSC5Jdyt4EWWmc=",
+        "tokenizer": {
+          "tokenizer.model": "sha256-YaexRzkMZFhdbDVD3W/GNpBsmvOGWlVI8n8xruHUyOI=",
+          "tokenizer.json": "sha256-PyibwFEyY1qLx6ynqiElXv1eGPNxD0PjzblrzUG+SSI="
+        }
+      }
+    },
+    "Qwen2.5-1.5B-Instruct-q4f16_1-MLC": {
+      "revision": "9bd564b064631febf14deadcac492efb761d60c3",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-Q2Rira1AfgkU0jUP1FKlo9mD4AMdd8lAxD6jUcjNMAA=",
+        "config": "sha256-faSVQhLT8hqRzD5pPRefYyE/1XNWeWhH9l1/lUeKH54=",
+        "tokenizer": {
+          "tokenizer.json": "sha256-wDghF+oynN8JcEETL21zWSS2l5JNb2/DlFcT6WzodTk="
+        }
+      }
+    },
+    "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC": {
+      "revision": "aa4e41dd1861bb2469f9ddfb8fa3054b857a00ed",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-5R3+7JHaMgUUX52KnJac/WxR5lvS3Ekw15h3kYX4Szg=",
+        "config": "sha256-du9pU7ZeUXL2kaA2zfYnwz2GS28LerRY1A74RsnN/8Y=",
+        "tokenizer": {
+          "tokenizer.model": "sha256-nlVq/UQhO2vRviuFDru9mPVIFDeoAhr69Y7n+xgY00c=",
+          "tokenizer.json": "sha256-vNBPDq35Aoe9JuGhg6xIfYoUGwmwauy3clu900NkDy4="
+        }
+      }
+    },
+    "RedPajama-INCITE-Chat-3B-v1-q4f16_1-MLC": {
+      "revision": "3400b5d0cd1a7721031c6507ae6d9d6ba3b6e1bd",
+      "libCommit": "00fe7a40e57e5e8eb9fef87526a4bf28ad5846c0",
+      "integrity": {
+        "model_lib": "sha256-nY35GB11eMorRlE3BdscIwQjZyoRYTWCSd9HsDjUcX4=",
+        "config": "sha256-bz2F2Rpn3pDnusa3fwglqMzSytbxAKD3mGQoQGe3Xmg=",
+        "tokenizer": {
+          "tokenizer.json": "sha256-PPQwZ4E3yEkcqC+3CS7knkStOIV//+HkpKXthgE5pbg="
+        }
+      }
+    }
+  }
+}
