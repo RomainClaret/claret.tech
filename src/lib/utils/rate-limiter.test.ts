@@ -133,6 +133,32 @@ describe("rate-limiter", () => {
       expect((await rateLimit(spoofed, okHandler)).status).toBe(429);
     });
 
+    it("keys a client by an address only, so junk in the header mints no bucket", async () => {
+      // A direct client of next start sends its own x-real-ip, and the key
+      // took it verbatim, any length (security audit run 1, hardening).
+      for (let i = 0; i < RATE_LIMIT_CONFIG.maxRequests; i++) {
+        await rateLimit(
+          makeRequest({
+            "x-real-ip": `junk-${i}-${"x".repeat(2000)}`,
+            "user-agent": "junk-probe",
+          }),
+          okHandler,
+        );
+      }
+      const next = makeRequest({
+        "x-real-ip": "not-an-address",
+        "user-agent": "junk-probe",
+      });
+      expect((await rateLimit(next, okHandler)).status).toBe(429);
+
+      // Real addresses, v4 and v6, still count apart.
+      for (const ip of ["192.0.2.10", "2001:db8::10"]) {
+        expect(
+          (await rateLimit(makeRequest({ "x-real-ip": ip }), okHandler)).status,
+        ).toBe(200);
+      }
+    });
+
     it("tolerates an undefined request without throwing", async () => {
       // getClientId swallows the undefined access and falls back to "unknown".
       const res = await rateLimit(

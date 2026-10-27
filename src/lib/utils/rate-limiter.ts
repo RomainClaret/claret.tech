@@ -39,6 +39,10 @@ function cleanupExpiredEntries(): void {
 // Run cleanup every 5 minutes
 setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
 
+/** An IPv4 or IPv6 address, as Vercel's edge sets one; nothing longer. */
+const ADDRESS =
+  /^(?:\d{1,3}(?:\.\d{1,3}){3}|(?=[0-9A-Fa-f:.]{2,45}$)[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*)$/;
+
 /**
  * Get client identifier from request
  */
@@ -60,8 +64,11 @@ function getClientId(request: NextRequest): string {
   const forwarded = getHeader("x-forwarded-for");
   const realIp = getHeader("x-real-ip");
 
-  // Use the first available IP
-  const ip = realIp || forwarded?.split(",")[0] || "unknown";
+  // The first available address, and only an address: a direct client of
+  // next start sends its own header, which was taken verbatim, any length,
+  // a fresh bucket per value. Anything else shares the "unknown" bucket.
+  const candidate = (realIp || forwarded?.split(",")[0] || "").trim();
+  const ip = ADDRESS.test(candidate) ? candidate : "unknown";
 
   // Combine IP with User-Agent for better fingerprinting
   const userAgent = getHeader("user-agent") || "unknown";
