@@ -400,4 +400,27 @@ Final paragraph.`;
       expect(duration).toBeLessThan(2000);
     });
   });
+
+  // Only DOMPurify in the legal components removed these before (security
+  // audit run 1, hardening): the renderer escapes on its own now.
+  describe("Escaping on its own", () => {
+    it("escapes a heading's text", () => {
+      expect(renderMarkdownToHtml("# <img src=x onerror=alert(1)>")).toBe(
+        "<h1>&lt;img src=x onerror=alert(1)&gt;</h1>",
+      );
+    });
+
+    it("passes only an exact code-block placeholder line through", () => {
+      const html = renderMarkdownToHtml(
+        "x __CODE_BLOCK_0__ <script>y</script>",
+      );
+      expect(html).not.toContain("<script>");
+    });
+
+    it("keeps $& and $' in code as they are", () => {
+      const html = renderMarkdownToHtml("```\na $& b $' c\n```\n\n`$&`");
+      expect(html).toContain("<pre><code>a $&amp; b $&#39; c</code></pre>");
+      expect(html).toContain("<code>$&amp;</code>");
+    });
+  });
 });

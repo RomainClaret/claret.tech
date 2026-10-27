@@ -41,17 +41,19 @@ export function renderMarkdownToHtml(markdown: string): string {
   html = processBlockElements(html);
 
   // Step 4: Restore code blocks and inline code
+  // A function, not a string, as the replacement: in a string, "$&" and
+  // "$'" in the code would expand.
   codeBlocks.forEach((code, index) => {
     html = html.replace(
       `__CODE_BLOCK_${index}__`,
-      `<pre><code>${escapeHtml(code)}</code></pre>`,
+      () => `<pre><code>${escapeHtml(code)}</code></pre>`,
     );
   });
 
   inlineCodes.forEach((code, index) => {
     html = html.replace(
       `__INLINE_CODE_${index}__`,
-      `<code>${escapeHtml(code)}</code>`,
+      () => `<code>${escapeHtml(code)}</code>`,
     );
   });
 
@@ -63,6 +65,12 @@ export function renderMarkdownToHtml(markdown: string): string {
 
   return html;
 }
+
+/**
+ * A code block's placeholder, alone on its line: only that passes through
+ * unwrapped (any line holding the text did, unescaped).
+ */
+const CODE_BLOCK_LINE = /^__CODE_BLOCK_\d+__$/;
 
 function processBlockElements(content: string): string {
   const lines = content.split("\n");
@@ -76,7 +84,7 @@ function processBlockElements(content: string): string {
     if (line.match(/^#{1,3}\s+/)) {
       const level = line.match(/^#+/)?.[0].length || 1;
       const text = line.replace(/^#+\s*/, "").trim();
-      result.push(`<h${level}>${text}</h${level}>`);
+      result.push(`<h${level}>${processInlineElements(text)}</h${level}>`);
       i++;
     }
     // Blockquotes
@@ -117,7 +125,7 @@ function processBlockElements(content: string): string {
       i++;
     }
     // Code block placeholders (should not be wrapped in paragraphs)
-    else if (line.includes("__CODE_BLOCK_")) {
+    else if (CODE_BLOCK_LINE.test(line)) {
       result.push(line);
       i++;
     }
@@ -130,7 +138,7 @@ function processBlockElements(content: string): string {
         !lines[i].match(/^>\s+/) &&
         !lines[i].match(/^-\s+/) &&
         !lines[i].match(/^\d+\.\s+/) &&
-        !lines[i].includes("__CODE_BLOCK_") &&
+        !CODE_BLOCK_LINE.test(lines[i]) &&
         lines[i].trim() !== ""
       ) {
         paragraphLines.push(lines[i]);
