@@ -418,6 +418,9 @@ const nextConfig = {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
           },
+          // Only this site's pages may load it: the files are large and
+          // draw on the plan's shared monthly transfer.
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },
       {
@@ -550,6 +553,9 @@ const nextConfig = {
             key: "Cache-Control",
             value: "public, max-age=86400, stale-while-revalidate=2592000",
           },
+          // Only this site's pages may load it: the files are large and
+          // draw on the plan's shared monthly transfer.
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },
       // Do NOT add a Cache-Control rule for /_next/static here. Next applies

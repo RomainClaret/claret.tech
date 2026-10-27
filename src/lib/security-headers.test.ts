@@ -57,6 +57,27 @@ async function readHeaders(): Promise<Map<string, string>> {
   return new Map(rule!.headers.map((h) => [h.key, h.value]));
 }
 
+describe("the large static files", () => {
+  // The Pyodide runtime (a 9.6 MB wasm) and the PDFs draw on the plan's
+  // shared monthly transfer. Same-origin keeps another site from making its
+  // visitors' browsers fetch them; the site's own worker and pdf.js load
+  // them same-origin, and opening a PDF in a tab is a navigation, which the
+  // header does not touch (security audit run 1, lead 12).
+  it.each(["/pyodide/:path*", "/pdfs/:path*"])(
+    "%s may be loaded by this site's pages only",
+    async (source) => {
+      const rules = (await (
+        nextConfig as { headers: () => Promise<HeaderRule[]> }
+      ).headers()) as HeaderRule[];
+      const rule = rules.find((r) => r.source === source);
+      expect(rule?.headers).toContainEqual({
+        key: "Cross-Origin-Resource-Policy",
+        value: "same-origin",
+      });
+    },
+  );
+});
+
 describe("security headers (next.config)", () => {
   it("sets the expected security response headers on all paths", async () => {
     const headers = await securityHeaderMap();
