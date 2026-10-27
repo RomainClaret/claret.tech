@@ -167,7 +167,7 @@ jobs:
        needs.detect-changes.outputs.tests == 'true')
     strategy:
       matrix:
-        check: [lint, format, type-check, knip, actionlint]
+        check: [lint, format, type-check, knip, actionlint, audit]
       fail-fast: false
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -175,8 +175,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      # actionlint runs from its Docker image and needs no dependencies.
-      - if: matrix.check != 'actionlint'
+      # actionlint runs from its Docker image and audit reads the lockfile:
+      # neither needs the dependencies.
+      - if: matrix.check != 'actionlint' && matrix.check != 'audit'
         run: npm ci
       # actionlint runs from its image through the host's Docker, which act
       # gives jobs no access to (.actrc): under act it runs on the host.
@@ -200,6 +201,11 @@ jobs:
               ;;
             actionlint)
               npm run lint:workflows
+              ;;
+            audit)
+              # What the site runs, at high and above: a known hole in a
+              # runtime dependency fails CI (security audit run 1).
+              npm audit --omit=dev --audit-level=high
               ;;
           esac
 

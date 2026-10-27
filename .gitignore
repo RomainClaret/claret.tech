@@ -27,9 +27,18 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Local env files
+# Local env files: every .env variant but the two examples, and other
+# credential files (security audit run 1, hardening).
 .env
+.env.*
 .env*.local
+!.env.example
+!.env.act.local.example
+*.key
+*.p12
+*.pfx
+.npmrc
+.netrc
 
 # Vercel
 .vercel
