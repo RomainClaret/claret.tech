@@ -318,4 +318,27 @@ describe("Terminal commands", () => {
 
     expect(term.writes.join("")).not.toContain("after the cancel");
   });
+
+  it("echoes a paste without its control sequences", async () => {
+    // A paste arrives as one chunk and was echoed raw: its escape sequences
+    // cleared the screen or hid a link (security audit run 1, hardening).
+    xterm.release();
+    render(<Terminal isOpen onClose={() => {}} />);
+    advance(200);
+    await settle();
+    const term = xterm.instances.at(-1)!;
+    const before = term.writes.length;
+
+    act(() => {
+      term.dataHandler!(
+        "ls\u001b[2J\u001b]8;;https://evil.example\u0007here\u001b]8;;\u0007\u009b2J",
+      );
+    });
+
+    const echoed = term.writes.slice(before).join("");
+    expect(echoed).toContain("ls");
+    expect(echoed).not.toContain("\u001b[2J");
+    expect(echoed).not.toContain("\u001b]8");
+    expect(echoed).not.toContain("\u009b");
+  });
 });

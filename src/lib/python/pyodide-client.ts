@@ -185,7 +185,10 @@ export class PythonClient {
 
         switch (msg.t) {
           case "boot":
-            onProgress?.(msg.phase);
+            // Only while booting: the user's own code reaches postMessage,
+            // and a late "boot" made the reporter write cursor sequences
+            // over the output.
+            if (!this.bootInfo) onProgress?.(msg.phase);
             return;
 
           case "ready": {

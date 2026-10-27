@@ -223,6 +223,27 @@ describe("PythonClient boot", () => {
     });
   });
 
+  it("takes no boot progress once the interpreter is up", async () => {
+    // The user's own code reaches postMessage: a "boot" after "ready" made
+    // the boot reporter write its cursor sequences over the output
+    // (security audit run 1, hardening).
+    const phases: string[] = [];
+    const ready = client.ensureReady([], (phase) => phases.push(phase));
+    const worker = currentWorker();
+    worker.emit({ t: "boot", phase: "downloading" });
+    worker.emit({
+      t: "ready",
+      python: PYTHON_VERSION,
+      pyodide: PYODIDE_VERSION,
+      missing: [],
+    });
+    await ready;
+
+    worker.emit({ t: "boot", phase: "booting" });
+
+    expect(phases).toEqual(["downloading"]);
+  });
+
   it("reports vendored packages whose wheel failed to load", async () => {
     await bootClient(client, ["numpy"]);
 

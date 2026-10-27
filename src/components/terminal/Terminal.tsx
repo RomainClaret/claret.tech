@@ -15,6 +15,7 @@ import { terminalConfig } from "@/data/portfolio";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import { logError } from "@/lib/utils/dev-logger";
+import { sanitizePythonOutput } from "@/lib/python/sanitize";
 import "@xterm/xterm/css/xterm.css";
 
 // Type imports for TypeScript
@@ -1392,7 +1393,13 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               term.write(data);
             }
           } else if (code >= 32) {
-            // Printable characters
+            // Printable characters. A paste arrives as one chunk, and its
+            // escape sequences were echoed raw (a clear, a hidden link):
+            // sequences go, and line breaks become spaces in this one line.
+            const typed =
+              data.length > 1
+                ? sanitizePythonOutput(data).replace(/[\t\n]+/g, " ")
+                : data;
             const oldLineCount = getWrappedLineCount(
               inputBufferRef.current,
               term.cols,
@@ -1401,7 +1408,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
 
             inputBufferRef.current =
               inputBufferRef.current.slice(0, cursorPosRef.current) +
-              data +
+              typed +
               inputBufferRef.current.slice(cursorPosRef.current);
             updatePermanentBackup();
 
@@ -1410,7 +1417,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               term.cols,
             );
             const isAtEnd = cursorPosRef.current === oldText.length;
-            const isSingleChar = data.length === 1;
+            const isSingleChar = typed.length === 1;
 
             // Check if we need to re-render due to line wrapping changes
             // Only clear/re-render when typing in the middle, not at the end
@@ -1428,7 +1435,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               writeWrappedInput(term, inputBufferRef.current);
 
               // Update cursor position
-              cursorPosRef.current += data.length;
+              cursorPosRef.current += typed.length;
               updatePermanentBackup();
 
               // Move cursor to correct position if not at end
@@ -1488,7 +1495,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                 writeWrappedInput(term, inputBufferRef.current);
               } else {
                 // No wrap needed, just write the character
-                term.write(data);
+                term.write(typed);
                 cursorPosRef.current++;
                 updatePermanentBackup();
               }
@@ -1502,7 +1509,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
               term.write("\x1b[?25l");
 
               // Write new character and shift remaining text
-              term.write(data + remainingText);
+              term.write(typed + remainingText);
               cursorPosRef.current++;
               updatePermanentBackup();
 
@@ -1519,7 +1526,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                 // Pasting at end - need full re-render to handle wrapping
                 clearWrappedInput(term, oldText);
 
-                cursorPosRef.current += data.length;
+                cursorPosRef.current += typed.length;
                 updatePermanentBackup();
                 writePrompt();
                 writeWrappedInput(term, inputBufferRef.current);
@@ -1527,7 +1534,7 @@ export function Terminal({ isOpen, onClose }: TerminalProps) {
                 // Pasting in middle - need full re-render
                 clearWrappedInput(term, oldText);
 
-                cursorPosRef.current += data.length;
+                cursorPosRef.current += typed.length;
                 updatePermanentBackup();
                 writePrompt();
                 writeWrappedInput(term, inputBufferRef.current);

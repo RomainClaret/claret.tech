@@ -4,6 +4,7 @@ import {
   WebLLMConfig,
   AIModelInfo,
 } from "@/types/webllm";
+import { sanitizePythonOutput } from "@/lib/python/sanitize";
 
 /** The WebLLM client class, as the dynamic import returns it. */
 interface WebLLMClientClass {
@@ -215,7 +216,7 @@ export const aiCommands: Record<string, CommandFunction> = {
 
                 // Write new progress (always 2 lines)
                 context.writer(`${progressBar}\r\n`);
-                context.writer(shortText);
+                context.writer(sanitizePythonOutput(shortText));
               } else {
                 // Fallback: collect progress for later display
                 progressSteps.push(`${progressBar}\n${shortText}`);
@@ -292,7 +293,9 @@ export const aiCommands: Record<string, CommandFunction> = {
             if (isCancelled) {
               context.writer("✗ AI model initialization canceled");
             } else {
-              context.writer(`✗ Error loading model: ${errorMessage}`);
+              context.writer(
+                `✗ Error loading model: ${sanitizePythonOutput(errorMessage)}`,
+              );
             }
           }
 
@@ -308,7 +311,7 @@ export const aiCommands: Record<string, CommandFunction> = {
             if (isCancelled) {
               fallbackErrorOutput += "✗ AI model initialization canceled";
             } else {
-              fallbackErrorOutput += `✗ Error loading model: ${errorMessage}`;
+              fallbackErrorOutput += `✗ Error loading model: ${sanitizePythonOutput(errorMessage)}`;
             }
           }
 
@@ -440,7 +443,9 @@ export const aiCommands: Record<string, CommandFunction> = {
       // Add AI response to chat history
       aiState.chatHistory.push({ role: "assistant", content: aiResponse });
 
-      output += aiResponse;
+      // The model's text is third-party output, as Python's is: no escape
+      // sequence reaches the screen.
+      output += sanitizePythonOutput(aiResponse);
 
       return {
         output,
@@ -497,7 +502,9 @@ export const aiCommands: Record<string, CommandFunction> = {
       // Add AI response to chat history
       aiState.chatHistory.push({ role: "assistant", content: aiResponse });
 
-      output += aiResponse;
+      // The model's text is third-party output, as Python's is: no escape
+      // sequence reaches the screen.
+      output += sanitizePythonOutput(aiResponse);
       output += `\n\n[Streamed ${tokenCount} tokens in ${duration}s]`;
 
       return {
