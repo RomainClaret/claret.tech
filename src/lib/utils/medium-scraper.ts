@@ -530,22 +530,3 @@ export async function cleanMediumCache(): Promise<void> {
     await saveCache(cache);
   }
 }
-
-// Get all cached colors for client-side use
-export async function getCachedColors(): Promise<{
-  [key: string]: { color: string; image: string };
-}> {
-  const cache = await loadCache();
-  const colors: { [key: string]: { color: string; image: string } } = {};
-
-  for (const [url, entry] of Object.entries(cache)) {
-    if (entry.color && entry.expiresAt > Date.now()) {
-      colors[url] = {
-        color: entry.color,
-        image: entry.image || "",
-      };
-    }
-  }
-
-  return colors;
-}

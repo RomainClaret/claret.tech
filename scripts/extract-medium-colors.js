@@ -22,64 +22,6 @@ function mediumRssUrl(value = process.env.NEXT_PUBLIC_MEDIUM_USERNAME) {
 const OUTPUT_FILE = path.join(__dirname, "../src/lib/utils/medium-colors.json");
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
-// Extract thumbnail from Medium RSS item
-function extractMediumThumbnail(item) {
-  // Check for thumbnail field
-  if (item.thumbnail && item.thumbnail !== "") {
-    return item.thumbnail;
-  }
-
-  // Check for enclosure field (common in RSS)
-  if (item.enclosure && item.enclosure.link) {
-    return item.enclosure.link;
-  }
-
-  // Check if enclosure has url property
-  if (item.enclosure && item.enclosure.url) {
-    return item.enclosure.url;
-  }
-
-  // Check content for images (most reliable for Medium)
-  if (item.content) {
-    return extractMediumImage(item.content);
-  }
-
-  // Check description for images as fallback
-  if (item.description) {
-    return extractMediumImage(item.description);
-  }
-
-  return null;
-}
-
-// Extract image from HTML content
-function extractMediumImage(content) {
-  if (!content || typeof content !== "string") {
-    return null;
-  }
-
-  // Try to find img tag with src attribute
-  const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (imgMatch && imgMatch[1]) {
-    return imgMatch[1];
-  }
-
-  // Try to find Medium CDN URLs in the content
-  const cdnPatterns = [
-    /https:\/\/cdn-images-\d+\.medium\.com\/[^\s"'<>]+/i,
-    /https:\/\/miro\.medium\.com\/[^\s"'<>]+/i,
-  ];
-
-  for (const pattern of cdnPatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      return match[0];
-    }
-  }
-
-  return null;
-}
-
 // Blog category colors for fallback
 const BLOG_COLORS = {
   ai: "rgb(59, 130, 246)", // Blue
@@ -150,20 +92,18 @@ async function extractMediumColors(outputFile = OUTPUT_FILE) {
     const colorMap = {};
 
     for (const post of posts) {
-      const imageUrl = extractMediumThumbnail(post);
       const postId = post.guid || post.link;
       // The post's category picks its color: taking one from the thumbnail
-      // was never written (a stub returned null for every image).
+      // was never written (a stub returned null for every image). Only the
+      // color is kept: the file ships whole in the client bundle, which
+      // needs nothing else (no image URL, no title).
       const category = getCategoryFromPost(post);
       colorMap[postId] = {
         color: BLOG_COLORS[category] || BLOG_COLORS.default,
-        image: imageUrl || null,
-        title: post.title,
-        category,
       };
 
       console.log(
-        `  ✓ ${post.title.substring(0, 50)}... -> ${colorMap[postId].color}${imageUrl ? "" : " (no image)"}`,
+        `  ✓ ${post.title.substring(0, 50)}... -> ${colorMap[postId].color}`,
       );
     }
 

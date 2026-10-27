@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   fetchMediumArticle,
   cleanMediumCache,
-  getCachedColors,
 } from "@/lib/utils/medium-scraper";
 import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
@@ -45,10 +44,7 @@ async function handler() {
     }
 
     // Medium's own RSS feed, cached for an hour
-    const data = await fetchMediumFeed<{
-      items?: MediumPost[];
-      cachedColors?: unknown;
-    }>(username);
+    const data = await fetchMediumFeed<{ items?: MediumPost[] }>(username);
 
     // Each post's picture comes from the feed, through the site's own
     // route, which serves only what the feed names (src/lib/blog-images);
@@ -70,15 +66,6 @@ async function handler() {
       data.items = enrichedItems;
     }
 
-    // Get all cached colors for client-side use (non-fatal if it fails)
-    try {
-      const cachedColors = await getCachedColors();
-      data.cachedColors = cachedColors;
-    } catch (error) {
-      logError(error, "Failed to get cached colors");
-      data.cachedColors = {}; // Provide empty colors object as fallback
-    }
-
     return NextResponse.json(data, {
       headers: {
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
@@ -91,7 +78,7 @@ async function handler() {
     // five minutes, so the posts come back soon after the feed does.
     logError(error, "Error fetching Medium posts");
     return NextResponse.json(
-      { status: "unavailable", items: [], cachedColors: {} },
+      { status: "unavailable", items: [] },
       {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",

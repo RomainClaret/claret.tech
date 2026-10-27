@@ -1,14 +1,8 @@
 {
   "https://medium.com/p/fad548bb9bfb": {
-    "color": "rgb(16, 185, 129)",
-    "image": "https://cdn-images-1.medium.com/max/1024/0*foSWTIlQM-cdYK3S",
-    "title": "Call me Liz.",
-    "category": "technology"
+    "color": "rgb(16, 185, 129)"
   },
   "https://medium.com/p/ffba38a04a95": {
-    "color": "rgb(236, 72, 153)",
-    "image": "https://cdn-images-1.medium.com/max/1024/0*EKYFWiak9n1vXniX",
-    "title": "Writing, what a story…",
-    "category": "story"
+    "color": "rgb(236, 72, 153)"
   }
 }

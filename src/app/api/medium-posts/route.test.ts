@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => {
     },
     fetchMediumArticle: vi.fn(),
     cleanMediumCache: vi.fn(),
-    getCachedColors: vi.fn(),
   };
 });
 
@@ -42,7 +41,6 @@ vi.mock("next/server", () => ({
 vi.mock("@/lib/utils/medium-scraper", () => ({
   fetchMediumArticle: mocks.fetchMediumArticle,
   cleanMediumCache: mocks.cleanMediumCache,
-  getCachedColors: mocks.getCachedColors,
 }));
 
 // Set up global fetch mock
@@ -53,7 +51,6 @@ let GET: typeof import("./route").GET;
 
 const mockFetchMediumArticle = mocks.fetchMediumArticle as Mock;
 const mockCleanMediumCache = mocks.cleanMediumCache as Mock;
-const mockGetCachedColors = mocks.getCachedColors as Mock;
 const mockFetch = mocks.fetch as Mock;
 const mockNextResponse = mocks.NextResponse as { json: Mock };
 
@@ -94,7 +91,7 @@ describe("Medium Posts API Route", () => {
 
   /** What the route answers while the feed cannot be had. */
   const UNAVAILABLE = [
-    { status: "unavailable", items: [], cachedColors: {} },
+    { status: "unavailable", items: [] },
     {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
@@ -105,11 +102,6 @@ describe("Medium Posts API Route", () => {
   const mockEnrichedData = {
     image: "https://medium.com/better-image.jpg",
     color: "#3178c6",
-  };
-
-  const mockCachedColors = {
-    "test-post": "#3178c6",
-    "another-post": "#f1e05a",
   };
 
   beforeEach(async () => {
@@ -144,7 +136,6 @@ describe("Medium Posts API Route", () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
         new NextRequest("http://localhost:3000/api/medium-posts"),
@@ -165,9 +156,6 @@ describe("Medium Posts API Route", () => {
       // Verify article enrichment was called
       expect(mockFetchMediumArticle).toHaveBeenCalledWith(mockMediumPost.link);
 
-      // Verify cached colors were retrieved
-      expect(mockGetCachedColors).toHaveBeenCalled();
-
       const result = await response.json();
       expect(result.status).toBe("ok");
       expect(result.items).toHaveLength(1);
@@ -177,7 +165,9 @@ describe("Medium Posts API Route", () => {
         image: PICTURE_PATH,
         enrichedColor: mockEnrichedData.color,
       });
-      expect(result.cachedColors).toEqual(mockCachedColors);
+      // Only the posts: the scraped image URLs it sent as cachedColors went
+      // unused (security audit run 1, hardening).
+      expect(result).not.toHaveProperty("cachedColors");
     });
 
     it("serves the feed to a request that says ?playwright=true", async () => {
@@ -187,7 +177,6 @@ describe("Medium Posts API Route", () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
         new NextRequest(
@@ -208,7 +197,6 @@ describe("Medium Posts API Route", () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce({});
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
@@ -226,7 +214,6 @@ describe("Medium Posts API Route", () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce({});
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
@@ -299,8 +286,6 @@ describe("Medium Posts API Route", () => {
         new Error("Scraping failed"),
       );
 
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
-
       const response = await GET(
         new NextRequest("http://localhost:3000/api/medium-posts"),
       );
@@ -330,7 +315,6 @@ describe("Medium Posts API Route", () => {
       );
       // The article page's own image is not what the card shows.
       mockFetchMediumArticle.mockResolvedValue(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
         new NextRequest("http://localhost:3000/api/medium-posts"),
@@ -348,7 +332,6 @@ describe("Medium Posts API Route", () => {
     it("handles empty items array gracefully", async () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([])));
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       const response = await GET(
         new NextRequest("http://localhost:3000/api/medium-posts"),
@@ -356,7 +339,6 @@ describe("Medium Posts API Route", () => {
 
       const result = await response.json();
       expect(result.items).toEqual([]);
-      expect(result.cachedColors).toEqual(mockCachedColors);
     });
 
     it("handles cache operation errors gracefully", async () => {
@@ -365,9 +347,6 @@ describe("Medium Posts API Route", () => {
 
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-
-      // Getting cached colors fails
-      mockGetCachedColors.mockRejectedValueOnce(new Error("Cache read error"));
 
       // Should still work despite cache errors
       const response = await GET(
@@ -383,7 +362,6 @@ describe("Medium Posts API Route", () => {
       mockCleanMediumCache.mockResolvedValueOnce(undefined);
       mockFetch.mockResolvedValueOnce(answer(feed([mockMediumPost])));
       mockFetchMediumArticle.mockResolvedValueOnce(mockEnrichedData);
-      mockGetCachedColors.mockResolvedValueOnce(mockCachedColors);
 
       await GET(new NextRequest("http://localhost:3000/api/medium-posts"));
 
