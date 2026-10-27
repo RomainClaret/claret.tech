@@ -6,9 +6,6 @@
 const fs = require("fs").promises;
 const path = require("path");
 
-// Load environment variables
-require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
-
 // Configurable map of abbreviated author names (as returned by academic APIs)
 // to canonical full names. Shared with the runtime API route; edit
 // src/lib/api/author-name-fixes.json to extend.
@@ -37,7 +34,7 @@ function httpsGet(url) {
               }
             } else {
               console.error(`API returned status ${res.statusCode}`);
-              console.error(`Response: ${data}`);
+              console.error(`Response: ${logText(data)}`);
               resolve({ ok: false, status: res.statusCode, data });
             }
           });
@@ -48,7 +45,86 @@ function httpsGet(url) {
 }
 
 // Simple implementation without TypeScript compilation
+/**
+ * Third-party text for the job log, on one line: a line of it starting with
+ * "::" was a workflow command to GitHub Actions.
+ */
+function logText(value) {
+  return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/::/g, ": :");
+}
+
+/** A fetched paper with only https links: its url fields come from an API. */
+function httpsOnly(pub) {
+  const out = { ...pub };
+  for (const [key, value] of Object.entries(out)) {
+    if (
+      /url$/i.test(key) &&
+      typeof value === "string" &&
+      !/^https:\/\//i.test(value)
+    ) {
+      delete out[key];
+    }
+  }
+  return out;
+}
+
+/**
+ * The fetched papers merged with the saved file.
+ *  - field level: for a paper the fetch returned that already existed, start
+ *    from the existing entry and overlay only the fresh, non-empty fetched
+ *    values. This keeps manually-curated fields the API omits or returns
+ *    empty (e.g. openAccessUrl) while still refreshing citations, etc., and
+ *    preserves the existing key order (so an unchanged run stays a no-op).
+ *  - paper level: re-add any existing paper this run did not return at all
+ *    (Semantic Scholar unauthenticated frequently rate-limits CI runners).
+ * Ids match ids and titles match titles, in maps of their own: in one map a
+ * fetched paper titled like a curated id merged onto that record and took
+ * its PDFs and links.
+ */
+function mergeWithExisting(fetched, existing) {
+  const publications = fetched.map(httpsOnly);
+  if (!existing || !Array.isArray(existing.publications)) return publications;
+  const key = (value) => (value || "").toString().toLowerCase().trim();
+  const byId = new Map();
+  const byTitle = new Map();
+  for (const old of existing.publications) {
+    if (old.id) byId.set(key(old.id), old);
+    if (old.title) byTitle.set(key(old.title), old);
+  }
+  const matchOf = (pub) =>
+    (pub.id && byId.get(key(pub.id))) ||
+    (pub.title && byTitle.get(key(pub.title))) ||
+    null;
+
+  const matched = new Set();
+  for (let i = 0; i < publications.length; i++) {
+    const old = matchOf(publications[i]);
+    if (!old) continue;
+    matched.add(old);
+    const merged = { ...old };
+    for (const [k, v] of Object.entries(publications[i])) {
+      if (v !== undefined && v !== null && v !== "") merged[k] = v;
+    }
+    publications[i] = merged;
+  }
+  for (const old of existing.publications) {
+    if (!matched.has(old)) publications.push(old);
+  }
+  return publications;
+}
+
+/** Canonical author names; own entries of the map only. */
+function fixAuthor(name) {
+  return Object.hasOwn(AUTHOR_NAME_FIXES, name)
+    ? AUTHOR_NAME_FIXES[name]
+    : name;
+}
+
 async function fetchPublicationsSimple() {
+  // The keys, for a local run; CI passes them in the environment.
+  require("dotenv").config({ path: path.join(__dirname, "..", ".env.local") });
   try {
     console.log("🔍 Fetching publications from academic sources...\n");
 
@@ -162,7 +238,7 @@ async function fetchPublicationsSimple() {
           // Show first paper as example
           if (papers.length > 0) {
             console.log("\nFirst paper example:");
-            console.log(`- Title: ${papers[0].title}`);
+            console.log(`- Title: ${logText(papers[0].title)}`);
             console.log(`- Year: ${papers[0].year}`);
             console.log(`- Citations: ${papers[0].citationCount}`);
           }
@@ -179,54 +255,16 @@ async function fetchPublicationsSimple() {
       console.log("⚠️  No Semantic Scholar ID configured");
     }
 
-    // Merge with the previously-saved file:
-    //  - field level: for a paper the fetch returned that already existed, start
-    //    from the existing entry and overlay only the fresh, non-empty fetched
-    //    values. This keeps manually-curated fields the API omits or returns
-    //    empty (e.g. openAccessUrl) while still refreshing citations, etc., and
-    //    preserves the existing key order (so an unchanged run stays a no-op).
-    //  - paper level: re-add any existing paper this run did not return at all
-    //    (Semantic Scholar unauthenticated frequently rate-limits CI runners).
-    if (existing && Array.isArray(existing.publications)) {
-      const idKey = (p) =>
-        (p.id || p.title || "").toString().toLowerCase().trim();
-      const titleKey = (p) => (p.title || "").toString().toLowerCase().trim();
-
-      const existingByKey = new Map();
-      for (const old of existing.publications) {
-        existingByKey.set(idKey(old), old);
-        existingByKey.set(titleKey(old), old);
-      }
-
-      // Field-level merge onto matched papers.
-      for (let i = 0; i < publications.length; i++) {
-        const pub = publications[i];
-        const old =
-          existingByKey.get(idKey(pub)) || existingByKey.get(titleKey(pub));
-        if (!old) continue;
-        const merged = { ...old };
-        for (const [k, v] of Object.entries(pub)) {
-          if (v !== undefined && v !== null && v !== "") merged[k] = v;
-        }
-        publications[i] = merged;
-      }
-
-      // Paper-level: preserve existing papers not returned this run.
-      const haveIds = new Set(publications.map(idKey));
-      const haveTitles = new Set(publications.map(titleKey));
-      let preserved = 0;
-      for (const old of existing.publications) {
-        if (haveIds.has(idKey(old)) || haveTitles.has(titleKey(old))) continue;
-        publications.push(old);
-        haveIds.add(idKey(old));
-        haveTitles.add(titleKey(old));
-        preserved++;
-      }
-      if (preserved > 0) {
-        console.log(
-          `↻ Preserved ${preserved} existing publication(s) not returned this run (merge).`,
-        );
-      }
+    // Merge with the previously-saved file (mergeWithExisting).
+    const before = publications.length;
+    const mergedPublications = mergeWithExisting(publications, existing);
+    publications.length = 0;
+    publications.push(...mergedPublications);
+    const preserved = publications.length - before;
+    if (preserved > 0) {
+      console.log(
+        `↻ Preserved ${preserved} existing publication(s) not returned this run (merge).`,
+      );
     }
 
     // Normalize author names (academic APIs abbreviate; map -> canonical full
@@ -234,7 +272,7 @@ async function fetchPublicationsSimple() {
     // so it covers static, fetched, and preserved entries.
     for (const pub of publications) {
       if (Array.isArray(pub.authors)) {
-        pub.authors = pub.authors.map((a) => AUTHOR_NAME_FIXES[a] || a);
+        pub.authors = pub.authors.map(fixAuthor);
       }
     }
 
@@ -293,3 +331,5 @@ async function fetchPublicationsSimple() {
 if (require.main === module) {
   fetchPublicationsSimple();
 }
+
+module.exports = { mergeWithExisting, logText };

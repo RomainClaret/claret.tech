@@ -5,19 +5,25 @@ name: Update Publications
 on:
   workflow_dispatch:
 
+# Each job asks for what it needs: the fetch runs third-party data and the
+# install scripts with a read-only token, and the job that can write opens
+# the pull request alone, with no install and no third-party input but the
+# file it reviews.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  update-publications:
+  fetch:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.check-changes.outputs.changed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -26,7 +32,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # The fetch needs dotenv alone: no package's install script runs.
+        run: npm ci --ignore-scripts
 
       - name: Fetch publications
         env:
@@ -42,6 +49,34 @@ jobs:
         run: |
           git diff --quiet public/publications.json || echo "changed=true" >> "$GITHUB_OUTPUT"
 
+      - name: Keep the fetched file
+        if: steps.check-changes.outputs.changed == 'true'
+        # As every upload (ci-workflows.test.ts): a failed upload still shows,
+        # as the pull-request job's download fails.
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: publications
+          path: public/publications.json
+          retention-days: 1
+
+  pull-request:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Take the fetched file
+        uses: actions/download-artifact@v8
+        with:
+          name: publications
+          path: public
+
       - name: Get current date
         id: date
         run: echo "date=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
@@ -49,21 +84,22 @@ jobs:
       - name: Create Pull Request
         # Never under act (which sets ACT): with a token it would open a real
         # pull request.
-        if: steps.check-changes.outputs.changed == 'true' && !env.ACT
+        if: ${{ !env.ACT }}
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: public/publications.json
           commit-message: 'chore: update publications data'
           title: 'Update Publications Data'
           body: |
             ## Automated Publications Update
-            
+
             This PR updates the publications data from academic sources:
             - Semantic Scholar
             - ORCID
-            
+
             The data was fetched on ${{ steps.date.outputs.date }}.
-            
+
             Please review the changes and merge if everything looks correct.
           branch: update-publications-${{ github.run_number }}
           delete-branch: true

@@ -360,7 +360,12 @@ export async function fetchAllPublications(config: {
   // Normalize abbreviated author names (e.g. "K. Stoffel" -> "Kilian Stoffel")
   // using the shared config, so the live API matches the curated publications.
   for (const pub of allPublications) {
-    pub.authors = pub.authors.map((name) => AUTHOR_NAME_FIXES[name] || name);
+    // Own entries only: a plain object's lookup reached Object.prototype.
+    pub.authors = pub.authors.map((name) =>
+      Object.hasOwn(AUTHOR_NAME_FIXES, name)
+        ? (AUTHOR_NAME_FIXES as Record<string, string>)[name]
+        : name,
+    );
   }
 
   // Starred first, then newest by year and month, then citations.
