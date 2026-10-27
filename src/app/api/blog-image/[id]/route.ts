@@ -36,6 +36,8 @@ const refuse = (status: number) =>
  * failure is not kept.
  */
 const resizedPictures = new Map<string, Promise<Buffer | number>>();
+// sharp names AVIF input "heif".
+const RASTER = new Set(["jpeg", "png", "webp", "gif", "heif"]);
 const MAX_KEPT = 64;
 
 function resizedOnce(
@@ -75,6 +77,13 @@ async function resize(source: string, width: number): Promise<Buffer | number> {
   if (!original) return 502;
 
   try {
+    // sharp picks its loader from the bytes, not the declared type: only the
+    // raster formats Medium serves go on (an SVG labeled image/png went to
+    // librsvg).
+    const { format } = await sharp(original, {
+      limitInputPixels: MAX_IMAGE_PIXELS,
+    }).metadata();
+    if (!format || !RASTER.has(format)) return 502;
     return await sharp(original, { limitInputPixels: MAX_IMAGE_PIXELS })
       .rotate()
       .resize({ width, fit: "inside", withoutEnlargement: true })

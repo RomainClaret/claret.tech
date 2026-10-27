@@ -31,6 +31,9 @@ describe("the blog's pictures", () => {
     ["Medium's tracking pixel", PIXEL, false],
     ["another site", "https://images.unsplash.com/photo-1", false],
     ["not a URL", "0*abc", false],
+    // The allowlist names origins: no other port, no credentials.
+    ["another port", "https://miro.medium.com:8443/v2/0*abc", false],
+    ["credentials", "https://user:pw@miro.medium.com/v2/0*abc", false],
   ])("takes %s as Medium's image: %s", (_label, url, expected) => {
     expect(isMediumImage(url as string)).toBe(expected);
   });

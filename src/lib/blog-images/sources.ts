@@ -18,11 +18,20 @@ const MEDIUM_IMAGE_HOSTS = new Set([
   "cdn-images-2.medium.com",
 ]);
 
-/** An https image on one of Medium's image hosts. */
+/**
+ * An https image on one of Medium's image hosts: those origins exactly, so
+ * no other port and no credentials.
+ */
 export function isMediumImage(url: string): boolean {
   try {
-    const { protocol, hostname } = new URL(url);
-    return protocol === "https:" && MEDIUM_IMAGE_HOSTS.has(hostname);
+    const { protocol, hostname, port, username, password } = new URL(url);
+    return (
+      protocol === "https:" &&
+      MEDIUM_IMAGE_HOSTS.has(hostname) &&
+      port === "" &&
+      username === "" &&
+      password === ""
+    );
   } catch {
     return false;
   }

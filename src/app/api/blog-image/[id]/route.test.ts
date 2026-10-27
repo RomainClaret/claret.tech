@@ -119,6 +119,20 @@ describe("GET /api/blog-image/[id]", () => {
     expect(upstream).toHaveBeenCalledTimes(2);
   });
 
+  it("resizes only raster formats, whatever type the upstream declares", async () => {
+    // sharp picks its loader from the bytes: an SVG labeled image/png went
+    // to librsvg (security audit run 1, hardening).
+    upstream.mockResolvedValueOnce(
+      image(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8"/></svg>',
+      ),
+    );
+
+    const response = await GET(get(`/api/blog-image/${ID}?w=480`));
+
+    expect(response.status).toBe(502);
+  });
+
   it("refuses an id that is not one, without reading the feed", async () => {
     const response = await GET(get("/api/blog-image/not-an-id?w=480"));
 
