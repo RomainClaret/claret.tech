@@ -1,6 +1,18 @@
 // RSS Feed Generator
 import { logError } from "@/lib/utils/dev-logger";
 import { fetchMediumFeed } from "@/lib/utils/medium-feed";
+import { blogImagePath } from "@/lib/blog-images/sources";
+
+/**
+ * Characters XML 1.0 forbids: one (decoded from Medium's &#11;, say) made
+ * the whole feed ill-formed for a strict reader.
+ */
+// eslint-disable-next-line no-control-regex
+const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+
+/** Medium's view counter, an image in every post: not ours to republish. */
+const VIEW_COUNTER =
+  /<img[^>]+src="https:\/\/medium\.com\/_\/stat[^"]*"[^>]*>/g;
 
 // A backstop for the feed fetch's 10 s timeout, which Next drops when it
 // refreshes the stale cached feed in the background.
@@ -15,6 +27,7 @@ export const maxDuration = 30;
  */
 function xmlEscape(value: unknown): string {
   return String(value ?? "")
+    .replace(NOT_XML, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -28,7 +41,9 @@ function xmlEscape(value: unknown): string {
  * markup. Splitting it across two sections is the standard fix.
  */
 function cdata(value: unknown): string {
-  return String(value ?? "").replace(/]]>/g, "]]]]><![CDATA[>");
+  return String(value ?? "")
+    .replace(NOT_XML, "")
+    .replace(/]]>/g, "]]]]><![CDATA[>");
 }
 
 export async function GET() {
@@ -69,6 +84,7 @@ export async function GET() {
               (post: {
                 title: string;
                 content?: string;
+                thumbnail?: string;
                 description?: string;
                 link: string;
                 guid?: string;
@@ -76,17 +92,17 @@ export async function GET() {
                 author?: string;
                 categories?: string[];
               }) => {
+                const content = post.content?.replace(VIEW_COUNTER, "");
                 // Extract clean content from HTML
-                const cleanContent = post.content
-                  ? post.content.replace(/<[^>]*>/g, "").substring(0, 500) +
-                    "..."
+                const cleanContent = content
+                  ? content.replace(/<[^>]*>/g, "").substring(0, 500) + "..."
                   : post.description || "";
 
-                // Extract first image from content if available
-                const imageMatch = post.content?.match(
-                  /<img[^>]+src="([^">]+)"/,
-                );
-                const imageUrl = imageMatch ? imageMatch[1] : null;
+                // The post's picture through the site's own route, as the
+                // blog shows it: a reader of the feed then asks this site,
+                // not Medium.
+                const picture = blogImagePath(post);
+                const imageUrl = picture ? `${siteUrl}${picture}?w=960` : null;
 
                 return `
     <item>
@@ -106,8 +122,8 @@ export async function GET() {
               .join("\n      ")
           : ""
       }
-      ${imageUrl ? `<enclosure url="${xmlEscape(imageUrl)}" type="image/jpeg" />` : ""}
-      <content:encoded><![CDATA[${cdata(post.content || cleanContent)}]]></content:encoded>
+      ${imageUrl ? `<enclosure url="${xmlEscape(imageUrl)}" type="image/webp" />` : ""}
+      <content:encoded><![CDATA[${cdata(content || cleanContent)}]]></content:encoded>
     </item>`;
               },
             )

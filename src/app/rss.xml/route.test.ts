@@ -101,4 +101,33 @@ describe("GET /rss.xml", () => {
       "<link>https://medium.com/@x/p?a=1&amp;b=&lt;2&gt;</link>",
     );
   });
+
+  it("writes no character XML forbids, no view counter, and its own picture", async () => {
+    // A control character (decoded from &#11;) made the whole feed
+    // ill-formed; the feed carried Medium's view counter and pointed its
+    // enclosure at Medium, which a reader then contacted (security audit
+    // run 1, hardening).
+    const picture = "https://cdn-images-1.medium.com/max/1024/0*rss-picture";
+    vi.stubGlobal(
+      "fetch",
+      answering([
+        {
+          title: "tab\u000bbell\u0007",
+          link: "https://medium.com/@x/p",
+          pubDate: "2026-10-01 10:00:00",
+          content: `<p>x\u0001</p><img src="${picture}"><img src="https://medium.com/_/stat?event=post.clientViewed" width="1" height="1">`,
+        },
+      ]),
+    );
+
+    const xml = await (await GET()).text();
+
+    // The characters XML 1.0 forbids.
+    // eslint-disable-next-line no-control-regex
+    expect(xml).not.toMatch(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/);
+    expect(xml).not.toContain("medium.com/_/stat");
+    expect(xml).toMatch(
+      /<enclosure url="https:\/\/claret\.tech\/api\/blog-image\/[0-9a-f]{16}\?w=960" type="image\/webp" \/>/,
+    );
+  });
 });
