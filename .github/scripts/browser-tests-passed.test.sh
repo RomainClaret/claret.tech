@@ -84,7 +84,7 @@ state() { # state <id> <n> <status> <conclusion|null>: the run's nth answer
 
 check() { # check <name> <pass|refuse> <sha> [text the refusal shows]
   local out status
-  out=$(cd "$T/repo" && PATH="$T/bin:$PATH" API="$T/api" SHA=$3 REPO=o/r \
+  out=$(cd "$T/repo" && PATH="${FIRST_ON_PATH:-}$T/bin:$PATH" API="$T/api" SHA=$3 REPO=o/r \
     POLL_SECONDS=0 bash "$SCRIPT" 2>&1) && status=0 || status=$?
   if { [ "$2" = pass ] && [ "$status" -eq 0 ]; } ||
     { [ "$2" = refuse ] && [ "$status" -ne 0 ] &&
@@ -160,6 +160,19 @@ check "refuses when no run is found" refuse "$code1" "No browser-test run"
 
 touch "$T/api/fail"
 check "refuses when GitHub cannot be asked" refuse "$code1" "Could not ask GitHub"
+
+# A git whose diff fails: the pipeline read that as "nothing changed" and
+# passed the gate (security audit run 1, hardening).
+mkdir -p "$T/badgit"
+real_git=$(command -v git)
+cat >"$T/badgit/git" <<STUB
+#!/usr/bin/env bash
+for arg in "\$@"; do [ "\$arg" = diff ] && { echo "fatal: bad object" >&2; exit 128; }; done
+exec "$real_git" "\$@"
+STUB
+chmod +x "$T/badgit/git"
+runs "$code1" "$(run 1 push completed success)"
+FIRST_ON_PATH="$T/badgit:" check "refuses when the commits cannot be compared" refuse "$code1" "Could not compare"
 
 [ -n "$root" ]
 if [ "$failures" -gt 0 ]; then

@@ -47,9 +47,18 @@ for commit in $commits; do
   [ -z "$run" ] && continue
   read -r id status conclusion <<<"$run"
 
-  # Everything after the tested commit must be files the workflow skips.
-  untested=$(git -c core.quotePath=false diff --name-only --no-renames "$commit" "$SHA" |
-    while IFS= read -r path; do skipped "$path" || echo "$path"; done)
+  # Everything after the tested commit must be files the workflow skips. The
+  # diff runs on its own: in a pipeline its failure read as "nothing
+  # changed", and the gate passed.
+  if ! changed=$(git -c core.quotePath=false diff --name-only --no-renames "$commit" "$SHA"); then
+    echo "Could not compare $commit with $SHA" >&2
+    exit 1
+  fi
+  untested=$(printf '%s\n' "$changed" |
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      skipped "$path" || echo "$path"
+    done)
   if [ -n "$untested" ]; then
     echo "The newest browser-test run is for $commit ($runs_url/$id)," >&2
     echo "and these files changed after it:" >&2
