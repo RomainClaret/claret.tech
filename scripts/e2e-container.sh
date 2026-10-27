@@ -33,9 +33,8 @@
 # first's test-results/, and both timings are void). Ctrl-C stops the
 # script, and in run the tests in the container too.
 #
-# Environment: IMAGE (default: the image playwright.yml runs), PLATFORM
-# (linux/amd64; for another, start keeps that image's copy under a local
-# tag, claret-e2e/...), CPUS (4, a GitHub runner's; empty for no limit),
+# Environment: IMAGE (default: the image playwright.yml runs, kept for each
+# platform under a local tag, claret-e2e/...), PLATFORM (linux/amd64), CPUS (4, a GitHub runner's; empty for no limit),
 # OUT (for start: where the logs, reports and test results go, mounted at
 # /out; a new temporary folder by default), REPORT (for run: the JSON
 # report's name in OUT, written with --reporter=line,json; report.json by
@@ -115,20 +114,24 @@ start)
     "$root/.github/workflows/playwright.yml" | head -1)}
   [ -n "$image" ] || { echo "no Playwright image in playwright.yml" >&2; exit 1; }
   platform=${PLATFORM:-linux/amd64}
-  # This image store keeps one architecture per tag: an arm64 pull under the
-  # shared tag would replace the amd64 image. Another platform gets the image
-  # under a local tag of its own, made on first use.
-  if [ -z "${IMAGE:-}" ] && [ "$platform" != linux/amd64 ]; then
+  # This image store binds a name, a digest too, to one architecture: an
+  # arm64 pull of playwright.yml's digest leaves it arm64, and an amd64 pull
+  # then fails ("cannot overwrite digest", 2026-10-27). So each platform
+  # gets the image under a local tag of its own, made on first use, and the
+  # digest's name is dropped before a pull (the image and its tags stay).
+  if [ -z "${IMAGE:-}" ]; then
     arch=${platform#*/}
     arch=${arch%%/*}
-    # The name without its digest: a tag holds no "@".
+    # The name without its digest (a tag holds no "@"), then the digest's
+    # first 12 hex: claret-e2e/playwright:v1.64.0-jammy-c064e7f355d2-amd64.
     base=${image%@*}
-    tag="claret-e2e/${base##*/}-$arch"
+    digest=${image#*@sha256:}
+    tag="claret-e2e/${base##*/}-${digest:0:12}-$arch"
     if [ "$(docker image inspect -f '{{.Architecture}}' "$tag" 2>/dev/null)" != "$arch" ]; then
-      echo "$name: making $tag, once per Playwright version"
+      echo "$name: making $tag, once per Playwright image and platform"
+      docker image rm "$image" >/dev/null 2>&1 || true
       docker pull --quiet --platform "$platform" "$image" >/dev/null
       docker tag "$image" "$tag"
-      docker pull --quiet --platform linux/amd64 "$image" >/dev/null
     fi
     image=$tag
   fi

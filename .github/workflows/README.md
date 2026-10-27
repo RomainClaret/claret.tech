@@ -244,7 +244,10 @@ act push -W .github/workflows/playwright.yml -e ../push.json \
   pinned by `src/app/ci-workflows.test.ts`), and `.actrc` pulls nothing:
   pull it once by that name for the run's platform, `docker pull --platform
 linux/amd64 <image@sha256:...>` (a tag pulled earlier does not match a
-  digest).
+  digest). Docker Desktop binds that name to one architecture: if the other
+  platform's copy holds it, the pull fails with "cannot overwrite digest",
+  so `docker image rm <image@sha256:...>` first (the image and its tags
+  stay; `scripts/e2e-container.sh` keeps a tag per platform for this).
 - On Apple Silicon, native containers are about twice as fast: build the
   image with `--platform linux/arm64 -t claret-act:24-arm64`, add
   `--container-architecture linux/arm64 -P ubuntu-latest=claret-act:24-arm64`,
