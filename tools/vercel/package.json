@@ -1,0 +1,8 @@
+{
+  "name": "claret-tech-vercel-cli",
+  "private": true,
+  "description": "The deploy jobs' Vercel CLI, its whole tree pinned by package-lock.json: the job that runs it holds VERCEL_TOKEN. Bump it as a reviewed change.",
+  "dependencies": {
+    "vercel": "64.7.0"
+  }
+}

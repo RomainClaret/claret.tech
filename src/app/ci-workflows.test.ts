@@ -596,18 +596,28 @@ describe("the GitHub workflows", () => {
     );
   });
 
-  it("install one exact Vercel CLI in both deploy jobs", () => {
-    // Both jobs ran `npm install -g vercel@latest` with the deploy token in
-    // their environment, so whatever Vercel had published minutes before
-    // ran with it (a release came out almost daily in 2026-10). A new
-    // version is now a reviewed change.
+  it("install the Vercel CLI from its lockfile, with no install script", () => {
+    // Both jobs ran `npm install -g vercel@latest`, then vercel@64.7.0, with
+    // the deploy token in their environment. The pin fixed vercel's own
+    // files only: the registry still picked part of its tree (luxon ^3.4.0,
+    // readdirp ^4.0.1) at each deploy, and their install scripts ran before
+    // the token steps (security audit run 1, lead 10). tools/vercel pins the
+    // whole tree; a new version is a reviewed change to its lockfile.
+    const deploy = workflow("deploy.yml");
+    expect(deploy).not.toMatch(/npm install -g vercel/);
     const installs = [
-      ...workflow("deploy.yml").matchAll(/npm install -g vercel@(\S+)/g),
-    ].map((match) => match[1]);
-
+      ...deploy.matchAll(
+        /npm ci --prefix tools\/vercel --ignore-scripts --no-audit --no-fund/g,
+      ),
+    ];
     expect(installs).toHaveLength(2);
-    expect(installs[0]).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(installs[1]).toBe(installs[0]);
+
+    const tool = JSON.parse(read("tools/vercel/package.json"));
+    expect(tool.dependencies.vercel).toMatch(/^\d+\.\d+\.\d+$/);
+    const lock = JSON.parse(read("tools/vercel/package-lock.json"));
+    expect(lock.packages["node_modules/vercel"].version).toBe(
+      tool.dependencies.vercel,
+    );
   });
 
   it("tell the owner of new error reports, and only of theirs", () => {
