@@ -37,7 +37,9 @@ interface GitHubCall {
 
 let calls: GitHubCall[];
 // Issues the search finds besides the route's own: another instance's.
-let searchItems: { number: number; state?: string }[];
+// Without a body of its own, an item's body ends with the line searched
+// for, as a report the route filed does.
+let searchItems: { number: number; state?: string; body?: string }[];
 let searchIncomplete: boolean;
 // The issues the route opened, which the search finds by signature line,
 // as GitHub's does.
@@ -99,11 +101,16 @@ async function fakeGitHub(
       });
     }
     const phrase = /"([^"]+)"/.exec(query)?.[1] ?? "";
+    // GitHub matches the phrase anywhere in a body, and answers each item
+    // with its body.
     const own = opened
       .filter((issue) => issue.body.includes(phrase))
-      .map(({ number, state }) => ({ number, state }));
+      .map(({ number, state, body }) => ({ number, state, body }));
+    const others = searchItems
+      .map((item) => ({ ...item, body: item.body ?? `...\n${phrase}` }))
+      .filter((item) => item.body.includes(phrase));
     return json({
-      items: [...own, ...searchItems],
+      items: [...own, ...others],
       incomplete_results: searchIncomplete,
     });
   }
@@ -395,6 +402,41 @@ describe("POST /api/client-error", () => {
 
     expect(response.status).toBe(204);
     expect(calls.map((call) => call.method)).toEqual(["GET"]);
+  });
+
+  it("takes no issue whose own signature line is another's", async () => {
+    // A report's message is published in its issue's body, so a decoy can
+    // carry another error's signature line, inside its fenced message. Only
+    // the line the route writes last names an issue's error (security audit
+    // run 1, lead 18).
+    const target = signatureLine(signatureOf(sanitizeReport(report)!));
+    searchItems = [
+      {
+        number: 40,
+        body: `\`\`\`text\nx ${target}\n\`\`\`\n\n${signatureLine("0123456789ab")}`,
+      },
+    ];
+
+    const response = await send(report);
+
+    expect(response.status).toBe(202);
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
+      ["GET", expect.stringContaining("/search/issues")],
+      ["GET", expect.stringContaining("/search/issues")],
+      ["POST", `${REPO}/issues`],
+    ]);
+  });
+
+  it("finds the issue whose last line is its signature, wherever GitHub ranks it", async () => {
+    const target = signatureLine(signatureOf(sanitizeReport(report)!));
+    searchItems = [
+      { number: 40, body: `decoy ${target}\n${signatureLine("0123456789ab")}` },
+      { number: 41, body: `the error\r\n${target}\r\n` },
+    ];
+
+    await send(report);
+
+    expect(calls.at(-1)?.url).toBe(`${REPO}/issues/41/comments`);
   });
 
   it("comments on the issue another instance opened", async () => {

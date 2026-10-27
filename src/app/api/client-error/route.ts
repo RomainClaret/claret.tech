@@ -125,9 +125,10 @@ async function openedOnGitHub(token: string, day: string): Promise<number> {
 }
 
 /**
- * The issue an error already has, open or closed, by its signature line.
- * Only the site's own reports count: anyone can open an issue holding a
- * signature line, and it would have taken the comments. "incomplete" when
+ * The issue an error already has, open or closed, by its signature line,
+ * which the route writes as an issue's last line. Only the site's own
+ * reports count: anyone can open an issue holding a signature line, and it
+ * would have taken the comments. "incomplete" when
  * GitHub's search ran out of time, which must not open a duplicate.
  */
 async function findIssue(
@@ -137,15 +138,22 @@ async function findIssue(
 ): Promise<KnownIssue | null | "incomplete"> {
   const known = issues.get(signature);
   if (known && now - known.at < REPORT_LIMITS.commentEveryMs) return known;
-  const query = `repo:${ISSUE_REPO} is:issue author:@me label:${ISSUE_LABEL} in:body "${signatureLine(signature)}"`;
+  const line = signatureLine(signature);
+  const query = `repo:${ISSUE_REPO} is:issue author:@me label:${ISSUE_LABEL} in:body "${line}"`;
   const found = (await github(
     token,
-    `/search/issues?per_page=1&q=${encodeURIComponent(query)}`,
+    `/search/issues?per_page=100&q=${encodeURIComponent(query)}`,
   )) as {
     incomplete_results?: boolean;
-    items?: { number: number; state?: string }[];
+    items?: { number: number; state?: string; body?: string | null }[];
   };
-  const item = found.items?.[0];
+  // The route writes an issue's signature line last, and a report's message
+  // is published in the same body: a decoy could carry another error's line
+  // in its message. Only the last line names an issue's error.
+  const item = found.items?.find((candidate) => {
+    const lines = (candidate.body ?? "").replace(/\r\n/g, "\n").trimEnd();
+    return lines === line || lines.endsWith(`\n${line}`);
+  });
   if (!item) return found.incomplete_results ? "incomplete" : null;
   const issue: KnownIssue = {
     number: item.number,
