@@ -125,6 +125,25 @@ describe("the large static files", () => {
       });
     },
   );
+
+  // The pdf.js worker (1.1 MB) was revalidated on every visit by the pages'
+  // no-cache rule. Its URL names the pdf.js version (pdf-config.ts), so a
+  // bump is a new URL and the old copy can be kept for good (security audit
+  // run 1, hardening).
+  it("lets the browser keep the pdf.js worker, whose URL names its version", async () => {
+    const headers = await headersFor("/pdf.worker.min.mjs");
+    expect(headers.get("Cache-Control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    expect(headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    const config = readFileSync(
+      join(process.cwd(), "src/lib/pdf-config.ts"),
+      "utf8",
+    );
+    expect(config).toContain(
+      "workerSrc = `/pdf.worker.min.mjs?v=${pdfjs.version}`",
+    );
+  });
 });
 
 describe("security headers (next.config)", () => {

@@ -399,7 +399,7 @@ const nextConfig = {
       //   /rss.xml -> public, max-age=0, must-revalidate
       {
         source:
-          "/((?!_next|fonts|images|animations|pdfs|pyodide|api|favicon|robots|rss|sitemap).*)",
+          "/((?!_next|fonts|images|animations|pdfs|pdf\\.worker|pyodide|api|favicon|robots|rss|sitemap).*)",
         headers: [
           {
             key: "Cache-Control",
@@ -422,6 +422,21 @@ const nextConfig = {
           },
           // Only this site's pages may load it: the files are large and
           // draw on the plan's shared monthly transfer.
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
+      },
+      {
+        // The pdf.js worker (1.1 MB). pdf-config.ts loads it as
+        // /pdf.worker.min.mjs?v=<pdf.js version>, and pdf.js refuses a worker
+        // of another version, so a bump is a new URL: keeping a copy for
+        // good is safe, where the pages' rule above revalidated it on every
+        // visit (security audit run 1, hardening).
+        source: "/pdf.worker.min.mjs",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },

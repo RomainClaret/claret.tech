@@ -8,8 +8,10 @@
 // Configure PDF.js worker BEFORE importing react-pdf
 import { pdfjs } from "react-pdf";
 
-// Set absolute path for Next.js
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// Set absolute path for Next.js. The version in the URL lets the browser keep
+// the worker for good (next.config.mjs): a pdf.js bump is a new URL, and
+// pdf.js refuses a worker of another version than its API.
+pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${pdfjs.version}`;
 
 // Re-export react-pdf components with pre-configured worker
 export { Document, Page, pdfjs } from "react-pdf";
