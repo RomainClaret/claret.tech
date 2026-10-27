@@ -2,6 +2,11 @@
 import { promises as fs } from "fs";
 import path from "path";
 import sharp from "sharp";
+import {
+  MAX_IMAGE_PIXELS,
+  fetchMediumImage,
+  readCapped,
+} from "@/lib/blog-images/fetch";
 import { logError } from "@/lib/utils/dev-logger";
 
 interface MediumCacheEntry {
@@ -83,41 +88,25 @@ function isMediumArticleHost(url: string): boolean {
   }
 }
 
-/** Medium's own image hosts. Anything else is not ours to fetch. */
-function isMediumImageHost(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url);
-    if (protocol !== "https:") return false;
-    return hostname === "medium.com" || hostname.endsWith(".medium.com");
-  } catch {
-    return false;
-  }
-}
-
-/** Above any real article image, and small enough that libvips cannot be fed a bomb. */
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-
 async function extractColorFromImage(imageUrl: string): Promise<string | null> {
   try {
     // The URL comes out of article HTML fetched from a third party, so it is
     // not ours until proven. Without this the og:image and twitter:image
     // fallbacks would make this a request-forgery primitive from inside the
-    // serverless function, and pipe arbitrary bytes into libvips.
-    if (!isMediumImageHost(imageUrl)) return null;
-
-    const response = await fetch(imageUrl, {
-      signal: AbortSignal.timeout(10_000),
-    });
+    // serverless function, and pipe arbitrary bytes into libvips. So it is
+    // fetched as /api/blog-image fetches: Medium's image hosts only, every
+    // redirect hop re-checked, the body counted as it arrives. A host check
+    // on the first URL alone let a Medium-served 302 reach any host.
+    const response = await fetchMediumImage(imageUrl, 10_000);
     if (!response.ok) return null;
 
-    const declaredLength = Number(response.headers.get("content-length") ?? 0);
-    if (declaredLength > MAX_IMAGE_BYTES) return null;
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.byteLength > MAX_IMAGE_BYTES) return null;
+    const buffer = await readCapped(response);
+    if (!buffer) return null;
 
     // Resize and get dominant color using sharp
-    const { data, info } = await sharp(buffer)
+    const { data, info } = await sharp(buffer, {
+      limitInputPixels: MAX_IMAGE_PIXELS,
+    })
       .resize(100, 100, { fit: "cover" }) // Resize for faster processing
       .raw()
       .toBuffer({ resolveWithObject: true });

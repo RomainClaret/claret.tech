@@ -121,3 +121,94 @@ describe("fetchMediumArticle host guard", () => {
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 });
+
+/**
+ * The image leg fetches a URL the article page names, so it gets the same
+ * controls as /api/blog-image: Medium's image hosts only, every redirect hop
+ * re-checked, the body counted as it arrives (security audit run 1, 4.3).
+ */
+describe("fetchMediumArticle image leg", () => {
+  const originalSkip = process.env.SKIP_EXTERNAL_APIS;
+  // The color the scraper falls back to when no picture yields one.
+  const FALLBACK = "rgb(251, 146, 60)";
+  const page = (image: string) =>
+    new Response(`<meta property="og:image" content="${image}">`, {
+      status: 200,
+    });
+
+  beforeEach(() => {
+    delete process.env.SKIP_EXTERNAL_APIS;
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    if (originalSkip === undefined) delete process.env.SKIP_EXTERNAL_APIS;
+    else process.env.SKIP_EXTERNAL_APIS = originalSkip;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("does not fetch a picture off Medium's image hosts", async () => {
+    // medium.com's own redirector passed the old *.medium.com check.
+    vi.mocked(fetch).mockResolvedValueOnce(
+      page("https://medium.com/r/?url=http://127.0.0.1/"),
+    );
+
+    const result = await fetchMediumArticle(
+      "https://medium.com/@romainclaret/redirector-probe",
+    );
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(result.color).toBe(FALLBACK);
+  });
+
+  it("stops at a redirect off Medium's image hosts", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        page("https://miro.medium.com/v2/resize:fit:1200/0*hop-probe"),
+      )
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: "http://127.0.0.1/internal-probe" },
+        }),
+      );
+
+    const result = await fetchMediumArticle(
+      "https://medium.com/@romainclaret/hop-probe",
+    );
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const init = vi.mocked(fetch).mock.calls[1][1] as RequestInit;
+    expect(init.redirect).toBe("manual");
+    expect(result.color).toBe(FALLBACK);
+  });
+
+  it("stops reading a picture past 10 MiB with no declared length", async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      // 12 MiB, one MiB a chunk: finite, so a reader with no cap ends too.
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 12) controller.close();
+        else controller.enqueue(new Uint8Array(1024 * 1024));
+      },
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        page("https://miro.medium.com/v2/resize:fit:1200/0*size-probe"),
+      )
+      .mockResolvedValueOnce(
+        new Response(body, { headers: { "content-type": "image/jpeg" } }),
+      );
+
+    const result = await fetchMediumArticle(
+      "https://medium.com/@romainclaret/size-probe",
+    );
+
+    expect(result.color).toBe(FALLBACK);
+    // 11 read (past 10 MiB), plus the one the stream pulls ahead; reading
+    // to the end takes 13.
+    expect(pulled).toBeLessThanOrEqual(12);
+  });
+});
