@@ -20,6 +20,12 @@ const KIND_LABEL: Record<string, string> = {
   cv: "CV",
 };
 
+// Only the documents generateStaticParams lists. With Next's default, any
+// /pdf/<x> was rendered on request and its 404 cached under that path, with
+// no bound on the paths a caller can name. The registry is static data, so
+// no document appears without a rebuild.
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return PDF_ROUTES.map((route) => ({ slug: route.slug }));
 }
