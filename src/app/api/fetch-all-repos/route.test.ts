@@ -378,7 +378,7 @@ describe("Fetch All Repositories API Route", () => {
       mockNextResponse.json.mockReturnValueOnce({
         json: () => ({
           success: false,
-          error: "GitHub API error: 403",
+          error: "GitHub request failed",
         }),
         status: 500,
       });
@@ -392,7 +392,7 @@ describe("Fetch All Repositories API Route", () => {
       expect(mockNextResponse.json).toHaveBeenCalledWith(
         {
           success: false,
-          error: "GitHub API error: 403",
+          error: "GitHub request failed",
         },
         { status: 500 },
       );
@@ -416,8 +416,7 @@ describe("Fetch All Repositories API Route", () => {
       mockNextResponse.json.mockReturnValueOnce({
         json: () => ({
           success: false,
-          error:
-            'GraphQL errors: [{"message":"API rate limit exceeded","type":"RATE_LIMITED"}]',
+          error: "GitHub request failed",
         }),
         status: 500,
       });
@@ -431,7 +430,7 @@ describe("Fetch All Repositories API Route", () => {
       expect(mockNextResponse.json).toHaveBeenCalledWith(
         {
           success: false,
-          error: expect.stringContaining("GraphQL errors"),
+          error: "GitHub request failed",
         },
         { status: 500 },
       );
@@ -473,7 +472,7 @@ describe("Fetch All Repositories API Route", () => {
       mockNextResponse.json.mockReturnValueOnce({
         json: () => ({
           success: false,
-          error: "Network error",
+          error: "GitHub request failed",
         }),
         status: 500,
       });
@@ -487,7 +486,7 @@ describe("Fetch All Repositories API Route", () => {
       expect(mockNextResponse.json).toHaveBeenCalledWith(
         {
           success: false,
-          error: "Network error",
+          error: "GitHub request failed",
         },
         { status: 500 },
       );
@@ -558,6 +557,24 @@ describe("Fetch All Repositories API Route", () => {
       expect(query).toMatch(/repositories\([^)]*privacy: PUBLIC/);
       const data = (await response.json()).data as { name: string }[];
       expect(data.map((repo) => repo.name)).toEqual(["test-repo"]);
+    });
+
+    it("answers a fixed error, never the exception's text", async () => {
+      // undici puts a header's value in its validation error: a token with
+      // a stray CR came back in the 500 body.
+      mockFetch.mockRejectedValueOnce(
+        new TypeError(
+          'Headers.append: "Bearer ghp_secretvalue\r" is an invalid header value.',
+        ),
+      );
+      const request = {
+        nextUrl: { searchParams: { get: () => null, has: () => false } },
+      } as unknown as NextRequest;
+
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(await response.json())).not.toContain("ghp_");
     });
   });
 });

@@ -241,12 +241,18 @@ async function handler(request: NextRequest) {
       },
     );
   } catch (error) {
-    logError(error, "Error fetching repositories");
+    // A fixed answer: undici puts a header's value in its validation error,
+    // so a token stored with a stray CR or NUL came back in the 500 body.
+    // The log keeps the message, with anything token-shaped redacted.
+    const message = error instanceof Error ? error.message : String(error);
+    logError(
+      new Error(
+        message.replace(/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]+/g, "$1…"),
+      ),
+      "Error fetching repositories",
+    );
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { success: false, error: "GitHub request failed" },
       { status: 500 },
     );
   }
