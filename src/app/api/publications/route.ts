@@ -95,7 +95,11 @@ async function getHandler(request: NextRequest) {
 
     return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        // A keyed rebuild is uncurated third-party data: no shared cache may
+        // keep it for other visitors (docs/publications.md).
+        "Cache-Control": forceRefresh
+          ? "private, no-store"
+          : "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     });
   } catch (error) {
@@ -107,32 +111,7 @@ async function getHandler(request: NextRequest) {
   }
 }
 
-async function postHandler(request: NextRequest) {
-  try {
-    const { publications } = await request.json();
-    const { exportToBibTeX } = await import("@/lib/api/fetch-publications");
-
-    const bibtex = exportToBibTeX(publications);
-
-    return new NextResponse(bibtex, {
-      headers: {
-        "Content-Type": "text/plain",
-        "Content-Disposition": "attachment; filename=publications.bib",
-      },
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to export BibTeX" },
-      { status: 500 },
-    );
-  }
-}
-
 // For backwards compatibility with tests
 export async function GET(request: NextRequest) {
   return withRateLimit(getHandler)(request);
-}
-
-export async function POST(request: NextRequest) {
-  return withRateLimit(postHandler)(request);
 }

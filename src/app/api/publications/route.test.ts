@@ -9,7 +9,7 @@ import {
   Mocked,
 } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { GET, POST } from "./route";
+import { GET } from "./route";
 
 // Mock Next.js
 vi.mock("next/server", () => ({
@@ -106,7 +106,6 @@ import { fetchAllPublications } from "@/lib/api/fetch-publications";
 
 const mockFs = fs as Mocked<typeof fs>;
 const mockFetchAllPublications = fetchAllPublications as Mock;
-const mockNextResponse = NextResponse as unknown as { json: Mock };
 
 describe("Publications API Route", () => {
   const mockPublications = [
@@ -199,9 +198,11 @@ describe("Publications API Route", () => {
         "http://localhost:3000/api/publications?refresh=true",
         { headers: { "x-refresh-key": "s3cret" } },
       );
-      await GET(request);
+      const response = await GET(request);
 
       expect(mockFetchAllPublications).toHaveBeenCalled();
+      // A keyed rebuild is uncurated: no shared cache may keep it for others.
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     });
 
     it("never writes the committed file, even on a forced refresh", async () => {
@@ -382,78 +383,10 @@ describe("Publications API Route", () => {
     });
   });
 
-  describe("POST /api/publications", () => {
-    it("exports publications to BibTeX format", async () => {
-      const bibtexOutput = "@article{test1,\n  title={Test Publication 1},\n}";
-
-      // Mock the dynamic import
-      vi.doMock("@/lib/api/fetch-publications", () => ({
-        exportToBibTeX: vi.fn(() => bibtexOutput),
-      }));
-
-      const request = new NextRequest(
-        "http://localhost:3000/api/publications",
-        {
-          method: "POST",
-          body: JSON.stringify({ publications: mockPublications }),
-        },
-      );
-
-      const result = await POST(request);
-
-      // Compare Response properties separately
-      const resultBody = await result.text();
-      expect(resultBody).toEqual(bibtexOutput);
-      expect(result.headers.get("Content-Type")).toEqual("text/plain");
-      expect(result.headers.get("Content-Disposition")).toEqual(
-        "attachment; filename=publications.bib",
-      );
-    });
-
-    it("returns 500 error when BibTeX export fails", async () => {
-      // Mock the dynamic import to throw an error
-      vi.doMock("@/lib/api/fetch-publications", () => {
-        throw new Error("Import failed");
-      });
-
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({ error: "Failed to export BibTeX" }),
-        status: 500,
-      });
-
-      const request = new NextRequest(
-        "http://localhost:3000/api/publications",
-        {
-          method: "POST",
-          body: JSON.stringify({ publications: mockPublications }),
-        },
-      );
-
-      await POST(request);
-
-      expect(mockNextResponse.json).toHaveBeenCalledWith(
-        { error: "Failed to export BibTeX" },
-        { status: 500 },
-      );
-    });
-
-    it("handles invalid request body gracefully", async () => {
-      const request = new NextRequest(
-        "http://localhost:3000/api/publications",
-        {
-          method: "POST",
-          body: "invalid json",
-        },
-      );
-
-      mockNextResponse.json.mockReturnValueOnce({
-        json: () => ({ error: "Failed to export BibTeX" }),
-        status: 500,
-      });
-
-      const result = await POST(request);
-
-      expect(result.status).toBe(500);
-    });
+  it("takes no POST: the BibTeX export is built in the browser", async () => {
+    // POST echoed any JSON body back as publications.bib, with no caller
+    // left since Papers builds the file itself (security audit run 1).
+    const route = await import("./route");
+    expect("POST" in route).toBe(false);
   });
 });
