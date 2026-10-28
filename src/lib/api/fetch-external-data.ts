@@ -19,6 +19,7 @@ interface GitHubUser {
         stargazers: {
           totalCount: number;
         };
+        stargazerCount?: number;
         url: string;
         id: string;
         isPrivate?: boolean;
@@ -125,9 +126,7 @@ export async function fetchGitHubData(
                 name
                 description
                 forkCount
-                stargazers {
-                  totalCount
-                }
+                stargazerCount
                 url
                 id
                 isPrivate
@@ -169,11 +168,15 @@ export async function fetchGitHubData(
 
     // Public pins only, whatever the token can read: the answer is public
     // and cached (security audit run 1, lead 9). A pin not marked public is
-    // dropped, and the count is what is kept.
+    // dropped, and the count is what is kept. Stars come as stargazerCount
+    // (a fine-grained token is refused the stargazers connection) and leave
+    // in the stargazers.totalCount shape the cards read.
     const user = data.data.user as GitHubUser;
-    const edges = user.pinnedItems.edges.filter(
-      (edge) => edge.node.isPrivate === false,
-    );
+    const edges = user.pinnedItems.edges
+      .filter((edge) => edge.node.isPrivate === false)
+      .map(({ node: { stargazerCount, ...node } }) => ({
+        node: { ...node, stargazers: { totalCount: stargazerCount ?? 0 } },
+      }));
     return {
       ...user,
       pinnedItems: { ...user.pinnedItems, totalCount: edges.length, edges },

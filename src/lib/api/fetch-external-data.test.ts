@@ -75,6 +75,24 @@ describe("fetchGitHubData", () => {
     expect(user?.pinnedItems.totalCount).toBe(1);
   });
 
+  // A fine-grained token is refused the stargazers connection ("Resource not
+  // accessible by personal access token"), and that error failed the whole
+  // answer: the count comes from stargazerCount, in the shape cards read.
+  it("asks for stargazerCount and answers it as stargazers.totalCount", async () => {
+    const sent = answer([
+      { name: "starred", isPrivate: false, stargazerCount: 7 },
+    ]);
+
+    const user = await fetchGitHubData(config);
+
+    const { query } = JSON.parse(sent.join(""));
+    expect(query).toMatch(/\bstargazerCount\b/);
+    expect(query).not.toMatch(/\bstargazers\b/);
+    expect(user?.pinnedItems.edges[0].node.stargazers).toEqual({
+      totalCount: 7,
+    });
+  });
+
   it("passes the username as a variable, not as query text", async () => {
     const sent = answer([]);
 
