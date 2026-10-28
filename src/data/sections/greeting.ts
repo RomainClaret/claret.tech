@@ -4,7 +4,7 @@ export const greeting = {
   displayGreeting: true,
   username: "Claret.Tech",
   titleGreeting: "Accuracy is a lie",
-  titleGreetingNewline: "I am Romain,",
+  titleGreetingNewline: "I am Romain Claret,",
   titleGreetingTitleList: [
     "evolving intelligence rather than training it.",
     700,
