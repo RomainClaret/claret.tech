@@ -23,7 +23,7 @@
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
       "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026activations.pdf",
       "posterPdf": "/pdfs/poster_ALIFE_2026_claret2026activations.pdf",
-      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  pages={80},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.1042},\n}",
+      "bibtex": "@inproceedings{claret2026activations,\n  title={Per-Node Activation Function Evolution in Indirectly Encoded Substrates: Solvability, Limits, and Emergent Diversity},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.1042},\n}",
       "paperUrl": "https://doi.org/10.1162/ISAL.a.1042",
       "arxivId": "2610.00149",
       "starred": true
@@ -48,7 +48,7 @@
       "codeUrl": "https://github.com/RomainClaret/emr-hyperneat",
       "paperPdf": "/pdfs/paper_ALIFE_2026_claret2026neuromodulation.pdf",
       "presentationPdf": "/pdfs/presentation_ALIFE_2026_claret2026neuromodulation.pdf",
-      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  pages={78},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.968},\n}",
+      "bibtex": "@inproceedings{claret2026neuromodulation,\n  title={Multi-Behavioral Evolved Substrates Through Neuromodulation and Activation Selection},\n  author={Claret, Romain and O'Neill, Michael and Cotofrei, Paul and Stoffel, Kilian},\n  booktitle={ALIFE 2026: Proceedings of the 2026 Artificial Life Conference},\n  year={2026},\n  publisher={MIT Press},\n  doi={10.1162/ISAL.a.968},\n}",
       "paperUrl": "https://doi.org/10.1162/ISAL.a.968",
       "starred": true,
       "arxivId": "2610.00148"
