@@ -401,7 +401,7 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
               performance: PERFORMANCE_THRESHOLDS.chromium.performance,
               accessibility: 85,
               "best-practices": 75,
-              seo: 80,
+              seo: 100,
             },
             ignoreError: true,
             opts: {
@@ -509,11 +509,13 @@ test.describe.serial("Cross-Browser Lighthouse Performance", () => {
           `Best practices score should be >= 75 in ${browserInfo.name}`,
         ).toBeGreaterThanOrEqual(75); // 96 on 2026-10-18: console errors, no GitHub data
 
-        // SEO should be good
+        // SEO is a checklist, not a timing: 100 means every audit passed.
+        // At 80 one lost title or description (92 in Lighthouse 13.5) and
+        // even two failed audits went through: d8da49f4 shipped at 83.
         expect(
           scores.seo,
-          `SEO score should be >= 80 in ${browserInfo.name}`,
-        ).toBeGreaterThanOrEqual(80); // 100 on 2026-10-18
+          `SEO score should be 100 in ${browserInfo.name}`,
+        ).toBe(100); // 100 on 2026-10-28
 
         // Fail test if regression detected (optional - can be configured)
         if (
