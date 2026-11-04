@@ -182,14 +182,11 @@ export const researchSection = {
       color: "168, 85, 247",
       year: "2026-Present",
       links: [
-        // The play versions, latest first. The study will have a link of its own.
+        // The breeder, both modes on one page. The study will have a link of
+        // its own.
         {
           name: "Play: CPPN and Substrate",
           url: "https://picbreeder.claret.tech",
-        },
-        {
-          name: "Play: CPPN Only",
-          url: "https://picbreeder-cppn.claret.tech",
         },
       ],
     },
