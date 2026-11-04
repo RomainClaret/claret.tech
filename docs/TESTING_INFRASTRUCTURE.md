@@ -328,6 +328,14 @@ proved each replacement with a mutation:
   7.9 frames a second alone on 4 CPUs and 0.5 beside another browser (13
   with every blur off): a test that counts frames, or that wants to see an
   animation, cannot work there. Check such things in Chromium and Firefox.
+- **Linux WebKit reports a film it never fetches.** For a
+  `<video preload="none">`, CI's WebKit raises `request`, a `response`
+  with status 0 and `requestfinished` for the source it picked, while the
+  server receives nothing. The reduced-motion test in
+  `card-details.spec.ts` counted those requests and failed on GitHub
+  (2026-11-04). Chromium and macOS WebKit raise nothing until the film
+  plays. Count the responses with an HTTP status: after Play, WebKit's is
+  200 and Chromium's 206.
 - **A spec that skips itself still fills a shard.** `--shard` splits the
   tests Playwright lists, skipped ones too. `python-terminal.spec.ts` sorts
   first, and its 22 Chromium-only tests were the whole of Firefox's and

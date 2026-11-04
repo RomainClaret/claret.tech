@@ -412,10 +412,18 @@ test.describe("A card's details", () => {
   test("show the breeder's pictures, its animations still under reduced motion", async ({
     page,
   }) => {
-    const videoRequests: string[] = [];
-    page.on("request", (request) => {
-      if (/\/images\/research\/.+\.(webm|mp4)$/.test(request.url())) {
-        videoRequests.push(request.url());
+    // A film fetched is a response with an HTTP status. Linux WebKit, CI's,
+    // reports a request for a preload="none" film that it never sends: its
+    // response has status 0, and nothing reaches the server. play() then
+    // fetches the film with status 200 (Chromium: 206, and no event before).
+    // Measured in CI's Playwright 1.64 image, 2026-11-04.
+    const videoResponses: string[] = [];
+    page.on("response", (response) => {
+      if (
+        /\/images\/research\/.+\.(webm|mp4)$/.test(response.url()) &&
+        response.status() > 0
+      ) {
+        videoResponses.push(response.url());
       }
     });
     await openSite(page, "#evolvable-vocabulary-full");
@@ -471,7 +479,7 @@ test.describe("A card's details", () => {
             : "image/webp",
       );
     }
-    expect(videoRequests).toEqual([]);
+    expect(videoResponses).toEqual([]);
   });
 
   test("keep the skills and the journey compact", async ({ page }) => {
