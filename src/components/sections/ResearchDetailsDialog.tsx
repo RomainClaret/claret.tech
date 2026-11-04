@@ -8,6 +8,7 @@ import Rocket from "lucide-react/dist/esm/icons/rocket";
 import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 import { researchSection } from "@/data/sections/research";
 import { researchDetails } from "@/data/sections/research-details";
+import { researchMedia } from "@/data/sections/research-media";
 import {
   AccentChips,
   DetailsDialog,
@@ -26,6 +27,7 @@ import {
   statusConfig,
   visibleProjects,
 } from "./research-shared";
+import { ResearchMedia } from "./ResearchMedia";
 
 /**
  * Which of the section's texts the dialog shows: a project's (index 0 is the
@@ -77,6 +79,9 @@ export function ResearchDetailsDialog({
   const color = projectColor(project);
   const status = statusConfig[project.status];
   const StatusIcon = status.icon;
+  // Pictures and animations (research-media.ts), which come with this
+  // dialog's code, as its long texts do.
+  const media = project.anchorId ? researchMedia[project.anchorId] : undefined;
   const linkClass =
     "inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:underline";
 
@@ -107,6 +112,8 @@ export function ResearchDetailsDialog({
         {researchDetails.descriptions[project.title] ??
           project.shortDescription}
       </DetailsProse>
+
+      {media && <ResearchMedia groups={media} />}
 
       {!isHero && project.highlights && project.highlights.length > 0 && (
         <DetailsSection title="Key Contributions">

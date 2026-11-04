@@ -23,6 +23,9 @@ const NAV_OFFSET = 64;
 const MEDIUM_LONG = "a-post-under-its-picture-0a1b2c3d4e5f";
 const MEDIUM_SHORT = "a-short-post-6a7b8c9d0e1f";
 
+/** The research card whose dialog has pictures and animations (research-media.ts). */
+const BREEDER = "Breeding with an Evolvable Vocabulary";
+
 /**
  * The blog's Medium posts, as Medium writes them. The page asks
  * /api/medium-posts with no query string, so the API's own test posts
@@ -141,6 +144,16 @@ const KINDS: Kind[] = [
         name: "Read more about A post under its picture",
       }),
     dialog: "A post under its picture",
+  },
+  // Last, because LINKED and the tests below name the others by index.
+  {
+    name: "a research card with pictures and animations",
+    card: (page) => page.locator("#evolvable-vocabulary"),
+    trigger: (page) =>
+      page.getByRole("button", {
+        name: `Read more about ${BREEDER}`,
+      }),
+    dialog: BREEDER,
   },
 ];
 
@@ -386,11 +399,80 @@ test.describe("A card's details", () => {
           "nested-interactive",
           "list",
           "listitem",
+          "image-alt",
         ])
         .analyze();
       expect(dialog.violations).toEqual([]);
     });
   }
+
+  // The breeder's card shows pictures and two animations in its dialog
+  // (research-media.ts). Reduced motion is on in this describe: the
+  // animations wait on their last frame, and fetch nothing until Play.
+  test("show the breeder's pictures, its animations still under reduced motion", async ({
+    page,
+  }) => {
+    const videoRequests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/images\/research\/.+\.(webm|mp4)$/.test(request.url())) {
+        videoRequests.push(request.url());
+      }
+    });
+    await openSite(page, "#evolvable-vocabulary-full");
+    const dialog = page.getByRole("dialog", { name: BREEDER });
+    await expect(dialog).toBeVisible();
+
+    // Every picture decoded: served, and allowed by the CSP.
+    const pictures = dialog.locator("img");
+    await expect(pictures).toHaveCount(10);
+    await expect
+      .poll(() =>
+        pictures.evaluateAll((images) =>
+          images.every(
+            (image) =>
+              (image as HTMLImageElement).complete &&
+              (image as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+      )
+      .toBe(true);
+
+    const videos = dialog.locator("video");
+    await expect(videos).toHaveCount(2);
+    expect(
+      await videos.evaluateAll((elements) =>
+        elements.map((element) => {
+          const video = element as HTMLVideoElement;
+          return [video.autoplay, video.paused, video.preload, video.muted];
+        }),
+      ),
+    ).toEqual([
+      [false, true, "none", true],
+      [false, true, "none", true],
+    ]);
+
+    // Each file with its type, and in ranges, which Safari asks a video in.
+    const urls = await dialog.evaluate((element) => [
+      ...[...element.querySelectorAll("img")].map((image) => image.src),
+      ...[...element.querySelectorAll("video")].map((video) => video.poster),
+      ...[...element.querySelectorAll("source")].map((source) => source.src),
+    ]);
+    expect(urls).toHaveLength(16);
+    for (const url of urls) {
+      const response = await page.request.get(url, {
+        headers: { Range: "bytes=0-1" },
+      });
+      expect(response.status(), url).toBe(206);
+      expect(response.headers()["content-type"], url).toBe(
+        url.endsWith(".webm")
+          ? "video/webm"
+          : url.endsWith(".mp4")
+            ? "video/mp4"
+            : "image/webp",
+      );
+    }
+    expect(videoRequests).toEqual([]);
+  });
 
   test("keep the skills and the journey compact", async ({ page }) => {
     // Measured at 1280 px when the cards stopped growing in place (round
@@ -472,8 +554,9 @@ test.describe("A card's details on a phone", () => {
         await openSite(page);
         const viewport = page.viewportSize()!;
 
-        // The longest of the texts, and the one dialog with a footer.
-        for (const kind of [KINDS[3], KINDS[6]]) {
+        // The longest of the texts, the one dialog with a footer, and the
+        // one with pictures and animations.
+        for (const kind of [KINDS[3], KINDS[6], KINDS[8]]) {
           const trigger = kind.trigger(page);
           await trigger.scrollIntoViewIfNeeded();
           await trigger.tap();
@@ -512,5 +595,77 @@ test.describe("A card's details on a phone", () => {
 
       expect(await height(philosophy)).toBeLessThanOrEqual(888);
     });
+  });
+});
+
+// With motion allowed, the breeder's animations play by themselves, muted and
+// looping. Chromium only: it always has AV1, while whether a WebKit build
+// decodes AV1 or H.264 depends on the machine it runs on.
+test.describe("A card's animations, motion allowed", () => {
+  test.skip(
+    ({ browserName }) => browserName !== "chromium",
+    "chromium only: its AV1 decoder is built in",
+  );
+  test.use({
+    viewport: { width: 1280, height: 900 },
+    reducedMotion: "no-preference",
+  });
+
+  // A first frame decoded and playing: 20 s, not the default 8. Under a
+  // load average of 105 on the Mac one run took longer (2026-11-04), and CI's
+  // runners are slower than the Mac.
+  const PLAYING = { timeout: 20_000 };
+
+  test("play by themselves from the AV1 file, the end pause kept", async ({
+    page,
+  }) => {
+    await openSite(page, "#evolvable-vocabulary-full");
+    const dialog = page.getByRole("dialog", { name: BREEDER });
+    await expect(dialog).toBeVisible();
+    const videos = dialog.locator("video");
+    await expect(videos).toHaveCount(2);
+
+    // The GIFs' own lengths, their last frame's 3.6 s included.
+    const durations = [26.4, 24];
+    for (const [i, duration] of durations.entries()) {
+      const video = videos.nth(i);
+      await video.scrollIntoViewIfNeeded();
+      await expect
+        .poll(
+          () =>
+            video.evaluate((element) => {
+              const media = element as HTMLVideoElement;
+              return media.readyState >= 2 && !media.paused;
+            }),
+          PLAYING,
+        )
+        .toBe(true);
+      const state = await video.evaluate((element) => {
+        const media = element as HTMLVideoElement;
+        return { src: media.currentSrc, duration: media.duration };
+      });
+      expect(state.src).toMatch(/\.webm$/);
+      expect(Math.abs(state.duration - duration)).toBeLessThan(0.1);
+    }
+  });
+
+  test("pause and play again with Space on the focused animation", async ({
+    page,
+  }) => {
+    await openSite(page, "#evolvable-vocabulary-full");
+    const dialog = page.getByRole("dialog", { name: BREEDER });
+    const video = dialog.locator("video").first();
+    const paused = () =>
+      video.evaluate((element) => (element as HTMLVideoElement).paused);
+    // Playing first: Chromium holds a muted autoplay while it is off screen.
+    await video.scrollIntoViewIfNeeded();
+    await expect.poll(paused, PLAYING).toBe(false);
+
+    // One press, one toggle: the dialog's handler, Chromium's own prevented.
+    await video.focus();
+    await page.keyboard.press("Space");
+    await expect.poll(paused).toBe(true);
+    await page.keyboard.press("Space");
+    await expect.poll(paused, PLAYING).toBe(false);
   });
 });

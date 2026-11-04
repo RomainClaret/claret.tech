@@ -30,7 +30,8 @@ export interface ResearchProject {
   /**
    * Deep-link hash for this project, e.g. #geenns. Same idea as
    * `Paper.anchorId` and `WorkExperience.anchorId`. Once a value is published,
-   * treat it as permanent: people share these.
+   * treat it as permanent: people share these. research-media.ts keys a
+   * card's pictures and animations by it.
    */
   anchorId?: string;
   /**

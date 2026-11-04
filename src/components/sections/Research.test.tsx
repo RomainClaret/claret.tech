@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import {
   render,
   screen,
@@ -10,6 +12,7 @@ import {
 import { Research } from "./Research";
 import { isDisplayed, researchSection } from "@/data/sections/research";
 import { researchDetails } from "@/data/sections/research-details";
+import { researchMedia } from "@/data/sections/research-media";
 import * as scrollModule from "@/lib/utils/scroll-to-section";
 
 /**
@@ -67,6 +70,13 @@ vi.mock("@/components/ui/holographic-stats-card", () => ({
 
 vi.mock("@/lib/hooks/useSafari", () => ({
   useShouldReduceAnimations: () => true,
+}));
+
+// The visitor's reduced-motion setting (useReducedMotion), which decides
+// whether a dialog's animations play by themselves.
+const motion = vi.hoisted(() => ({ reduce: false }));
+vi.mock("@/lib/hooks/useReducedMotion", () => ({
+  useReducedMotion: () => motion.reduce,
 }));
 
 vi.mock("framer-motion", () => {
@@ -569,6 +579,265 @@ describe("Research", () => {
       expect(statValue("Active Research")).toBe(
         String(shown.filter((p) => p.status === "active").length),
       );
+    });
+  });
+
+  // A card's pictures and animations (research-media.ts, ResearchMedia.tsx),
+  // which come with its dialog's code.
+  describe("Pictures and animations", () => {
+    const BREEDER = "Breeding with an Evolvable Vocabulary";
+    const groups = researchMedia["evolvable-vocabulary"]!;
+    const pictures = groups.flatMap((group) => group.pictures);
+    const animations = groups.flatMap((group) =>
+      group.animation ? [group.animation] : [],
+    );
+
+    afterEach(() => {
+      motion.reduce = false;
+    });
+
+    async function openBreeder() {
+      render(<Research />);
+      fireEvent.click(
+        screen.getByRole("button", { name: `Read more about ${BREEDER}` }),
+      );
+      return screen.findByRole("dialog", { name: BREEDER });
+    }
+
+    it("belongs to cards on the page, every picture and animation described", () => {
+      const anchors = researchSection.projects
+        .filter(isDisplayed)
+        .map((project) => project.anchorId);
+
+      for (const [anchor, mediaGroups] of Object.entries(researchMedia)) {
+        expect(anchors).toContain(anchor);
+        for (const group of mediaGroups!) {
+          expect(group.title.trim()).not.toBe("");
+          expect(group.pictures.length).toBeGreaterThan(0);
+          for (const picture of group.pictures) {
+            expect(picture.alt.trim()).not.toBe("");
+          }
+          if (!group.animation) continue;
+          const { label, caption, width, height, sources } = group.animation;
+          expect(label.trim()).not.toBe("");
+          expect(caption.trim()).not.toBe("");
+          expect(width).toBeGreaterThan(0);
+          expect(height).toBeGreaterThan(0);
+          // AV1 first, named by its codecs so that a browser without it
+          // skips it unfetched; H.264 last, for those browsers.
+          expect(sources.map((source) => source.type.split(";")[0])).toEqual([
+            "video/webm",
+            "video/mp4",
+          ]);
+          expect(sources[0].type).toMatch(/codecs="av01\./);
+        }
+      }
+      const srcs = pictures.map((picture) => picture.src);
+      expect(new Set(srcs).size).toBe(srcs.length);
+    });
+
+    it("points only at files in the card's folder, which holds nothing else", () => {
+      for (const [anchor, mediaGroups] of Object.entries(researchMedia)) {
+        const folder = `/images/research/${anchor}/`;
+        const files = mediaGroups!.flatMap((group) => [
+          ...group.pictures.map((picture) => picture.src),
+          ...(group.animation
+            ? [
+                group.animation.poster,
+                ...group.animation.sources.map((source) => source.src),
+              ]
+            : []),
+        ]);
+        for (const src of files) {
+          expect(src.startsWith(folder), src).toBe(true);
+          expect(src.slice(folder.length)).toMatch(
+            /^[a-z0-9_-]+\.(webp|webm|mp4)$/,
+          );
+        }
+
+        // An exact-case listing: macOS opens a name in the wrong case, which
+        // Vercel answers with a 404. Both ways, because /images is cached as
+        // immutable: a changed file gets a new name, and the old one must go.
+        const onDisk = readdirSync(join(process.cwd(), "public", folder))
+          .filter((name) => !name.startsWith("."))
+          .sort();
+        expect(files.map((src) => src.slice(folder.length)).sort()).toEqual(
+          onDisk,
+        );
+      }
+    });
+
+    it("shows them in the card's dialog only, after its text and before its links", async () => {
+      render(<Research />);
+      expect(document.querySelector("video")).toBeNull();
+      expect(
+        document.querySelector('img[src^="/images/research/"]'),
+      ).toBeNull();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: `Read more about ${BREEDER}` }),
+      );
+      const dialog = await screen.findByRole("dialog", { name: BREEDER });
+
+      expect(
+        within(dialog)
+          .getAllByRole("heading", { level: 3 })
+          .map((heading) => heading.textContent),
+      ).toEqual([
+        "CPPN mode",
+        "Substrate mode",
+        "Technologies & Methods",
+        "Resources & Publications",
+      ]);
+      const text = within(dialog).getByText(
+        researchDetails.descriptions[BREEDER],
+      );
+      const firstGroup = within(dialog).getByRole("heading", {
+        name: "CPPN mode",
+      });
+      expect(
+        text.compareDocumentPosition(firstGroup) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      for (const picture of pictures) {
+        expect(
+          within(dialog).getByRole("img", { name: picture.alt }),
+        ).toHaveAttribute("src", picture.src);
+      }
+      // One breeder, both modes on its page: the CPPN-only one is retired.
+      expect(
+        within(dialog)
+          .getAllByRole("link")
+          .map((link) => [link.textContent, link.getAttribute("href")]),
+      ).toEqual([
+        ["Play: CPPN and Substrate", "https://picbreeder.claret.tech"],
+      ]);
+    });
+
+    it("plays each animation by itself, muted and looping, under the visitor's controls", async () => {
+      const dialog = await openBreeder();
+      const videos = [...dialog.querySelectorAll("video")];
+      expect(videos).toHaveLength(animations.length);
+
+      videos.forEach((video, i) => {
+        const animation = animations[i];
+        // In a figure, its caption under it.
+        expect(
+          within(video.closest("figure")!).getByText(animation.caption),
+        ).toBeInTheDocument();
+        // React sets `muted` as a property, never as the attribute.
+        expect(video.muted).toBe(true);
+        for (const attribute of [
+          "controls",
+          "loop",
+          "playsinline",
+          "autoplay",
+        ]) {
+          expect(video.hasAttribute(attribute), attribute).toBe(true);
+        }
+        expect(video.getAttribute("preload")).toBe("auto");
+        expect(video.getAttribute("poster")).toBe(animation.poster);
+        expect(video.getAttribute("width")).toBe(String(animation.width));
+        expect(video.getAttribute("height")).toBe(String(animation.height));
+        expect(video).toHaveAccessibleName(animation.label);
+        expect(video).toHaveAccessibleDescription(animation.caption);
+        expect(
+          [...video.querySelectorAll("source")].map((source) => [
+            source.getAttribute("src"),
+            source.getAttribute("type"),
+          ]),
+        ).toEqual(animation.sources.map((source) => [source.src, source.type]));
+      });
+    });
+
+    it("waits on each animation's last frame under reduced motion, Play left to the visitor", async () => {
+      motion.reduce = true;
+      const dialog = await openBreeder();
+      const videos = [...dialog.querySelectorAll("video")];
+      expect(videos).toHaveLength(animations.length);
+
+      videos.forEach((video, i) => {
+        expect(video.hasAttribute("autoplay")).toBe(false);
+        // Nothing downloads until Play.
+        expect(video.getAttribute("preload")).toBe("none");
+        expect(video.hasAttribute("controls")).toBe(true);
+        expect(video.getAttribute("poster")).toBe(animations[i].poster);
+      });
+    });
+
+    it("lets Tab reach each animation, as it reaches the links", async () => {
+      // The dialog's focus trap moves only between elements whose tabIndex is
+      // 0, and a video's is -1 unless it says otherwise: Tab skipped them.
+      const dialog = await openBreeder();
+      const videos = [...dialog.querySelectorAll("video")];
+      const reached: Element[] = [];
+      for (let i = 0; i < 8; i++) {
+        fireEvent.keyDown(document, { key: "Tab" });
+        if (document.activeElement) reached.push(document.activeElement);
+      }
+
+      for (const video of videos) {
+        expect(reached).toContain(video);
+      }
+      expect(reached).toContain(within(dialog).getByRole("link"));
+    });
+
+    it("plays and pauses a focused animation with Space or Enter, and only those", async () => {
+      // WebKit's controls ignore Space on the video itself, so the dialog
+      // handles it, on the key's release; both halves prevented, Chromium's
+      // own toggle on the release cannot undo it.
+      const play = vi
+        .spyOn(HTMLMediaElement.prototype, "play")
+        .mockResolvedValue(undefined);
+      const pause = vi
+        .spyOn(HTMLMediaElement.prototype, "pause")
+        .mockImplementation(() => {});
+      const dialog = await openBreeder();
+      const video = dialog.querySelector("video")!;
+      let paused = true;
+      Object.defineProperty(video, "paused", {
+        configurable: true,
+        get: () => paused,
+      });
+
+      // Prevented before it reaches the video: Chromium toggles from a
+      // listener on the video itself, which then leaves it.
+      const atVideo: boolean[] = [];
+      video.addEventListener("keydown", (event) =>
+        atVideo.push(event.defaultPrevented),
+      );
+
+      // A press, held so that its keydown repeats: prevented, one toggle.
+      expect(fireEvent.keyDown(video, { key: " " })).toBe(false);
+      expect(atVideo).toEqual([true]);
+      expect(fireEvent.keyDown(video, { key: " ", repeat: true })).toBe(false);
+      expect(play).not.toHaveBeenCalled();
+      expect(fireEvent.keyUp(video, { key: " " })).toBe(false);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(pause).not.toHaveBeenCalled();
+
+      paused = false;
+      expect(fireEvent.keyDown(video, { key: "Enter" })).toBe(false);
+      expect(fireEvent.keyUp(video, { key: "Enter" })).toBe(false);
+      expect(pause).toHaveBeenCalledTimes(1);
+
+      // Other keys and shortcuts stay the browser's.
+      expect(fireEvent.keyDown(video, { key: "a" })).toBe(true);
+      expect(fireEvent.keyUp(video, { key: "a" })).toBe(true);
+      expect(fireEvent.keyDown(video, { key: " ", metaKey: true })).toBe(true);
+      expect(fireEvent.keyUp(video, { key: " ", metaKey: true })).toBe(true);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(pause).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a card without pictures as it was", async () => {
+      render(<Research />);
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Read more about GraphQA/ }),
+      );
+      const dialog = await screen.findByRole("dialog", { name: /^GraphQA/ });
+
+      expect(dialog.querySelector("video, figure, img")).toBeNull();
     });
   });
 });
