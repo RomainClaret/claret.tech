@@ -8,10 +8,10 @@ import {
   Clock,
   User,
   Share2,
-  Eye,
   ArrowRight,
 } from "lucide-react";
 import Image from "next/image";
+import { formatDate } from "@/lib/utils/formatters";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
 import { m } from "framer-motion";
@@ -32,7 +32,6 @@ interface BlogCardHolographicProps {
   index: number;
   color?: string;
   readingTime?: number;
-  views?: number;
   author?: string;
   anchorId?: string; // deep-link hash for this post (enables the copy button)
   isDeepLinked?: boolean; // arrived via a deep link: hold the glow
@@ -135,7 +134,6 @@ export function BlogCardHolographic({
   index,
   color: providedColor,
   readingTime = 5,
-  views,
   author = "Romain Claret",
   anchorId,
   isDeepLinked = false,
@@ -187,6 +185,11 @@ export function BlogCardHolographic({
   const nodeColor = finalColor.replace("rgb(", "").replace(")", "");
 
   const articleStatus = detectArticleStatus(date);
+  const publishedOn = formatDate(date, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <m.div
@@ -261,14 +264,10 @@ export function BlogCardHolographic({
                   </span>
                 </div>
                 <p className="text-sm font-medium flex items-center gap-2">
-                  {date && (
+                  {publishedOn && (
                     <>
                       <Calendar className="w-3 h-3" />
-                      {new Date(date).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {publishedOn}
                     </>
                   )}
                   <span className="text-muted-foreground">•</span>
@@ -333,13 +332,6 @@ export function BlogCardHolographic({
             <div className="text-sm text-muted-foreground flex items-start gap-1">
               <User className="w-3 h-3 shrink-0 mt-0.5" />
               <p className="line-clamp-1">{author}</p>
-              {views && (
-                <>
-                  <span className="text-muted-foreground">•</span>
-                  <Eye className="w-3 h-3" />
-                  {views.toLocaleString()} views
-                </>
-              )}
             </div>
           </div>
 

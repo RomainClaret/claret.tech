@@ -100,6 +100,38 @@ The e2e checks that measure, and can fail (2026-10-18):
   promise, reaches none and reports nothing, so this is where those show.
   Builds without GitHub data stay quiet too: the GitHub routes answer "no
   data" with a 200.
+- **A visit long after the build** (`static-shell.spec.ts`, Chromium, the
+  performance job): the same, on the homepage and on a document's page
+  (`/pdf/cv`), with the browser's clock 400 days on, in UTC+14
+  (`Pacific/Kiritimati`) and Arabic (`ar-EG`). The HTML is generated
+  once, in UTC, and the test above visits minutes after the build, before
+  anything computed from today can change. The stats did count years from
+  the browser's clock: the day after a build, "10.8 Years of Research" met
+  "10.9" and React threw away most of the page (#418, production,
+  2026-11-07). A value computed from today goes through `useToday`
+  (`src/lib/hooks/useToday.ts`), and from dates built in UTC.
+- **The 404 page at a missing document** (`static-shell.spec.ts`,
+  Chromium, the performance job): `/pdf/no-such-document` and
+  `/no-such-page` answer 404 and hydrate with no error but their own 404.
+  The page is generated once, as `/_not-found`, and served at every
+  unknown URL; read from the URL, the layout dropped the splash the HTML
+  had at `/pdf/<no such document>` (#418, production, 2026-11-07).
+  The root layout's components tell a document and the homepage apart by
+  route (`useSelectedLayoutSegment`), not by `usePathname()`.
+- **High contrast through a rebuilt document** (`static-shell.spec.ts`,
+  Chromium, the performance job): the homepage served with one text node
+  edited, as a translator would, throws #418 and React renders the whole
+  document again; `<html>` keeps `high-contrast` and the toggle stays
+  pressed. The rebuild resets `<html>` to the layout's attributes, and
+  until 2026-11-07 nothing put the class back.
+- **iOS's data detectors** (`static-shell.spec.ts`, Chromium, the
+  performance job): the HTML asks iOS not to turn text into links
+  (`<meta name="format-detection">`, the layout's `formatDetection`). iOS
+  turns what it takes for a phone number, a date, an address or an email
+  into a link before hydration, and React then finds a link where it
+  rendered text (Next's hydration error page, "Common iOS issues").
+  Playwright's WebKit runs no data detectors: the tag is what a test can
+  check, and a real iPhone what proves it.
 - **Error reports** (`error-reports.spec.ts`, the accessibility job): an
   error is forced in the page's boundary (`error.tsx`, on `/pdf/cv`) and in
   the root's (`global-error.tsx`, the privacy notice): one

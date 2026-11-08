@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/details-dialog";
 import type { DetailsStandInProps } from "@/components/ui/lazy-details";
 import { shareArticle } from "@/lib/utils/share-article";
+import { formatDate } from "@/lib/utils/formatters";
 
 export interface BlogDetailsDialogProps extends DetailsStandInProps {
   /** The post's whole text, its paragraphs kept. */
@@ -38,6 +39,12 @@ export function BlogDetailsDialog({
   accent,
   dialog,
 }: BlogDetailsDialogProps) {
+  // The card's day, in UTC (formatDate).
+  const publishedOn = formatDate(date, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
   return (
     <DetailsDialog
       title={title}
@@ -45,15 +52,7 @@ export function BlogDetailsDialog({
       accent={accent}
       meta={
         <>
-          {date && (
-            <span>
-              {new Date(date).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
-          )}
+          {publishedOn && <span>{publishedOn}</span>}
           <span>{readingTime} min read</span>
           <span>{author}</span>
         </>

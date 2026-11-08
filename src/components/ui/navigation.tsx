@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter, useSelectedLayoutSegment } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import { HighContrastToggle } from "./high-contrast-toggle";
 import {
@@ -69,9 +69,13 @@ export function Navigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const pathname = usePathname();
   const router = useRouter();
-  const isHomePage = pathname === "/";
+  // From the route the HTML was rendered for (no segment below the root on
+  // the homepage), not from the URL: the CDN serves the homepage's HTML at
+  // /index too, where usePathname() said "/index" in the browser and the
+  // links hydrated with the server's "#section" hrefs but the other side's
+  // click handling.
+  const isHomePage = useSelectedLayoutSegment() === null;
 
   // Land on the right section when the page is *entered* at a hash, e.g.
   // /#research from the nav on /pdf/<slug>, from the sitemap, or from a shared

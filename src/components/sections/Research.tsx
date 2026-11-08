@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useId } from "react";
 import { getFormattedResearchYears } from "@/lib/utils/experience-calculator";
+import { useToday } from "@/lib/hooks/useToday";
 import { HolographicCard } from "@/components/ui/holographic-card";
 import { HolographicStatsCard } from "@/components/ui/holographic-stats-card";
 import { m } from "framer-motion";
@@ -263,6 +264,15 @@ export function Research() {
     },
   );
   const heroIsLinked = !!heroAnchor && deepLinkedId === heroAnchor;
+  // The built commit's day's figure while hydrating, today's after
+  // (useToday).
+  const yearsOfResearch = useToday((today) =>
+    getFormattedResearchYears(
+      visibleProjects,
+      researchSection.additionalResearchYears,
+      today,
+    ),
+  );
 
   if (!researchSection.display) {
     return null;
@@ -271,10 +281,7 @@ export function Research() {
   const stats = {
     totalProjects: visibleProjects.length,
     activeProjects: visibleProjects.filter((p) => p.status === "active").length,
-    yearsOfResearch: getFormattedResearchYears(
-      visibleProjects,
-      researchSection.additionalResearchYears,
-    ),
+    yearsOfResearch,
     // Hand-maintained, not derived from the data: several projects share a
     // field, so counting distinct tags would overcount.
     researchAreas: 5, // Neuroevolution, Artificial Life, Conversational AI, Decentralization, Neuroscience

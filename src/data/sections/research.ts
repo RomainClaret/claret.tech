@@ -14,7 +14,9 @@ export interface ResearchProject {
    * When ongoing work began, as "YYYY-MM". Set this instead of trusting
    * `yearsSpent` for a project that is still running: the elapsed time is
    * computed against today, so the figure cannot go stale the day after it is
-   * written.
+   * written. The page's HTML, generated at build time, has the figure for
+   * the built commit's day, and the browser shows today's once the page
+   * runs (useToday).
    */
   researchStart?: string;
   links?: {

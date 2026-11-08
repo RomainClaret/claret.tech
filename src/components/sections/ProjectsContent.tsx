@@ -13,7 +13,9 @@ import { SlideInUp, ScaleIn } from "@/components/ui/animated";
 import { useShouldReduceAnimations } from "@/lib/hooks/useSafari";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { formatFileSizeDisplay } from "@/lib/utils/formatters";
+// formatDate: in US English and UTC, the same day for every visitor (it
+// followed the visitor's language and zone: "1.7.2024", or a day off).
+import { formatDate, formatFileSizeDisplay } from "@/lib/utils/formatters";
 import {
   Star,
   GitFork,
@@ -800,13 +802,10 @@ export function ProjectsContent({
                           {project.updatedAt && (
                             <span className="hidden sm:flex items-center gap-1 ml-auto">
                               <Calendar className="w-4 h-4" />
-                              {new Date(project.updatedAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )}
+                              {formatDate(project.updatedAt, {
+                                month: "short",
+                                year: "numeric",
+                              })}
                             </span>
                           )}
                         </div>
@@ -900,10 +899,14 @@ export function ProjectsContent({
                                 </span>
                                 {project.updatedAt && (
                                   <span className="hidden sm:block ml-auto">
+                                    {/* The month by name: a day-first reader
+                                        took 7/1/2024 for 7 January. */}
                                     Updated{" "}
-                                    {new Date(
-                                      project.updatedAt,
-                                    ).toLocaleDateString()}
+                                    {formatDate(project.updatedAt, {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
                                   </span>
                                 )}
                               </div>

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { formatFileSizeDisplay } from "./formatters";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { formatDate, formatFileSizeDisplay } from "./formatters";
 
 describe("formatFileSizeDisplay", () => {
   describe("Bytes to KB conversion", () => {
@@ -97,5 +97,71 @@ describe("formatFileSizeDisplay", () => {
       expect(formatFileSizeDisplay(51200)).toBe("50.0 MB"); // Medium video
       expect(formatFileSizeDisplay(512000)).toBe("500.0 MB"); // Large video
     });
+  });
+});
+
+describe("formatDate", () => {
+  // In UTC whatever the machine's zone: the same day for every visitor.
+  const originalZone = process.env.TZ;
+  afterEach(() => {
+    if (originalZone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalZone;
+  });
+  const DAY: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  };
+
+  it.each(["UTC", "America/New_York", "Pacific/Kiritimati"])(
+    "gives a date-only value its own day, in %s",
+    (zone) => {
+      process.env.TZ = zone;
+      // A kudos article's date: it read "Jun 30, 2024" west of UTC.
+      expect(formatDate("2024-07-01", DAY)).toBe("Jul 1, 2024");
+    },
+  );
+
+  it.each(["UTC", "America/New_York", "Pacific/Kiritimati"])(
+    "gives a feed's timestamp its UTC day, in %s",
+    (zone) => {
+      process.env.TZ = zone;
+      // Medium's RSS pubDate; 14 hours east of UTC it read Apr 26.
+      expect(formatDate("Thu, 25 Apr 2019 12:34:56 GMT", DAY)).toBe(
+        "Apr 25, 2019",
+      );
+    },
+  );
+
+  it("formats in US English whatever the options", () => {
+    // This Mac and CI's runners both default to en-US, which hid a dropped
+    // locale: here a missing one formats in German, as a visitor's might.
+    const toLocaleDateString = Date.prototype.toLocaleDateString;
+    const german = vi
+      .spyOn(Date.prototype, "toLocaleDateString")
+      .mockImplementation(function (
+        this: Date,
+        locales?: Intl.LocalesArgument,
+        options?: Intl.DateTimeFormatOptions,
+      ) {
+        return toLocaleDateString.call(this, locales ?? "de-DE", options);
+      });
+    try {
+      expect(formatDate("2024-07-01", {})).toBe("7/1/2024");
+      expect(
+        formatDate("2024-07-01T00:00:00Z", {
+          month: "short",
+          year: "numeric",
+        }),
+      ).toBe("Jul 2024");
+    } finally {
+      german.mockRestore();
+    }
+  });
+
+  it("gives null for an empty or unreadable value", () => {
+    expect(formatDate("", DAY)).toBeNull();
+    expect(formatDate(undefined, DAY)).toBeNull();
+    expect(formatDate("not a date", DAY)).toBeNull();
   });
 });

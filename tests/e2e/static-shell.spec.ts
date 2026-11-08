@@ -484,6 +484,150 @@ test.describe("Static shell", () => {
     expect(errors).toEqual([]);
   });
 
+  // The test above visits minutes after the build. Visitors come weeks
+  // later, from any timezone, in any language, to HTML generated once, in
+  // UTC. The stats counted years from the browser's clock: the day after a
+  // build, "10.8 Years of Research" met "10.9", React threw #418 and rebuilt
+  // 3,185 of the page's 4,678 elements (production, 2026-11-07). A
+  // document's page too: it shares the root layout.
+  for (const { path, name } of [
+    { path: "/", name: "the homepage" },
+    { path: "/pdf/cv", name: "a document" },
+  ]) {
+    test(`hydrates ${name} without a mismatch a year after the build, far from UTC`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext({
+        timezoneId: "Pacific/Kiritimati", // UTC+14
+        locale: "ar-EG", // other digits from a bare toLocaleString()
+      });
+      const page = await context.newPage();
+      // 400 days on: past every step of the stats (a tenth of a year, half
+      // a year) and into another year, month and day. The clock runs on.
+      const visit = Date.now() + 400 * 24 * 60 * 60 * 1000;
+      await page.clock.install({ time: visit });
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") {
+          errors.push(`${message.text()} ${message.location().url}`);
+        }
+      });
+      page.on("pageerror", (error) => errors.push(String(error)));
+
+      await page.goto(`${path}?playwright=true`);
+      await waitForSplashToEnd(page);
+      // The visit's year, which only the hydrated footer shows (the HTML
+      // has the build's): hydration is over, and the clock reached the
+      // page. A document has no splash to wait for, and networkidle alone
+      // could come before a mismatch was reported.
+      const year = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Pacific/Kiritimati",
+        year: "numeric",
+      }).format(visit);
+      await expect(page.locator("footer")).toContainText(`© ${year}`);
+      await page.waitForLoadState("networkidle");
+
+      expect(errors).toEqual([]);
+      await closeContext(context);
+    });
+  }
+
+  // The 404 page is generated once and served at every unknown URL. At
+  // /pdf/<no such document> (a mistyped link, a retired document, a guessed
+  // /pdfs/<name> redirected there) the page decided "a document, no splash"
+  // from the URL while its HTML had the splash: React threw #418 and rebuilt
+  // the page (production, 2026-11-07). Only the page's own 404 may log.
+  for (const { path, name } of [
+    { path: "/pdf/no-such-document", name: "a missing document" },
+    { path: "/no-such-page", name: "an unknown page" },
+  ]) {
+    test(`hydrates the 404 page at ${name} without a mismatch`, async ({
+      page,
+    }) => {
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() !== "error") return;
+        const ownStatus =
+          message.text().includes("status of 404") &&
+          message.location().url.includes(path);
+        if (!ownStatus) {
+          errors.push(`${message.text()} ${message.location().url}`);
+        }
+      });
+      page.on("pageerror", (error) => errors.push(String(error)));
+
+      const response = await page.goto(`${path}?playwright=true`);
+      expect(response?.status()).toBe(404);
+      await waitForSplashToEnd(page);
+      await page.waitForLoadState("networkidle");
+
+      expect(errors).toEqual([]);
+    });
+  }
+
+  // iOS turns text it takes for a phone number, a date, an address or an
+  // email into links before React hydrates: a mismatch (Next's hydration
+  // error page, "Common iOS issues"). Playwright's WebKit runs no data
+  // detectors, so this checks that the page asks iOS not to.
+  test("asks iOS not to turn its text into links", async ({ request }) => {
+    const html = await (await request.get("/?playwright=true")).text();
+
+    expect(html).toMatch(
+      /<meta name="format-detection" content="telephone=no, date=no, address=no, email=no"\s*\/?>/,
+    );
+  });
+
+  // A translator or an extension can edit the page before React hydrates
+  // it. The mismatch makes React render the whole document again, which
+  // resets <html> to the layout's attributes: the class the head script set
+  // for high contrast was gone and the toggle said off. On production every
+  // load did that while the stats mismatched (2026-11-07).
+  test("keeps high contrast when the page was edited before hydration", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem("highContrast", "true");
+      } catch {
+        // Storage blocked: there is no choice to keep.
+      }
+    });
+    // Edited in the HTML itself, so that it lands before hydration whatever
+    // the timing: the footer's "© ", a text node beside the year's, as a
+    // translator would rewrite it.
+    let edited = false;
+    await context.route(
+      (url) => url.pathname === "/" && url.searchParams.has("playwright"),
+      async (route) => {
+        const response = await route.fetch();
+        const body = (await response.text()).replace("© <!-- -->", () => {
+          edited = true;
+          return "(c) <!-- -->";
+        });
+        await route.fulfill({ response, body });
+      },
+    );
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    page.on("pageerror", (error) => errors.push(String(error)));
+
+    await page.goto("/?playwright=true");
+    await waitForSplashToEnd(page);
+
+    expect(edited).toBe(true);
+    // The mismatch happened, or the rest would check nothing.
+    expect(errors.join("\n")).toMatch(/#418|Hydration failed/);
+    await expect(page.locator("html")).toHaveClass(/(^|\s)high-contrast(\s|$)/);
+    await expect(
+      page.getByRole("button", { name: /high contrast/i }).first(),
+    ).toHaveAttribute("aria-pressed", "true");
+    await closeContext(context);
+  });
+
   // Only the bundle removes the backdrop. When it never runs (a blocked or
   // missing chunk, an error before hydration), the stylesheet hides it
   // after 6 s. Reduced motion is checked too: it is the one setting under
@@ -572,10 +716,16 @@ test.describe("Static shell", () => {
       expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
         "hidden",
       );
-      // The splash still did its work: it asked for every project.
-      expect(
-        requested.some((url) => url.includes("/api/fetch-all-repos")),
-      ).toBe(true);
+      // The splash still did its work: it asked for every project. Waited
+      // for, not checked at the deadline above: the request comes two held
+      // chunks (3 s each) after the first ones, close to that deadline, and
+      // in CI's image 1 run in 10 failed at it (2 in 10 before 2026-11-07's
+      // changes, so not theirs).
+      await expect
+        .poll(() =>
+          requested.some((url) => url.includes("/api/fetch-all-repos")),
+        )
+        .toBe(true);
       await closeContext(context);
     });
   }

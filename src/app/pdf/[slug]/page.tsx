@@ -23,7 +23,9 @@ const KIND_LABEL: Record<string, string> = {
 // Only the documents generateStaticParams lists. With Next's default, any
 // /pdf/<x> was rendered on request and its 404 cached under that path, with
 // no bound on the paths a caller can name. The registry is static data, so
-// no document appears without a rebuild.
+// no document appears without a rebuild. Any other slug gets the site's
+// 404 page (src/app/not-found.tsx): this segment's own, "Document Not
+// Found", could no longer be reached and was removed (2026-11-07).
 export const dynamicParams = false;
 
 export function generateStaticParams() {

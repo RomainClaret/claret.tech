@@ -29,12 +29,17 @@ export function useSafariContext() {
 }
 
 /**
- * SafariProvider that handles SSR hydration mismatch properly
+ * Whether this browser is Safari, for the components that hold their
+ * animations back there.
  *
- * REVERSED STRATEGY for Safari performance:
- * 1. During SSR: Always render SAFARI version (static, no animations)
- * 2. After hydration: Only enable animations if NOT Safari
- * 3. This ensures Safari NEVER sees animations, even briefly
+ * The HTML is generated once, at build time, for every browser, and it is
+ * rendered as not Safari (the layout passes `initialSafari={false}`); so is
+ * the render that hydrates it, which keeps the two identical. React then
+ * renders the browser's own value at once (useSyncExternalStore), and an
+ * effect marks <body data-safari>, which the stylesheets key on. Safari
+ * therefore gets the animated version for that first render. (This said
+ * the opposite, that the server rendered the Safari version, until
+ * 2026-11-07.)
  */
 interface SafariProviderProps {
   children: ReactNode;
@@ -74,7 +79,7 @@ export function SafariProvider({
     <SafariContext.Provider
       value={{
         isSafari: isSafari, // Always report actual Safari status
-        shouldReduceAnimations, // True until we confirm it's NOT Safari
+        shouldReduceAnimations, // False in the HTML; Safari's own value after
         isHydrated,
       }}
     >

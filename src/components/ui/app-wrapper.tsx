@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useSelectedLayoutSegment } from "next/navigation";
 
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -202,7 +202,6 @@ export function AppWrapper({ children }: AppWrapperProps) {
     backdrop.addEventListener("animationend", onEnd);
     return () => backdrop.removeEventListener("animationend", onEnd);
   }, [showPageWithoutSplash]);
-  const pathname = usePathname();
 
   // The terminal mounts on its first open and then stays mounted, as it did
   // from the end of the splash before: until a visitor opens it, neither its
@@ -214,7 +213,13 @@ export function AppWrapper({ children }: AppWrapperProps) {
   // /pdf/<slug> exists so a document can be opened directly. Playing the site
   // intro over it defeats the point, so skip the splash there and treat it as
   // already finished, which is also what gates the terminal.
-  const isDirectDocument = pathname?.startsWith("/pdf/") ?? false;
+  //
+  // Read from the route the HTML was rendered for, not from the URL. The 404
+  // page is generated once, as /_not-found, and served at every unknown URL:
+  // at /pdf/<no such document> usePathname() said "/_not-found" in the HTML
+  // and "/pdf/..." in the browser, so the backdrop the HTML had was missing
+  // from the hydration render, and React threw #418 and rebuilt the page.
+  const isDirectDocument = useSelectedLayoutSegment() === "pdf";
 
   // The page is on screen once the splash has played, has skipped itself, or
   // never plays. What is there only to be seen waits for it (a deep link's

@@ -158,7 +158,9 @@ vi.mock("@/lib/utils", () => ({
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
 }));
 
-vi.mock("@/lib/utils/formatters", () => ({
+vi.mock("@/lib/utils/formatters", async (importOriginal) => ({
+  // formatDate as it is: the dates are part of what the cards show.
+  ...(await importOriginal<typeof import("@/lib/utils/formatters")>()),
   formatFileSizeDisplay: (size: number) => `${Math.round(size / 1024)}KB`,
 }));
 
@@ -1372,6 +1374,37 @@ describe("Projects Component", () => {
       expect(
         within(dialog).getByRole("link", { name: /Live Demo/ }),
       ).toHaveAttribute("href", "https://python-tool.example.com");
+    });
+
+    it("dates the cards in UTC, with the month by name, in any zone", async () => {
+      // updatedAt is midnight UTC on 1 December. Formatted in New York's
+      // zone it read "Nov 2023" on a card and "11/30/2023" in the list, and
+      // a day-first reader took a numeric date for another day.
+      const zone = process.env.TZ;
+      process.env.TZ = "America/New_York";
+      try {
+        // The zone switch takes effect, or this proves nothing.
+        expect(new Date("2023-12-01T00:00:00Z").getDate()).toBe(30);
+        mockProjectsContext.allProjects = mockAllProjects as never;
+        render(<Projects />);
+        fireEvent.click(await screen.findByText("All Projects"));
+        await screen.findByText("A useful Python tool");
+
+        // In New York's zone each date fell a day back: no "Dec 2023", and
+        // python-tool's 1 November read "Oct 2023".
+        expect(screen.getAllByText("Dec 2023").length).toBeGreaterThan(0);
+        expect(screen.getByText("Nov 2023")).toBeInTheDocument();
+        expect(screen.queryByText("Oct 2023")).toBeNull();
+
+        fireEvent.click(screen.getByLabelText("List view"));
+        expect(
+          screen.getAllByText("Updated Dec 1, 2023").length,
+        ).toBeGreaterThan(0);
+        expect(screen.getByText("Updated Nov 1, 2023")).toBeInTheDocument();
+      } finally {
+        if (zone === undefined) delete process.env.TZ;
+        else process.env.TZ = zone;
+      }
     });
 
     it("shows a pinned repository's full record once all are loaded", async () => {

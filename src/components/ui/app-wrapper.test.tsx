@@ -28,6 +28,21 @@ vi.mock("@/lib/utils/load-fallback", () => ({
   },
 }));
 
+// The router as a static page sees it: usePathname() is the URL, which is
+// the route's own path in the build's render and the visitor's in the
+// browser; useSelectedLayoutSegment() is the segment below the root layout
+// of the route the HTML was rendered for ("pdf" on a document, "_not-found"
+// on the 404 page at any URL, null on the homepage).
+const navigation = vi.hoisted(() => ({
+  pathname: "/",
+  segment: null as string | null,
+}));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  usePathname: () => navigation.pathname,
+  useSelectedLayoutSegment: () => navigation.segment,
+}));
+
 // Mock all the external dependencies
 vi.mock("@/data/portfolio", () => ({
   terminalConfig: {
@@ -469,6 +484,78 @@ describe("AppWrapper", () => {
         expect(container.querySelector("[data-splash-backdrop]")).toBeNull();
       } finally {
         vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("A document opened directly", () => {
+    afterEach(() => {
+      navigation.pathname = "/";
+      navigation.segment = null;
+    });
+
+    it("plays no splash on a document's page", async () => {
+      navigation.pathname = "/pdf/cv";
+      navigation.segment = "pdf";
+      const { renderToString } = await import("react-dom/server");
+
+      const html = renderToString(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+      render(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+
+      expect(html).not.toContain("data-splash-backdrop");
+      expect(screen.queryByTestId("splash-screen")).toBeNull();
+    });
+
+    it("hydrates the 404 page at a URL under /pdf/ without a mismatch", async () => {
+      // The 404 page is generated once, as /_not-found, and served at every
+      // unknown URL. Its HTML has the backdrop; read from the URL, the
+      // browser's render at /pdf/<no such document> left it out, and React
+      // threw #418 and rebuilt the page.
+      const { renderToString } = await import("react-dom/server");
+      const { hydrateRoot } = await import("react-dom/client");
+      navigation.segment = "_not-found";
+      navigation.pathname = "/_not-found"; // the build's render
+      const html = renderToString(
+        <AppWrapper>
+          <div>Test</div>
+        </AppWrapper>,
+      );
+      expect(html).toContain("data-splash-backdrop");
+
+      navigation.pathname = "/pdf/no-such-document"; // the visitor's URL
+      const container = document.createElement("div");
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      const recoverable: unknown[] = [];
+      const consoleErrors = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+      try {
+        await act(async () => {
+          root = hydrateRoot(
+            container,
+            <AppWrapper>
+              <div>Test</div>
+            </AppWrapper>,
+            { onRecoverableError: (error) => recoverable.push(error) },
+          );
+        });
+
+        expect(recoverable).toEqual([]);
+        expect(consoleErrors).not.toHaveBeenCalled();
+      } finally {
+        act(() => root?.unmount());
+        consoleErrors.mockRestore();
+        container.remove();
       }
     });
   });

@@ -3,6 +3,7 @@ import {
   HEAD_BOOT_SCRIPT,
   isSafariUserAgent,
   readStoredTheme,
+  wantsHighContrast,
 } from "./head-boot";
 import { memoryStorage } from "@/test/memory-storage";
 import { restoreNavigator, stubNavigator } from "@/test/navigator";
@@ -179,6 +180,7 @@ describe("head boot: high contrast", () => {
     systemAsksForMoreContrast(more);
 
     expect(boot().highContrast).toBe(expected);
+    expect(wantsHighContrast()).toBe(expected);
   });
 
   it("follows the system where storage is blocked", () => {
@@ -190,6 +192,7 @@ describe("head boot: high contrast", () => {
     systemAsksForMoreContrast(true);
 
     expect(boot().highContrast).toBe(true);
+    expect(wantsHighContrast()).toBe(true);
   });
 
   it("stays off where the browser has no matchMedia", () => {
@@ -197,5 +200,6 @@ describe("head boot: high contrast", () => {
     vi.stubGlobal("matchMedia", undefined);
 
     expect(boot().highContrast).toBe(false);
+    expect(wantsHighContrast()).toBe(false);
   });
 });

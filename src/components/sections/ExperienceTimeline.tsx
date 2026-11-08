@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormattedExperienceYears } from "@/lib/utils/experience-calculator";
+import { useToday } from "@/lib/hooks/useToday";
 import { m, AnimatePresence } from "framer-motion";
 import { useCardDeepLink } from "@/lib/hooks/useCardDeepLink";
 import { CopyLinkButton } from "@/components/ui/copy-link-button";
@@ -481,6 +482,12 @@ export function ExperienceTimeline() {
     if (deepLinkedId && target >= COLLAPSED_COUNT) setShowAll(true);
   }
 
+  // The built commit's day's figure while hydrating, today's after
+  // (useToday).
+  const yearsExperience = useToday((today) =>
+    getFormattedExperienceYears(workExperiences.experience, today),
+  );
+
   if (!workExperiences.display) {
     return null;
   }
@@ -492,7 +499,7 @@ export function ExperienceTimeline() {
 
   const stats = {
     totalPositions: workExperiences.experience.length,
-    yearsExperience: getFormattedExperienceYears(workExperiences.experience),
+    yearsExperience,
     companiesFounded: workExperiences.experience.filter((exp) =>
       exp.role.toLowerCase().includes("founder"),
     ).length,

@@ -57,6 +57,28 @@ export function readStoredTheme(fallback: Theme = systemTheme()): Theme {
 }
 
 /**
+ * High contrast as the script decides it: the visitor's stored choice
+ * ("true" or "false"), else the system's prefers-contrast: more. Decided
+ * again once React has mounted (high-contrast-toggle.tsx): a hydration
+ * mismatch makes React render the whole document again, which resets
+ * <html> to the layout's attributes and drops the class the script set.
+ */
+export function wantsHighContrast(): boolean {
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem("highContrast");
+  } catch {
+    // Storage blocked: the system decides, as in the script.
+  }
+  if (stored === "true") return true;
+  if (stored === "false") return false;
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-contrast: more)").matches
+  );
+}
+
+/**
  * Safari proper, not the Chromium browsers that also say "Safari" in their
  * user agent: the test the server's middleware used.
  */

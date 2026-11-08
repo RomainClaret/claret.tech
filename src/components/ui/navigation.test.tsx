@@ -26,10 +26,13 @@ import {
 } from "vitest";
 import { Navigation } from "./navigation";
 
-// The component reads the pathname to decide whether section anchors resolve
-// here or have to point back at the homepage. Mutable so a test can move off
-// the homepage.
+// The component reads the route to decide whether section anchors resolve
+// here or have to point back at the homepage: the segment below the root
+// layout, null on the homepage, "pdf" on a document. The pathname is the
+// URL, which differs from the route where the homepage's HTML is served at
+// /index. Mutable so a test can move off the homepage.
 const mockPathname = vi.hoisted(() => ({ current: "/" }));
+const mockSegment = vi.hoisted(() => ({ current: null as string | null }));
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
 /** Sections the getElementById stub put in the page, removed after each test. */
@@ -37,6 +40,7 @@ const stubSections: HTMLElement[] = [];
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname.current,
+  useSelectedLayoutSegment: () => mockSegment.current,
   useRouter: () => ({ push: mockRouterPush }),
 }));
 
@@ -693,10 +697,12 @@ describe("Navigation", () => {
     // the whole menu and the logo went dead while the terminal kept working.
     beforeEach(() => {
       mockPathname.current = "/pdf/geenns";
+      mockSegment.current = "pdf";
     });
 
     afterEach(() => {
       mockPathname.current = "/";
+      mockSegment.current = null;
     });
 
     it("points section links back at the homepage", () => {
@@ -736,6 +742,41 @@ describe("Navigation", () => {
   });
 
   describe("On the homepage", () => {
+    it("hydrates the homepage's HTML at /index with the same links", async () => {
+      // The CDN serves the homepage's HTML at /index too. Read from the URL,
+      // the browser's render there pointed every link at "/#section" while
+      // the HTML said "#section": an attribute mismatch React does not
+      // repair, so the links and their click handling disagreed.
+      const { renderToString } = await import("react-dom/server");
+      const { hydrateRoot } = await import("react-dom/client");
+      const html = renderToString(<Navigation />); // the build: "/"
+
+      mockPathname.current = "/index"; // the visitor's URL
+      const container = document.createElement("div");
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      const consoleErrors = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+      try {
+        await act(async () => {
+          root = hydrateRoot(container, <Navigation />);
+        });
+
+        expect(consoleErrors).not.toHaveBeenCalled(); // no mismatch
+        const research = [...container.querySelectorAll("a")].find(
+          (a) => a.textContent === "Research",
+        );
+        expect(research).toHaveAttribute("href", "#research");
+      } finally {
+        act(() => root?.unmount());
+        consoleErrors.mockRestore();
+        container.remove();
+        mockPathname.current = "/";
+      }
+    });
+
     it("still scrolls in-page rather than navigating", () => {
       const section = document.createElement("div");
       section.id = "research";

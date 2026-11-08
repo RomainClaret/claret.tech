@@ -4,6 +4,8 @@ import { useId, useSyncExternalStore } from "react";
 import { Contrast } from "lucide-react";
 import { writeStorage } from "@/lib/utils/safe-storage";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+import { useIsomorphicLayoutEffect } from "@/lib/hooks/useIsomorphicLayoutEffect";
+import { wantsHighContrast } from "@/lib/boot/head-boot";
 
 // The class on <html> is the state: the head script (lib/boot/head-boot.ts)
 // sets it before the first paint, from the visitor's choice or else the
@@ -18,15 +20,37 @@ const subscribe = (onChange: () => void) => {
 };
 const isOn = () => document.documentElement.classList.contains("high-contrast");
 
+// The visitor's choice in this page view, once made. Where storage is
+// blocked it lives only here and in the class, so a copy mounted later, or
+// one mounted after React rebuilt the document, must not take the script's
+// rule over it.
+let chosen: boolean | null = null;
+
 export function HighContrastToggle() {
   const isHighContrast = useSyncExternalStore(subscribe, isOn, () => false);
   const hydrated = useHydrated();
+
+  // The visitor's choice, or else the head script's decision, again on every
+  // mount and before the first paint. React resets <html> to the layout's
+  // attributes whenever it renders the whole document again: after a
+  // hydration mismatch anywhere (a translator or an extension editing the
+  // page first), and when global-error's Try again remounts the layout. The
+  // class was gone and the toggle said off (production, 2026-11-07). The
+  // theme's provider puts the theme back the same way.
+  useIsomorphicLayoutEffect(() => {
+    const on = chosen ?? wantsHighContrast();
+    if (on !== isOn()) {
+      document.documentElement.classList.toggle("high-contrast", on);
+      listeners.forEach((listener) => listener());
+    }
+  }, []);
   // Per copy: the navigation renders one in the desktop bar and one in the
   // phone menu, and a fixed id gave the page two elements with the same id.
   const descriptionId = useId();
 
   const toggleHighContrast = () => {
     const on = !isOn();
+    chosen = on;
     document.documentElement.classList.toggle("high-contrast", on);
     // Guarded: where storage is blocked, the choice lasts this page view.
     writeStorage("local", "highContrast", on ? "true" : "false");

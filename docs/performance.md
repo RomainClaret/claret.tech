@@ -2361,6 +2361,49 @@ Round 14 (2026-10-15/16):
   with a 4x slower CPU). It shows only on a load slower than the backdrop's
   6 s fallback, a failed bundle, or a page without the splash (`/pdf/*`).
   Let CSS choose from the class the head script sets.
+- **A figure computed from today breaks hydration days after a build.**
+  The homepage's HTML is generated at build time and hydrated whenever it
+  is visited. The research stats computed years with `new Date()` inside a
+  helper, where the purity lint rule cannot see it (it flags `Date.now()`
+  in a component, not `new Date()`, and not in a helper): the day after a
+  2026-11-04 build (the figure steps every 36.5 days, a tenth of a year)
+  "10.8" met the browser's "10.9", React threw #418 and rebuilt
+  3,185 of the page's 4,678 elements: a median 258 ms more blocking time
+  and a longest task 113 ms longer at 4x throttling (production,
+  2026-11-07, 4 interleaved pairs on a busy Mac, one pair showing no
+  difference). `useToday` renders the value for the built commit's day
+  (`BUILD_DATE`) while hydrating and today's after, from UTC dates (a
+  visitor's offset moved every start
+  up to 14 hours); its render after hydration measured nothing (4 pairs,
+  -148 to +5 ms). Compare timings with the fake clock installed in both
+  arms: Playwright's `clock.install` changes the timers, and a first
+  comparison that installed it in one arm only misread the cost.
+- **`usePathname()` is the URL, not the page (2026-11-07).** A static page
+  can be served at another URL: the 404 page, generated once as `/_not-found`, at
+  every unknown one, and the homepage at `/index` on Vercel's CDN. The
+  browser's router starts from `window.location`, so a layout decided from
+  the pathname differed from its HTML: at `/pdf/<no such document>` the
+  splash backdrop went missing and React threw #418 (HTML) and rebuilt the
+  page. `useSelectedLayoutSegment()` reads the route tree the HTML was
+  rendered with, the same on both sides ("pdf", "_not-found" without the
+  route's slash, or null on the homepage).
+- **A mismatch rebuilds the whole document, `<html>` included.** No
+  Suspense boundary sits between the root and the page, so any #418 makes
+  React render the document again, and that resets `<html>`, `<head>` and
+  `<body>` to the layout's attributes. The theme's provider puts the theme
+  back; nothing put back the head script's high contrast, so its users lost
+  it on every production load while the stats mismatched (2026-11-07), and
+  would again on a page a translator or an extension edits first, or
+  after global-error's Try again. The toggle decides it again on every
+  mount: the visitor's choice in this page view, else the script's rule
+  (`wantsHighContrast` in `head-boot.ts`). A `<Suspense>` around the page inside `<main>` would
+  keep a mismatch to the page's content. React 19.3 leaves such a boundary
+  dehydrated in the first pass and hydrates it in a later render at idle
+  priority; on the build it measured, the page's nodes were hydrated
+  within the same 5 ms poll as the nav's. But the prerender ships `<main>` empty and
+  the page in a hidden `<div id="S:0">`, moved into place by an inline
+  script: without scripts the page is blank (static-shell's "shows the page
+  when scripts are off" failed, 2026-11-07). Not done.
 - **`useSyncExternalStore` keeps hydration identical.** The server snapshot
   renders during hydration, and the client's applies in a synchronous
   re-render right after. It merges that re-render into the effects' task,

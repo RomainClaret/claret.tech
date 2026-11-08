@@ -123,6 +123,17 @@ export const metadata: Metadata = {
     ],
   },
   manifest: "/favicons/site.webmanifest",
+  // iOS turns text it takes for a phone number, a date, an address or an
+  // email into links before React hydrates the page, and React then finds a
+  // link where it rendered text: a mismatch, after which it renders the
+  // whole document again (Next's hydration error page, "Common iOS
+  // issues"). What the site means to link, it links (the email's mailto:).
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+  },
 };
 
 // Generate comprehensive structured data for SEO

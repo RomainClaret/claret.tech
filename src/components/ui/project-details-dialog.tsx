@@ -15,7 +15,9 @@ import {
   primaryActionClass,
   secondaryActionClass,
 } from "@/components/ui/details-dialog";
-import { formatFileSizeDisplay } from "@/lib/utils/formatters";
+// formatDate: in UTC, so every visitor reads the same day; null for the
+// empty strings pinned repositories carry.
+import { formatDate, formatFileSizeDisplay } from "@/lib/utils/formatters";
 import {
   defaultLanguageIcon,
   getProjectColor,
@@ -40,21 +42,6 @@ export function homepageHref(value: string | null | undefined): string | null {
   if (/^https?:\/\//i.test(address)) return address;
   if (/^[a-z][a-z0-9+.-]*:/i.test(address)) return null;
   return `https://${address}`;
-}
-
-/**
- * A date from the API, formatted in UTC so every visitor (and every test
- * machine) reads the same day. Null for the empty strings pinned
- * repositories carry.
- */
-function formatDate(
-  value: string,
-  options: Intl.DateTimeFormatOptions,
-): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
 }
 
 /**
