@@ -24,7 +24,7 @@ const MEDIUM_LONG = "a-post-under-its-picture-0a1b2c3d4e5f";
 const MEDIUM_SHORT = "a-short-post-6a7b8c9d0e1f";
 
 /** The research card whose dialog has pictures and animations (research-media.ts). */
-const BREEDER = "Breeding with an Evolvable Vocabulary";
+const BREEDER = "Interactive Image Evolution";
 
 /**
  * The blog's Medium posts, as Medium writes them. The page asks

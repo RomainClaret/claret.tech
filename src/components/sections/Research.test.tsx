@@ -585,7 +585,7 @@ describe("Research", () => {
   // A card's pictures and animations (research-media.ts, ResearchMedia.tsx),
   // which come with its dialog's code.
   describe("Pictures and animations", () => {
-    const BREEDER = "Breeding with an Evolvable Vocabulary";
+    const BREEDER = "Interactive Image Evolution";
     const groups = researchMedia["evolvable-vocabulary"]!;
     const pictures = groups.flatMap((group) => group.pictures);
     const animations = groups.flatMap((group) =>

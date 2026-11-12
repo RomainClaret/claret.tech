@@ -164,7 +164,9 @@ export const researchSection = {
       ],
     },
     {
-      title: "Breeding with an Evolvable Vocabulary",
+      // Retitled until the EvoStar 2027 notification (10 January 2027), for double-blind review;
+      // restore the paper's title afterwards (git log of this line).
+      title: "Interactive Image Evolution",
       anchorId: "evolvable-vocabulary",
       subtitle: "Active Research Direction",
       shortDescription:
