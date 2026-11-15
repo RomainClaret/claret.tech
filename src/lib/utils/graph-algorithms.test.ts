@@ -229,6 +229,10 @@ describe("buildResearchGraph, rule by rule", () => {
   });
 
   it("leaves a hidden research card out, and every link to it", () => {
+    // Linked by its card, and named by the data file too: in a lane's
+    // members and in a curated relation, as research-map.json keeps naming
+    // a card that is hidden for now.
+    const base = config();
     const graph = build({
       papers: [
         paper("item", {
@@ -241,6 +245,22 @@ describe("buildResearchGraph, rule by rule", () => {
           links: [{ name: "Code", url: "https://github.com/ada/tool" }],
         }),
       ],
+      config: config({
+        lanes: base.lanes.map((lane) =>
+          lane.id === "named"
+            ? { ...lane, members: [...lane.members, "hidden"] }
+            : lane,
+        ),
+        labels: { hidden: "Hidden card" },
+        relations: [
+          {
+            from: "item",
+            to: "hidden",
+            kind: "extends",
+            note: "The hidden card builds on the item.",
+          },
+        ],
+      }),
     });
 
     expect(graph.nodes.map((node) => node.id)).toEqual(["item"]);

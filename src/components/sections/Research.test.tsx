@@ -369,7 +369,7 @@ describe("Research", () => {
   });
 
   describe("Deep links", () => {
-    it("gives every project an anchor id", () => {
+    it("gives every project an anchor id, on the page while it is displayed", () => {
       render(<Research />);
 
       for (const id of [
@@ -381,7 +381,13 @@ describe("Research", () => {
         "overclouds",
         "vestibular-integration",
       ]) {
-        expect(document.getElementById(id)).toBeTruthy();
+        // A hidden card keeps its anchor for when it comes back; "Hidden
+        // projects" below checks that the page leaves it out.
+        const project = researchSection.projects.find((p) => p.anchorId === id);
+        expect(project, id).toBeDefined();
+        if (isDisplayed(project!)) {
+          expect(document.getElementById(id), id).toBeTruthy();
+        }
       }
     });
 
@@ -558,16 +564,25 @@ describe("Research", () => {
       await waitFor(() => expect(scrolledTo()).toContain(visibleAnchor));
       control.unmount();
 
+      // Both links a card has: #<card> points at it, #<card>-full also opens
+      // its details.
       for (const project of hidden.filter((p) => p.anchorId)) {
-        scrollSpy.mockClear();
-        window.location.hash = `#${project.anchorId}`;
-        const { unmount } = render(<Research />);
+        for (const hash of [
+          `#${project.anchorId}`,
+          `#${project.anchorId}-full`,
+        ]) {
+          scrollSpy.mockClear();
+          window.location.hash = hash;
+          const { unmount } = render(<Research />);
 
-        // The hook scrolls inside requestAnimationFrame, so checking straight
-        // after render would pass whether or not the anchor was registered.
-        await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
-        expect(scrolledTo()).not.toContain(project.anchorId);
-        unmount();
+          // The hook scrolls inside requestAnimationFrame, so checking
+          // straight after render would pass whether or not the anchor was
+          // registered.
+          await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+          expect(scrolledTo(), hash).not.toContain(project.anchorId);
+          expect(screen.queryByRole("dialog"), hash).toBeNull();
+          unmount();
+        }
       }
       scrollSpy.mockRestore();
     });
@@ -592,22 +607,64 @@ describe("Research", () => {
       group.animation ? [group.animation] : [],
     );
 
+    // The breeder's is the one card with pictures, and it can be hidden
+    // (display: false in research.ts). These tests render the section with
+    // it shown, so that its dialog's pictures and animations stay tested
+    // while it is off the site; the rest of the data is the site's own.
+    let WithBreeder: typeof Research;
+    beforeEach(async () => {
+      vi.resetModules();
+      vi.doMock("@/data/sections/research", async (importOriginal) => {
+        const actual =
+          await importOriginal<typeof import("@/data/sections/research")>();
+        return {
+          ...actual,
+          researchSection: {
+            ...actual.researchSection,
+            projects: actual.researchSection.projects.map((project) =>
+              project.title === BREEDER
+                ? { ...project, display: true }
+                : project,
+            ),
+          },
+        };
+      });
+      ({ Research: WithBreeder } = await import("./Research"));
+    });
+
     afterEach(() => {
       motion.reduce = false;
+      vi.doUnmock("@/data/sections/research");
+      vi.resetModules();
     });
 
     async function openBreeder() {
-      render(<Research />);
+      render(<WithBreeder />);
       fireEvent.click(
         screen.getByRole("button", { name: `Read more about ${BREEDER}` }),
       );
       return screen.findByRole("dialog", { name: BREEDER });
     }
 
-    it("belongs to cards on the page, every picture and animation described", () => {
-      const anchors = researchSection.projects
-        .filter(isDisplayed)
-        .map((project) => project.anchorId);
+    it("shows the breeder's card in these tests, whatever the site does", () => {
+      // Without it, a title or anchor that no longer matches would leave
+      // every test below to fail on a missing button.
+      const breeder = researchSection.projects.find(
+        (project) => project.title === BREEDER,
+      );
+      expect(breeder?.anchorId).toBe("evolvable-vocabulary");
+      render(<WithBreeder />);
+      expect(
+        screen.getByRole("button", { name: `Read more about ${BREEDER}` }),
+      ).toBeInTheDocument();
+    });
+
+    it("belongs to cards, every picture and animation described", () => {
+      // Any card's, shown or hidden: a hidden card keeps its pictures for
+      // when it comes back.
+      const anchors = researchSection.projects.map(
+        (project) => project.anchorId,
+      );
 
       for (const [anchor, mediaGroups] of Object.entries(researchMedia)) {
         expect(anchors).toContain(anchor);
@@ -668,7 +725,7 @@ describe("Research", () => {
     });
 
     it("shows them in the card's dialog only, after its text and before its links", async () => {
-      render(<Research />);
+      render(<WithBreeder />);
       expect(document.querySelector("video")).toBeNull();
       expect(
         document.querySelector('img[src^="/images/research/"]'),
@@ -831,7 +888,7 @@ describe("Research", () => {
     });
 
     it("leaves a card without pictures as it was", async () => {
-      render(<Research />);
+      render(<WithBreeder />);
       fireEvent.click(
         screen.getByRole("button", { name: /^Read more about GraphQA/ }),
       );

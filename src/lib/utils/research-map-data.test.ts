@@ -5,7 +5,7 @@ import mapData from "@/data/research-map.json";
 import { buildResearchGraph, parseMapConfig } from "./graph-algorithms";
 import { STATIC_PUBLICATIONS } from "@/lib/api/fetch-publications";
 import { papersSection } from "@/data/sections/papers";
-import { researchSection } from "@/data/sections/research";
+import { isDisplayed, researchSection } from "@/data/sections/research";
 
 /**
  * src/data/research-map.json, the research map's hand-edited data: what it
@@ -23,6 +23,13 @@ const graph = buildResearchGraph({
   now: new Date().getFullYear(),
 });
 const shown = new Set(graph.nodes.map((node) => node.id));
+// Research cards kept off the site for now (display: false): the file may
+// keep naming them, for when they come back, and the map leaves them out.
+const hidden = new Set(
+  researchSection.projects
+    .filter((project) => !isDisplayed(project))
+    .flatMap((project) => (project.anchorId ? [project.anchorId] : [])),
+);
 
 type Rgb = [number, number, number];
 
@@ -66,14 +73,35 @@ describe("src/data/research-map.json", () => {
     );
   });
 
-  it("names only items the map shows", () => {
+  it("names only items the map shows, or a research card hidden for now", () => {
     const named = [
       ...config.lanes.flatMap((lane) => lane.members),
       ...Object.keys(config.labels),
       ...config.relations.flatMap((relation) => [relation.from, relation.to]),
     ];
 
-    expect(named.filter((id) => !shown.has(id))).toEqual([]);
+    expect(named.filter((id) => !shown.has(id) && !hidden.has(id))).toEqual([]);
+  });
+
+  it("draws nothing of a hidden research card: no item, no line, no note", () => {
+    // Real data: this bites while a card is hidden and passes trivially when
+    // none is. The file still names the card in a lane, a label and a
+    // relation, and none of them may reach the map.
+    const notes = config.relations
+      .filter(({ from, to }) => hidden.has(from) || hidden.has(to))
+      .map((relation) => relation.note);
+    const texts = graph.edges.flatMap((edge) =>
+      edge.reasons.map((reason) => reason.text),
+    );
+
+    for (const id of hidden) {
+      expect(shown.has(id), id).toBe(false);
+      expect(
+        graph.edges.filter((edge) => [edge.source, edge.target].includes(id)),
+        id,
+      ).toEqual([]);
+    }
+    expect(texts.filter((text) => notes.includes(text))).toEqual([]);
   });
 
   it("has one id per lane, one fallback lane, and puts each item in a lane", () => {

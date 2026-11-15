@@ -533,7 +533,6 @@ Current Focus:
 - Lifelong learning without forgetting: knowledge as reusable, evolvable components instead of overwritten weights
 - Emergent behaviors from bio-inspired artificial life: nothing in the evolutionary loop ever sees human data, so the results are not built to look familiar
 - Measuring that honestly: every test for novel behavior I know of is calibrated on human data, so anything genuinely outside it reads as noise
-- An image breeder whose vocabulary can change: picbreeder.claret.tech
 - Building the tools this needs, because most of them do not exist yet
 
 Research Philosophy:

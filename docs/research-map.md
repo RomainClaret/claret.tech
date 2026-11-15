@@ -18,7 +18,9 @@ typed twice, except the few things below that only the map needs.
 
 Each item is keyed by the deep link its card already has (`#claret2026emr`,
 `#geenns`), and **Show on page** follows it. A card with `display: false`
-stays off the map, as it stays off the page.
+stays off the map, as it stays off the page, and so do the lines to it:
+the data file may keep naming it in a lane, a label and a relation, for when
+it comes back.
 
 ## Adding a paper or a project
 
@@ -32,7 +34,8 @@ from then on. Two optional touches in `src/data/research-map.json`:
   repository, else to the lane marked `fallback`.
 
 `src/lib/utils/research-map-data.test.ts` checks the file: every id it names
-must be on the map, relations must not loop, lane colours must reach 3:1
+must be on the map or be a research card hidden for now (nothing of which
+may reach the map), relations must not loop, lane colours must reach 3:1
 against both themes, and no em or en dashes.
 
 ## Links

@@ -37,8 +37,7 @@ export interface ResearchProject {
    */
   anchorId?: string;
   /**
-   * Set to false to keep a card off the site for now, for example while the
-   * paper behind it is under double-blind review. A hidden card is left out
+   * Set to false to keep a card off the site for now. A hidden card is left out
    * of the grid, the stats, the deep links and the reader routes. Its text
    * still ships in the page's JavaScript and in the git history, so this hides
    * a card and does not make it private.
@@ -164,10 +163,13 @@ export const researchSection = {
       ],
     },
     {
-      // Retitled until the EvoStar 2027 notification (10 January 2027), for double-blind review;
-      // restore the paper's title afterwards (git log of this line).
+      // Hidden and retitled until 10 January 2027. Then delete `display: false` and restore what
+      // the retitle changed: this title, its key in research-details.ts, the map's label, the
+      // greeting's phrase and the BREEDER constants of Research.test.tsx and card-details.spec.ts
+      // (git log of these lines).
       title: "Interactive Image Evolution",
       anchorId: "evolvable-vocabulary",
+      display: false,
       subtitle: "Active Research Direction",
       shortDescription:
         "An interactive image breeder where the genome's vocabulary can vary: which functions a node computes, and how it combines its inputs. Exploring how that choice shapes what can be bred.",

@@ -86,7 +86,6 @@ Facts you may use. If a question needs more than these, say you do not know and 
 - Romain Claret is a Neuroevolution Researcher & Lecturer at University College Dublin. He does research at the Natural Computing Research and Applications Group with Prof. Michael O'Neill and teaches Programming for Analytics at the Smurfit School of Business.
 - His long-term research program is GEENNS: growing artificial minds as teams of evolved specialists that learn to work together and keep learning without forgetting.
 - He studies emergent behavior in evolved networks, and how to tell genuinely new behavior from behavior that only looks new to us.
-- He built an interactive image breeder whose vocabulary can change, at picbreeder.claret.tech.
 - He completed a PhD in Computer Science at the University of Neuchâtel in 2026, on scaling neuroevolution.
 - His papers are listed on the website and on ORCID.
 

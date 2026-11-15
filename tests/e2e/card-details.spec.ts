@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from "./utils/fixtures";
 import AxeBuilder from "@axe-core/playwright";
 import { acknowledgeCookieNotice } from "./utils/cookie-notice";
 import { waitForSplashToEnd } from "./utils/splash";
+import { isDisplayed, researchSection } from "../../src/data/sections/research";
 
 /**
  * The research, skills, paper and blog cards open their details in a dialog
@@ -25,6 +26,20 @@ const MEDIUM_SHORT = "a-short-post-6a7b8c9d0e1f";
 
 /** The research card whose dialog has pictures and animations (research-media.ts). */
 const BREEDER = "Interactive Image Evolution";
+
+const breederCard = researchSection.projects.find(
+  (project) => project.title === BREEDER,
+);
+if (!breederCard) throw new Error(`No research card is titled ${BREEDER}`);
+
+/**
+ * Whether the site shows the breeder's card: it can be hidden for a while
+ * (display: false in research.ts). Its tests skip while it is, and run
+ * again once it is back; the unit tests (Research.test.tsx) keep testing
+ * its pictures and animations meanwhile.
+ */
+const BREEDER_SHOWN = isDisplayed(breederCard);
+const BREEDER_HIDDEN = "the breeder's card is hidden (display: false)";
 
 /**
  * The blog's Medium posts, as Medium writes them. The page asks
@@ -75,6 +90,8 @@ interface Kind {
   trigger: (page: Page) => Locator;
   /** The dialog's name: the card's title. */
   dialog: string | RegExp;
+  /** False while the card is hidden from the site: its tests skip. */
+  shown?: boolean;
 }
 
 const holographicCard = (page: Page, heading: string | RegExp) =>
@@ -154,6 +171,7 @@ const KINDS: Kind[] = [
         name: `Read more about ${BREEDER}`,
       }),
     dialog: BREEDER,
+    shown: BREEDER_SHOWN,
   },
 ];
 
@@ -216,6 +234,7 @@ test.describe("A card's details", () => {
     test(`open above the page for ${kind.name}, which keeps its size`, async ({
       page,
     }) => {
+      test.skip(kind.shown === false, BREEDER_HIDDEN);
       await openSite(page);
       const trigger = kind.trigger(page);
       await trigger.scrollIntoViewIfNeeded();
@@ -257,6 +276,41 @@ test.describe("A card's details", () => {
         /deep-link-highlight/,
       );
       await expect(page.locator(`[id="${id}"]`)).toBeInViewport();
+      // A moment for a dialog that would open, whose code loads first.
+      await page.waitForTimeout(500);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    }
+  });
+
+  // A research card with display: false (research.ts) is off the site: not
+  // in the page as served, no card, no Read more, and its link opens
+  // nothing. Real data: this runs while a card is hidden and skips when none
+  // is. Its text still ships in the page's JavaScript.
+  test("keep a hidden research card off the page, its link opening nothing", async ({
+    page,
+  }) => {
+    const hidden = researchSection.projects.filter(
+      (project) => !isDisplayed(project),
+    );
+    test.skip(hidden.length === 0, "no research card is hidden");
+
+    // The HTML, before any script runs; a shown card's title is the control.
+    const html = await (await page.request.get("/?playwright=true")).text();
+    expect(html).toContain(researchSection.projects.find(isDisplayed)!.title);
+    for (const project of hidden) {
+      expect(html, project.title).not.toContain(project.title);
+    }
+
+    for (const project of hidden.filter((each) => each.anchorId)) {
+      await openSite(page, `#${project.anchorId}-full`);
+      // Control: the research cards are on the page.
+      await expect(KINDS[0].card(page)).toBeAttached();
+
+      await expect(page.locator(`[id="${project.anchorId}"]`)).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: `Read more about ${project.title}` }),
+      ).toHaveCount(0);
+      await expect(page.getByText(project.title)).toHaveCount(0);
       // A moment for a dialog that would open, whose code loads first.
       await page.waitForTimeout(500);
       await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -381,6 +435,7 @@ test.describe("A card's details", () => {
     test(`pass the accessibility rules, open for ${kind.name}`, async ({
       page,
     }) => {
+      test.skip(kind.shown === false, BREEDER_HIDDEN);
       await openSite(page);
       const trigger = kind.trigger(page);
       await trigger.scrollIntoViewIfNeeded();
@@ -412,6 +467,7 @@ test.describe("A card's details", () => {
   test("show the breeder's pictures, its animations still under reduced motion", async ({
     page,
   }) => {
+    test.skip(!BREEDER_SHOWN, BREEDER_HIDDEN);
     // A film fetched is a response with an HTTP status. Linux WebKit, CI's,
     // reports a request for a preload="none" film that it never sends: its
     // response has status 0, and nothing reaches the server. play() then
@@ -563,8 +619,10 @@ test.describe("A card's details on a phone", () => {
         const viewport = page.viewportSize()!;
 
         // The longest of the texts, the one dialog with a footer, and the
-        // one with pictures and animations.
-        for (const kind of [KINDS[3], KINDS[6], KINDS[8]]) {
+        // one with pictures and animations while its card is shown.
+        for (const kind of [KINDS[3], KINDS[6], KINDS[8]].filter(
+          (each) => each.shown !== false,
+        )) {
           const trigger = kind.trigger(page);
           await trigger.scrollIntoViewIfNeeded();
           await trigger.tap();
@@ -614,6 +672,7 @@ test.describe("A card's animations, motion allowed", () => {
     ({ browserName }) => browserName !== "chromium",
     "chromium only: its AV1 decoder is built in",
   );
+  test.skip(() => !BREEDER_SHOWN, BREEDER_HIDDEN);
   test.use({
     viewport: { width: 1280, height: 900 },
     reducedMotion: "no-preference",
