@@ -436,7 +436,7 @@ export const greeting = {
       { text: "Team of Specialists", category: "evolution" },
       { text: "Learning Without Forgetting", category: "evolution" },
       { text: "Image Breeding", category: "creative" },
-      { text: "Per-Node Functions", category: "creative" },
+      { text: "Evolvable Vocabulary", category: "creative" },
       { text: "Measuring Emergence", category: "technical" },
     ],
   },

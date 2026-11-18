@@ -163,13 +163,8 @@ export const researchSection = {
       ],
     },
     {
-      // Hidden and retitled until 10 January 2027. Then delete `display: false` and restore what
-      // the retitle changed: this title, its key in research-details.ts, the map's label, the
-      // greeting's phrase and the BREEDER constants of Research.test.tsx and card-details.spec.ts
-      // (git log of these lines).
-      title: "Interactive Image Evolution",
+      title: "Breeding with an Evolvable Vocabulary",
       anchorId: "evolvable-vocabulary",
-      display: false,
       subtitle: "Active Research Direction",
       shortDescription:
         "An interactive image breeder where the genome's vocabulary can vary: which functions a node computes, and how it combines its inputs. Exploring how that choice shapes what can be bred.",

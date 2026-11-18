@@ -108,6 +108,7 @@ export const skillsSection = {
         "Lifelong learning without forgetting: reuse settled behaviors instead of overwriting them",
         "Emergent behaviors in bio-inspired artificial life, grown by evolution and never fitted to us",
         "Measuring emergence honestly: every test for novel behavior I know of is calibrated on human data, so behavior outside that space reads as noise",
+        "An image breeder whose vocabulary can change, to see how the material shapes what evolution can reach",
       ],
     },
     "Why Evolution": {
