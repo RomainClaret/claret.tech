@@ -1584,6 +1584,65 @@ from outside the repository (Vercel, GitHub or the Mac). The fixes are on
   153 passed (8 CPUs, the Mac under load, so no timings); act's API job
   under the new `.actrc` (no Docker socket, empty token), 147 passed.
 
+### Next 16.4.6 (2026-11-18)
+
+Next 16.4.5 fixed seven moderate advisories. On the day of the bump, GitHub's
+advisory database, which `npm audit` reads, listed two of them
+(GHSA-mfr8-8qww-v76h, GHSA-vc7v-qv4w-wrv8); the other five were vercel/next.js
+repository advisories only (GHSA-7qx7-33qx-rqx2, GHSA-f3mh-rxg3-f5g2,
+GHSA-pc58-hwjq-p385, GHSA-vvgp-ww4w-46vf, GHSA-rhh4-g77r-r9qj). None reached
+this site: it uses no `'use cache'`, `unstable_cache()`, Cache Components or
+root params; Vercel serves it, and two of the five concern self-hosted servers
+only; the image optimizer takes no remote image; and it has no Edge route, sets
+no cookie and returns no fetched response unchanged. 16.4.6 adds the
+compression of self-hosted route-handler responses that follows 16.4.5's
+header fix (vercel/next.js#101220).
+
+The bump also ends a stop in agent sessions. Next 16.4's default
+`experimental.agentUpgrade: 'security'` looks up npm's advisories when an AI
+agent (`@vercel/detect-agent`; `CLAUDECODE` for Claude Code) runs `next build`
+or `next dev`. While the installed version has one, the build finishes, then
+exits 1 with a message addressed to the agent, and the dev server exits 1; a
+rerun within five minutes passes (`.next/cache/next-agentic-upgrade-retries/`).
+On 16.4.2 the first build here exited 1 after 16 s and the rerun passed. The
+command the message proposes, `next upgrade --agent=security`, runs the canary
+CLI through npx and hands the agent a procedure of Next's own; it was not used.
+
+Two cache-free webpack builds in this checkout at `7c7d80c8`, Next 16.4.2 and
+then 16.4.6, compared file by file with build IDs and hashed names mapped:
+
+| Output files (601) | Count | What differs                                                                                                                                                                                    |
+| ------------------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identical          | 550   |                                                                                                                                                                                                 |
+| Version string     | 5     | Next's version, in three client chunks and two of their maps                                                                                                                                    |
+| Client runtime     | 2     | the app router's chunk and its map: 825 B smaller, 204 B gzipped; Next's code only, nothing from `src/`                                                                                         |
+| Route handlers     | 16    | 16.4.3's request tracing, 38 B more in each (114 B in `/og-image.png`)                                                                                                                          |
+| Server runtime     | 3     | `sendResponse` drops a route handler's Content-Length, Content-Encoding and Transfer-Encoding (the GHSA-pc58 fix, 76 B); two chunks 26 and 32 KB smaller                                        |
+| File traces        | 20    | 730 to 830 B smaller each: fast-jwt in place of jsonwebtoken (16.4.4), React's standalone files no longer traced (16.4.3)                                                                       |
+| Noise              | 5     | the sitemap's `lastmod`, the key order of `app-paths-manifest.json`, the per-build keys of `preview-props.json` and `server-reference-manifest.json`, a font's input name in a stylesheet's map |
+
+`/api/blog-image` sets its own Content-Length; Next now drops it, and the image
+is sent chunked. The lockfile changed only Next's packages, plus fastq 1.19.1
+to 1.20.3 (development only, under eslint-config-next). npm audit: 27 before
+(12 moderate, 15 high), 26 after (11 moderate, 15 high), all in development
+tools but `@tailwindcss/typography`'s postcss-selector-parser 6.0.10
+(GHSA-rj75-hqrm-r3gf: build time only, on our own CSS).
+
+Checked with the breeder card hidden (`7c7d80c8`) and shown again (`c887ce4b`,
+the release): lint, types, formatting and knip; 2,833 unit tests each time;
+CI's build-job checks (static homepage, client-bundle deny list); and
+`playwright.yml`'s groups on Chromium and Mobile Chrome, each against a fresh
+`next start` of a build with CI's env. With the card shown: navigation 7 passed;
+cards, accessibility and privacy 88, plus the hidden-card test, which skips
+with no card hidden; performance, shell and PDF reader 82; terminal and research
+map 67; phones 16. `error-reports.spec.ts:80` failed in its group both times, on
+429s from the in-memory rate limiter (90 tests on one server, 4 or 6 workers),
+and passed alone, 4 of 4: the Mac's request rate, not the bump. The dev server
+stayed up with no nudge, `npm ci` on Linux (Node 24.22, npm 11.19.1, amd64)
+installed the lockfile, and Lighthouse, projected in the arm64 container, gave a
+median of 96 at GitHub's slowdown (3.7: TBT 219 ms, LCP 869 ms) and 87 at 1.5
+times it (TBT 495 ms), CPU benchmark 3,894 to 3,955.
+
 ## Measuring well
 
 - **Interleave.** Build the baseline in a git worktree, serve it on another
